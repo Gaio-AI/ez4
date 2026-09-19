@@ -4,7 +4,7 @@ import type { ScheduleState, ScheduleResult, ScheduleParameters } from './types'
 
 import { deepCompare, deepEqual } from '@ez4/utils';
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
-import { getFunctionAliasArn } from '@ez4/aws-function';
+import { getFunctionAliasArn, getFunctionAliasTarget } from '@ez4/aws-function';
 import { getRoleArn } from '@ez4/aws-identity';
 
 import { tryGetGroupName } from '../group/utils';
@@ -27,6 +27,13 @@ const equalsResource = (candidate: ScheduleState, current: ScheduleState) => {
 const previewResource = (candidate: ScheduleState, current: ScheduleState) => {
   const target = { ...candidate.parameters, dependencies: candidate.dependencies };
   const source = { ...current.parameters, dependencies: current.dependencies };
+
+  const functionArn = getFunctionAliasTarget(current.result?.functionArn);
+
+  if (functionArn) {
+    Object.assign(target, { functionArn });
+    Object.assign(source, { functionArn: current.result?.functionArn });
+  }
 
   const changes = deepCompare(target, source);
 

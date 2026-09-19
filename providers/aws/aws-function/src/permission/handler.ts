@@ -4,7 +4,7 @@ import type { PermissionResult, PermissionState } from './types';
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
-import { getFunctionAliasName } from '../function/utils';
+import { getFunctionAliasName, getFunctionAliasTarget } from '../function/utils';
 import { createPermission, deletePermission } from './client';
 import { PermissionServiceName } from './types';
 
@@ -24,6 +24,13 @@ const equalsResource = (candidate: PermissionState, current: PermissionState) =>
 const previewResource = (candidate: PermissionState, current: PermissionState) => {
   const target = { ...candidate.parameters, dependencies: candidate.dependencies };
   const source = { ...current.parameters, dependencies: current.dependencies };
+
+  const functionName = getFunctionAliasTarget(current.result?.functionName);
+
+  if (functionName) {
+    Object.assign(target, { functionName });
+    Object.assign(source, { functionName: current.result?.functionName });
+  }
 
   const changes = deepCompare(target, source, {
     exclude: {
