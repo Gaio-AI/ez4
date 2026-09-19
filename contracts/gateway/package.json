@@ -1,7 +1,7 @@
 {
   "name": "@ez4/gateway",
   "description": "EZ4: Components to build gateway services",
-  "version": "0.53.900",
+  "version": "0.53.901",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
