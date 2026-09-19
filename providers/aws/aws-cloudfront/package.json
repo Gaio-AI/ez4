@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-cloudfront",
   "description": "EZ4: Self-managed AWS CloudFront provider",
-  "version": "0.53.0",
+  "version": "0.53.900",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
