@@ -5,11 +5,11 @@ install from there.
 
 ## Branches
 
-- **`gaio/main`** — our line. Protected: changes arrive through a pull request, no direct pushes, no
-  force pushes.
-- **`main`** — mirrors `sbalmt/ez4`. Kept only so we can diff against upstream and pick changes from
-  it. Never develop here.
-- Work happens on `fix/*` or `feat/*`, merged into `gaio/main` with a squash.
+- **`main`** — our line, and the repository's default. Protected: changes arrive through a pull
+  request, no direct pushes, no force pushes.
+- **`upstream-main`** — mirrors `sbalmt/ez4`. Kept only so we can diff against upstream and pick
+  changes from it. Never develop here.
+- Work happens on `fix/*` or `feat/*`, merged into `main` with a squash.
 
 Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`.
 
