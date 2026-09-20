@@ -25,7 +25,7 @@ tag, that version does not exist.
 
 ## Cutting a release
 
-1. Merge the fixes into `gaio/main` through pull requests.
+1. Merge the fixes into `main` through pull requests.
 2. Bump every publishable package in lockstep:
 
    ```bash
