@@ -25,16 +25,23 @@ tag, that version does not exist.
 
 ## Cutting a release
 
-1. Merge the fixes into `gaio/main` through pull requests.
+1. Merge the fixes into `main` through pull requests.
 2. Bump every publishable package in lockstep:
 
    ```bash
    npm version <version> --workspaces --no-git-tag-version --allow-same-version
-   git checkout -- examples/ tests/ extensions/vscode/package.json
+   git checkout -- examples/ tests/
+   npm install   # relinks the workspaces at the new version
    ```
 
    The `checkout` is not optional: packages under `examples/` reference each other with `^0.0.0`, and
    the bump breaks their resolution.
+
+   **`extensions/vscode` stays bumped**, and its `@ez4/*` dependencies — pinned to an *exact*
+   version, not a range — have to be rewritten to the new one along with it. Left behind, npm stops
+   resolving them to the workspace and the build fails with `Could not resolve "@ez4/utils"`. If a
+   stale `extensions/vscode/node_modules` survives from an earlier attempt, delete it: it shadows
+   the workspace links.
 
    Lockstep matters beyond tidiness — ez4 refuses to load providers whose declared `@ez4/*` versions
    are not the same string (`ProviderVersionMismatchError`).
