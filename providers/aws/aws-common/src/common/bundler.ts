@@ -2,9 +2,9 @@ import type { LinkedContext } from '@ez4/project/library';
 import type { AnyObject } from '@ez4/utils';
 
 import { build, formatMessages } from 'esbuild';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join, parse } from 'node:path';
+import { join, parse, relative } from 'node:path';
 import { existsSync } from 'node:fs';
 import { cpus } from 'node:os';
 
@@ -36,31 +36,47 @@ export type BundlerOptions = {
   target?: string;
 };
 
+/**
+ * A file's contribution to the bundle hash: where it sits in the project, and what it holds.
+ *
+ * Both halves are deliberate. The path is relative so the same tree hashes the same from any
+ * checkout — an absolute one makes every function look changed when the deploy runs from another
+ * directory or another machine. The digest is of the content rather than the mtime, which a rebuild
+ * bumps without changing a byte, and which a copy that preserves timestamps leaves untouched over
+ * content that did change.
+ */
+const getFileSignature = async (filePath: string) => {
+  const cached = pathCache.get(filePath);
+
+  if (cached) {
+    return cached;
+  }
+
+  const content = await readFile(filePath);
+  const digest = createHash('sha256').update(content).digest('hex');
+
+  const signature = `${relative(process.cwd(), filePath)}:${digest}`;
+
+  pathCache.set(filePath, signature);
+
+  return signature;
+};
+
 export const createBundleHash = async (allSourceFiles: string[]) => {
   const fileSignatures = createHash('sha256');
 
   const pathSignatures = await Promise.all(
     allSourceFiles.map(async (filePath) => {
-      let pathSignature = pathCache.get(filePath);
-
-      if (!pathSignature) {
-        const fileStat = await stat(filePath);
-        const modified = fileStat.mtime.getTime();
-
-        pathSignature = `${filePath}:${modified}`;
-
-        pathCache.set(filePath, pathSignature);
-      }
-
       return {
         filePath,
-        pathSignature
+        pathSignature: await getFileSignature(filePath)
       };
     })
   );
 
-  // Ensure the same position to not trigger updates without real changes.
-  pathSignatures.sort((a, b) => a.filePath.localeCompare(b.filePath));
+  // Ensure the same position to not trigger updates without real changes. Ordering by the signature
+  // rather than by the absolute path keeps the order stable across checkouts too.
+  pathSignatures.sort((a, b) => a.pathSignature.localeCompare(b.pathSignature));
 
   for (const { pathSignature } of pathSignatures) {
     fileSignatures.update(pathSignature);
