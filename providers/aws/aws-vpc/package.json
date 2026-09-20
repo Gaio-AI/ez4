@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-vpc",
   "description": "EZ4: Self-managed AWS VPC provider",
-  "version": "0.53.901",
+  "version": "0.53.903",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
