@@ -4,6 +4,7 @@ import type { QueueImport } from './types';
 
 import {
   DuplicateServiceError,
+  isSameSourceFile,
   InvalidServicePropertyError,
   isExternalDeclaration,
   isClassDeclaration,
@@ -163,8 +164,12 @@ export const getQueueImportsMetadata = (reflection: ReflectionTypes) => {
       continue;
     }
 
-    if (queueImports[declaration.name]) {
-      errorList.push(new DuplicateServiceError(declaration.name, fileName));
+    const existingService = queueImports[declaration.name];
+
+    if (existingService) {
+      if (!isSameSourceFile(existingService.file, fileName)) {
+        errorList.push(new DuplicateServiceError(declaration.name, fileName));
+      }
       continue;
     }
 
