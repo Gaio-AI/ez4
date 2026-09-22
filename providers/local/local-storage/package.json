@@ -1,7 +1,7 @@
 {
   "name": "@ez4/local-storage",
   "description": "EZ4: Local storage emulator",
-  "version": "0.53.903",
+  "version": "0.53.904",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
