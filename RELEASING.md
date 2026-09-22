@@ -61,10 +61,13 @@ One recipe per batch. A batch that needs two recipes is two batches.
    publishable package in lockstep:
 
    ```bash
-   npm version <version> --workspaces --no-git-tag-version --allow-same-version
+   npm version <version> --workspaces --no-workspaces-update --no-git-tag-version --allow-same-version
    git checkout -- examples/ tests/
    npm install   # relinks the workspaces at the new version
    ```
+
+   Without `--no-workspaces-update`, `npm version` reinstalls right after the bump, before the
+   `checkout` below, and fails with a 404 on `hello-aws-gateway`.
 
    Not a pre-release (`-rc.<n>`): the packages depend on each other through `^0.53.0`, and a range
    never matches a pre-release. npm would stop linking the workspaces during the build, and a
