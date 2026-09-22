@@ -56,14 +56,19 @@ One recipe per batch. A batch that needs two recipes is two batches.
    ```
 
 2. Merge the batch into it through pull requests.
-3. Publish a **release candidate** from the release branch. Bump every publishable package in
-   lockstep to `<version>-rc.<n>`:
+3. Publish the **candidate** from the release branch. A candidate is an ordinary version, the next
+   unused number, published under the `next` dist-tag so `latest` does not move. Bump every
+   publishable package in lockstep:
 
    ```bash
-   npm version <version>-rc.<n> --workspaces --no-git-tag-version --allow-same-version
+   npm version <version> --workspaces --no-git-tag-version --allow-same-version
    git checkout -- examples/ tests/
    npm install   # relinks the workspaces at the new version
    ```
+
+   Not a pre-release (`-rc.<n>`): the packages depend on each other through `^0.53.0`, and a range
+   never matches a pre-release. npm would stop linking the workspaces during the build, and a
+   consumer installing the candidate would get its siblings at `latest` instead of the candidate.
 
    The `checkout` is not optional: packages under `examples/` reference each other with `^0.0.0`, and
    the bump breaks their resolution.
@@ -77,25 +82,26 @@ One recipe per batch. A batch that needs two recipes is two batches.
    Lockstep matters beyond tidiness — ez4 refuses to load providers whose declared `@ez4/*` versions
    are not the same string (`ProviderVersionMismatchError`).
 
-   `npm run build`, commit as `chore: version <version>-rc.<n>`, tag that commit
-   `v<version>-rc.<n>`, push the tag, and publish under the `next` dist-tag so `latest` does not move:
+   Build from a clean tree, `npm run clean && npm run build`: a stale file left in some `dist/` is
+   published as if it were current, and `0.53.902` and `0.53.903` shipped a months-old browser bundle
+   of `@ez4/utils` exactly that way. Commit as `chore: version <version>`, tag that commit
+   `v<version>`, push the tag, and publish every package under `next`:
 
    ```bash
    aws codeartifact login --tool npm --domain gaio --repository npm --namespace ez4
    npm publish --workspace @ez4/<package> --access public --tag next
    ```
 
-4. Validate the candidate in the consumer with the batch's recipe. The consumer has to pin **every**
-   `@ez4/*` dependency to the exact candidate: a range like `^0.53.0` never resolves to a
-   pre-release, and mixing the candidate with the range trips `ProviderVersionMismatchError`.
-   Anything found goes back to step 2 and out again as `rc.<n+1>`.
-5. Bump to the final `<version>` the same way, commit as `chore: version <version>`, and open the
-   release pull request into `main`. Merge it with a **merge commit**, not a squash: each change keeps
-   its own commit on `main`, so it can be bisected and `git merge-base --is-ancestor` tells the truth
-   about what a version contains. Upstream squashes its version branches, so there a whole version
-   is a single commit and a fix is never an ancestor of the version that ships it.
-6. Tag the merge commit `v<version>`, push the tag and publish without `--tag`.
-7. Write the release notes from the tag, `gh release create v<version> --generate-notes`, and delete
+4. Validate the candidate in the consumer with the batch's recipe. The consumer takes **every**
+   `@ez4/*` dependency at the candidate (`npm install @ez4/<package>@<version>` for all of them):
+   mixing versions trips `ProviderVersionMismatchError`. Anything found goes back to step 2 and out
+   again as the next number; the failed candidate stays under `next` and nobody resolves to it.
+5. Promote the candidate: `npm dist-tag add @ez4/<package>@<version> latest` for every package. Then
+   open the release pull request into `main` and merge it with a **merge commit**, not a squash: each
+   change keeps its own commit on `main`, so it can be bisected and `git merge-base --is-ancestor`
+   tells the truth about what a version contains. Upstream squashes its version branches, so there a
+   whole version is a single commit and a fix is never an ancestor of the version that ships it.
+6. Write the release notes from the tag, `gh release create v<version> --generate-notes`, and delete
    the release branch.
 
 A published version is immutable. A mistake means publishing the next one — which is what the
@@ -105,7 +111,9 @@ candidates are for.
 
 A release branch with one change in it: cut `release/<version>` from `main`, fix, candidate if the
 fix warrants one, release. A batch already in flight rebases onto `main` afterwards and takes the
-next version number, so the numbers in an open release branch are tentative until it merges.
+next version number, so the numbers in an open release branch are tentative until it merges. A
+candidate it already published does not have the hotfix and sits below it: it can never be promoted,
+and the batch publishes its next candidate above the hotfix.
 
 ### Patching a single package
 
