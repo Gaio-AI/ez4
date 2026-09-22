@@ -1,6 +1,8 @@
 import type { EveryMemberType, ModelProperty, ReflectionTypes, TypeModel, TypeObject } from '@ez4/reflection';
 import type { LinkedServices } from '@ez4/project/library';
 
+import { realpathSync } from 'node:fs';
+
 import { triggerAllSync } from '@ez4/project/library';
 import { isModelProperty } from '@ez4/reflection';
 import { isAnyArray } from '@ez4/utils';
@@ -10,6 +12,23 @@ import { getPropertyObject, getPropertyString } from '../reflection/property';
 import { getObjectMembers, getPlainObject } from '../reflection/object';
 import { isExternalDeclaration } from '../reflection/declaration';
 import { isClassDeclaration } from '../reflection/model';
+
+// Symlinked workspaces can reflect one declaration under several paths; compare the real files.
+export const isSameSourceFile = (fileA?: string, fileB?: string): boolean => {
+  if (!fileA || !fileB) {
+    return false;
+  }
+
+  if (fileA === fileB) {
+    return true;
+  }
+
+  try {
+    return realpathSync(fileA) === realpathSync(fileB);
+  } catch {
+    return false;
+  }
+};
 
 export const isLinkedService = (member: ModelProperty, reflection: ReflectionTypes) => {
   const referencePath = getPropertyString(member);
