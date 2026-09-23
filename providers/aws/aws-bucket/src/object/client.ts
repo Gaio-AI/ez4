@@ -99,14 +99,10 @@ export const tagStaleObject = async (logger: OperationLogLine, bucketName: strin
         }
       })
     );
-
-    return true;
   } catch (error) {
     if (!(error instanceof NoSuchBucket) && !(error instanceof NoSuchKey)) {
       throw error;
     }
-
-    return false;
   }
 };
 
