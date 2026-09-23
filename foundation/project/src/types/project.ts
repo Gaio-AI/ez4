@@ -55,7 +55,8 @@ export type ProjectOptions = {
   tsconfigFile?: string;
 
   /**
-   * List of source files containing declarative resources.
+   * List of source files containing declarative resources, each one a path or a glob pattern
+   * relative to the current working directory.
    */
   sourceFiles: string[];
 
