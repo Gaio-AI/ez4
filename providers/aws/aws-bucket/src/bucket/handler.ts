@@ -9,7 +9,7 @@ import { deepCompare, deepEqual } from '@ez4/utils';
 
 import {
   isBucketEmpty,
-  emptyBucket,
+  deleteStaleObjects,
   createBucket,
   deleteBucket,
   updateCorsConfiguration,
@@ -98,7 +98,7 @@ const deleteResource = async (current: BucketState) => {
 
     return OperationLogger.logExecution(BucketServiceName, bucketName, 'deletion', async (logger) => {
       if (parameters.staleExpireDays) {
-        await emptyBucket(logger, bucketName);
+        await deleteStaleObjects(logger, bucketName);
       }
 
       const isEmpty = await isBucketEmpty(logger, bucketName);

@@ -17,7 +17,14 @@ import { ArchitectureType, RuntimeType } from '@ez4/project';
 import { createLogGroup } from '@ez4/aws-logs';
 import { createRole } from '@ez4/aws-identity';
 import { deploy, getAwsClientOptions } from '@ez4/aws-common';
-import { GetBucketLifecycleConfigurationCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetBucketLifecycleConfigurationCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3';
 import { deepClone } from '@ez4/utils';
 
 import { getRoleDocument } from './common/role';
@@ -240,10 +247,26 @@ describe('bucket stale lifecycle', { timeout: 60000 }, () => {
     ]);
   });
 
-  it('assert :: destroy non-empty bucket', async () => {
+  it('assert :: destroy keeps unmanaged objects', async () => {
     ok(bucketId && bucketName && lastState);
 
-    await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: 'assets/old-chunk.js', Body: 'stale' }));
+    await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: 'assets/old-chunk.js', Body: 'stale', Tagging: 'ez4:stale=true' }));
+    await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: 'uploads/user-file.txt', Body: 'unmanaged' }));
+
+    const { result } = await deploy(undefined, lastState, {
+      force: true
+    });
+
+    equal(result[bucketId], undefined);
+
+    await rejects(s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: 'assets/old-chunk.js' })), { name: 'NotFound' });
+    await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: 'uploads/user-file.txt' }));
+  });
+
+  it('assert :: destroy bucket', async () => {
+    ok(bucketId && bucketName && lastState);
+
+    await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: 'uploads/user-file.txt' }));
 
     const { result } = await deploy(undefined, lastState, {
       force: true

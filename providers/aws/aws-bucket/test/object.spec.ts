@@ -142,7 +142,8 @@ describe('bucket stale objects', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const bucketResource = createBucket(localState, {
-      bucketName: 'ez4-test-object-stale-bucket'
+      bucketName: 'ez4-test-object-stale-bucket',
+      staleExpireDays: 7
     });
 
     const staleResource = createBucketObject(localState, bucketResource, {
@@ -240,16 +241,9 @@ describe('bucket stale objects', { timeout: 60000 }, () => {
   });
 
   it('assert :: destroy', async () => {
-    ok(staleId && lastState);
+    ok(lastState);
 
-    const oldState = deepClone(lastState);
-    const resource = oldState[staleId];
-
-    ok(resource && isBucketObjectState(resource));
-
-    resource.parameters.staleExpireDays = undefined;
-
-    await deploy(undefined, oldState);
+    await deploy(undefined, lastState);
 
     await rejects(s3.send(new HeadBucketCommand({ Bucket: bucketName })));
   });
