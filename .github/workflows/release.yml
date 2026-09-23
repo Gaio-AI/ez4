@@ -1,0 +1,89 @@
+name: Release
+
+# Runs after the full suite passes on main, so nothing is versioned or published from a red commit.
+on:
+  workflow_run:
+    workflows:
+      - Pull requests
+    types:
+      - completed
+    branches:
+      - main
+
+permissions: {}
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  release:
+    name: 🦋 Release
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    # Never cancel: an interrupted publish leaves a version half out.
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Version
+        id: changesets
+        uses: changesets/action@v2
+        with:
+          version-script: npm run version-packages
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
+
+      # A version is published only from a commit that carries its tag (RELEASING.md), so the tag
+      # is what tells a released version from one still to publish.
+      - name: Unreleased version
+        id: unreleased
+        if: steps.changesets.outputs['has-changesets'] == 'false'
+        run: |
+          version=$(node -p "require('./foundation/utils/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate with CodeArtifact
+        if: steps.unreleased.outputs.publish == 'true'
+        env:
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: aws codeartifact login --tool npm --domain gaio --repository npm --namespace ez4
+
+      - name: Publish
+        if: steps.unreleased.outputs.publish == 'true'
+        run: npm run release
+
+      - name: Tag and release notes
+        if: steps.unreleased.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v${{ steps.unreleased.outputs.version }}
+        run: |
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" --generate-notes --verify-tag
