@@ -11,6 +11,7 @@ import {
 } from '@aws-sdk/client-apigatewayv2';
 
 import { getApiGatewayV2Client } from '../utils/deploy';
+import { getAccessLogFormat } from './helpers/access-log';
 import { assertVariables } from './helpers/variables';
 import { StageServiceName } from './types';
 
@@ -102,22 +103,7 @@ export const enableAccessLogs = async (logger: OperationLogLine, apiId: string, 
       StageName: stageName,
       AccessLogSettings: {
         DestinationArn: logGroupArn,
-        Format: JSON.stringify({
-          requestId: '$context.requestId',
-          timestamp: '$context.requestTimeEpoch',
-          protocol: '$context.protocol',
-          route: '$context.routeKey',
-          status: '$context.status',
-          errorMessage: '$context.error.message',
-          responseLength: '$context.responseLength',
-          authorizationError: '$context.authorizer.error',
-          integrationRequestId: '$context.integration.requestId',
-          integrationStatus: '$context.integration.status',
-          integrationError: '$context.integration.error',
-          integrationLatency: '$context.integration.latency',
-          userAgent: '$context.identity.userAgent',
-          ip: '$context.identity.sourceIp'
-        })
+        Format: getAccessLogFormat()
       }
     })
   );

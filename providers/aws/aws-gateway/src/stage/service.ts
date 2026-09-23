@@ -6,6 +6,7 @@ import type { StageParameters, StageState } from './types';
 import { attachEntry } from '@ez4/state';
 import { hashData } from '@ez4/utils';
 
+import { getAccessLogFormat } from './helpers/access-log';
 import { getStageName } from './helpers/stage';
 import { StageServiceType } from './types';
 
@@ -28,6 +29,10 @@ export const createStage = <E extends EntryState>(
     type: StageServiceType,
     entryId: stageId,
     dependencies,
-    parameters
+    parameters: {
+      ...parameters,
+      // Kept in the parameters so a new format shows up as a change of the stage.
+      ...(logGroupState && { accessLogFormat: getAccessLogFormat() })
+    }
   });
 };
