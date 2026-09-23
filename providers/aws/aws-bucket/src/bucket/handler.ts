@@ -1,6 +1,6 @@
 import type { OperationLogLine, ResourceTags } from '@ez4/aws-common';
 import type { LifecycleRule } from '@aws-sdk/client-s3';
-import type { StepHandler } from '@ez4/state';
+import type { StepContext, StepHandler } from '@ez4/state';
 import type { BucketState, BucketResult, BucketParameters } from './types';
 
 import { ExpirationStatus } from '@aws-sdk/client-s3';
@@ -75,7 +75,7 @@ const createResource = (candidate: BucketState): Promise<BucketResult> => {
   });
 };
 
-const updateResource = async (candidate: BucketState, current: BucketState) => {
+const updateResource = async (candidate: BucketState, current: BucketState, context: StepContext) => {
   const { result, parameters } = candidate;
   const { bucketName } = parameters;
 
@@ -87,6 +87,13 @@ const updateResource = async (candidate: BucketState, current: BucketState) => {
     await checkCorsUpdates(logger, bucketName, parameters, current.parameters);
     await checkLifecycleUpdates(logger, bucketName, parameters, current.parameters);
     await checkTagUpdates(logger, bucketName, parameters.tags, current.parameters.tags);
+
+    // Object deletions run after this update and may still tag objects as stale under the old setting.
+    if (current.parameters.staleExpireDays && !parameters.staleExpireDays) {
+      context.postAction(() =>
+        OperationLogger.logExecution(BucketServiceName, bucketName, 'cleanup', (logger) => deleteStaleObjects(logger, bucketName))
+      );
+    }
   });
 };
 

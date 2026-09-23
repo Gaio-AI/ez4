@@ -89,7 +89,7 @@ Keeps objects that disappear from `localPath` on a deploy instead of deleting th
 staleExpireDays: 7;
 ```
 
-> The first deploy that enables this option still deletes objects removed in that same deploy. Deleting the bucket removes only stale objects; any other object left in the bucket keeps it from being deleted.
+> The first deploy that enables this option still deletes objects removed in that same deploy. Disabling it deletes every stale object at the end of that deploy. Deleting the bucket removes only stale objects; any other object left in the bucket keeps it from being deleted.
 
 #### Cache control (optional)
 

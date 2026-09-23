@@ -248,3 +248,92 @@ describe('bucket stale objects', { timeout: 60000 }, () => {
     await rejects(s3.send(new HeadBucketCommand({ Bucket: bucketName })));
   });
 });
+
+describe('bucket stale retention disabled', { timeout: 60000 }, () => {
+  const s3 = new S3Client(getAwsClientOptions());
+  const filePath = join('test/files', 'object-file.txt');
+
+  let lastState: EntryStates | undefined;
+  let bucketName: string | undefined;
+  let bucketId: string | undefined;
+  let firstId: string | undefined;
+  let secondId: string | undefined;
+
+  const headObject = (objectKey: string) => {
+    return s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: objectKey }));
+  };
+
+  registerTriggers();
+
+  it('assert :: deploy', async () => {
+    const localState: EntryStates = {};
+
+    const bucketResource = createBucket(localState, {
+      bucketName: 'ez4-test-object-retention-bucket',
+      staleExpireDays: 7
+    });
+
+    const firstResource = createBucketObject(localState, bucketResource, {
+      objectKey: 'first-file.txt',
+      staleExpireDays: 7,
+      filePath
+    });
+
+    const secondResource = createBucketObject(localState, bucketResource, {
+      objectKey: 'second-file.txt',
+      staleExpireDays: 7,
+      filePath
+    });
+
+    bucketId = bucketResource.entryId;
+    firstId = firstResource.entryId;
+    secondId = secondResource.entryId;
+
+    const { result, state } = await assertDeploy(firstId, localState, undefined);
+
+    bucketName = result.bucketName;
+    lastState = state;
+  });
+
+  it('assert :: removed object is kept as stale', async () => {
+    ok(firstId && lastState);
+
+    const localState = deepClone(lastState);
+
+    delete localState[firstId];
+
+    const { result } = await deploy(localState, lastState);
+
+    await headObject('first-file.txt');
+
+    lastState = result;
+  });
+
+  it('assert :: disabling retention deletes stale and removed objects', async () => {
+    ok(bucketId && secondId && lastState);
+
+    const localState = deepClone(lastState);
+    const bucketResource = localState[bucketId];
+
+    ok(bucketResource && isBucketState(bucketResource));
+
+    bucketResource.parameters.staleExpireDays = undefined;
+
+    delete localState[secondId];
+
+    const { result } = await deploy(localState, lastState);
+
+    await rejects(headObject('first-file.txt'), { name: 'NotFound' });
+    await rejects(headObject('second-file.txt'), { name: 'NotFound' });
+
+    lastState = result;
+  });
+
+  it('assert :: destroy', async () => {
+    ok(lastState);
+
+    await deploy(undefined, lastState);
+
+    await rejects(s3.send(new HeadBucketCommand({ Bucket: bucketName })));
+  });
+});
