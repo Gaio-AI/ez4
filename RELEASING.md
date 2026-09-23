@@ -1,21 +1,24 @@
 # Releasing the Gaio line of ez4
 
 This fork publishes `@ez4/*` to Gaio's private CodeArtifact repository. The backend and the frontend
-install from there.
+install from there. Releases are driven by [changesets](https://github.com/changesets/changesets):
+merging the release pull request publishes to CodeArtifact on its own.
 
 ## Branches
 
-- **`main`** — what is published. It only moves through a release pull request, so every commit on
-  it between two tags is a version someone can install. Protected: no direct pushes, no force pushes.
-- **`release/<version>`** — one batch of changes on its way to becoming `<version>`. Cut from `main`,
-  merged back into `main` when the batch is validated.
+- **`main`** — every change lands here through a pull request, each one carrying a changeset when it
+  touches a published package. A commit on `main` is published only when it carries a `v<version>`
+  tag. Protected: no direct pushes, no force pushes.
+- **`changeset-release/main`** — the release branch. The Release workflow keeps it, and its pull
+  request (`chore: version packages`), up to date with every changeset waiting on `main`. Never push
+  to it by hand.
 - **`upstream-main`** — mirrors `sbalmt/ez4`. Kept only so we can diff against upstream and pick
   changes from it. Never develop here.
-- Work happens on `fix/*` or `feat/*`, opened against the **release branch** and merged with a
-  squash: one commit per change.
+- Work happens on `fix/*` or `feat/*`, opened against `main` and merged with a squash: one commit per
+  change.
 
-Changes that touch no published package — this file, CI, repository tooling — are opened against
-`main` directly, since there is nothing to release.
+Changes that touch no published package — this file, CI, repository tooling — need no changeset,
+since there is nothing to release.
 
 Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. In a fork `gh` resolves to the parent
 repository unless told otherwise: run `gh repo set-default Gaio-AI/ez4` once, or pass
@@ -29,127 +32,95 @@ without a single commit saying so. Anyone basing work on the release commit alon
 those packages, which is exactly what happened to this fork on its first day.
 
 So: **a version is published only from a commit that carries its tag.** If there is no `v<version>`
-tag, that version does not exist. This holds for release candidates too.
+tag, that version does not exist. The Release workflow uses the same rule the other way around: a
+version on `main` without its tag is a version still to publish.
 
-## Batches
+## Only patches
 
-A release carries a small batch, not a single pull request and not everything that is ready. What
-goes together is decided by **what the change can break**, because that is what decides how the
-batch gets validated:
+The fork never goes above upstream's minor. While upstream is on `0.54`, every release of ours is a
+`0.54` patch: a caret range on a `0.x` version stops at the minor, so the backend and the frontend
+take any of them by changing their lockfile alone, and go back by reverting it. A consumer change
+that works with both versions can land first to make that true: `0.53.904` typed Postgres reads as
+`T | null`, and the backend was fixed to compile against both sets of types before a lockfile-only
+pull request took the version.
 
-- **Deploy-time behaviour only** — plan output, guards, what the deploy sends to AWS: plan every
-  consumer package with the candidate and compare against the current version.
-- **The runtime client** — ORM, drivers, queue and topic clients: the consumer's full test suite and
-  type check on the candidate, then a deploy to `dev`.
-- **The migration engine**: the lab account, against a table large enough to hit the Data API limits.
-- **Something new and opt-in**: the lab account.
+A `minor` or `major` changeset fails the pull request (`npm run changeset:check`), and the release
+workflow refuses to version it too. A change that would need consumers to change code or
+configuration in the same step waits until it can be made compatible, or rides the next upstream
+minor.
 
-One recipe per batch. A batch that needs two recipes is two batches.
+Patch numbers start at `900` on each minor, clear of the patches upstream publishes on its own
+(`0.53.1`, `0.53.2`).
 
-## Patch or minor
+## Releasing
 
-The number says what a consumer has to do to take the version, not how large the change is. The
-backend and the frontend depend on `^0.53.0`, and a caret range on a `0.x` version stops at the
-minor: `^0.53.0` never resolves `0.54.0`.
-
-- **Patch** — the consumers take it by changing their lockfile alone, and go back by reverting it. A
-  consumer change that works with both versions can land first to make that true: `0.53.904` typed
-  Postgres reads as `T | null`, and the backend was fixed to compile against both sets of types
-  before a lockfile-only pull request took the version.
-- **Minor** — anything else: the consumer has to change code or configuration in the same step, or
-  going back takes more than reverting the lockfile — deploy state written in a new shape, AWS
-  resources the previous version does not recognize, a migration. Every `@ez4/*` range moves to the
-  new minor in the same pull request, here and in the consumers, and that friction is the point:
-  nobody takes a minor by accident.
-
-The minor is ours. It moves when our line breaks its consumers, not when upstream's does, so our
-`0.54` would not be upstream's `0.54.0`. Patch numbers start at `900` on each minor, clear of the
-patches upstream publishes on its own (`0.53.1`, `0.53.2`): the first release of our `0.54` would be
-`0.54.900`.
-
-## Cutting a release
-
-1. Cut the branch from `main`:
+1. Add a changeset to the pull request that changes a package:
 
    ```bash
-   git switch -c release/<version> origin/main
-   git push -u origin release/<version>
+   npx changeset   # pick any package, always `patch`
    ```
 
-2. Merge the batch into it through pull requests.
-3. Publish the **candidate** from the release branch. A candidate is an ordinary version, the next
-   unused number, published under the `next` dist-tag so `latest` does not move. Bump every
-   publishable package in lockstep:
+   Every published package and `extensions/vscode` move in lockstep (`fixed` in
+   `.changeset/config.json`), so which package the changeset names only matters for the summary.
+   Lockstep is not tidiness: ez4 refuses to load providers whose declared `@ez4/*` versions are not
+   the same string (`ProviderVersionMismatchError`).
 
-   ```bash
-   npm version <version> --workspaces --no-workspaces-update --no-git-tag-version --allow-same-version
-   git checkout -- examples/ tests/
-   npm install   # relinks the workspaces at the new version
-   ```
+2. Once the pull request merges and the suite passes on `main`, the Release workflow opens or updates
+   the release pull request from `changeset-release/main`, with every package bumped to the next
+   patch and the lockfile relinked.
 
-   Without `--no-workspaces-update`, `npm version` reinstalls right after the bump, before the
-   `checkout` below, and fails with a 404 on `hello-aws-gateway`.
+3. Validate the batch before merging the release pull request. A release carries a small batch, and
+   what goes together is decided by **what the change can break**, because that decides how it is
+   validated:
 
-   Not a pre-release (`-rc.<n>`): the packages depend on each other through `^0.53.0`, and a range
-   never matches a pre-release. npm would stop linking the workspaces during the build, and a
-   consumer installing the candidate would get its siblings at `latest` instead of the candidate.
+   - **Deploy-time behaviour only** — plan output, guards, what the deploy sends to AWS: plan every
+     consumer package with the release branch and compare against the current version.
+   - **The runtime client** — ORM, drivers, queue and topic clients: the consumer's full test suite
+     and type check on the release branch, then a deploy to `dev`.
+   - **The migration engine**: the lab account, against a table large enough to hit the Data API
+     limits.
+   - **Something new and opt-in**: the lab account.
 
-   The `checkout` is not optional: packages under `examples/` reference each other with `^0.0.0`, and
-   the bump breaks their resolution.
+   One recipe per batch. A batch that needs two recipes is two batches. To install the release branch
+   in a consumer, publish it to the local registry (`npm run local:registry`, then
+   `npm run local:publish`) and take **every** `@ez4/*` dependency at that version: mixing versions
+   trips `ProviderVersionMismatchError`.
 
-   **`extensions/vscode` stays bumped**, and its `@ez4/*` dependencies — pinned to an *exact*
-   version, not a range — have to be rewritten to the new one along with it. Left behind, npm stops
-   resolving them to the workspace and the build fails with `Could not resolve "@ez4/utils"`. If a
-   stale `extensions/vscode/node_modules` survives from an earlier attempt, delete it: it shadows
-   the workspace links.
+4. Merge the release pull request with a **merge commit**, not a squash, so each change keeps its own
+   commit on `main`: it can be bisected, and `git merge-base --is-ancestor` tells the truth about what
+   a version contains.
 
-   Lockstep matters beyond tidiness — ez4 refuses to load providers whose declared `@ez4/*` versions
-   are not the same string (`ProviderVersionMismatchError`).
+5. The suite runs on the merge commit and, when it passes, the Release workflow cleans, builds and
+   publishes every public workspace to CodeArtifact under `latest` (`npm run release`), tags the
+   commit `v<version>` and creates the GitHub release with generated notes. A failed publish can be
+   re-run: packages already in the registry at that version are skipped.
 
-   Build from a clean tree, `npm run clean && npm run build`: a stale file left in some `dist/` is
-   published as if it were current, and `0.53.902` and `0.53.903` shipped a months-old browser bundle
-   of `@ez4/utils` exactly that way. Commit as `chore: version <version>`, tag that commit
-   `v<version>`, push the tag, and publish every package under `next`:
+A published version is immutable. A mistake means publishing the next one.
 
-   ```bash
-   aws codeartifact login --tool npm --domain gaio --repository npm --namespace ez4
-   npm publish --workspace @ez4/<package> --access public --tag next
-   ```
+### Adopting an upstream minor
 
-4. Validate the candidate in the consumer with the batch's recipe. The consumer takes **every**
-   `@ez4/*` dependency at the candidate (`npm install @ez4/<package>@<version>` for all of them):
-   mixing versions trips `ProviderVersionMismatchError`. Anything found goes back to step 2 and out
-   again as the next number; the failed candidate stays under `next` and nobody resolves to it.
-5. Promote the candidate: `npm dist-tag add @ez4/<package>@<version> latest` for every package. Then
-   open the release pull request into `main` and merge it with a **merge commit**, not a squash: each
-   change keeps its own commit on `main`, so it can be bisected and `git merge-base --is-ancestor`
-   tells the truth about what a version contains. Upstream squashes its version branches, so there a
-   whole version is a single commit and a fix is never an ancestor of the version that ships it.
-6. Write the release notes from the tag, `gh release create v<version> --generate-notes`, and delete
-   the release branch.
+The one version change that is not a changeset. When upstream moves to a new minor and we take it,
+bump everything by hand to our first patch of that minor, in a pull request against `main`:
 
-A published version is immutable. A mistake means publishing the next one — which is what the
-candidates are for.
+```bash
+npm version <minor>.900 --workspaces --no-workspaces-update --no-git-tag-version --allow-same-version
+git checkout -- examples/ tests/
+npm install   # relinks the workspaces at the new version
+```
 
-### Hotfix
-
-A release branch with one change in it: cut `release/<version>` from `main`, fix, candidate if the
-fix warrants one, release. A batch already in flight rebases onto `main` afterwards and takes the
-next version number, so the numbers in an open release branch are tentative until it merges. A
-candidate it already published does not have the hotfix and sits below it: it can never be promoted,
-and the batch publishes its next candidate above the hotfix.
-
-### Patching a single package
-
-Allowed, and it still needs its own tag — see `v0.53.902`, which carries only `@ez4/utils`. Say so in
-the tag message.
+Without `--no-workspaces-update`, `npm version` reinstalls right after the bump, before the
+`checkout`, and fails with a 404 on `hello-aws-gateway`. The `checkout` is not optional: packages
+under `examples/` reference each other with `^0.0.0`, and the bump breaks their resolution. Move every
+`@ez4/*` range to the new minor, here — including the exact pins in `extensions/vscode` — and in the
+consumers, in the same step: nobody takes a minor by accident. Merging it publishes the version, since
+it has no tag yet.
 
 ## What CI covers
 
 The pull request workflow builds everything, lints, and tests the foundation, the contracts, the
 libraries and the local and docs providers. It skips drafts, so a pull request has only been checked
 once it is marked ready. It does **not** run the specs under `providers/aws/*`: run the ones for the
-packages a batch touches before publishing its candidate, against the lab account where they need
+packages a change touches before merging the release pull request, against the lab account where they need
 real AWS.
 
 ## Taking a change from upstream
