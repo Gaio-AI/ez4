@@ -1,12 +1,15 @@
 import type { OperationLogLine, ResourceTags } from '@ez4/aws-common';
+import type { LifecycleRule } from '@aws-sdk/client-s3';
 import type { StepHandler } from '@ez4/state';
 import type { BucketState, BucketResult, BucketParameters } from './types';
 
+import { ExpirationStatus } from '@aws-sdk/client-s3';
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare, deepEqual } from '@ez4/utils';
 
 import {
   isBucketEmpty,
+  emptyBucket,
   createBucket,
   deleteBucket,
   updateCorsConfiguration,
@@ -16,6 +19,7 @@ import {
   tagBucket
 } from './client';
 
+import { StaleObjectTag } from '../object/types';
 import { BucketServiceName } from './types';
 
 export const getBucketHandler = (): StepHandler<BucketState> => ({
@@ -87,16 +91,20 @@ const updateResource = async (candidate: BucketState, current: BucketState) => {
 };
 
 const deleteResource = async (current: BucketState) => {
-  const { result } = current;
+  const { result, parameters } = current;
 
   if (result) {
     const { bucketName } = result;
 
     return OperationLogger.logExecution(BucketServiceName, bucketName, 'deletion', async (logger) => {
-      const isEmpty = await isBucketEmpty(logger, result.bucketName);
+      if (parameters.staleExpireDays) {
+        await emptyBucket(logger, bucketName);
+      }
+
+      const isEmpty = await isBucketEmpty(logger, bucketName);
 
       if (isEmpty) {
-        await deleteBucket(logger, result.bucketName);
+        await deleteBucket(logger, bucketName);
       }
     });
   }
@@ -121,21 +129,59 @@ const checkCorsUpdates = async (
   }
 };
 
+const getLifecycleRules = ({ autoExpireDays, staleExpireDays }: BucketParameters) => {
+  const rules: LifecycleRule[] = [];
+
+  if (autoExpireDays) {
+    rules.push({
+      ID: 'ez4-auto-expire',
+      Status: ExpirationStatus.Enabled,
+      Filter: {
+        Prefix: ''
+      },
+      Expiration: {
+        Days: autoExpireDays
+      }
+    });
+  }
+
+  if (staleExpireDays) {
+    rules.push({
+      ID: 'ez4-stale-expire',
+      Status: ExpirationStatus.Enabled,
+      Filter: {
+        Tag: {
+          Key: StaleObjectTag.key,
+          Value: StaleObjectTag.value
+        }
+      },
+      Expiration: {
+        Days: staleExpireDays
+      }
+    });
+  }
+
+  return rules;
+};
+
 const checkLifecycleUpdates = async (
   logger: OperationLogLine,
   bucketName: string,
   candidate: BucketParameters,
   current: BucketParameters | undefined
 ) => {
-  if (candidate.autoExpireDays === current?.autoExpireDays) {
+  if (candidate.autoExpireDays === current?.autoExpireDays && candidate.staleExpireDays === current?.staleExpireDays) {
     return;
   }
 
-  if (candidate.autoExpireDays) {
-    return createLifecycle(logger, bucketName, candidate.autoExpireDays);
+  const rules = getLifecycleRules(candidate);
+
+  // PutBucketLifecycleConfiguration replaces every rule, so the whole list is always sent.
+  if (rules.length) {
+    return createLifecycle(logger, bucketName, rules);
   }
 
-  if (current?.autoExpireDays) {
+  if (current?.autoExpireDays || current?.staleExpireDays) {
     return deleteLifecycle(logger, bucketName);
   }
 };
