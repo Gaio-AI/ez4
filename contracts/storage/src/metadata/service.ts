@@ -24,6 +24,7 @@ import { isObjectWith } from '@ez4/utils';
 import { IncompleteServiceError } from '../errors/service';
 import { getBucketEventsMetadata } from './event';
 import { getBucketCorsMetadata } from './cors';
+import { getBucketCacheMetadata } from './cache';
 import { createBucketService } from './types';
 
 export const isBucketServiceDeclaration = (type: AllType): type is TypeClass => {
@@ -65,8 +66,14 @@ export const getBucketServicesMetadata = (reflection: ReflectionTypes) => {
           break;
         }
 
-        case 'autoExpireDays': {
-          service.autoExpireDays = getPropertyNumber(member);
+        case 'autoExpireDays':
+        case 'staleExpireDays': {
+          service[member.name] = getPropertyNumber(member);
+          break;
+        }
+
+        case 'cacheControl': {
+          service.cacheControl = getBucketCacheMetadata(member, declaration, reflection, errorList);
           break;
         }
 

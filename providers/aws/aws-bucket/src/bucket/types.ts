@@ -9,6 +9,7 @@ export const BucketServiceType = 'aws:s3.bucket';
 
 export type BucketParameters = CreateRequest & {
   autoExpireDays?: number;
+  staleExpireDays?: number;
   localPath?: string;
   tags?: ResourceTags;
   cors?: Bucket.Cors;

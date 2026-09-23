@@ -1,6 +1,6 @@
 import type { EntryState, EntryStates } from '@ez4/state';
 
-import { ok, equal } from 'node:assert/strict';
+import { ok, equal, deepEqual, rejects } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { join } from 'node:path';
 
@@ -10,12 +10,21 @@ import {
   createBucketEventFunction,
   getBucketEventFunctionAliasArn,
   isBucketState,
-  registerTriggers
+  registerTriggers,
+  StaleObjectTag
 } from '@ez4/aws-bucket';
 import { ArchitectureType, RuntimeType } from '@ez4/project';
 import { createLogGroup } from '@ez4/aws-logs';
 import { createRole } from '@ez4/aws-identity';
-import { deploy } from '@ez4/aws-common';
+import { deploy, getAwsClientOptions } from '@ez4/aws-common';
+import {
+  DeleteObjectCommand,
+  GetBucketLifecycleConfigurationCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3';
 import { deepClone } from '@ez4/utils';
 
 import { getRoleDocument } from './common/role';
@@ -36,6 +45,14 @@ const assertDeploy = async <E extends EntryState>(resourceId: string, newState: 
     result,
     state
   };
+};
+
+const s3 = new S3Client(getAwsClientOptions());
+
+const fetchLifecycleRules = async (bucketName: string) => {
+  const { Rules = [] } = await s3.send(new GetBucketLifecycleConfigurationCommand({ Bucket: bucketName }));
+
+  return Rules;
 };
 
 describe('bucket resources', { timeout: 60000 }, () => {
@@ -103,9 +120,16 @@ describe('bucket resources', { timeout: 60000 }, () => {
 
     bucketId = resource.entryId;
 
-    const { state } = await assertDeploy(bucketId, localState, undefined);
+    const { result, state } = await assertDeploy(bucketId, localState, undefined);
 
     lastState = state;
+
+    const [rule, ...otherRules] = await fetchLifecycleRules(result.bucketName);
+
+    equal(otherRules.length, 0);
+    equal(rule?.ID, 'ez4-auto-expire');
+    equal(rule?.Expiration?.Days, 5);
+    equal(rule?.Filter?.Prefix ?? '', '');
   });
 
   it('assert :: update cors', async () => {
@@ -133,9 +157,11 @@ describe('bucket resources', { timeout: 60000 }, () => {
 
     resource.parameters.autoExpireDays = undefined;
 
-    const { state } = await assertDeploy(bucketId, localState, lastState);
+    const { result, state } = await assertDeploy(bucketId, localState, lastState);
 
     lastState = state;
+
+    await rejects(fetchLifecycleRules(result.bucketName), { name: 'NoSuchLifecycleConfiguration' });
   });
 
   it('assert :: update tags', async () => {
@@ -166,5 +192,88 @@ describe('bucket resources', { timeout: 60000 }, () => {
     });
 
     equal(result[bucketId], undefined);
+  });
+});
+
+describe('bucket stale lifecycle', { timeout: 60000 }, () => {
+  let lastState: EntryStates | undefined;
+  let bucketName: string | undefined;
+  let bucketId: string | undefined;
+
+  registerTriggers();
+
+  it('assert :: deploy', async () => {
+    const localState: EntryStates = {};
+
+    const resource = createBucket(localState, {
+      bucketName: 'ez4-test-bucket-stale',
+      staleExpireDays: 7
+    });
+
+    bucketId = resource.entryId;
+
+    const { result, state } = await assertDeploy(bucketId, localState, undefined);
+
+    bucketName = result.bucketName;
+    lastState = state;
+
+    const [rule, ...otherRules] = await fetchLifecycleRules(bucketName);
+
+    equal(otherRules.length, 0);
+    equal(rule?.ID, 'ez4-stale-expire');
+    equal(rule?.Expiration?.Days, 7);
+    deepEqual(rule?.Filter?.Tag, { Key: StaleObjectTag.key, Value: StaleObjectTag.value });
+  });
+
+  it('assert :: update lifecycle', async () => {
+    ok(bucketId && bucketName && lastState);
+
+    const localState = deepClone(lastState);
+    const resource = localState[bucketId];
+
+    ok(resource && isBucketState(resource));
+
+    resource.parameters.autoExpireDays = 30;
+
+    const { state } = await assertDeploy(bucketId, localState, lastState);
+
+    lastState = state;
+
+    const rules = await fetchLifecycleRules(bucketName);
+
+    deepEqual(rules.map(({ ID, Expiration }) => [ID, Expiration?.Days]).sort(), [
+      ['ez4-auto-expire', 30],
+      ['ez4-stale-expire', 7]
+    ]);
+  });
+
+  it('assert :: destroy keeps unmanaged objects', async () => {
+    ok(bucketId && bucketName && lastState);
+
+    await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: 'assets/old-chunk.js', Body: 'stale', Tagging: 'ez4:stale=true' }));
+    await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: 'uploads/user-file.txt', Body: 'unmanaged' }));
+
+    const { result } = await deploy(undefined, lastState, {
+      force: true
+    });
+
+    equal(result[bucketId], undefined);
+
+    await rejects(s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: 'assets/old-chunk.js' })), { name: 'NotFound' });
+    await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: 'uploads/user-file.txt' }));
+  });
+
+  it('assert :: destroy bucket', async () => {
+    ok(bucketId && bucketName && lastState);
+
+    await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: 'uploads/user-file.txt' }));
+
+    const { result } = await deploy(undefined, lastState, {
+      force: true
+    });
+
+    equal(result[bucketId], undefined);
+
+    await rejects(s3.send(new HeadBucketCommand({ Bucket: bucketName })));
   });
 });

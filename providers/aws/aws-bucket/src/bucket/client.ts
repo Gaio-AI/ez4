@@ -1,8 +1,9 @@
 import type { Arn, OperationLogLine, ResourceTags } from '@ez4/aws-common';
-import type { Event } from '@aws-sdk/client-s3';
+import type { Event, LifecycleRule } from '@aws-sdk/client-s3';
 import type { Bucket } from '@ez4/storage';
 
 import { getTagList } from '@ez4/aws-common';
+import { Tasks } from '@ez4/utils';
 
 import {
   ListObjectsV2Command,
@@ -13,11 +14,14 @@ import {
   PutBucketLifecycleConfigurationCommand,
   DeleteBucketLifecycleCommand,
   DeleteBucketCorsCommand,
-  ExpirationStatus,
-  NoSuchBucket
+  DeleteObjectsCommand,
+  GetObjectTaggingCommand,
+  NoSuchBucket,
+  NoSuchKey
 } from '@aws-sdk/client-s3';
 
 import { getS3Client } from '../utils/deploy';
+import { StaleObjectTag } from '../object/types';
 
 export type CreateRequest = {
   bucketName: string;
@@ -51,6 +55,71 @@ export const isBucketEmpty = async (logger: OperationLogLine, bucketName: string
     }
 
     return 0;
+  }
+};
+
+const isStaleObject = async (bucketName: string, objectKey: string) => {
+  try {
+    const { TagSet = [] } = await getS3Client().send(
+      new GetObjectTaggingCommand({
+        Bucket: bucketName,
+        Key: objectKey
+      })
+    );
+
+    return TagSet.some(({ Key, Value }) => Key === StaleObjectTag.key && Value === StaleObjectTag.value);
+  } catch (error) {
+    if (!(error instanceof NoSuchKey)) {
+      throw error;
+    }
+
+    return false;
+  }
+};
+
+export const deleteStaleObjects = async (logger: OperationLogLine, bucketName: string) => {
+  logger.update(`Deleting stale objects`);
+
+  const client = getS3Client();
+
+  let continuationToken: string | undefined;
+
+  try {
+    do {
+      const { Contents = [], NextContinuationToken } = await client.send(
+        new ListObjectsV2Command({
+          Bucket: bucketName,
+          ContinuationToken: continuationToken
+        })
+      );
+
+      const objectKeys = Contents.flatMap(({ Key }) => (Key ? [Key] : []));
+
+      const staleKeys = await Tasks.run(
+        objectKeys.map((objectKey) => async () => ((await isStaleObject(bucketName, objectKey)) ? [objectKey] : [])),
+        { concurrency: 20 }
+      );
+
+      const objects = staleKeys.flat().map((Key) => ({ Key }));
+
+      if (objects.length) {
+        await client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucketName,
+            Delete: {
+              Objects: objects,
+              Quiet: true
+            }
+          })
+        );
+      }
+
+      continuationToken = NextContinuationToken;
+    } while (continuationToken);
+  } catch (error) {
+    if (!(error instanceof NoSuchBucket)) {
+      throw error;
+    }
   }
 };
 
@@ -148,25 +217,14 @@ export const deleteCorsConfiguration = async (logger: OperationLogLine, bucketNa
   }
 };
 
-export const createLifecycle = async (logger: OperationLogLine, bucketName: string, autoExpireDays: number) => {
+export const createLifecycle = async (logger: OperationLogLine, bucketName: string, rules: LifecycleRule[]) => {
   logger.update(`Creating bucket lifecycle`);
 
   await getS3Client().send(
     new PutBucketLifecycleConfigurationCommand({
       Bucket: bucketName,
       LifecycleConfiguration: {
-        Rules: [
-          {
-            ID: 'ID0',
-            Status: ExpirationStatus.Enabled,
-            Filter: {
-              Prefix: '*'
-            },
-            Expiration: {
-              Days: autoExpireDays
-            }
-          }
-        ]
+        Rules: rules
       }
     })
   );

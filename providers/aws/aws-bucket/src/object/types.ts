@@ -6,7 +6,14 @@ export const ObjectServiceName = 'AWS:S3/Object';
 
 export const ObjectServiceType = 'aws:s3.object';
 
+export const StaleObjectTag = {
+  key: 'ez4:stale',
+  value: 'true'
+} as const;
+
 export type ObjectParameters = CreateRequest & {
+  cacheControl?: string;
+  staleExpireDays?: number;
   tags?: ResourceTags;
 };
 

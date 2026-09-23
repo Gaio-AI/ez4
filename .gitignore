@@ -11,5 +11,6 @@ bin/
 *.env
 
 !.github
+!.changeset
 !example.env
 !.husky
