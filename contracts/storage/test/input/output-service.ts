@@ -13,6 +13,19 @@ export declare class TestStorage extends Bucket.Service {
 
   autoExpireDays: 30;
 
+  staleExpireDays: 7;
+
+  cacheControl: [
+    Bucket.UseCacheRule<{
+      path: 'assets/*';
+      value: 'public, max-age=31536000, immutable';
+    }>,
+    {
+      path: '*';
+      value: 'no-cache';
+    }
+  ];
+
   variables: {
     TEST_VAR1: 'test-literal-value';
     TEST_VAR2: Environment.Variable<'TEST_ENV_VAR'>;

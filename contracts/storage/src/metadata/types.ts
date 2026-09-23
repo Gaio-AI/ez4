@@ -15,6 +15,8 @@ export type BucketService = Omit<ServiceMetadata, 'variables' | 'services'> &
     localPath?: string;
     globalName?: string;
     autoExpireDays?: number;
+    staleExpireDays?: number;
+    cacheControl?: BucketCacheRule[];
     events?: BucketEvent[];
     tags?: Service.Tags;
     cors?: BucketCors;
@@ -26,6 +28,11 @@ export type BucketCors = {
   exposeHeaders?: string[];
   allowHeaders?: string[];
   maxAge?: number;
+};
+
+export type BucketCacheRule = {
+  path: string;
+  value: string;
 };
 
 export type EventHandler = FunctionSignature;

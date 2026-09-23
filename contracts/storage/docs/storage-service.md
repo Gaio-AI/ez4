@@ -81,6 +81,33 @@ Deletes objects automatically after the configured number of days. This is usefu
 autoExpireDays: 30;
 ```
 
+#### Stale expiration (optional)
+
+Keeps objects that disappear from `localPath` on a deploy instead of deleting them. EZ4 tags each removed object `ez4:stale=true`, and a bucket lifecycle rule expires tagged objects after the configured number of days. An object that reappears in `localPath` is uploaded again and loses the tag.
+
+```ts
+staleExpireDays: 7;
+```
+
+> The first deploy that enables this option still deletes objects removed in that same deploy. Deleting the bucket removes every object, stale or not.
+
+#### Cache control (optional)
+
+Sets the `Cache-Control` header on objects synchronized from `localPath`. Rules are checked in order, and the first matching `path` wins. A `path` is an exact object key, a `prefix/*`, or `*` for any key. Changing a rule uploads the matching objects again.
+
+```ts
+cacheControl: [
+  Bucket.UseCacheRule<{
+    path: 'assets/*';
+    value: 'public, max-age=31536000, immutable';
+  }>,
+  Bucket.UseCacheRule<{
+    path: '*';
+    value: 'no-cache';
+  }>
+];
+```
+
 #### Variables (optional)
 
 Declares environment variables that apply to every function event attached to the bucket.
@@ -134,6 +161,7 @@ Project deployment tags take precedence when the same key is defined in both pla
 
 - Use a path prefix to keep unrelated object workflows separate.
 - Set `autoExpireDays` for temporary uploads, generated files, and processing artifacts.
+- Set `staleExpireDays` on buckets that serve a web app from `localPath`, so tabs still on the previous release can load its files.
 - Keep event handlers focused and use linked services for application-side processing.
 - Use `localPath` to make local development deterministic without changing cloud configuration.
 - Use `globalName` only when a stable external bucket name is required; otherwise prefer provider-generated names.

@@ -7,6 +7,7 @@ import type { BucketRequest } from './request';
 import type { BucketHandler } from './handler';
 import type { BucketEvent } from './event';
 import type { BucketCors } from './cors';
+import type { BucketCacheRule } from './cache';
 import type { Client } from './client';
 
 /**
@@ -14,6 +15,8 @@ import type { Client } from './client';
  */
 export namespace Bucket {
   export type Cors = BucketCors;
+
+  export type CacheRule = BucketCacheRule;
 
   export type ObjectEvent = BucketObjectEvent;
 
@@ -44,6 +47,11 @@ export namespace Bucket {
   export type UseCors<T extends Cors> = T;
 
   /**
+   * Bucket Cache-Control rule definition.
+   */
+  export type UseCacheRule<T extends CacheRule> = T;
+
+  /**
    * Bucket Tags definition.
    */
   export type UseTags<T extends CommonService.Tags> = T;
@@ -66,6 +74,18 @@ export namespace Bucket {
      * Maximum amount of days an object is stored before its auto-deletion.
      */
     readonly autoExpireDays?: number;
+
+    /**
+     * Days to keep objects removed from `localPath` before they expire.
+     * When unset, removed objects are deleted on deploy.
+     */
+    readonly staleExpireDays?: number;
+
+    /**
+     * Ordered Cache-Control rules for objects synchronized from `localPath`.
+     * The first rule matching the object key wins.
+     */
+    readonly cacheControl?: CacheRule[];
 
     /**
      * Bucket events.
