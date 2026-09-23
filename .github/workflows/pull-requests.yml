@@ -40,7 +40,7 @@ jobs:
 
       # A pull request that needs no release adds one with `npx changeset add --empty`.
       - name: Require a changeset
-        run: npx --yes @changesets/cli@2.31.1 status --since=origin/main
+        run: npx --yes @changesets/cli@3.0.3 status --since=origin/main
 
       - name: Allow only patches
         run: npm run changeset:check
