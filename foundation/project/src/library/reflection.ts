@@ -1,6 +1,7 @@
 import type { ReflectionOptions, ReflectionReadyListener, ReflectionTypes } from '@ez4/reflection';
 
-import { existsSync } from 'node:fs';
+import { existsSync, globSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { getReflectionFromFiles, watchReflectionFromFiles } from '@ez4/reflection';
 import { triggerAllSync } from '@ez4/project/library';
@@ -12,9 +13,7 @@ export type BuildReflectionOptions = {
 };
 
 export const buildReflection = (sourceFiles: string[], options?: BuildReflectionOptions): ReflectionTypes => {
-  assertSourceFiles(sourceFiles);
-
-  return getReflectionFromFiles(sourceFiles, {
+  return getReflectionFromFiles(getReflectionSources(sourceFiles), {
     ...getReflectionOptions(),
     compilerOptions: {
       paths: options?.aliasPaths
@@ -29,11 +28,9 @@ export type WatchReflectionOptions = {
 };
 
 export const watchReflection = (sourceFiles: string[], options: WatchReflectionOptions) => {
-  assertSourceFiles(sourceFiles);
-
   const { additionalPaths, aliasPaths } = options;
 
-  return watchReflectionFromFiles(sourceFiles, {
+  return watchReflectionFromFiles(getReflectionSources(sourceFiles), {
     ...getReflectionOptions(options.onReflectionReady),
     additionalPaths,
     compilerOptions: {
@@ -62,10 +59,38 @@ const getReflectionOptions = (onReflectionReady?: ReflectionReadyListener): Refl
   };
 };
 
-const assertSourceFiles = (sourceFiles: string[]) => {
+/**
+ * Expand the project source files, each one a path or a glob pattern, into the files to reflect.
+ * An entry naming an existing file is taken as it is, so a file name with glob characters or a path
+ * inside `node_modules` keeps working. A pattern only matches files, sorted, since the order a
+ * directory lists its files differs between systems. A file reached twice is reflected once.
+ */
+export const getReflectionSources = (sourceFiles: string[]) => {
+  const reflectionSources = new Set<string>();
+
   for (const sourceFile of sourceFiles) {
-    if (!existsSync(sourceFile)) {
+    if (existsSync(sourceFile)) {
+      reflectionSources.add(resolve(sourceFile));
+      continue;
+    }
+
+    // A pattern in `exclude` is matched relative to the working directory and misses a pattern
+    // outside it, like `../shared/**`, so dependencies are pruned by directory name instead.
+    const matches = globSync(sourceFile, {
+      exclude: (entry) => entry.name === 'node_modules',
+      withFileTypes: true
+    });
+
+    const matchedFiles = matches.filter((entry) => entry.isFile()).map((entry) => resolve(join(entry.parentPath, entry.name)));
+
+    if (!matchedFiles.length) {
       throw new ReflectionSourceFileNotFound(sourceFile);
     }
+
+    for (const matchedFile of matchedFiles.sort()) {
+      reflectionSources.add(matchedFile);
+    }
   }
+
+  return [...reflectionSources];
 };
