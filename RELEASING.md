@@ -46,6 +46,27 @@ batch gets validated:
 
 One recipe per batch. A batch that needs two recipes is two batches.
 
+## Patch or minor
+
+The number says what a consumer has to do to take the version, not how large the change is. The
+backend and the frontend depend on `^0.53.0`, and a caret range on a `0.x` version stops at the
+minor: `^0.53.0` never resolves `0.54.0`.
+
+- **Patch** — the consumers take it by changing their lockfile alone, and go back by reverting it. A
+  consumer change that works with both versions can land first to make that true: `0.53.904` typed
+  Postgres reads as `T | null`, and the backend was fixed to compile against both sets of types
+  before a lockfile-only pull request took the version.
+- **Minor** — anything else: the consumer has to change code or configuration in the same step, or
+  going back takes more than reverting the lockfile — deploy state written in a new shape, AWS
+  resources the previous version does not recognize, a migration. Every `@ez4/*` range moves to the
+  new minor in the same pull request, here and in the consumers, and that friction is the point:
+  nobody takes a minor by accident.
+
+The minor is ours. It moves when our line breaks its consumers, not when upstream's does, so our
+`0.54` would not be upstream's `0.54.0`. Patch numbers start at `900` on each minor, clear of the
+patches upstream publishes on its own (`0.53.1`, `0.53.2`): the first release of our `0.54` would be
+`0.54.900`.
+
 ## Cutting a release
 
 1. Cut the branch from `main`:
