@@ -23,7 +23,7 @@ describe('bucket client', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const resource = createBucket(localState, {
-      bucketName: 'ez4-test-bucket-client'
+      bucketName: 'ez4-test-aws-bucket-client'
     });
 
     bucketId = resource.entryId;
