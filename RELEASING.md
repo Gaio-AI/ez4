@@ -10,7 +10,7 @@ merging the release pull request publishes to CodeArtifact on its own.
   touches a published package. A commit on `main` is published only when it carries a `v<version>`
   tag. Protected: no direct pushes, no force pushes.
 - **`changeset-release/main`** — the release branch. The Release workflow keeps it, and its pull
-  request (`chore: version packages`), up to date with every changeset waiting on `main`. Never push
+  request (`chore: version <version>`), up to date with every changeset waiting on `main`. Never push
   to it by hand.
 - **`upstream-main`** — mirrors `sbalmt/ez4`. Kept only so we can diff against upstream and pick
   changes from it. Never develop here.
