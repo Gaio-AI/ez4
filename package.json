@@ -80,9 +80,14 @@
     "test:only": "npm run test:only --workspaces --if-present",
     "local:publish": "npm run local:publish --workspaces --if-present",
     "local:registry": "rm -rf .registry/* && node tools/verdaccio.mjs",
-    "live:publish": "npm run build && npm run live:publish --workspaces --if-present"
+    "live:publish": "npm run build && npm run live:publish --workspaces --if-present",
+    "changeset": "changeset",
+    "changeset:check": "node tools/changeset-patch-only.mjs",
+    "version-packages": "npm run changeset:check && changeset version && npm install --package-lock-only --no-audit --no-fund",
+    "release": "tools/release.sh"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
     "@types/node": "^22.9.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
