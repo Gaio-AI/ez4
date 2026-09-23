@@ -25,13 +25,14 @@ export const prepareBucketServices = async (event: PrepareResourceEvent) => {
     return false;
   }
 
-  const { localPath, autoExpireDays, cors } = service;
+  const { localPath, autoExpireDays, staleExpireDays, cacheControl, cors } = service;
 
   const bucketName = await getBucketName(service, options);
 
   const bucketState = createBucket(state, {
     bucketName,
     autoExpireDays,
+    staleExpireDays,
     localPath,
     cors,
     tags: {
@@ -43,7 +44,7 @@ export const prepareBucketServices = async (event: PrepareResourceEvent) => {
   context.setServiceState(service, options, bucketState);
 
   if (localPath) {
-    await prepareLocalContent(state, bucketState, localPath);
+    await prepareLocalContent(state, bucketState, localPath, { staleExpireDays, cacheControl });
   }
 
   prepareBucketEvents(state, service, bucketState, options, context);

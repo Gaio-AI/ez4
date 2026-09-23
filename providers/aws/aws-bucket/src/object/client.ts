@@ -1,11 +1,21 @@
 import type { OperationLogLine, ResourceTags } from '@ez4/aws-common';
+import type { ObjectParameters } from './types';
 
 import { createReadStream } from 'node:fs';
 
-import { PutObjectCommand, PutObjectTaggingCommand, DeleteObjectCommand, NoSuchBucket } from '@aws-sdk/client-s3';
+import {
+  PutObjectCommand,
+  PutObjectTaggingCommand,
+  GetObjectTaggingCommand,
+  DeleteObjectCommand,
+  NoSuchBucket,
+  NoSuchKey
+} from '@aws-sdk/client-s3';
+
 import { getTagList } from '@ez4/aws-common';
 
 import { getS3Client } from '../utils/deploy';
+import { StaleObjectTag } from './types';
 
 import mime from 'mime';
 
@@ -18,10 +28,10 @@ export type CreateResponse = {
   objectKey: string;
 };
 
-export const putObject = async (logger: OperationLogLine, bucketName: string, request: CreateRequest): Promise<CreateResponse> => {
+export const putObject = async (logger: OperationLogLine, bucketName: string, request: ObjectParameters): Promise<CreateResponse> => {
   logger.update(`Creating object`);
 
-  const { objectKey, filePath } = request;
+  const { objectKey, filePath, cacheControl } = request;
 
   const contentType = mime.getType(filePath);
 
@@ -32,6 +42,9 @@ export const putObject = async (logger: OperationLogLine, bucketName: string, re
       Body: createReadStream(filePath),
       ...(contentType && {
         ContentType: contentType
+      }),
+      ...(cacheControl && {
+        CacheControl: cacheControl
       })
     })
   );
@@ -56,6 +69,45 @@ export const updateTags = async (logger: OperationLogLine, bucketName: string, o
       }
     })
   );
+};
+
+export const tagStaleObject = async (logger: OperationLogLine, bucketName: string, objectKey: string) => {
+  logger.update(`Tagging stale object`);
+
+  const client = getS3Client();
+
+  try {
+    const { TagSet = [] } = await client.send(
+      new GetObjectTaggingCommand({
+        Bucket: bucketName,
+        Key: objectKey
+      })
+    );
+
+    await client.send(
+      new PutObjectTaggingCommand({
+        Bucket: bucketName,
+        Key: objectKey,
+        Tagging: {
+          TagSet: [
+            ...TagSet.filter(({ Key }) => Key !== StaleObjectTag.key),
+            {
+              Key: StaleObjectTag.key,
+              Value: StaleObjectTag.value
+            }
+          ]
+        }
+      })
+    );
+
+    return true;
+  } catch (error) {
+    if (!(error instanceof NoSuchBucket) && !(error instanceof NoSuchKey)) {
+      throw error;
+    }
+
+    return false;
+  }
 };
 
 export const deleteObject = async (logger: OperationLogLine, bucketName: string, objectKey: string) => {

@@ -8,7 +8,7 @@ import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@
 import { deepCompare, deepEqual } from '@ez4/utils';
 
 import { getBucketName } from '../bucket/utils';
-import { putObject, deleteObject, updateTags } from './client';
+import { putObject, deleteObject, tagStaleObject, updateTags } from './client';
 import { getBucketObjectPath } from './utils';
 import { ObjectServiceName } from './types';
 
@@ -71,7 +71,7 @@ const createResource = (candidate: ObjectState, context: StepContext): Promise<O
 
     const { objectKey } = await putObject(logger, bucketName, parameters);
 
-    await checkTagUpdates(logger, bucketName, objectKey, parameters.tags, candidate.parameters.tags);
+    await checkTagUpdates(logger, bucketName, objectKey, parameters.tags, undefined);
 
     return {
       lastModified,
@@ -91,9 +91,14 @@ const updateResource = (candidate: ObjectState, current: ObjectState): Promise<O
   const objectName = getBucketObjectPath(result.bucketName, objectKey);
 
   return OperationLogger.logExecution(ObjectServiceName, objectName, 'updates', async (logger) => {
-    await checkTagUpdates(logger, result.bucketName, objectKey, tags, current.parameters.tags);
+    const newResult = await checkObjectUpdates(logger, result, parameters, current.parameters);
 
-    return checkObjectUpdates(logger, result, parameters, current.parameters);
+    // A re-put object has no tags, so every tag has to be applied again.
+    const currentTags = newResult === result ? current.parameters.tags : undefined;
+
+    await checkTagUpdates(logger, result.bucketName, objectKey, tags, currentTags);
+
+    return newResult;
   });
 };
 
@@ -104,7 +109,11 @@ const deleteResource = async (current: ObjectState) => {
     const objectName = getBucketObjectPath(result.bucketName, parameters.objectKey);
 
     return OperationLogger.logExecution(ObjectServiceName, objectName, 'deletion', async (logger) => {
-      await deleteObject(logger, result.bucketName, parameters.objectKey);
+      if (parameters.staleExpireDays) {
+        await tagStaleObject(logger, result.bucketName, parameters.objectKey);
+      } else {
+        await deleteObject(logger, result.bucketName, parameters.objectKey);
+      }
     });
   }
 };
@@ -123,7 +132,7 @@ const checkObjectUpdates = async (
 ) => {
   const lastModified = await getLastModifiedTime(candidate.filePath);
 
-  if (lastModified <= result.lastModified && candidate.filePath === current.filePath) {
+  if (lastModified <= result.lastModified && candidate.filePath === current.filePath && candidate.cacheControl === current.cacheControl) {
     return result;
   }
 

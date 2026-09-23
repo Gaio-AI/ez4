@@ -1,3 +1,4 @@
+import type { BucketService } from '@ez4/storage/library';
 import type { BucketState } from '@ez4/aws-bucket';
 import type { EntryStates } from '@ez4/state';
 
@@ -6,7 +7,18 @@ import { join, relative } from 'node:path';
 
 import { createBucketObject } from '@ez4/aws-bucket';
 
-export const prepareLocalContent = async (state: EntryStates, bucketState: BucketState, localPath: string) => {
+import { getObjectCacheControl } from './cache';
+
+export type LocalContentOptions = Pick<BucketService, 'staleExpireDays' | 'cacheControl'>;
+
+export const prepareLocalContent = async (
+  state: EntryStates,
+  bucketState: BucketState,
+  localPath: string,
+  options: LocalContentOptions
+) => {
+  const { staleExpireDays, cacheControl } = options;
+
   const basePath = process.cwd();
   const fullPath = join(basePath, localPath);
 
@@ -21,10 +33,13 @@ export const prepareLocalContent = async (state: EntryStates, bucketState: Bucke
     }
 
     const filePath = join(file.parentPath, file.name);
+    const objectKey = relative(fullPath, filePath);
 
     createBucketObject(state, bucketState, {
-      objectKey: relative(fullPath, filePath),
-      filePath: relative(basePath, filePath)
+      cacheControl: getObjectCacheControl(cacheControl, objectKey),
+      filePath: relative(basePath, filePath),
+      staleExpireDays,
+      objectKey
     });
   }
 };
