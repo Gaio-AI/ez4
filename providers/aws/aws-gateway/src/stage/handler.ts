@@ -1,5 +1,6 @@
-import type { Arn, OperationLogLine } from '@ez4/aws-common';
+import type { OperationLogLine } from '@ez4/aws-common';
 import type { StepContext, StepHandler } from '@ez4/state';
+import type { AccessLogSettings } from './helpers/access-log';
 import type { StageState, StageResult, StageParameters } from './types';
 
 import { deepCompare, deepEqual } from '@ez4/utils';
@@ -7,6 +8,7 @@ import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@
 import { tryGetLogGroupArn } from '@ez4/aws-logs';
 
 import { getGatewayId } from '../gateway/utils';
+import { getAccessLogChange } from './helpers/access-log';
 import { getStageName } from './helpers/stage';
 import { createStage, deleteStage, disableAccessLogs, enableAccessLogs, importStage, updateStage } from './client';
 import { StageServiceName } from './types';
@@ -89,7 +91,14 @@ const updateResource = (candidate: StageState, current: StageState, context: Ste
     const newLogGroupArn = tryGetLogGroupArn(context);
     const oldLogGroupArn = current.result?.logGroupArn;
 
-    await checkAccessLogUpdates(logger, result.apiId, result.stageName, newLogGroupArn, oldLogGroupArn);
+    await checkAccessLogUpdates(
+      logger,
+      result.apiId,
+      result.stageName,
+      { logGroupArn: newLogGroupArn, format: newParameters.accessLogFormat },
+      { logGroupArn: oldLogGroupArn, format: oldParameters.accessLogFormat }
+    );
+
     await checkGeneralUpdates(logger, result.apiId, result.stageName, newParameters, oldParameters);
 
     return {
@@ -118,7 +127,8 @@ const checkGeneralUpdates = async (
 ) => {
   const hasChanges = !deepEqual(candidate, current, {
     exclude: {
-      stageName: true
+      stageName: true,
+      accessLogFormat: true
     }
   });
 
@@ -131,16 +141,16 @@ const checkAccessLogUpdates = async (
   logger: OperationLogLine,
   apiId: string,
   stageName: string,
-  candidate: Arn | undefined,
-  current: Arn | undefined
+  candidate: AccessLogSettings,
+  current: AccessLogSettings
 ) => {
-  if (candidate !== current) {
-    if (candidate) {
-      return enableAccessLogs(logger, apiId, stageName, candidate);
-    }
+  const change = getAccessLogChange(candidate, current);
 
-    if (current) {
-      return disableAccessLogs(logger, apiId, stageName);
-    }
+  if (change?.action === 'enable') {
+    return enableAccessLogs(logger, apiId, stageName, change.logGroupArn);
+  }
+
+  if (change?.action === 'disable') {
+    return disableAccessLogs(logger, apiId, stageName);
   }
 };

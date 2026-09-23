@@ -8,6 +8,7 @@ export const StageServiceType = 'aws:api.stage';
 
 export type StageParameters = Omit<CreateRequest, 'stageName' | 'access'> & {
   stageName?: string;
+  accessLogFormat?: string;
 };
 
 export type StageResult = ImportOrCreateResponse & {
