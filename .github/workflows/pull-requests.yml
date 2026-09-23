@@ -18,6 +18,33 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  changeset:
+    name: 🦋 Changeset
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      github.base_ref == 'main' &&
+      github.head_ref != 'changeset-release/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # A pull request that needs no release adds one with `npx changeset add --empty`.
+      - name: Require a changeset
+        run: npx --yes @changesets/cli@2.31.1 status --since=origin/main
+
+      - name: Allow only patches
+        run: npm run changeset:check
+
   test:
     name: 🧪 Tests
     runs-on: ubuntu-latest
@@ -59,9 +86,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
-
-      - name: Check changesets
-        run: npm run changeset:check
 
       - name: Build all packages
         run: npm run build

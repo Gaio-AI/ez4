@@ -18,7 +18,8 @@ merging the release pull request publishes to CodeArtifact on its own.
   change.
 
 Changes that touch no published package — this file, CI, repository tooling — need no changeset,
-since there is nothing to release.
+since there is nothing to release. The `🦋 Changeset` job fails any other pull request into `main`
+without one; a package change that must not release adds `npx changeset add --empty`.
 
 Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. In a fork `gh` resolves to the parent
 repository unless told otherwise: run `gh repo set-default Gaio-AI/ez4` once, or pass
