@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-bucket",
   "description": "EZ4: Self-managed AWS S3 bucket provider",
-  "version": "0.53.905",
+  "version": "0.53.906",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
