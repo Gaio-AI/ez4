@@ -27,9 +27,7 @@ export const processWsConnection = async (
   const serviceClients = context.makeClients(servicesInUse);
 
   const scopeHeaders = connection.live ? defaults?.scope : undefined;
-  const incomingTraceId = connection.live ? (event.headers['x-trace-id'] ?? event.query?.['x-trace-id']) : undefined;
-
-  const traceId = incomingTraceId ?? getRandomUUID();
+  const traceId = connection.live ? Runtime.readTraceId(event.headers, event.query) : getRandomUUID();
 
   Runtime.setScope({ ...Runtime.readScopeValues(scopeHeaders, event.headers, event.query), traceId }, scopeHeaders);
 

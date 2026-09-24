@@ -34,7 +34,7 @@ export const processHttpRequest = async (
   const servicesInUse = route.handler.references ? pickObject(services, route.handler.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = route.headers['x-trace-id'] ?? getRandomUUID();
+  const traceId = Runtime.readTraceId(route.headers);
 
   Runtime.setScope({ ...Runtime.readScopeValues(route.scope, route.headers), traceId }, route.scope);
 

@@ -30,7 +30,7 @@ export const processWsAuthorization = async (
 
   const scopeHeaders = defaults?.scope;
 
-  const traceId = event.headers['x-trace-id'] ?? event.query?.['x-trace-id'] ?? getRandomUUID();
+  const traceId = Runtime.readTraceId(event.headers, event.query);
 
   Runtime.setScope({ ...Runtime.readScopeValues(scopeHeaders, event.headers, event.query), traceId }, scopeHeaders);
 

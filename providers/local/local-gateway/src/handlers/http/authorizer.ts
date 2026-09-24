@@ -27,7 +27,7 @@ export const processHttpAuthorization = async (
   const servicesInUse = route.authorizer.references ? pickObject(services, route.authorizer.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = route.headers['x-trace-id'] ?? getRandomUUID();
+  const traceId = Runtime.readTraceId(route.headers);
 
   Runtime.setScope({ ...Runtime.readScopeValues(route.scope, route.headers), traceId }, route.scope);
 

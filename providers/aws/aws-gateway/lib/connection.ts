@@ -13,7 +13,6 @@ import type {
 
 import { resolveHeaders, resolveIdentity, resolveQueryStrings, resolveValidation } from '@ez4/gateway/utils';
 import { ServiceEventType, Runtime } from '@ez4/common';
-import { getRandomUUID } from '@ez4/utils';
 
 type RequestEvent = APIGatewayProxyEventV2WithRequestContext<APIGatewayEventWebsocketRequestContextV2> &
   APIGatewayProxyWithLambdaAuthorizerEvent<any>;
@@ -39,7 +38,7 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
   const milliseconds = Math.max(0, context.getRemainingTimeInMillis() - 1000);
   const timeoutEvent = setTimeout(() => onTimeout(request, milliseconds), milliseconds);
 
-  const traceId = event.headers['x-trace-id'] ?? event.queryStringParameters?.['x-trace-id'] ?? getRandomUUID();
+  const traceId = Runtime.readTraceId(event.headers, event.queryStringParameters);
 
   const request: Ws.Incoming<Ws.Event> = {
     timestamp: new Date(requestContext.requestTimeEpoch),
