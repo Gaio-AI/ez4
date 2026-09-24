@@ -24,7 +24,7 @@ let currentRequest: Queue.Incoming<Queue.Message> | undefined;
 /**
  * Entrypoint to handle SQS events.
  */
-export async function sqsEntryPoint(event: SQSEvent, context: Context): Promise<SQSBatchResponse | void> {
+export async function sqsEntryPoint(event: SQSEvent, context: Context): Promise<SQSBatchResponse> {
   if (!__EZ4_SCHEMA) {
     throw new Error('Validation schema for SQS message not found.');
   }
@@ -50,6 +50,10 @@ export async function sqsEntryPoint(event: SQSEvent, context: Context): Promise<
     };
   } catch (error) {
     await onError(error, request);
+
+    // Without a batch response the event source mapping takes the batch as done and deletes every
+    // record, including the ones that never ran. Failing the invocation hands them back instead.
+    throw error;
   } finally {
     clearTimeout(timeoutEvent);
     await onEnd(request);
@@ -60,9 +64,17 @@ const processAllRecords = async (request: Queue.Request, schema: MessageSchema, 
   const failedMessageIds = new Set<string>();
   const failedGroupIds = new Set<string>();
 
+  // The event source mapping deletes every record left out of the batch response, so a lone record
+  // needs no delete of its own. In a longer batch each record is still deleted as soon as it's handled:
+  // an invocation that dies on a later record hands the whole batch back, and what already ran must
+  // not run again.
+  const deleteEachRecord = records.length > 1;
+
   for (const record of records) {
     const messageGroupId = record.attributes.MessageGroupId;
     const messageId = record.messageId;
+
+    let handled = false;
 
     try {
       // If a previous message from the same message group (FIFO Queues) has failed,
@@ -103,19 +115,26 @@ const processAllRecords = async (request: Queue.Request, schema: MessageSchema, 
 
       await handle(currentRequest, __EZ4_CONTEXT);
 
-      if (!failedMessageIds.has(messageId)) {
+      handled = true;
+
+      if (deleteEachRecord && !failedMessageIds.has(messageId)) {
         await ackMessage(record);
       }
 
       await onDone(currentRequest);
     } catch (error) {
       await onError(error, currentRequest ?? request);
-      await retryMessage(record);
-
-      failedMessageIds.add(messageId);
 
       if (messageGroupId) {
         failedGroupIds.add(messageGroupId);
+      }
+
+      // A record whose handler finished is consumed even when a hook after it fails: sending it
+      // back would run it again.
+      if (!handled) {
+        await retryMessage(record);
+
+        failedMessageIds.add(messageId);
       }
     }
   }
