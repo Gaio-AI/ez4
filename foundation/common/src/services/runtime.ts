@@ -1,3 +1,5 @@
+import { getRandomUUID } from '@ez4/utils';
+
 /**
  * Determines whether or not the handler is running in a debug runtime.
  * !! IT MUST BE DEFINED BY THE BUNDLER !!
@@ -43,6 +45,14 @@ export namespace Runtime {
   };
 
   /**
+   * Clear the common runtime scope and its headers.
+   */
+  export const clearScope = () => {
+    globalScope = undefined;
+    globalScopeHeaders = {};
+  };
+
+  /**
    * Get the current common runtime scope.
    *
    * @returns Returns the current common runtime scope.
@@ -80,6 +90,39 @@ export namespace Runtime {
     }
 
     return values;
+  };
+
+  /**
+   * Read the client trace id from the given sources.
+   *
+   * @param sources Header or query maps with lowercase keys, in priority order.
+   * @returns Returns the first non-empty `x-trace-id` truncated to `MAX_SCOPE_VALUE_LENGTH`, or a new one.
+   */
+  export const readTraceId = (...sources: ScopeSource[]) => {
+    const traceId = sources.find((source) => !!source?.['x-trace-id'])?.['x-trace-id'];
+
+    return traceId?.slice(0, MAX_SCOPE_VALUE_LENGTH) ?? getRandomUUID();
+  };
+
+  /**
+   * Get the request headers that forward the current scope.
+   *
+   * @returns Returns the `X-Trace-Id` header (a new one without scope) and each declared scope header.
+   */
+  export const getScopeRequestHeaders = () => {
+    const headers: Record<string, string> = {
+      ['X-Trace-Id']: globalScope?.traceId ?? getRandomUUID()
+    };
+
+    for (const [key, header] of Object.entries(globalScopeHeaders)) {
+      const value = globalScope?.[key];
+
+      if (value !== undefined) {
+        headers[header] = value;
+      }
+    }
+
+    return headers;
   };
 
   /**

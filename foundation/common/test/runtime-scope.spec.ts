@@ -1,5 +1,5 @@
-import { deepEqual, equal } from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { deepEqual, equal, notEqual } from 'node:assert/strict';
+import { afterEach, describe, it } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -8,6 +8,10 @@ describe('runtime scope', () => {
     clientVersion: 'X-Client-Version',
     sessionId: 'x-session-id'
   };
+
+  afterEach(() => {
+    Runtime.clearScope();
+  });
 
   it('assert :: read lowercased headers from the first source that has them', () => {
     const values = Runtime.readScopeValues(
@@ -97,5 +101,40 @@ describe('runtime scope', () => {
       deepEqual(Runtime.getScope(), { traceId: 'trace-7' });
       deepEqual(Runtime.getScopeHeaders(), {});
     }
+  });
+
+  it('assert :: read trace id from the first source that has a non-empty one', () => {
+    equal(Runtime.readTraceId(undefined, { 'x-trace-id': '' }, { 'x-trace-id': 'trace-8' }), 'trace-8');
+    equal(Runtime.readTraceId({ 'x-trace-id': 'header' }, { 'x-trace-id': 'query' }), 'header');
+  });
+
+  it('assert :: truncate long trace ids', () => {
+    equal(Runtime.readTraceId({ 'x-trace-id': 'c'.repeat(300) }), 'c'.repeat(256));
+  });
+
+  it('assert :: generate a trace id when none is sent', () => {
+    const traceId = Runtime.readTraceId(null, {});
+
+    equal(typeof traceId, 'string');
+    equal(traceId.length, 36);
+    notEqual(traceId, Runtime.readTraceId());
+  });
+
+  it('assert :: build scope request headers from the current scope', () => {
+    Runtime.setScope({ traceId: 'trace-9', clientVersion: '1.2.3', sessionId: undefined }, headers);
+
+    deepEqual(Runtime.getScopeRequestHeaders(), {
+      ['X-Trace-Id']: 'trace-9',
+      ['X-Client-Version']: '1.2.3'
+    });
+  });
+
+  it('assert :: build scope request headers without a scope', () => {
+    equal(Runtime.getScope(), undefined);
+
+    const requestHeaders = Runtime.getScopeRequestHeaders();
+
+    deepEqual(Object.keys(requestHeaders), ['X-Trace-Id']);
+    equal(requestHeaders['X-Trace-Id'].length, 36);
   });
 });
