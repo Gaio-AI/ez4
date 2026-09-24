@@ -80,20 +80,20 @@ jobs:
         include:
           - group: foundation
             workspaces: >-
-              @ez4/utils @ez4/state @ez4/reflection @ez4/logger @ez4/project @ez4/schema @ez4/validator
-              @ez4/transform
+              -w @ez4/utils -w @ez4/state -w @ez4/reflection -w @ez4/logger -w @ez4/project -w @ez4/schema
+              -w @ez4/validator -w @ez4/transform
           - group: contracts
             workspaces: >-
-              @ez4/gateway @ez4/database @ez4/cache @ez4/scheduler @ez4/storage @ez4/distribution @ez4/queue
-              @ez4/topic @ez4/factory @ez4/validation @ez4/email
+              -w @ez4/gateway -w @ez4/database -w @ez4/cache -w @ez4/scheduler -w @ez4/storage -w @ez4/distribution
+              -w @ez4/queue -w @ez4/topic -w @ez4/factory -w @ez4/validation -w @ez4/email
           - group: libraries
-            workspaces: '@ez4/pgsql @ez4/pgclient @ez4/pgmigration'
+            workspaces: -w @ez4/pgsql -w @ez4/pgclient -w @ez4/pgmigration
           - group: local providers
             workspaces: >-
-              @ez4/local-common @ez4/local-gateway @ez4/local-database @ez4/local-cache @ez4/local-scheduler
-              @ez4/local-storage @ez4/local-queue @ez4/local-topic
+              -w @ez4/local-common -w @ez4/local-gateway -w @ez4/local-database -w @ez4/local-cache
+              -w @ez4/local-scheduler -w @ez4/local-storage -w @ez4/local-queue -w @ez4/local-topic
           - group: docs providers
-            workspaces: '@ez4/docs-gateway @ez4/docs-database @ez4/docs-topology'
+            workspaces: -w @ez4/docs-gateway -w @ez4/docs-database -w @ez4/docs-topology
 
     env:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -138,13 +138,8 @@ jobs:
       - name: Link all binaries
         run: npm link -w @ez4/project --prefer-offline --no-audit
 
-      # Each package's `test` script builds it first; the step above already built everything, so
-      # this runs the rest of that script: the type check and the specs.
       - name: Test ${{ matrix.group }}
-        run: |
-          for workspace in ${{ matrix.workspaces }}; do
-            npm exec --workspace "$workspace" -c 'tsc -p tsconfig.test.json --noEmit && ez4 test'
-          done
+        run: npm test ${{ matrix.workspaces }}
 
   # Branch protection requires a check with this name, so it stands for every lint and test job.
   tests:
