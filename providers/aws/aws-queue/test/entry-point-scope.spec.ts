@@ -1,4 +1,4 @@
-import type { Context, SQSEvent } from 'aws-lambda';
+import type { Context, SQSEvent, SQSMessageAttributes } from 'aws-lambda';
 
 import { afterEach, describe, it, mock } from 'node:test';
 import { deepEqual } from 'node:assert/strict';
@@ -20,7 +20,7 @@ describe('queue entry point scope', () => {
     headers: { clientVersion: 'x-client-version' }
   });
 
-  const handleMessage = async (messageAttributes: Record<string, { stringValue: string }>) => {
+  const handleMessage = async (messageAttributes: SQSMessageAttributes) => {
     let handledScope: Runtime.Scope | undefined;
 
     Object.assign(globalThis, {
@@ -39,20 +39,28 @@ describe('queue entry point scope', () => {
 
     Runtime.setScope({ traceId: 'stale', clientVersion: 'stale' }, { clientVersion: 'x-client-version' });
 
-    const event = {
+    const event: SQSEvent = {
       Records: [
         {
           messageId: 'message-1',
           receiptHandle: 'receipt-1',
           body: '{}',
-          attributes: { ApproximateReceiveCount: '1' },
+          attributes: {
+            ApproximateReceiveCount: '1',
+            SentTimestamp: '0',
+            SenderId: 'sender-1',
+            ApproximateFirstReceiveTimestamp: '0'
+          },
+          messageAttributes,
+          md5OfBody: '99914b932bd37a50b983c5e7c90ae93b',
+          eventSource: 'aws:sqs',
           eventSourceARN: 'arn:aws:sqs:us-east-1:000000000000:ez4-test-queue',
-          messageAttributes
+          awsRegion: 'us-east-1'
         }
       ]
     };
 
-    await sqsEntryPoint(event as unknown as SQSEvent, lambdaContext);
+    await sqsEntryPoint(event, lambdaContext);
 
     return handledScope;
   };
@@ -60,12 +68,24 @@ describe('queue entry point scope', () => {
   afterEach(() => {
     mock.restoreAll();
     Runtime.clearScope();
+
+    for (const name of [
+      '__EZ4_SCHEMA',
+      '__EZ4_MAX_ATTEMPTS',
+      '__EZ4_MIN_BACKOFF',
+      '__EZ4_MAX_BACKOFF',
+      '__EZ4_CONTEXT',
+      'dispatch',
+      'handle'
+    ]) {
+      Reflect.deleteProperty(globalThis, name);
+    }
   });
 
   it('assert :: restore EZ4.SCOPE into the runtime scope', async () => {
     const handledScope = await handleMessage({
-      ['EZ4.TRACE_ID']: { stringValue: 'trace-1' },
-      ['EZ4.SCOPE']: { stringValue: scope }
+      ['EZ4.TRACE_ID']: { dataType: 'String', stringValue: 'trace-1' },
+      ['EZ4.SCOPE']: { dataType: 'String', stringValue: scope }
     });
 
     deepEqual(handledScope, { traceId: 'trace-1', clientVersion: '1.2.3' });
@@ -73,7 +93,7 @@ describe('queue entry point scope', () => {
 
   it('assert :: restore only the trace id without EZ4.SCOPE', async () => {
     const handledScope = await handleMessage({
-      ['EZ4.TRACE_ID']: { stringValue: 'trace-2' }
+      ['EZ4.TRACE_ID']: { dataType: 'String', stringValue: 'trace-2' }
     });
 
     deepEqual(handledScope, { traceId: 'trace-2' });

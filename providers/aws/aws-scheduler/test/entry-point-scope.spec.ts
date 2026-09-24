@@ -40,6 +40,10 @@ describe('scheduler entry point scope', () => {
 
   afterEach(() => {
     Runtime.clearScope();
+
+    for (const name of ['__EZ4_SCHEMA', '__EZ4_CONTEXT', 'dispatch', 'handle']) {
+      Reflect.deleteProperty(globalThis, name);
+    }
   });
 
   it('assert :: restore the envelope scope into the runtime scope', async () => {

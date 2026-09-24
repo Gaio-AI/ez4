@@ -1,4 +1,4 @@
-import type { Context, SNSEvent } from 'aws-lambda';
+import type { Context, SNSEvent, SNSMessageAttributes } from 'aws-lambda';
 
 import { afterEach, describe, it } from 'node:test';
 import { deepEqual } from 'node:assert/strict';
@@ -19,7 +19,7 @@ describe('topic entry point scope', () => {
     headers: { clientVersion: 'x-client-version' }
   });
 
-  const handleEvent = async (messageAttributes: Record<string, { Type: string; Value: string }>) => {
+  const handleEvent = async (messageAttributes: SNSMessageAttributes) => {
     let handledScope: Runtime.Scope | undefined;
 
     Object.assign(globalThis, {
@@ -33,24 +33,41 @@ describe('topic entry point scope', () => {
 
     Runtime.setScope({ traceId: 'stale', clientVersion: 'stale' }, { clientVersion: 'x-client-version' });
 
-    const event = {
+    const topicArn = 'arn:aws:sns:us-east-1:000000000000:ez4-test-topic';
+
+    const event: SNSEvent = {
       Records: [
         {
+          EventVersion: '1.0',
+          EventSubscriptionArn: `${topicArn}:subscription-1`,
+          EventSource: 'aws:sns',
           Sns: {
+            SignatureVersion: '1',
+            Timestamp: '1970-01-01T00:00:00.000Z',
+            Signature: 'signature',
+            SigningCertUrl: 'https://sns.us-east-1.amazonaws.com/cert.pem',
+            MessageId: 'message-1',
             Message: '{}',
-            MessageAttributes: messageAttributes
+            MessageAttributes: messageAttributes,
+            Type: 'Notification',
+            UnsubscribeUrl: 'https://sns.us-east-1.amazonaws.com/unsubscribe',
+            TopicArn: topicArn
           }
         }
       ]
     };
 
-    await snsEntryPoint(event as unknown as SNSEvent, lambdaContext);
+    await snsEntryPoint(event, lambdaContext);
 
     return handledScope;
   };
 
   afterEach(() => {
     Runtime.clearScope();
+
+    for (const name of ['__EZ4_SCHEMA', '__EZ4_CONTEXT', 'dispatch', 'handle']) {
+      Reflect.deleteProperty(globalThis, name);
+    }
   });
 
   it('assert :: restore EZ4.SCOPE into the runtime scope', async () => {
