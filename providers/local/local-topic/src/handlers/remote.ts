@@ -1,9 +1,11 @@
 import type { AnyObject } from '@ez4/utils';
 import type { TopicRemoteSubscription } from '../types/subscription';
+import type { MessageTrace } from '@ez4/local-common';
 
+import { getMessageTraceHeaders } from '@ez4/local-common';
 import { Logger } from '@ez4/logger';
 
-export const processRemoteEvent = async (subscription: TopicRemoteSubscription, event: AnyObject) => {
+export const processRemoteEvent = async (subscription: TopicRemoteSubscription, event: AnyObject, trace: MessageTrace) => {
   const { resourceName, serviceHost } = subscription;
 
   try {
@@ -11,7 +13,8 @@ export const processRemoteEvent = async (subscription: TopicRemoteSubscription, 
       method: 'POST',
       body: JSON.stringify(event),
       headers: {
-        ['content-type']: 'application/json'
+        ['content-type']: 'application/json',
+        ...getMessageTraceHeaders(trace)
       }
     });
 

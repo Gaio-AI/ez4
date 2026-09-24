@@ -2,12 +2,14 @@ import type { Client, Topic } from '@ez4/topic';
 import type { EventSchema } from '@ez4/topic/utils';
 import type { ServeOptions } from '@ez4/project/library';
 import type { AnyObject } from '@ez4/utils';
+import type { MessageTrace } from '@ez4/local-common';
 
 import { getJsonEvent } from '@ez4/topic/utils';
+import { captureMessageTrace } from '@ez4/local-common';
 import { Logger } from '@ez4/logger';
 
 export type LocalClientOptions = ServeOptions & {
-  handler: (event: AnyObject) => Promise<void>;
+  handler: (event: AnyObject, trace: MessageTrace) => Promise<void>;
 };
 
 export const createLocalClient = <T extends Topic.Event = any>(
@@ -17,13 +19,15 @@ export const createLocalClient = <T extends Topic.Event = any>(
 ): Client<T> => {
   return new (class {
     async publishEvent(event: T) {
+      const trace = captureMessageTrace();
+
       Logger.log(`✉️  Publishing event to topic [${resourceName}]`);
 
       const payload = await getJsonEvent(event, eventSchema);
 
       setImmediate(async () => {
         try {
-          await clientOptions.handler(payload);
+          await clientOptions.handler(payload, trace);
         } catch (error) {
           Logger.error(`Local topic [${resourceName}] finished with errors.`);
           Logger.error(`    ${error}`);

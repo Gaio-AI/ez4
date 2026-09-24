@@ -4,6 +4,7 @@ import type { Client, Topic } from '@ez4/topic';
 
 import { getJsonStringEvent } from '@ez4/topic/utils';
 import { getServiceName } from '@ez4/project/library';
+import { captureMessageTrace, getMessageTraceHeaders } from '@ez4/local-common';
 import { Logger } from '@ez4/logger';
 
 import { getTopicServiceHost, sendTopicServiceRequest, subscribeToTopicService, unsubscribeFromTopicService } from '../utils/topic';
@@ -22,13 +23,15 @@ export const createRemoteClient = <T extends Topic.Event = any>(
 
   return new (class {
     async publishEvent(event: T) {
+      const trace = captureMessageTrace();
+
       Logger.log(`✉️  Publishing event to topic [${resourceName}] at ${topicHost}.`);
 
       const payload = await getJsonStringEvent(event, eventSchema);
 
       setImmediate(async () => {
         try {
-          await sendTopicServiceRequest(topicHost, payload);
+          await sendTopicServiceRequest(topicHost, payload, getMessageTraceHeaders(trace));
         } catch (error) {
           Logger.error(`Remote topic [${resourceName}] at ${topicHost} isn't available.`);
           Logger.error(`    ${error}`);
