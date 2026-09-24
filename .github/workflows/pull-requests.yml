@@ -45,10 +45,55 @@ jobs:
       - name: Allow only patches
         run: npm run changeset:check
 
-  test:
-    name: 🧪 Tests
+  lint:
+    name: 🧹 Lint
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Lint codebase
+        run: npm run lint
+
+  test:
+    name: 🧪 Test ${{ matrix.group }}
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: foundation
+            workspaces: >-
+              @ez4/utils @ez4/state @ez4/reflection @ez4/logger @ez4/project @ez4/schema @ez4/validator
+              @ez4/transform
+          - group: contracts
+            workspaces: >-
+              @ez4/gateway @ez4/database @ez4/cache @ez4/scheduler @ez4/storage @ez4/distribution @ez4/queue
+              @ez4/topic @ez4/factory @ez4/validation @ez4/email
+          - group: libraries
+            workspaces: '@ez4/pgsql @ez4/pgclient @ez4/pgmigration'
+          - group: local providers
+            workspaces: >-
+              @ez4/local-common @ez4/local-gateway @ez4/local-database @ez4/local-cache @ez4/local-scheduler
+              @ez4/local-storage @ez4/local-queue @ez4/local-topic
+          - group: docs providers
+            workspaces: '@ez4/docs-gateway @ez4/docs-database @ez4/docs-topology'
 
     env:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -93,58 +138,23 @@ jobs:
       - name: Link all binaries
         run: npm link -w @ez4/project --prefer-offline --no-audit
 
-      - name: Lint codebase
-        run: npm run lint
-
-      - name: Test foundation
+      # Each package's `test` script builds it first; the step above already built everything, so
+      # this runs the rest of that script: the type check and the specs.
+      - name: Test ${{ matrix.group }}
         run: |
-          npm test \
-          -w @ez4/utils \
-          -w @ez4/state \
-          -w @ez4/reflection \
-          -w @ez4/logger \
-          -w @ez4/project \
-          -w @ez4/schema \
-          -w @ez4/validator \
-          -w @ez4/transform
+          for workspace in ${{ matrix.workspaces }}; do
+            npm exec --workspace "$workspace" -c 'tsc -p tsconfig.test.json --noEmit && ez4 test'
+          done
 
-      - name: Test contracts
-        run: |
-          npm test \
-          -w @ez4/gateway \
-          -w @ez4/database \
-          -w @ez4/cache \
-          -w @ez4/scheduler \
-          -w @ez4/storage \
-          -w @ez4/distribution \
-          -w @ez4/queue \
-          -w @ez4/topic \
-          -w @ez4/factory \
-          -w @ez4/validation \
-          -w @ez4/email
+  # Branch protection requires a check with this name, so it stands for every lint and test job.
+  tests:
+    name: 🧪 Tests
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: ${{ !cancelled() && (github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.fork == false)) }}
 
-      - name: Test libraries
+    steps:
+      - name: Require every lint and test job
         run: |
-          npm test \
-          -w @ez4/pgsql \
-          -w @ez4/pgclient \
-          -w @ez4/pgmigration
-
-      - name: Test local providers
-        run: |
-          npm test \
-          -w @ez4/local-common \
-          -w @ez4/local-gateway \
-          -w @ez4/local-database \
-          -w @ez4/local-cache \
-          -w @ez4/local-scheduler \
-          -w @ez4/local-storage \
-          -w @ez4/local-queue \
-          -w @ez4/local-topic
-
-      - name: Test docs providers
-        run: |
-          npm test \
-          -w @ez4/docs-gateway \
-          -w @ez4/docs-database \
-          -w @ez4/docs-topology
+          test "${{ needs.lint.result }}" = success
+          test "${{ needs.test.result }}" = success
