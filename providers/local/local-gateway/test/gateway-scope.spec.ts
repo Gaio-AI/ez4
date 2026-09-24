@@ -4,7 +4,7 @@ import type { HttpClientRequest } from '@ez4/gateway';
 import type { ObservedScope } from './fixtures/scope-probe';
 
 import { deepEqual, equal, match, notEqual } from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -121,6 +121,11 @@ const getWsEvent = (live: boolean): EmulatorConnectionEvent => ({
 });
 
 describe('local gateway scope', () => {
+  afterEach(() => {
+    globalThis.observeScope = undefined;
+    Runtime.clearScope();
+  });
+
   it('assert :: http request captures trace id and merged scope', async () => {
     const api = registerHttpLocalService(getHttpService(), options, context);
     const observed = observeScopes(1);

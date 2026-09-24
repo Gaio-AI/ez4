@@ -4,7 +4,7 @@ import type { Client } from '@ez4/queue';
 import type { ObservedScope } from './fixtures/scope-probe';
 
 import { deepEqual, equal, match } from 'node:assert/strict';
-import { describe, it, type TestContext } from 'node:test';
+import { afterEach, describe, it, type TestContext } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -108,6 +108,11 @@ const mockFetch = (t: TestContext) => {
 };
 
 describe('local queue scope', () => {
+  afterEach(() => {
+    globalThis.observeScope = undefined;
+    Runtime.clearScope();
+  });
+
   it('assert :: local client carries trace id and scope to the handler', async () => {
     const client = registerLocalService(queueService, options, context).exportHandler() as Client<{ foo: string }, any>;
     const observed = observeScopes(1);

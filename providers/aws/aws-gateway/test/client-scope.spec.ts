@@ -1,7 +1,8 @@
 import type { HttpClientRequest } from '@ez4/gateway';
+import type { TestContext } from 'node:test';
 
 import { equal } from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -19,39 +20,32 @@ describe('gateway http client scope', () => {
     }
   }) as unknown as TestClient;
 
-  const sendRequest = async (request: HttpClientRequest) => {
-    const originalFetch = globalThis.fetch;
+  afterEach(() => {
+    Runtime.clearScope();
+  });
 
-    let headers = new Headers();
+  const sendRequest = async (t: TestContext, request: HttpClientRequest) => {
+    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 204 }));
 
-    globalThis.fetch = async (_input, init) => {
-      headers = new Headers(init?.headers);
-      return new Response(null, { status: 204 });
-    };
+    await client.getItems(request);
 
-    try {
-      await client.getItems(request);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-
-    return headers;
+    return new Headers(fetch.mock.calls[0].arguments[1]?.headers);
   };
 
-  it('assert :: forward scope values under their header names', async () => {
+  it('assert :: forward scope values under their header names', async (t) => {
     Runtime.setScope({ traceId: 'trace-1', clientVersion: '1.2.3' }, { clientVersion: 'x-client-version', sessionId: 'x-session-id' });
 
-    const headers = await sendRequest({});
+    const headers = await sendRequest(t, {});
 
     equal(headers.get('x-trace-id'), 'trace-1');
     equal(headers.get('x-client-version'), '1.2.3');
     equal(headers.get('x-session-id'), null);
   });
 
-  it('assert :: request headers override scope headers', async () => {
+  it('assert :: request headers override scope headers', async (t) => {
     Runtime.setScope({ traceId: 'trace-2', clientVersion: '1.2.3' }, { clientVersion: 'x-client-version' });
 
-    const headers = await sendRequest({
+    const headers = await sendRequest(t, {
       headers: {
         'x-client-version': 'explicit'
       }
@@ -60,10 +54,10 @@ describe('gateway http client scope', () => {
     equal(headers.get('x-client-version'), 'explicit');
   });
 
-  it('assert :: no scope headers without declaration', async () => {
+  it('assert :: no scope headers without declaration', async (t) => {
     Runtime.setScope({ traceId: 'trace-3', clientVersion: '1.2.3' });
 
-    const headers = await sendRequest({});
+    const headers = await sendRequest(t, {});
 
     equal(headers.get('x-trace-id'), 'trace-3');
     equal(headers.get('x-client-version'), null);

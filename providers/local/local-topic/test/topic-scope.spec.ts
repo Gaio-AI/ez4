@@ -5,7 +5,7 @@ import type { Client } from '@ez4/topic';
 import type { ObservedScope } from './fixtures/scope-probe';
 
 import { deepEqual, equal, match } from 'node:assert/strict';
-import { describe, it, type TestContext } from 'node:test';
+import { afterEach, describe, it, type TestContext } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -111,6 +111,11 @@ const scopedEntry = (traceId: string) => ({
 });
 
 describe('local topic scope', () => {
+  afterEach(() => {
+    globalThis.observeScope = undefined;
+    Runtime.clearScope();
+  });
+
   it('assert :: lambda subscriber runs for an event without a handler field', async () => {
     const observed = observeScopes(1);
     const subscription = topicService.subscriptions[0] as TopicLambdaSubscription;

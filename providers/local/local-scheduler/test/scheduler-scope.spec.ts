@@ -4,7 +4,7 @@ import type { Client } from '@ez4/scheduler';
 import type { ObservedScope } from './fixtures/scope-probe';
 
 import { deepEqual, equal, match } from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -70,6 +70,11 @@ const observeScopes = (count: number) => {
 };
 
 describe('local scheduler scope', () => {
+  afterEach(() => {
+    globalThis.observeScope = undefined;
+    Runtime.clearScope();
+  });
+
   it('assert :: created event carries trace id and scope to the target', async () => {
     const scheduler = registerLocalService(getCronService('scopeCronCreate'), options, context);
 
