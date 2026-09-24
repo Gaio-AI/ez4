@@ -214,11 +214,12 @@ export namespace Client {
     return `at(${date.toISOString().substring(0, 19)})`;
   };
 
-  const prepareEventData = <T extends Cron.Event>(data: T) => {
+  export const prepareEventData = <T extends Cron.Event>(data: T) => {
     const scope = Runtime.getScope();
 
     return JSON.stringify({
       traceId: scope?.traceId ?? getRandomUUID(),
+      scope: Runtime.exportScope(),
       event: data
     });
   };

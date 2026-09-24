@@ -28,9 +28,7 @@ export async function eventEntryPoint(payload: AnyObject | null, context: Contex
     traceId
   };
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.importScope(traceId, payload?.scope);
 
   try {
     await onBegin(request);
