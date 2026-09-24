@@ -1,0 +1,45 @@
+{
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "TestService": {
+    "type": "@ez4/http",
+    "name": "TestService",
+    "file": "test/http/input/output-scope.ts",
+    "context": {},
+    "variables": {},
+    "services": {},
+    "defaults": {
+      "scope": {
+        "clientVersion": "x-client-version",
+        "sessionId": "x-session-id"
+      }
+    },
+    "routes": [
+      {
+        "path": "GET /test-route",
+        "handler": {
+          "name": "testRoute",
+          "file": "test/http/input/output-scope.ts",
+          "position": [
+            22,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "scope": {
+          "sessionId": "x-route-session-id"
+        }
+      }
+    ]
+  }
+}

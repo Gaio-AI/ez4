@@ -23,6 +23,7 @@ export * from './errors/ws/target';
 export * from './errors/service';
 export * from './errors/preferences';
 export * from './errors/defaults';
+export * from './errors/scope';
 export * from './errors/handler';
 export * from './errors/request';
 export * from './errors/response';

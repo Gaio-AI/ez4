@@ -91,6 +91,21 @@ export interface HttpRoute<T extends HttpRequest, U extends AuthRequest> extends
   readonly cors?: boolean;
 
   /**
+   * Maps scope keys to the request headers they are read from.
+   *
+   * - Merged over `defaults.scope`; the route wins on a key clash.
+   * - A handler shared by several routes uses the scope of the first route that deploys it.
+   *
+   * @example
+   * ```ts
+   * scope: {
+   *   requestSource: 'x-request-source';
+   * }
+   * ```
+   */
+  readonly scope?: Record<string, string>;
+
+  /**
    * Enables VPC access for the route.
    *
    * - Allows the handler to access private resources inside the default VPC.

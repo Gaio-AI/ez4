@@ -23,6 +23,7 @@ import { isModelProperty, isTypeObject, isTypeReference } from '@ez4/reflection'
 import { IncorrectDefaultsTypeError, InvalidDefaultsTypeError } from '../../errors/defaults';
 import { getFullTypeName } from '../utils/name';
 import { getWebPreferencesMetadata } from '../preferences';
+import { getWebScopeMetadata } from '../scope';
 import { getHttpErrorsMetadata } from './errors';
 import { HttpNamespaceType } from './types';
 
@@ -122,6 +123,11 @@ const getTypeFromMembers = (parent: TypeModel, members: MemberType[], reflection
 
       case 'listener': {
         defaults.listener = getServiceListener(member.value, errorList);
+        break;
+      }
+
+      case 'scope': {
+        defaults.scope = getWebScopeMetadata(member, errorList);
         break;
       }
     }

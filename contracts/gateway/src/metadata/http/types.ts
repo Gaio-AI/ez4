@@ -100,6 +100,7 @@ export type HttpDefaults = {
   memory?: number;
   files?: string[];
   debug?: boolean;
+  scope?: Record<string, string>;
 };
 
 export type HttpCache = {
