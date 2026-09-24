@@ -1,4 +1,5 @@
 import type { Cron, ScheduleEvent } from '@ez4/scheduler';
+import type { MessageTrace } from '@ez4/local-common';
 
 import { deepClone, deepMerge } from '@ez4/utils';
 
@@ -10,15 +11,10 @@ type InMemorySchedulerData<T extends Cron.Event> = InMemoryScheduler.SchedulerPa
 const ALL_SCHEDULERS: Record<string, InMemorySchedulerData<any>> = {};
 
 export namespace InMemoryScheduler {
-  export type EventTrace = {
-    traceId?: string;
-    scope?: string;
-  };
-
-  export type ScheduledEvent<T extends Cron.Event> = ScheduleEvent<T> & EventTrace;
+  export type ScheduledEvent<T extends Cron.Event> = ScheduleEvent<T> & MessageTrace;
 
   export type SchedulerParameters = {
-    handler: (event: Cron.Event | null, trace?: EventTrace) => Promise<void> | void;
+    handler: (event: Cron.Event | null, trace?: MessageTrace) => Promise<void> | void;
   };
 
   export const createScheduler = (schedulerName: string, parameters: SchedulerParameters) => {
