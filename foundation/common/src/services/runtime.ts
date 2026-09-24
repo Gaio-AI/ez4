@@ -75,16 +75,16 @@ export namespace Runtime {
    *
    * @param headers Header name of each scope key.
    * @param sources Header or query maps with lowercase keys, in priority order.
-   * @returns Returns the scope values found, truncated to `MAX_SCOPE_VALUE_LENGTH`.
+   * @returns Returns the non-empty scope values found, truncated to `MAX_SCOPE_VALUE_LENGTH`.
    */
   export const readScopeValues = (headers: ScopeHeaders | null | undefined, ...sources: ScopeSource[]) => {
     const values: Record<string, string> = {};
 
     for (const [key, header] of Object.entries(headers ?? {})) {
       const name = header.toLowerCase();
-      const value = sources.find((source) => source?.[name] !== undefined)?.[name];
+      const value = sources.find((source) => !!source?.[name])?.[name];
 
-      if (value !== undefined) {
+      if (value) {
         values[key] = value.slice(0, MAX_SCOPE_VALUE_LENGTH);
       }
     }

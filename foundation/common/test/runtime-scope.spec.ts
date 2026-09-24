@@ -32,6 +32,16 @@ describe('runtime scope', () => {
     deepEqual(Runtime.readScopeValues(null, { 'x-session-id': 'session-1' }), {});
   });
 
+  it('assert :: skip empty values', () => {
+    const values = Runtime.readScopeValues(
+      headers,
+      { 'x-client-version': '', 'x-session-id': '' },
+      { 'x-client-version': '1.2.3' }
+    );
+
+    deepEqual(values, { clientVersion: '1.2.3' });
+  });
+
   it('assert :: truncate long values', () => {
     const values = Runtime.readScopeValues(headers, { 'x-session-id': 'a'.repeat(300) });
 
