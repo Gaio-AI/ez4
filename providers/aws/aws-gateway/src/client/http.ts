@@ -43,6 +43,7 @@ export namespace HttpClient {
               namingStyle,
               headers: {
                 ['X-Trace-Id']: scope?.traceId ?? getRandomUUID(),
+                ...getScopeRequestHeaders(scope),
                 ...request.headers
               },
               ...(authorize && {
@@ -55,3 +56,17 @@ export namespace HttpClient {
     );
   };
 }
+
+const getScopeRequestHeaders = (scope: Runtime.Scope | undefined) => {
+  const headers: Record<string, string> = {};
+
+  for (const [key, header] of Object.entries(Runtime.getScopeHeaders())) {
+    const value = scope?.[key];
+
+    if (value !== undefined) {
+      headers[header] = value;
+    }
+  }
+
+  return headers;
+};
