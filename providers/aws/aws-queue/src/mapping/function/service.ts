@@ -8,7 +8,7 @@ import { createFunction } from '@ez4/aws-function';
 import { hashObject } from '@ez4/utils';
 import { LogLevel } from '@ez4/project';
 
-import { bundleQueueFunction } from './bundler';
+import { bundleQueueFunction, getQueueTemplateFile } from './bundler';
 
 export const createQueueFunction = <E extends EntryState>(
   state: EntryStates<E>,
@@ -40,7 +40,7 @@ export const createQueueFunction = <E extends EntryState>(
       return bundleQueueFunction(parameters, [...context.getDependencies(), ...context.getConnections()]);
     },
     getFunctionFiles: () => {
-      return [handler.sourceFile, handler.dependencies];
+      return [handler.sourceFile, [...handler.dependencies, getQueueTemplateFile()]];
     },
     getFunctionHash: () => {
       return hashObject({

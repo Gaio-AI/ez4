@@ -8,11 +8,23 @@ import { getFunctionBundle } from '@ez4/aws-common';
 import { pickObject } from '@ez4/utils';
 
 import { IntegrationServiceName } from '../types';
+import { IntegrationFunctionType } from './types';
 
 // __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
 
 export type BundleFunction = (parameters: IntegrationFunctionParameters, connections: EntryState[]) => Promise<string>;
+
+const templateFiles: Record<IntegrationFunctionType, string> = {
+  [IntegrationFunctionType.HttpRequest]: '../lib/request.ts',
+  [IntegrationFunctionType.WsConnection]: '../lib/connection.ts',
+  [IntegrationFunctionType.WsMessage]: '../lib/message.ts'
+};
+
+// Shared with the source hash, so a change to the template reaches every function it wraps.
+export const getIntegrationTemplateFile = (type: IntegrationFunctionType) => {
+  return join(__MODULE_PATH, templateFiles[type]);
+};
 
 export const bundleRequestFunction = async (parameters: IntegrationFunctionParameters, connections: EntryState[]) => {
   const {
@@ -36,7 +48,7 @@ export const bundleRequestFunction = async (parameters: IntegrationFunctionParam
 
   return getFunctionBundle(IntegrationServiceName, {
     context: context && references ? pickObject(context, references) : context,
-    templateFile: join(__MODULE_PATH, '../lib/request.ts'),
+    templateFile: getIntegrationTemplateFile(IntegrationFunctionType.HttpRequest),
     resourceName: functionName,
     filePrefix: 'api',
     define: {
@@ -64,7 +76,7 @@ export const bundleConnectionFunction = async (parameters: IntegrationFunctionPa
 
   return getFunctionBundle(IntegrationServiceName, {
     context: context && references ? pickObject(context, references) : context,
-    templateFile: join(__MODULE_PATH, '../lib/connection.ts'),
+    templateFile: getIntegrationTemplateFile(IntegrationFunctionType.WsConnection),
     resourceName: functionName,
     filePrefix: 'api',
     define: {
@@ -88,7 +100,7 @@ export const bundleMessageFunction = async (parameters: IntegrationFunctionParam
 
   return getFunctionBundle(IntegrationServiceName, {
     context: context && references ? pickObject(context, references) : context,
-    templateFile: join(__MODULE_PATH, '../lib/message.ts'),
+    templateFile: getIntegrationTemplateFile(IntegrationFunctionType.WsMessage),
     resourceName: functionName,
     filePrefix: 'api',
     define: {

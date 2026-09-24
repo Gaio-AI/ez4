@@ -12,6 +12,11 @@ import { AuthorizerServiceName } from '../types';
 // __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
 
+// Shared with the source hash, so a change to the template reaches every function it wraps.
+export const getAuthorizerTemplateFile = () => {
+  return join(__MODULE_PATH, '../lib/authorizer.ts');
+};
+
 export const bundleApiFunction = async (parameters: AuthorizerFunctionParameters, connections: EntryState[]) => {
   const { authorizer, listener, functionName, headersSchema, parametersSchema, querySchema, preferences, context, references, debug } =
     parameters;
@@ -20,7 +25,7 @@ export const bundleApiFunction = async (parameters: AuthorizerFunctionParameters
 
   return getFunctionBundle(AuthorizerServiceName, {
     context: context && references ? pickObject(context, references) : context,
-    templateFile: join(__MODULE_PATH, '../lib/authorizer.ts'),
+    templateFile: getAuthorizerTemplateFile(),
     resourceName: functionName,
     filePrefix: 'auth',
     handler: authorizer,
