@@ -96,7 +96,7 @@ describe('gateway http scope', () => {
       return parameters.getFunctionHash();
     };
 
-    // Hash of this function at 43eb2244, before scope existed: a mismatch redeploys every function.
+    // Hash of a service without scope; any change redeploys every existing function.
     const preScopeHash = '74330756ebfb3f15df4748b4ce5af7f7';
 
     equal(await getIntegrationHash('ez4-test-scope-baseline-a'), preScopeHash);

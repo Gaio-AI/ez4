@@ -76,6 +76,31 @@ describe('gateway ws scope', () => {
     });
   });
 
+  it('assert :: connection skips an empty header for the query value', async () => {
+    setEntryPointGlobals(scopeHeaders, captureScope);
+
+    const event = {
+      headers: {
+        'x-client-version': '',
+        'x-trace-id': 'trace-empty'
+      },
+      queryStringParameters: {
+        'x-client-version': 'query-version'
+      },
+      requestContext: {
+        requestTimeEpoch: 0,
+        connectionId: 'connection-3'
+      }
+    };
+
+    await connectionEntryPoint(event as unknown as ConnectionEvent, lambdaContext);
+
+    deepEqual(captured.scope, {
+      traceId: 'trace-empty',
+      clientVersion: 'query-version'
+    });
+  });
+
   it('assert :: connection trace header wins over query', async () => {
     setEntryPointGlobals(scopeHeaders, captureScope);
 
