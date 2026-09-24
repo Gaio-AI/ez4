@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-dynamodb",
   "description": "EZ4: Self-managed AWS DynamoDB provider",
-  "version": "0.53.906",
+  "version": "0.53.907",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
