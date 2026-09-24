@@ -33,11 +33,7 @@ describe('runtime scope', () => {
   });
 
   it('assert :: skip empty values', () => {
-    const values = Runtime.readScopeValues(
-      headers,
-      { 'x-client-version': '', 'x-session-id': '' },
-      { 'x-client-version': '1.2.3' }
-    );
+    const values = Runtime.readScopeValues(headers, { 'x-client-version': '', 'x-session-id': '' }, { 'x-client-version': '1.2.3' });
 
     deepEqual(values, { clientVersion: '1.2.3' });
   });
@@ -60,6 +56,14 @@ describe('runtime scope', () => {
     Runtime.setScope({ traceId: 'trace-2' });
 
     deepEqual(Runtime.getScope(), { traceId: 'trace-2' });
+    deepEqual(Runtime.getScopeHeaders(), {});
+  });
+
+  it('assert :: clear scope and headers', () => {
+    Runtime.setScope({ traceId: 'trace-clear', clientVersion: '1.2.3' }, headers);
+    Runtime.clearScope();
+
+    equal(Runtime.getScope(), undefined);
     deepEqual(Runtime.getScopeHeaders(), {});
   });
 
@@ -140,7 +144,8 @@ describe('runtime scope', () => {
   });
 
   it('assert :: build scope request headers without a scope', () => {
-    equal(Runtime.getScope(), undefined);
+    Runtime.setScope({ traceId: 'stale' }, headers);
+    Runtime.clearScope();
 
     const requestHeaders = Runtime.getScopeRequestHeaders();
 
