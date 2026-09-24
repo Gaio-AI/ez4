@@ -2,6 +2,7 @@ import type { ArraySchema, ObjectSchema, ScalarSchema, UnionSchema } from '@ez4/
 import type { ContextSource, LinkedVariables } from '@ez4/project/library';
 import type { FunctionParameters } from '@ez4/aws-function';
 import type { HttpPreferences } from '@ez4/gateway/library';
+import type { Runtime } from '@ez4/common';
 
 export type IntegrationFunction = {
   functionName: string;
@@ -21,6 +22,7 @@ export type IntegrationFunctionParameters = Omit<
   handler: IntegrationEntryPoint;
   listener?: IntegrationFunction;
   preferences?: HttpPreferences;
+  scope?: Runtime.ScopeHeaders;
   headersSchema?: ObjectSchema;
   identitySchema?: ObjectSchema | UnionSchema;
   parametersSchema?: ObjectSchema;

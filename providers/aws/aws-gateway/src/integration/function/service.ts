@@ -25,7 +25,7 @@ export const createIntegrationFunction = <E extends EntryState>(
   parameters: IntegrationFunctionParameters
 ) => {
   const { headersSchema, parametersSchema, querySchema, bodySchema, identitySchema, responseSchema } = parameters;
-  const { type, handler, variables, debug, architecture, preferences, errorsMap } = parameters;
+  const { type, handler, variables, debug, architecture, preferences, errorsMap, scope } = parameters;
 
   return createFunction(state, roleState, logGroupState, {
     handlerName: 'apiEntryPoint',
@@ -62,6 +62,7 @@ export const createIntegrationFunction = <E extends EntryState>(
         responseSchema,
         preferences,
         errorsMap,
+        scope,
         debug
       });
     }

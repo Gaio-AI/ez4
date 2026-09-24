@@ -32,6 +32,7 @@ declare const __EZ4_BODY_SCHEMA: ObjectSchema | UnionSchema | ArraySchema | Scal
 declare const __EZ4_RESPONSE_SCHEMA: ObjectSchema | UnionSchema | ArraySchema | ScalarSchema | null;
 declare const __EZ4_ERRORS_MAP: Record<string, number> | null;
 declare const __EZ4_PREFERENCES: HttpPreferences;
+declare const __EZ4_SCOPE: Runtime.ScopeHeaders | undefined;
 declare const __EZ4_CONTEXT: object;
 
 declare function handle(request: Http.Incoming<Http.Request>, context: object): Promise<Http.Response>;
@@ -58,9 +59,13 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
     traceId
   };
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.setScope(
+    {
+      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers),
+      traceId
+    },
+    __EZ4_SCOPE
+  );
 
   try {
     await onBegin(request);

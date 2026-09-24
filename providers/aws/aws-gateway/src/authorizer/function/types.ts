@@ -1,6 +1,7 @@
 import type { ContextSource, LinkedVariables } from '@ez4/project/library';
 import type { FunctionParameters } from '@ez4/aws-function';
 import type { HttpPreferences } from '@ez4/gateway/library';
+import type { Runtime } from '@ez4/common';
 import type { ObjectSchema } from '@ez4/schema';
 
 export type AuthorizerFunction = {
@@ -20,6 +21,7 @@ export type AuthorizerFunctionParameters = Omit<
   authorizer: AuthorizerEntryPoint;
   listener?: AuthorizerFunction;
   preferences?: HttpPreferences;
+  scope?: Runtime.ScopeHeaders;
   headersSchema?: ObjectSchema;
   parametersSchema?: ObjectSchema;
   querySchema?: ObjectSchema;

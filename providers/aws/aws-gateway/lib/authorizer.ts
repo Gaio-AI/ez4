@@ -26,6 +26,7 @@ declare const __EZ4_HEADERS_SCHEMA: ObjectSchema | null;
 declare const __EZ4_PARAMETERS_SCHEMA: ObjectSchema | null;
 declare const __EZ4_QUERY_SCHEMA: ObjectSchema | null;
 declare const __EZ4_PREFERENCES: HttpPreferences;
+declare const __EZ4_SCOPE: Runtime.ScopeHeaders | undefined;
 declare const __EZ4_CONTEXT: object;
 
 declare function handle(request: IncomingRequest, context: object): Promise<Http.AuthResponse>;
@@ -51,9 +52,13 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
     traceId
   };
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.setScope(
+    {
+      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers),
+      traceId
+    },
+    __EZ4_SCOPE
+  );
 
   try {
     await onBegin(request);

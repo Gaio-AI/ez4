@@ -13,6 +13,7 @@ import { IntegrationFunctionType } from '../integration/function/types';
 import { createIntegrationFunction } from '../integration/function/service';
 import { getIntegration, createIntegration } from '../integration/service';
 import { getFunctionName, getInternalName } from './utils/name';
+import { mergeScopeHeaders } from './utils/scope';
 import { RoleMissingError } from './errors';
 
 export const getIntegrationRequestFunction = (
@@ -133,6 +134,7 @@ const getIntegrationFunction = (
         ...defaults.preferences,
         ...target.preferences
       },
+      scope: mergeScopeHeaders(defaults, target),
       architecture,
       logLevel,
       runtime,
