@@ -1,4 +1,4 @@
-import type { SQSClient, ReceiveMessageCommand, SendMessageCommand, SendMessageRequest } from '@aws-sdk/client-sqs';
+import type { SQSClient, ReceiveMessageCommand, SendMessageCommand, SendMessageRequest, MessageAttributeValue } from '@aws-sdk/client-sqs';
 import type { Queue, ReceiveOptions, SendOptions, Client as SqsClient } from '@ez4/queue';
 import type { MessageSchema } from '@ez4/queue/utils';
 import type { AnyObject } from '@ez4/utils';
@@ -33,8 +33,6 @@ export namespace Client {
           getSqsClient()
         ]);
 
-        const scope = Runtime.getScope();
-
         await sqsClient.send(
           new SendMessageCommand({
             QueueUrl: queueUrl,
@@ -42,12 +40,7 @@ export namespace Client {
             MessageBody: messageBody,
             ...(parameters?.fifoMode && getFifoParameters(message, parameters.fifoMode)),
             ...(parameters?.fairMode && getFairParameters(message, parameters.fairMode)),
-            MessageAttributes: {
-              ['EZ4.TRACE_ID']: {
-                StringValue: scope?.traceId ?? getRandomUUID(),
-                DataType: 'String'
-              }
-            }
+            MessageAttributes: getMessageAttributes()
           })
         );
       }
@@ -102,6 +95,24 @@ const getFifoParameters = <T extends Queue.Message>(
     ...getFairParameters(message, fifoMode),
     ...(uniqueIdValue && {
       MessageDeduplicationId: `${uniqueIdValue}`
+    })
+  };
+};
+
+export const getMessageAttributes = (): Record<string, MessageAttributeValue> => {
+  const traceId = Runtime.getScope()?.traceId ?? getRandomUUID();
+  const scope = Runtime.exportScope();
+
+  return {
+    ['EZ4.TRACE_ID']: {
+      StringValue: traceId,
+      DataType: 'String'
+    },
+    ...(scope !== undefined && {
+      ['EZ4.SCOPE']: {
+        StringValue: scope,
+        DataType: 'String'
+      }
     })
   };
 };
