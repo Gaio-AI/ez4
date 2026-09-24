@@ -28,11 +28,11 @@ export const processWsAuthorization = async (
   const servicesInUse = connect.authorizer.references ? pickObject(services, connect.authorizer.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = getRandomUUID();
+  const scopeHeaders = defaults?.scope;
 
-  Runtime.setScope({
-    traceId
-  });
+  const traceId = event.headers['x-trace-id'] ?? event.query?.['x-trace-id'] ?? getRandomUUID();
+
+  Runtime.setScope({ ...Runtime.readScopeValues(scopeHeaders, event.headers, event.query), traceId }, scopeHeaders);
 
   const module = await createModule({
     listener: connect.listener ?? defaults?.listener,

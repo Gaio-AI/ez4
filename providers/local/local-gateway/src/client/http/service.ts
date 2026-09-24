@@ -5,14 +5,33 @@ import type { CommonOptions } from '@ez4/project/library';
 import { sendClientRequest } from '@ez4/gateway/utils';
 import { getServiceName } from '@ez4/project/library';
 import { prepareRequestUrl } from '@ez4/http';
-import { isAnyString } from '@ez4/utils';
+import { getRandomUUID, isAnyString } from '@ez4/utils';
 import { HttpError } from '@ez4/gateway';
+import { Runtime } from '@ez4/common';
 import { Logger } from '@ez4/logger';
 
 export type HttpServiceClientOptions = CommonOptions & {
   authorization?: ClientAuthorization;
   operations: Record<string, ClientOperation>;
   serviceHost: string;
+};
+
+const getScopeRequestHeaders = () => {
+  const scope = Runtime.getScope();
+
+  const headers: Record<string, string> = {
+    ['X-Trace-Id']: scope?.traceId ?? getRandomUUID()
+  };
+
+  for (const [key, header] of Object.entries(Runtime.getScopeHeaders())) {
+    const value = scope?.[key];
+
+    if (value !== undefined) {
+      headers[header] = value;
+    }
+  }
+
+  return headers;
 };
 
 export const createHttpServiceClient = <T extends Http.Service>(
@@ -39,6 +58,8 @@ export const createHttpServiceClient = <T extends Http.Service>(
         return async (request: HttpClientRequest) => {
           const { authorize, method, path, namingStyle, querySchema, bodySchema, responseSchema } = operations[property];
 
+          const scopeHeaders = getScopeRequestHeaders();
+
           const requestUrl = prepareRequestUrl(gatewayHost, path, {
             ...request,
             querySchema,
@@ -53,6 +74,10 @@ export const createHttpServiceClient = <T extends Http.Service>(
               bodySchema,
               responseSchema,
               namingStyle,
+              headers: {
+                ...scopeHeaders,
+                ...request.headers
+              },
               ...(authorize && {
                 authorization
               })

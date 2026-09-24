@@ -1,6 +1,7 @@
 import type { AuthHandler, HttpHandler, HttpErrors, HttpPreferences } from '@ez4/gateway/library';
 import type { EmulatorRequestEvent, LinkedVariables } from '@ez4/project/library';
 import type { ServiceListener } from '@ez4/common/library';
+import type { Runtime } from '@ez4/common';
 
 export type RouteData = {
   httpErrors?: HttpErrors | null;
@@ -8,6 +9,7 @@ export type RouteData = {
   variables?: LinkedVariables | null;
   authorizer?: AuthHandler | null;
   listener?: ServiceListener | null;
+  scope?: Runtime.ScopeHeaders;
   handler: HttpHandler;
 };
 
