@@ -1,7 +1,7 @@
 {
   "name": "@ez4/state",
   "description": "EZ4: State management with dependencies for providers",
-  "version": "0.53.906",
+  "version": "0.53.907",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
