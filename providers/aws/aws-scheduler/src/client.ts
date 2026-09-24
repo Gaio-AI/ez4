@@ -214,7 +214,7 @@ export namespace Client {
     return `at(${date.toISOString().substring(0, 19)})`;
   };
 
-  export const prepareEventData = <T extends Cron.Event>(data: T) => {
+  const prepareEventData = <T extends Cron.Event>(data: T) => {
     const scope = Runtime.getScope();
 
     return JSON.stringify({

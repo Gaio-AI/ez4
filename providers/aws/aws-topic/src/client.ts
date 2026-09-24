@@ -57,7 +57,7 @@ const getFifoParameters = <T extends Topic.Event>(event: AnyObject, fifoMode: To
   return parameters;
 };
 
-export const getMessageAttributes = (): Record<string, MessageAttributeValue> => {
+const getMessageAttributes = (): Record<string, MessageAttributeValue> => {
   const traceId = Runtime.getScope()?.traceId ?? getRandomUUID();
   const scope = Runtime.exportScope();
 
