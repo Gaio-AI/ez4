@@ -1,9 +1,11 @@
 import type { Client, Queue, SendOptions } from '@ez4/queue';
 import type { CommonOptions } from '@ez4/project/library';
 import type { MessageSchema } from '@ez4/queue/utils';
+import type { MessageTrace } from '@ez4/local-common';
 
 import { getServiceName } from '@ez4/project/library';
 import { getJsonStringMessage } from '@ez4/queue/utils';
+import { captureMessageTrace, getMessageTraceHeaders } from '@ez4/local-common';
 import { Logger } from '@ez4/logger';
 
 export type RemoteClientOptions = CommonOptions & {
@@ -20,11 +22,13 @@ export const createRemoteClient = <T extends Queue.Message = any, U extends Queu
 
   return new (class {
     async sendMessage(message: T, _options?: SendOptions<U>) {
+      const trace = captureMessageTrace();
+
       Logger.log(`✉️  Sending message to queue [${resourceName}] at ${queueHost}.`);
 
       const payload = await getJsonStringMessage(message, messageSchema);
 
-      setImmediate(() => forwardQueueMessage(resourceName, queueHost, payload));
+      setImmediate(() => forwardQueueMessage(resourceName, queueHost, payload, trace));
     }
 
     receiveMessage(): Promise<T[]> {
@@ -33,13 +37,14 @@ export const createRemoteClient = <T extends Queue.Message = any, U extends Queu
   })();
 };
 
-const forwardQueueMessage = async (resourceName: string, serviceHost: string, payload: string) => {
+const forwardQueueMessage = async (resourceName: string, serviceHost: string, payload: string, trace: MessageTrace) => {
   try {
     const response = await fetch(serviceHost, {
       method: 'POST',
       body: payload,
       headers: {
-        ['content-type']: 'application/json'
+        ['content-type']: 'application/json',
+        ...getMessageTraceHeaders(trace)
       }
     });
 

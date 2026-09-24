@@ -3,6 +3,9 @@ import type { QueueImport } from '@ez4/queue/library';
 import type { RemoteClientOptions } from '../client/remote';
 
 import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
+import { getMessageTraceFromHeaders } from '@ez4/local-common';
+import { getRandomUUID } from '@ez4/utils';
+import { Runtime } from '@ez4/common';
 
 import { createRemoteClient } from '../client/remote';
 
@@ -33,8 +36,12 @@ export const registerRemoteService = (service: QueueImport, options: ServeOption
 
 const handleQueueForward = (service: QueueImport, options: RemoteClientOptions, request: EmulatorRequestEvent) => {
   const { reference: referenceName, schema: messageSchema } = service;
+  const { traceId = getRandomUUID(), scope } = getMessageTraceFromHeaders(request.headers);
 
   const client = createRemoteClient(referenceName, messageSchema, options);
+
+  // sendMessage captures the runtime scope synchronously, so it must be imported right before the call.
+  Runtime.importScope(traceId, scope);
 
   return client.sendMessage(JSON.parse(request.body!.toString()));
 };
