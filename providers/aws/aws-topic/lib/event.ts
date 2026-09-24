@@ -44,9 +44,7 @@ export async function snsEntryPoint(event: SNSEvent, context: Context): Promise<
         event
       };
 
-      Runtime.setScope({
-        traceId
-      });
+      Runtime.importScope(traceId, Sns.MessageAttributes['EZ4.SCOPE']?.Value);
 
       await onReady(currentRequest);
       await handle(currentRequest, __EZ4_CONTEXT);

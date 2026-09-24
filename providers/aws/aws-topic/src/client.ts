@@ -1,4 +1,4 @@
-import type { PublishInput, PublishCommand, SNSClient } from '@aws-sdk/client-sns';
+import type { PublishInput, PublishCommand, SNSClient, MessageAttributeValue } from '@aws-sdk/client-sns';
 import type { Topic, Client as SnsClient } from '@ez4/topic';
 import type { EventSchema } from '@ez4/topic/utils';
 import type { AnyObject } from '@ez4/utils';
@@ -22,8 +22,6 @@ export namespace Client {
       async publishEvent(event: T) {
         const [payload, { snsClient, PublishCommand }] = await Promise.all([getJsonStringEvent(event, eventSchema), getSnsClient()]);
 
-        const scope = Runtime.getScope();
-
         await snsClient.send(
           new PublishCommand({
             TargetArn: topicArn,
@@ -31,12 +29,7 @@ export namespace Client {
             ...(fifoMode && {
               ...getFifoParameters(event, fifoMode)
             }),
-            MessageAttributes: {
-              ['EZ4.TRACE_ID']: {
-                StringValue: scope?.traceId ?? getRandomUUID(),
-                DataType: 'String'
-              }
-            }
+            MessageAttributes: getMessageAttributes()
           })
         );
       }
@@ -62,6 +55,24 @@ const getFifoParameters = <T extends Topic.Event>(event: AnyObject, fifoMode: To
   }
 
   return parameters;
+};
+
+export const getMessageAttributes = (): Record<string, MessageAttributeValue> => {
+  const traceId = Runtime.getScope()?.traceId ?? getRandomUUID();
+  const scope = Runtime.exportScope();
+
+  return {
+    ['EZ4.TRACE_ID']: {
+      StringValue: traceId,
+      DataType: 'String'
+    },
+    ...(scope !== undefined && {
+      ['EZ4.SCOPE']: {
+        StringValue: scope,
+        DataType: 'String'
+      }
+    })
+  };
 };
 
 const getSnsClient = async () => {
