@@ -24,6 +24,7 @@ declare const __EZ4_HEADERS_SCHEMA: ObjectSchema | null;
 declare const __EZ4_QUERY_SCHEMA: ObjectSchema | null;
 declare const __EZ4_IDENTITY_SCHEMA: ObjectSchema | UnionSchema | null;
 declare const __EZ4_PREFERENCES: HttpPreferences;
+declare const __EZ4_SCOPE: Runtime.ScopeHeaders | undefined;
 declare const __EZ4_CONTEXT: object;
 
 declare function dispatch(event: Ws.ServiceEvent<Ws.Event>, context: object): Promise<void>;
@@ -38,7 +39,7 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
   const milliseconds = Math.max(0, context.getRemainingTimeInMillis() - 1000);
   const timeoutEvent = setTimeout(() => onTimeout(request, milliseconds), milliseconds);
 
-  const traceId = event.headers['x-trace-id'] ?? getRandomUUID();
+  const traceId = event.headers['x-trace-id'] ?? event.queryStringParameters?.['x-trace-id'] ?? getRandomUUID();
 
   const request: Ws.Incoming<Ws.Event> = {
     timestamp: new Date(requestContext.requestTimeEpoch),
@@ -47,9 +48,13 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
     traceId
   };
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.setScope(
+    {
+      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers, event.queryStringParameters),
+      traceId
+    },
+    __EZ4_SCOPE
+  );
 
   try {
     await onBegin(request);

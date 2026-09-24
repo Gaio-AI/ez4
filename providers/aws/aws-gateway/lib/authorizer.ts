@@ -42,7 +42,10 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
   const timeoutEvent = setTimeout(() => onTimeout(request, milliseconds), milliseconds);
 
   const resourceArn = event.methodArn ?? event.routeArn;
-  const traceId = event.headers['x-trace-id'] ?? getRandomUUID();
+  // WS connections send the scope in the query string, since browsers cannot set WebSocket headers.
+  const connectionQuery = requestContext.http ? undefined : event.queryStringParameters;
+
+  const traceId = event.headers['x-trace-id'] ?? connectionQuery?.['x-trace-id'] ?? getRandomUUID();
 
   const request: Http.Incoming<Http.AuthRequest> = {
     timestamp: new Date(requestContext.timeEpoch),
@@ -54,7 +57,7 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
 
   Runtime.setScope(
     {
-      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers),
+      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers, connectionQuery),
       traceId
     },
     __EZ4_SCOPE
