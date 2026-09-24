@@ -2,6 +2,7 @@ import type { Client, ScheduleEvent } from '@ez4/scheduler';
 import type { EventSchema } from '@ez4/scheduler/utils';
 
 import { getJsonEvent } from '@ez4/scheduler/utils';
+import { Runtime } from '@ez4/common';
 import { Logger } from '@ez4/logger';
 
 import { InMemoryScheduler } from '../service/scheduler';
@@ -15,11 +16,16 @@ export const createServiceClient = (serviceName: string, eventSchema: EventSchem
     }
 
     async setEvent(identifier: string, input: ScheduleEvent<any>) {
+      const traceId = Runtime.getScope()?.traceId;
+      const scope = Runtime.exportScope();
+
       const event = await getJsonEvent(input.event, eventSchema);
 
       InMemoryScheduler.setEvent(serviceName, identifier, {
         ...input,
-        event
+        event,
+        traceId,
+        scope
       });
 
       const isoDate = input.date.toISOString();
@@ -28,11 +34,16 @@ export const createServiceClient = (serviceName: string, eventSchema: EventSchem
     }
 
     async createEvent(identifier: string, input: ScheduleEvent<any>) {
+      const traceId = Runtime.getScope()?.traceId;
+      const scope = Runtime.exportScope();
+
       const event = await getJsonEvent(input.event, eventSchema);
 
       InMemoryScheduler.createEvent(serviceName, identifier, {
         ...input,
-        event
+        event,
+        traceId,
+        scope
       });
 
       const isoDate = input.date.toISOString();

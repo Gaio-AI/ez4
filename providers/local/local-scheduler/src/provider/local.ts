@@ -25,7 +25,7 @@ export const registerLocalService = (service: CronService, options: ServeOptions
     },
     bootstrapHandler: () => {
       InMemoryScheduler.createScheduler(resourceName, {
-        handler: (event) => processSchedulerEvent(service, options, context, event)
+        handler: (event, trace) => processSchedulerEvent(service, options, context, event, trace)
       });
 
       if (options.suppress) {

@@ -1,6 +1,7 @@
 import type { EmulateServiceContext, ServeOptions } from '@ez4/project/library';
 import type { CronService } from '@ez4/scheduler/library';
 import type { Cron } from '@ez4/scheduler';
+import type { InMemoryScheduler } from '../service/scheduler';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/local-common';
 import { getRandomUUID, pickObject } from '@ez4/utils';
@@ -10,18 +11,17 @@ export const processSchedulerEvent = async (
   service: CronService,
   options: ServeOptions,
   context: EmulateServiceContext,
-  event: Cron.Event | null
+  event: Cron.Event | null,
+  trace?: InMemoryScheduler.EventTrace
 ) => {
   const { services, target } = service;
 
   const servicesInUse = target.handler.references ? pickObject(services, target.handler.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = getRandomUUID();
+  const traceId = trace?.traceId ?? getRandomUUID();
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.importScope(traceId, trace?.scope);
 
   const module = await createModule({
     listener: target.listener,
