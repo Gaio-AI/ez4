@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 const execFile = promisify(execFileCallback);
 
-import { createBundleHash } from '@ez4/aws-common';
+import { createBundleHash, getBundleHash } from '@ez4/aws-common';
 
 /**
  * The hash decides whether a deploy bundles a function at all, so what it reacts to is the contract:
@@ -111,6 +111,24 @@ describe('bundle hash', () => {
     await writeFile(other, 'export const a = 1;');
 
     notEqual(await hashFrom('named', other), await hashFrom('named', one));
+  });
+
+  it('keeps functions built from the same source apart', async () => {
+    const source = join(root, 'shared', 'src/file.js');
+    const template = join(root, 'shared', 'src/template.js');
+
+    await mkdir(join(root, 'shared', 'src'), { recursive: true });
+    await writeFile(source, 'export const a = 1;');
+    await writeFile(template, 'export const t = 1;');
+
+    const cwd = process.cwd();
+
+    try {
+      process.chdir(join(root, 'shared'));
+      notEqual(await getBundleHash(source, [source, template]), await getBundleHash(source, [source]));
+    } finally {
+      process.chdir(cwd);
+    }
   });
 
   it('ignores the order the files arrive in', async () => {

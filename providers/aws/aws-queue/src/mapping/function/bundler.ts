@@ -13,6 +13,11 @@ declare const __MODULE_PATH: string;
 
 export type BundleQueueFunctionParameters = QueueFunctionParameters;
 
+// Shared with the source hash, so a change to the template reaches every function it wraps.
+export const getQueueTemplateFile = () => {
+  return join(__MODULE_PATH, '../lib/message.ts');
+};
+
 export const bundleQueueFunction = async (parameters: BundleQueueFunctionParameters, connections: EntryState[]) => {
   const { handler, listener, functionName, messageSchema, backoff, context, references, debug } = parameters;
 
@@ -20,7 +25,7 @@ export const bundleQueueFunction = async (parameters: BundleQueueFunctionParamet
 
   return getFunctionBundle(MappingServiceName, {
     context: context && references ? pickObject(context, references) : context,
-    templateFile: join(__MODULE_PATH, '../lib/message.ts'),
+    templateFile: getQueueTemplateFile(),
     resourceName: functionName,
     filePrefix: 'sqs',
     define: {

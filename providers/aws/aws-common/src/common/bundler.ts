@@ -86,12 +86,16 @@ export const createBundleHash = async (allSourceFiles: string[]) => {
 };
 
 export const getBundleHash = async (sourceFile: string, dependencyFiles: string[]) => {
-  let bundleHash = hashCache.get(sourceFile);
+  // Functions built from the same source can still bundle different files, such as their runtime
+  // template, so the cache answers for the whole list rather than for the source alone.
+  const cacheKey = [sourceFile, ...dependencyFiles].join('\n');
+
+  let bundleHash = hashCache.get(cacheKey);
 
   if (!bundleHash) {
     bundleHash = await createBundleHash(arrayUnique(dependencyFiles));
 
-    hashCache.set(sourceFile, bundleHash);
+    hashCache.set(cacheKey, bundleHash);
   }
 
   return bundleHash;

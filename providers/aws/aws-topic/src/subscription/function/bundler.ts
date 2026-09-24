@@ -11,6 +11,11 @@ import { pickObject } from '@ez4/utils';
 // __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
 
+// Shared with the source hash, so a change to the template reaches every function it wraps.
+export const getSubscriptionTemplateFile = () => {
+  return join(__MODULE_PATH, '../lib/event.ts');
+};
+
 export const bundleSubscriptionFunction = async (parameters: SubscriptionFunctionParameters, connections: EntryState[]) => {
   const { handler, listener, functionName, eventSchema, context, references, debug } = parameters;
 
@@ -18,7 +23,7 @@ export const bundleSubscriptionFunction = async (parameters: SubscriptionFunctio
 
   return getFunctionBundle(MappingServiceName, {
     context: context && references ? pickObject(context, references) : context,
-    templateFile: join(__MODULE_PATH, '../lib/event.ts'),
+    templateFile: getSubscriptionTemplateFile(),
     resourceName: functionName,
     filePrefix: 'sns',
     define: {
