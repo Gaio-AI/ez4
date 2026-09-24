@@ -34,13 +34,13 @@ export const prepareHttpServices = (event: PrepareResourceEvent) => {
   const { state, service, options, context } = event;
 
   if (isHttpService(service)) {
-    const { name, displayName, description, routes, cors } = service;
+    const { name, displayName, description, routes, cors, defaults } = service;
     const { branchName, tags } = options;
 
     const gatewayState = createGateway(state, {
       gatewayId: getServiceName(service, options),
       gatewayName: getDisplayName(displayName ?? name, branchName),
-      cors: cors && getCorsConfiguration(routes, cors),
+      cors: cors && getCorsConfiguration(routes, cors, defaults),
       protocol: GatewayProtocol.Http,
       description,
       tags
