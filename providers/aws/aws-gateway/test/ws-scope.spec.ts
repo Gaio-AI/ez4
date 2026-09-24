@@ -4,7 +4,7 @@ import type { EntryStates } from '@ez4/state';
 import type { FunctionState } from '@ez4/aws-function';
 
 import { deepEqual, equal, notEqual } from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { createRole } from '@ez4/aws-identity';
 import { Runtime } from '@ez4/common';
@@ -30,6 +30,10 @@ describe('gateway ws scope', () => {
     clientVersion: 'x-client-version',
     sessionId: 'x-session-id'
   };
+
+  afterEach(() => {
+    Runtime.clearScope();
+  });
 
   const captured: { scope?: Runtime.Scope } = {};
 

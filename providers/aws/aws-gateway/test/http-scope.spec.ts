@@ -1,7 +1,7 @@
 import type { EntryStates } from '@ez4/state';
 
 import { deepEqual, equal, notEqual } from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { ArchitectureType, RuntimeType } from '@ez4/project';
 import { createLogGroup } from '@ez4/aws-logs';
@@ -25,6 +25,10 @@ describe('gateway http scope', () => {
     clientVersion: 'X-Client-Version',
     sessionId: 'x-session-id'
   };
+
+  afterEach(() => {
+    Runtime.clearScope();
+  });
 
   it('assert :: merge route scope over defaults', () => {
     const scope = mergeScopeHeaders(
