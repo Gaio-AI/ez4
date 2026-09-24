@@ -44,14 +44,17 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      # A changeset added with `--empty` releases nothing, so it opens no release pull request: it stays
+      # on `main` until the next release consumes it.
       - name: Pending changesets
         id: changesets
         run: |
-          if find .changeset -name '*.md' ! -name README.md | grep -q .; then
-            echo "has-changesets=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has-changesets=false" >> "$GITHUB_OUTPUT"
-          fi
+          releasing=$(node -e '
+            require("@changesets/read").default(process.cwd()).then((changesets) => {
+              console.log(changesets.some((changeset) => changeset.releases.length > 0));
+            });
+          ')
+          echo "has-changesets=$releasing" >> "$GITHUB_OUTPUT"
 
       # Not changesets/action: it builds the pull request body from each package's CHANGELOG.md,
       # and this repository writes none (`changelog: false`).

@@ -19,7 +19,8 @@ merging the release pull request publishes to CodeArtifact on its own.
 
 Changes that touch no published package — this file, CI, repository tooling — need no changeset,
 since there is nothing to release. The `🦋 Changeset` job fails any other pull request into `main`
-without one; a package change that must not release adds `npx changeset add --empty`.
+without one; a package change that must not release adds `npx changeset add --empty`. An empty
+changeset opens no release pull request: it waits on `main` and goes out with the next release.
 
 Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. In a fork `gh` resolves to the parent
 repository unless told otherwise: run `gh repo set-default Gaio-AI/ez4` once, or pass
@@ -86,6 +87,18 @@ Patch numbers start at `900` on each minor, clear of the patches upstream publis
    in a consumer, publish it to the local registry (`npm run local:registry`, then
    `npm run local:publish`) and take **every** `@ez4/*` dependency at that version: mixing versions
    trips `ProviderVersionMismatchError`.
+
+   `aws codeartifact login` points the `@ez4` scope at CodeArtifact in `~/.npmrc`, and a scope's
+   registry wins over `--registry`. That is why `local:publish` names the scope, and the consumer has
+   to name it too. Check that the version reached the local registry, then install it from there:
+
+   ```bash
+   npm view @ez4/utils versions --@ez4:registry=http://localhost:4873/
+   npm update $(ls node_modules/@ez4 | sed 's#^#@ez4/#') --@ez4:registry=http://localhost:4873/
+   ```
+
+   The consumer's lockfile then resolves from the local registry: it serves the validation, and the
+   consumer takes the version for real only once it is published.
 
 4. Merge the release pull request with a **merge commit**, not a squash, so each change keeps its own
    commit on `main`: it can be bisected, and `git merge-base --is-ancestor` tells the truth about what
