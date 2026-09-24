@@ -77,6 +77,7 @@ export type QueueSubscription = {
   logRetention?: number;
   logLevel?: LogLevel;
   concurrency?: number;
+  parallelism?: number;
   batch?: number;
   memory?: number;
   files?: string[];

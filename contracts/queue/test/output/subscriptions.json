@@ -37,11 +37,12 @@
         "logRetention": 7,
         "concurrency": 2,
         "batch": 5,
+        "parallelism": 3,
         "handler": {
           "name": "testHandler",
           "file": "test/input/output-subscriptions.ts",
           "position": [
-            51,
+            52,
             1
           ]
         }
@@ -54,7 +55,7 @@
           "name": "testHandler",
           "file": "test/input/output-subscriptions.ts",
           "position": [
-            51,
+            52,
             1
           ]
         },

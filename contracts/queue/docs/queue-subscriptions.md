@@ -81,6 +81,14 @@ Maximum number of messages per handler invocation.
 batch: 5;
 ```
 
+#### Parallelism (optional)
+
+Maximum number of messages one handler invocation processes at the same time. The default, `1`, processes them one after another. Messages from the same group in a FIFO queue still run in order. A message starts only while the invocation has time left for the slowest message so far; the ones it doesn't start go back to the queue.
+
+```ts
+parallelism: 5;
+```
+
 #### Log retention (optional)
 
 Specifies the number of days logs should be retained.

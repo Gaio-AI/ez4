@@ -81,7 +81,8 @@ describe('queue mapping', { timeout: 90000 }, () => {
         attempts: 3,
         minDelay: 5,
         maxDelay: 60
-      }
+      },
+      parallelism: 1
     });
 
     const resource = createMapping(localState, queueResource, functionResource, {

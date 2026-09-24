@@ -19,6 +19,7 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
       logRetention: 7;
       concurrency: 2;
       batch: 5;
+      parallelism: 3;
     }>,
 
     // Subscription reference.

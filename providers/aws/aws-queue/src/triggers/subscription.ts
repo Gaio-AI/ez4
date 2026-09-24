@@ -72,6 +72,7 @@ export const prepareSubscriptions = (
           minDelay: backoff?.minDelay ?? Defaults.MinBackoff,
           maxDelay: backoff?.maxDelay ?? Defaults.MaxBackoff
         },
+        parallelism: subscription.parallelism ?? Defaults.Parallelism,
         handler: {
           sourceFile: handler.file,
           functionName: handler.name,

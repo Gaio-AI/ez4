@@ -118,6 +118,7 @@ const getTypeFromMembers = (
       case 'batch':
       case 'memory':
       case 'concurrency':
+      case 'parallelism':
       case 'logRetention': {
         subscription[member.name] = getPropertyNumber(member);
         break;

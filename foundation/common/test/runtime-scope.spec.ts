@@ -1,5 +1,6 @@
 import { deepEqual, equal, notEqual } from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 
 import { Runtime } from '@ez4/common';
 
@@ -151,5 +152,53 @@ describe('runtime scope', () => {
 
     deepEqual(Object.keys(requestHeaders), ['X-Trace-Id']);
     equal(requestHeaders['X-Trace-Id'].length, 36);
+  });
+
+  it('assert :: each run keeps its own scope across awaits', async () => {
+    const seen: string[] = [];
+
+    const run = (traceId: string, delay: number) => {
+      return Runtime.runWithScope(async () => {
+        Runtime.setScope({ traceId, clientVersion: `${traceId}-version` }, headers);
+
+        await setTimeout(delay);
+
+        const requestHeaders = Runtime.getScopeRequestHeaders();
+
+        seen.push(`${requestHeaders['X-Trace-Id']}:${requestHeaders['X-Client-Version']}`);
+      });
+    };
+
+    await Promise.all([run('first', 20), run('second', 5), run('third', 10)]);
+
+    deepEqual(seen, ['second:second-version', 'third:third-version', 'first:first-version']);
+  });
+
+  it('assert :: a run imports and exports its own scope, leaving the common one untouched', async () => {
+    Runtime.setScope({ traceId: 'common' }, headers);
+
+    const raw = JSON.stringify({ values: { sessionId: 'session-1' }, headers });
+
+    const [scope, exported] = await Runtime.runWithScope(async () => {
+      Runtime.importScope('record', raw);
+
+      await setTimeout(1);
+
+      return [Runtime.getScope(), Runtime.exportScope()];
+    });
+
+    deepEqual(scope, { traceId: 'record', sessionId: 'session-1' });
+    deepEqual(JSON.parse(String(exported)), { values: { sessionId: 'session-1' }, headers });
+
+    deepEqual(Runtime.getScope(), { traceId: 'common' });
+    deepEqual(Runtime.getScopeHeaders(), headers);
+  });
+
+  it('assert :: a run starts without a scope', async () => {
+    Runtime.setScope({ traceId: 'common' }, headers);
+
+    const inside = await Runtime.runWithScope(async () => [Runtime.getScope(), Runtime.getScopeHeaders()]);
+
+    deepEqual(inside, [undefined, {}]);
   });
 });

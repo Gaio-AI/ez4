@@ -29,6 +29,12 @@ export interface QueueSubscription<T extends QueueMessage> {
   readonly concurrency?: number;
 
   /**
+   * Maximum number of messages one handler execution processes at the same time. Messages from the
+   * same group in a FIFO queue still run one after another.
+   */
+  readonly parallelism?: number;
+
+  /**
    * Variables associated to the subscription.
    */
   readonly variables?: LinkedVariables;
