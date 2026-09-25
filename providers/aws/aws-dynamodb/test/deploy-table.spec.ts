@@ -1,6 +1,6 @@
 import type { EntryState, EntryStates } from '@ez4/state';
 
-import { ok, equal } from 'node:assert/strict';
+import { ok, equal, deepEqual } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { deploy } from '@ez4/aws-common';
@@ -9,7 +9,10 @@ import { deepClone } from '@ez4/utils';
 import { createTable, isTableState, AttributeType, AttributeKeyType, registerTriggers } from '@ez4/aws-dynamodb';
 
 const assertDeploy = async <E extends EntryState>(resourceId: string, newState: EntryStates<E>, oldState: EntryStates<E> | undefined) => {
-  const { result: state } = await deploy(newState, oldState);
+  const { result: state, errors } = await deploy(newState, oldState);
+
+  // A failed update keeps the resource's previous state, so only the errors tell it apart.
+  deepEqual(errors, []);
 
   const resource = state[resourceId];
 
@@ -27,7 +30,9 @@ const assertDeploy = async <E extends EntryState>(resourceId: string, newState: 
   };
 };
 
-describe('dynamodb table', { timeout: 60000 }, () => {
+// Replacing the secondary indexes waits for DynamoDB to build each new one in turn, which takes
+// minutes to tens of minutes even on an empty table, and the table can't be deleted before then.
+describe('dynamodb table', { timeout: 60 * 60_000 }, () => {
   let lastState: EntryStates | undefined;
   let tableId: string | undefined;
 
@@ -36,10 +41,11 @@ describe('dynamodb table', { timeout: 60000 }, () => {
   it('assert :: deploy', async () => {
     const localState: EntryStates = {};
 
+    // DynamoDB refuses a second change to the TTL of a table within an hour of the first, so the
+    // table starts without one for the update to turn it on.
     const resource = createTable(localState, {
       tableName: 'ez4TestTable',
       enableStreams: true,
-      ttlAttribute: 'ttl',
       attributeSchema: [
         // Primary index
         [
@@ -152,7 +158,7 @@ describe('dynamodb table', { timeout: 60000 }, () => {
 
     ok(resource && isTableState(resource));
 
-    resource.parameters.ttlAttribute = undefined;
+    resource.parameters.ttlAttribute = 'ttl';
 
     const { state } = await assertDeploy(tableId, localState, lastState);
 

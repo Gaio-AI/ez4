@@ -1,13 +1,18 @@
 import type { EntryStates } from '@ez4/state';
 
-import { ok, equal, deepEqual } from 'node:assert/strict';
+import { ok, equal, deepEqual, rejects } from 'node:assert/strict';
 import { createReadStream } from 'node:fs';
 import { describe, it } from 'node:test';
 import { join } from 'node:path';
 
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { createBucket, isBucketState, registerTriggers } from '@ez4/aws-bucket';
 import { Client } from '@ez4/aws-bucket/client';
-import { deploy } from '@ez4/aws-common';
+import { deploy, getAwsClientOptions } from '@ez4/aws-common';
+
+import { getBucketName } from './common/names';
+
+const s3 = new S3Client(getAwsClientOptions());
 
 describe('bucket client', { timeout: 60000 }, () => {
   const baseDir = 'test/files';
@@ -23,7 +28,7 @@ describe('bucket client', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const resource = createBucket(localState, {
-      bucketName: 'ez4-test-aws-bucket-client'
+      bucketName: getBucketName('aws-bucket-client')
     });
 
     bucketId = resource.entryId;
@@ -150,7 +155,7 @@ describe('bucket client', { timeout: 60000 }, () => {
     await Promise.all([
       bucketClient.delete('test-client'),
       bucketClient.delete('test-client-plain'),
-      bucketClient.delete('test-plain-copy')
+      bucketClient.delete('folder/test-plain-copy')
     ]);
   });
 
@@ -162,5 +167,8 @@ describe('bucket client', { timeout: 60000 }, () => {
     const { result } = await deploy(undefined, lastState);
 
     equal(result[bucketId], undefined);
+
+    // A bucket with objects left in it is kept on destroy, so check it's gone from S3 too.
+    await rejects(s3.send(new HeadBucketCommand({ Bucket: getBucketName('aws-bucket-client') })));
   });
 });

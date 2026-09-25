@@ -1,6 +1,6 @@
 import type { EntryState, EntryStates } from '@ez4/state';
 
-import { ok, equal, rejects } from 'node:assert/strict';
+import { ok, equal, deepEqual, rejects } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,8 +12,13 @@ import { createBucket, createBucketObject, isBucketObjectState, isBucketState, r
 import { GetObjectTaggingCommand, HeadBucketCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getAwsClientOptions } from '@ez4/aws-common';
 
+import { getBucketName } from './common/names';
+
 const assertDeploy = async <E extends EntryState>(resourceId: string, newState: EntryStates<E>, oldState: EntryStates<E> | undefined) => {
-  const { result: state } = await deploy(newState, oldState);
+  const { result: state, errors } = await deploy(newState, oldState);
+
+  // A failed update keeps the resource's previous state, so only the errors tell it apart.
+  deepEqual(errors, []);
 
   const resource = state[resourceId];
 
@@ -42,7 +47,7 @@ describe('bucket objects', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const bucketResource = createBucket(localState, {
-      bucketName: 'ez4-test-object-bucket'
+      bucketName: getBucketName('object-bucket')
     });
 
     const resource = createBucketObject(localState, bucketResource, {
@@ -142,7 +147,7 @@ describe('bucket stale objects', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const bucketResource = createBucket(localState, {
-      bucketName: 'ez4-test-object-stale-bucket',
+      bucketName: getBucketName('object-stale-bucket'),
       staleExpireDays: 7
     });
 
@@ -269,7 +274,7 @@ describe('bucket stale retention disabled', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const bucketResource = createBucket(localState, {
-      bucketName: 'ez4-test-object-retention-bucket',
+      bucketName: getBucketName('object-retention-bucket'),
       staleExpireDays: 7
     });
 
