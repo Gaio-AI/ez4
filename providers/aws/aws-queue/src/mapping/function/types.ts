@@ -29,5 +29,6 @@ export type QueueFunctionParameters = Omit<
   variables: (LinkedVariables | undefined)[];
   references?: string[];
   backoff: QueueBackoff;
+  parallelism: number;
   debug?: boolean;
 };

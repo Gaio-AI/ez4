@@ -42,7 +42,8 @@ describe('queue function', () => {
         attempts: 3,
         minDelay: 5,
         maxDelay: 60
-      }
+      },
+      parallelism: 1
     });
 
     const [, files] = functionResource.parameters.getFunctionFiles();

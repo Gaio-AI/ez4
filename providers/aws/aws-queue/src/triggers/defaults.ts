@@ -57,6 +57,11 @@ export namespace Defaults {
   export const Batch = 10;
 
   /**
+   * Default number of messages one handler execution processes at the same time.
+   */
+  export const Parallelism = 1;
+
+  /**
    * Default queue delay.
    */
   export const Delay = 0;

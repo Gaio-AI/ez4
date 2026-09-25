@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { getRandomUUID } from '@ez4/utils';
 
 /**
@@ -22,8 +24,20 @@ declare const EZ4_RESOURCE_NAME: string;
  * Access to the current runtime settings.
  */
 export namespace Runtime {
-  let globalScope: Scope | undefined;
-  let globalScopeHeaders: ScopeHeaders = {};
+  type ScopeState = {
+    scope?: Scope;
+    headers: ScopeHeaders;
+  };
+
+  const scopeStorage = new AsyncLocalStorage<ScopeState>();
+
+  const globalState: ScopeState = {
+    headers: {}
+  };
+
+  const getScopeState = () => {
+    return scopeStorage.getStore() ?? globalState;
+  };
 
   export type Scope = { traceId: string } & { [key: string]: string | undefined };
 
@@ -34,31 +48,46 @@ export namespace Runtime {
   export const MAX_SCOPE_VALUE_LENGTH = 256;
 
   /**
-   * Set the new common runtime scope.
+   * Set the new runtime scope, the one of the current `runWithScope` callback or the common one.
    *
    * @param scope New scope object.
    * @param headers Header name of each scope key, used to forward the scope.
    */
   export const setScope = (scope: Scope, headers: ScopeHeaders = {}) => {
-    globalScope = { ...scope };
-    globalScopeHeaders = { ...headers };
+    const state = getScopeState();
+
+    state.scope = { ...scope };
+    state.headers = { ...headers };
   };
 
   /**
-   * Clear the common runtime scope and its headers.
+   * Clear the runtime scope and its headers.
    */
   export const clearScope = () => {
-    globalScope = undefined;
-    globalScopeHeaders = {};
+    const state = getScopeState();
+
+    state.scope = undefined;
+    state.headers = {};
   };
 
   /**
-   * Get the current common runtime scope.
+   * Run the given callback in a scope of its own, which takes the place of the common scope for
+   * everything the callback runs or awaits, so concurrent callbacks don't share one scope.
    *
-   * @returns Returns the current common runtime scope.
+   * @param callback Callback to run, which sets its scope with `setScope` or `importScope`.
+   * @returns Returns the callback result.
+   */
+  export const runWithScope = <T>(callback: () => T) => {
+    return scopeStorage.run({ headers: {} }, callback);
+  };
+
+  /**
+   * Get the current runtime scope.
+   *
+   * @returns Returns the scope of the current `runWithScope` callback, or the common scope.
    */
   export const getScope = () => {
-    return globalScope;
+    return getScopeState().scope;
   };
 
   /**
@@ -67,7 +96,7 @@ export namespace Runtime {
    * @returns Returns the scope headers map (empty when none is declared).
    */
   export const getScopeHeaders = () => {
-    return globalScopeHeaders;
+    return getScopeState().headers;
   };
 
   /**
@@ -110,12 +139,14 @@ export namespace Runtime {
    * @returns Returns the `X-Trace-Id` header (a new one without scope) and each declared scope header.
    */
   export const getScopeRequestHeaders = () => {
+    const { scope, headers: scopeHeaders } = getScopeState();
+
     const headers: Record<string, string> = {
-      ['X-Trace-Id']: globalScope?.traceId ?? getRandomUUID()
+      ['X-Trace-Id']: scope?.traceId ?? getRandomUUID()
     };
 
-    for (const [key, header] of Object.entries(globalScopeHeaders)) {
-      const value = globalScope?.[key];
+    for (const [key, header] of Object.entries(scopeHeaders)) {
+      const value = scope?.[key];
 
       if (value !== undefined) {
         headers[header] = value;
@@ -131,7 +162,9 @@ export namespace Runtime {
    * @returns Returns the serialized scope, or `undefined` when it has no extra values.
    */
   export const exportScope = () => {
-    const values = { ...globalScope, traceId: undefined };
+    const { scope, headers } = getScopeState();
+
+    const values = { ...scope, traceId: undefined };
 
     if (!Object.values(values).some((value) => value !== undefined)) {
       return undefined;
@@ -139,7 +172,7 @@ export namespace Runtime {
 
     return JSON.stringify({
       values,
-      headers: globalScopeHeaders
+      headers
     });
   };
 

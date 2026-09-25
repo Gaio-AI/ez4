@@ -19,7 +19,7 @@ export const getQueueTemplateFile = () => {
 };
 
 export const bundleQueueFunction = async (parameters: BundleQueueFunctionParameters, connections: EntryState[]) => {
-  const { handler, listener, functionName, messageSchema, backoff, context, references, debug } = parameters;
+  const { handler, listener, functionName, messageSchema, backoff, parallelism, context, references, debug } = parameters;
 
   const definitions = getDefinitionsObject(connections);
 
@@ -33,7 +33,8 @@ export const bundleQueueFunction = async (parameters: BundleQueueFunctionParamet
       __EZ4_SCHEMA: messageSchema ? JSON.stringify(messageSchema) : 'undefined',
       __EZ4_MAX_ATTEMPTS: `${backoff.attempts}`,
       __EZ4_MIN_BACKOFF: `${backoff.minDelay}`,
-      __EZ4_MAX_BACKOFF: `${backoff.maxDelay}`
+      __EZ4_MAX_BACKOFF: `${backoff.maxDelay}`,
+      __EZ4_PARALLELISM: `${parallelism}`
     },
     handler,
     listener,
