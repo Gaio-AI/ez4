@@ -44,6 +44,10 @@ export async function eventEntryPoint(payload: AnyObject | null, context: Contex
     await onDone(request);
   } catch (error) {
     await onError(error, request);
+
+    // A failed run fails the invocation, so it counts in the function errors. Schedule targets take
+    // no asynchronous retries, so the handler doesn't run again for the same schedule.
+    throw error;
   } finally {
     clearTimeout(timeoutEvent);
     await onEnd(request);

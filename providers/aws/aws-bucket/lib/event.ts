@@ -52,6 +52,10 @@ export async function s3EntryPoint(event: S3Event, context: Context): Promise<vo
     }
   } catch (error) {
     await onError(error, currentRequest ?? request);
+
+    // A failed event fails the invocation, so it counts in the function errors and gets the retries
+    // of the asynchronous invocation.
+    throw error;
   } finally {
     clearTimeout(timeoutEvent);
     await onEnd(request);
