@@ -110,7 +110,7 @@ endDate: '2026-12-31T23:59:59Z';
 
 #### Max retries (optional)
 
-Limits the number of retry attempts for failed event executions.
+Limits the number of retry attempts to deliver an event the target didn't accept. A handler that throws fails its run, and the run isn't retried: the next scheduled event runs the handler again.
 
 ```ts
 maxRetries: 3;

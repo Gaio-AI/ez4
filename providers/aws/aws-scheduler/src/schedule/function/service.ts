@@ -32,6 +32,9 @@ export const createTargetFunction = <E extends EntryState>(
     files: parameters.files,
     tags: parameters.tags,
     vpc: parameters.vpc,
+    // The schedule's retry policy covers delivering the event. A handler that fails must not run the
+    // job again, so the asynchronous invocation takes no retries of its own.
+    retryAttempts: 0,
     getFunctionVariables: () => {
       return variables.reduce<LinkedVariables>((variables, current) => ({ ...variables, ...current }), {});
     },

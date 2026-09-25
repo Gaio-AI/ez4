@@ -11,6 +11,8 @@ import {
   PublishVersionCommand,
   CreateAliasCommand,
   UpdateAliasCommand,
+  PutFunctionEventInvokeConfigCommand,
+  DeleteFunctionEventInvokeConfigCommand,
   TagResourceCommand,
   UntagResourceCommand,
   waitUntilFunctionActive,
@@ -49,6 +51,7 @@ export type CreateRequest = {
   runtime: RuntimeType;
   timeout: number;
   memory: number;
+  retryAttempts?: number;
   vpc?: boolean;
   tags?: ResourceTags;
 };
@@ -207,6 +210,38 @@ export const updateAlias = async (logger: OperationLogLine, functionName: string
         FunctionName: functionName
       })
     );
+  }
+};
+
+export const updateRetryAttempts = async (logger: OperationLogLine, functionName: string, retryAttempts: number | undefined) => {
+  logger.update(`Updating asynchronous retries`);
+
+  const client = getLambdaClient();
+
+  // Set on the alias every trigger invokes, which keeps it through new versions.
+  if (retryAttempts !== undefined) {
+    await client.send(
+      new PutFunctionEventInvokeConfigCommand({
+        FunctionName: functionName,
+        Qualifier: FunctionDefaults.AliasName,
+        MaximumRetryAttempts: retryAttempts
+      })
+    );
+
+    return;
+  }
+
+  try {
+    await client.send(
+      new DeleteFunctionEventInvokeConfigCommand({
+        FunctionName: functionName,
+        Qualifier: FunctionDefaults.AliasName
+      })
+    );
+  } catch (error) {
+    if (!(error instanceof ResourceNotFoundException)) {
+      throw error;
+    }
   }
 };
 

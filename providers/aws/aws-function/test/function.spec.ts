@@ -1,17 +1,20 @@
 import type { EntryState, EntryStates } from '@ez4/state';
 
-import { ok, equal, notEqual } from 'node:assert/strict';
+import { ok, equal, notEqual, rejects } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { join } from 'node:path';
 
-import { createFunction, isFunctionState, registerTriggers } from '@ez4/aws-function';
+import { GetFunctionEventInvokeConfigCommand, LambdaClient } from '@aws-sdk/client-lambda';
+import { createFunction, FunctionDefaults, isFunctionState, registerTriggers } from '@ez4/aws-function';
 import { ArchitectureType, RuntimeType } from '@ez4/project';
 import { createLogGroup } from '@ez4/aws-logs';
 import { createRole } from '@ez4/aws-identity';
-import { deploy } from '@ez4/aws-common';
+import { deploy, getAwsClientOptions } from '@ez4/aws-common';
 import { deepClone } from '@ez4/utils';
 
 import { getRoleDocument } from './common/role';
+
+const lambda = new LambdaClient(getAwsClientOptions());
 
 const assertDeploy = async <E extends EntryState>(resourceId: string, newState: EntryStates<E>, oldState: EntryStates<E> | undefined) => {
   const { result: state } = await deploy(newState, oldState);
@@ -158,6 +161,55 @@ describe('function', { timeout: 60000 }, () => {
     };
 
     const { state } = await assertDeploy(functionId, localState, lastState);
+
+    lastState = state;
+  });
+
+  it('assert :: update asynchronous retries', async () => {
+    ok(functionId && lastState);
+
+    const localState = deepClone(lastState);
+    const resource = localState[functionId];
+
+    ok(resource && isFunctionState(resource));
+
+    resource.parameters.retryAttempts = 0;
+
+    const { state } = await assertDeploy(functionId, localState, lastState);
+
+    const { MaximumRetryAttempts } = await lambda.send(
+      new GetFunctionEventInvokeConfigCommand({
+        FunctionName: resource.parameters.functionName,
+        Qualifier: FunctionDefaults.AliasName
+      })
+    );
+
+    equal(MaximumRetryAttempts, 0);
+
+    lastState = state;
+  });
+
+  it('assert :: remove asynchronous retries', async () => {
+    ok(functionId && lastState);
+
+    const localState = deepClone(lastState);
+    const resource = localState[functionId];
+
+    ok(resource && isFunctionState(resource));
+
+    resource.parameters.retryAttempts = undefined;
+
+    const { state } = await assertDeploy(functionId, localState, lastState);
+
+    await rejects(
+      lambda.send(
+        new GetFunctionEventInvokeConfigCommand({
+          FunctionName: resource.parameters.functionName,
+          Qualifier: FunctionDefaults.AliasName
+        })
+      ),
+      { name: 'ResourceNotFoundException' }
+    );
 
     lastState = state;
   });

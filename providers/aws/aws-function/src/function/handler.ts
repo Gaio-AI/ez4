@@ -17,6 +17,7 @@ import {
   publishFunction,
   unpublishFunctions,
   updateAlias,
+  updateRetryAttempts,
   untagFunction,
   tagFunction
 } from './client';
@@ -139,6 +140,10 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
 
       await updateAlias(logger, functionName, functionVersion);
 
+      if (parameters.retryAttempts !== undefined) {
+        await updateRetryAttempts(logger, functionName, parameters.retryAttempts);
+      }
+
       return {
         variables: protectVariables(variables),
         functionArn: importedFunction.functionArn,
@@ -173,6 +178,10 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
     });
 
     await updateAlias(logger, functionName, functionVersion);
+
+    if (parameters.retryAttempts !== undefined) {
+      await updateRetryAttempts(logger, functionName, parameters.retryAttempts);
+    }
 
     return {
       variables: protectVariables(variables),
@@ -214,6 +223,8 @@ const updateResource = (candidate: FunctionState, current: FunctionState, contex
     const hasConfigurationUpdated = await checkConfigurationUpdates(logger, functionName, newConfig, oldConfig, hasSourceUpdated, context);
 
     await checkTagUpdates(logger, result.functionArn, parameters, current.parameters, hasSourceUpdated);
+
+    await checkRetryUpdates(logger, functionName, parameters, current, context);
 
     const shouldPublish = hasSourceUpdated || hasConfigurationUpdated;
     const functionVersion = shouldPublish ? await publishFunction(logger, functionName) : result.functionVersion;
@@ -274,6 +285,7 @@ const checkConfigurationUpdates = async (
       sourceFile: true,
       functionName: true,
       architecture: true,
+      retryAttempts: true,
       release: true,
       tags: true
     }
@@ -322,6 +334,25 @@ const checkTagUpdates = async (
     (tags) => tagFunction(logger, functionArn, tags),
     (tags) => untagFunction(logger, functionArn, tags)
   );
+};
+
+const checkRetryUpdates = async (
+  logger: OperationLogLine,
+  functionName: string,
+  candidate: FunctionParameters,
+  current: FunctionState,
+  context: StepContext
+) => {
+  const { retryAttempts } = candidate;
+
+  // A function that never sets its retries doesn't call the API, so deploying it needs no
+  // permission over the asynchronous invocation config.
+  const hasRetryChange = retryAttempts !== current.parameters.retryAttempts;
+  const hasRetryToRestore = retryAttempts !== undefined && (current.partial || context.force);
+
+  if (hasRetryChange || hasRetryToRestore) {
+    await updateRetryAttempts(logger, functionName, retryAttempts);
+  }
 };
 
 const checkSourceCodeUpdates = async (
