@@ -1,8 +1,14 @@
-import type { HttpCors, HttpRoute } from '@ez4/gateway/library';
+import type { HttpCors, HttpDefaults, HttpRoute } from '@ez4/gateway/library';
 
-export const getCorsConfiguration = (routes: HttpRoute[], cors: HttpCors): HttpCors => {
+export const getCorsConfiguration = (routes: HttpRoute[], cors: HttpCors, defaults?: HttpDefaults): HttpCors => {
   const allowHeaders = new Set<string>(cors.allowHeaders?.map((header) => header.toLowerCase()));
   const allowMethods = new Set<string>(cors.allowMethods);
+
+  allowHeaders.add('x-trace-id');
+
+  Object.values(defaults?.scope ?? {}).forEach((header) => {
+    allowHeaders.add(header.toLowerCase());
+  });
 
   for (const route of routes) {
     if (!route.cors) {
@@ -33,12 +39,12 @@ export const getCorsConfiguration = (routes: HttpRoute[], cors: HttpCors): HttpC
 };
 
 const getCorsHeaderNames = (route: HttpRoute) => {
-  const { authorizer, handler } = route;
+  const { authorizer, handler, scope } = route;
 
   const headerNames = Object.keys({
     ...authorizer?.request?.headers?.properties,
     ...handler.request?.headers?.properties
   });
 
-  return headerNames;
+  return [...headerNames, ...Object.values(scope ?? {})];
 };

@@ -14,6 +14,7 @@ import { Defaults } from '../utils/defaults';
 import { getAuthorizer, createAuthorizer } from '../authorizer/service';
 import { createAuthorizerFunction } from '../authorizer/function/service';
 import { getFunctionName, getInternalName } from './utils/name';
+import { mergeScopeHeaders } from './utils/scope';
 import { RoleMissingError } from './errors';
 
 export const getAuthorizerFunction = (
@@ -88,6 +89,7 @@ export const getAuthorizerFunction = (
         ...service.defaults?.preferences,
         ...target.preferences
       },
+      scope: mergeScopeHeaders(defaults, target),
       authorizer: {
         sourceFile: authorizer.file,
         functionName: authorizer.name,

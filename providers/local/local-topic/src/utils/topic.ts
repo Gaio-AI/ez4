@@ -19,12 +19,13 @@ export const getTopicServiceHost = (serviceHost: string, topicIdentifier: string
   return `http://${serviceHost}/${topicIdentifier}`;
 };
 
-export const sendTopicServiceRequest = async (serviceHost: string, request: string) => {
+export const sendTopicServiceRequest = async (serviceHost: string, request: string, headers?: Record<string, string>) => {
   const response = await fetch(serviceHost, {
     method: 'POST',
     body: request,
     headers: {
-      ['content-type']: 'application/json'
+      ['content-type']: 'application/json',
+      ...headers
     }
   });
 

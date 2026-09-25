@@ -18,8 +18,19 @@ export const getAuthorizerTemplateFile = () => {
 };
 
 export const bundleApiFunction = async (parameters: AuthorizerFunctionParameters, connections: EntryState[]) => {
-  const { authorizer, listener, functionName, headersSchema, parametersSchema, querySchema, preferences, context, references, debug } =
-    parameters;
+  const {
+    authorizer,
+    listener,
+    functionName,
+    headersSchema,
+    parametersSchema,
+    querySchema,
+    preferences,
+    scope,
+    context,
+    references,
+    debug
+  } = parameters;
 
   const definitions = getDefinitionsObject(connections);
 
@@ -34,7 +45,8 @@ export const bundleApiFunction = async (parameters: AuthorizerFunctionParameters
       __EZ4_HEADERS_SCHEMA: headersSchema ? JSON.stringify(headersSchema) : 'undefined',
       __EZ4_PARAMETERS_SCHEMA: parametersSchema ? JSON.stringify(parametersSchema) : 'undefined',
       __EZ4_QUERY_SCHEMA: querySchema ? JSON.stringify(querySchema) : 'undefined',
-      __EZ4_PREFERENCES: preferences ? JSON.stringify(preferences) : 'undefined'
+      __EZ4_PREFERENCES: preferences ? JSON.stringify(preferences) : 'undefined',
+      __EZ4_SCOPE: scope ? JSON.stringify(scope) : 'undefined'
     },
     listener,
     debug

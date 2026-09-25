@@ -36,4 +36,5 @@ describe('ws metadata', () => {
   it('assert :: target identity', () => testFile('identity'));
   it('assert :: target listener', () => testFile('listener'));
   it('assert :: target vpc', () => testFile('vpc'));
+  it('assert :: service scope', () => testFile('scope'));
 });

@@ -1,0 +1,60 @@
+{
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "TestService1": {
+    "type": "@ez4/ws",
+    "name": "TestService1",
+    "file": "test/ws/input/output-scope.ts",
+    "context": {},
+    "variables": {},
+    "services": {},
+    "defaults": {
+      "scope": {
+        "clientVersion": "x-client-version"
+      }
+    },
+    "schema": {
+      "type": "object",
+      "properties": {},
+      "identity": 1
+    },
+    "connect": {
+      "handler": {
+        "name": "connectHandler",
+        "file": "test/ws/input/output-scope.ts",
+        "position": [
+          23,
+          1
+        ]
+      }
+    },
+    "disconnect": {
+      "handler": {
+        "name": "disconnectHandler",
+        "file": "test/ws/input/output-scope.ts",
+        "position": [
+          25,
+          1
+        ]
+      }
+    },
+    "message": {
+      "handler": {
+        "name": "messageHandler",
+        "file": "test/ws/input/output-scope.ts",
+        "position": [
+          27,
+          1
+        ]
+      }
+    }
+  }
+}

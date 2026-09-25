@@ -75,6 +75,7 @@ export type WsDefaults = {
   memory?: number;
   files?: string[];
   debug?: boolean;
+  scope?: Record<string, string>;
 };
 
 export const isWsService = (service: ServiceMetadata): service is WsService => {

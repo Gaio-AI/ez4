@@ -1,8 +1,9 @@
 import type { EmulateServiceContext, EmulatorRequestEvent, ServeOptions } from '@ez4/project/library';
 import type { TopicImport, TopicService } from '@ez4/topic/library';
 import type { AnyObject } from '@ez4/utils';
+import type { MessageTrace } from '@ez4/local-common';
 
-import { getErrorResponse, getSuccessResponse } from '@ez4/local-common';
+import { getErrorResponse, getMessageTraceFromHeaders, getSuccessResponse } from '@ez4/local-common';
 import { getJsonEvent, MalformedEventError } from '@ez4/topic/utils';
 import { TopicSubscriptionType } from '@ez4/topic/library';
 import { getServiceName } from '@ez4/project/library';
@@ -20,8 +21,8 @@ export const registerLocalService = (service: TopicService, options: ServeOption
 
   const clientOptions = {
     ...options,
-    handler: (event: AnyObject) => {
-      return handleTopicEvent(service, options, context, event);
+    handler: (event: AnyObject, trace: MessageTrace) => {
+      return handleTopicEvent(service, options, context, event, trace);
     }
   };
 
@@ -47,7 +48,7 @@ const handleTopicRequest = async (
   context: EmulateServiceContext,
   request: EmulatorRequestEvent
 ) => {
-  const { method, path, body } = request;
+  const { method, path, body, headers } = request;
 
   if (method !== 'POST' || !body) {
     throw new Error('Unsupported topic request.');
@@ -55,7 +56,7 @@ const handleTopicRequest = async (
 
   switch (path) {
     case '/':
-      return handleEventRequest(service, options, context, body.toString());
+      return handleEventRequest(service, options, context, body.toString(), getMessageTraceFromHeaders(headers));
 
     case '/unsubscribe':
       return handleUnsubscribeRequest(service, body.toString());
@@ -68,12 +69,18 @@ const handleTopicRequest = async (
   }
 };
 
-const handleEventRequest = async (service: TopicService, options: ServeOptions, context: EmulateServiceContext, body: string) => {
+const handleEventRequest = async (
+  service: TopicService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  body: string,
+  trace: MessageTrace
+) => {
   try {
     const jsonEvent = JSON.parse(body.toString());
     const safeEvent = await getJsonEvent(jsonEvent, service.schema);
 
-    await handleTopicEvent(service, options, context, safeEvent);
+    await handleTopicEvent(service, options, context, safeEvent, trace);
 
     return getSuccessResponse(201);
     //
@@ -112,18 +119,19 @@ const handleTopicEvent = async (
   service: TopicService | TopicImport,
   options: ServeOptions,
   context: EmulateServiceContext,
-  event: AnyObject
+  event: AnyObject,
+  trace: MessageTrace
 ) => {
   const allSubscriptions = [...InMemoryTopic.getSubscriptions(service.name), ...service.subscriptions].map((subscription) => {
     switch (subscription.type) {
       case TopicSubscriptionType.Lambda:
-        return processLambdaEvent(service, options, context, subscription, event);
+        return processLambdaEvent(service, options, context, subscription, event, trace);
 
       case TopicSubscriptionType.Queue:
-        return processQueueEvent(context, subscription, event);
+        return processQueueEvent(context, subscription, event, trace);
 
       case TopicEmulatorSubscriptionType.Remote:
-        return processRemoteEvent(subscription, event);
+        return processRemoteEvent(subscription, event, trace);
     }
   });
 

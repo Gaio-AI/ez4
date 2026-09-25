@@ -26,11 +26,10 @@ export const processWsConnection = async (
   const servicesInUse = handler.references ? pickObject(services, handler.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = getRandomUUID();
+  const scopeHeaders = connection.live ? defaults?.scope : undefined;
+  const traceId = connection.live ? Runtime.readTraceId(event.headers, event.query) : getRandomUUID();
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.setScope({ ...Runtime.readScopeValues(scopeHeaders, event.headers, event.query), traceId }, scopeHeaders);
 
   const module = await createModule({
     listener: target.listener ?? defaults?.listener,

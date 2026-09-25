@@ -33,6 +33,7 @@ import { getAuthHandlerMetadata } from '../auth/handler';
 import { getFullTypeName } from '../utils/name';
 import { isHttpPath } from '../utils/path';
 import { getWebPreferencesMetadata } from '../preferences';
+import { getWebScopeMetadata } from '../scope';
 import { getHttpHandlerMetadata } from './handler';
 import { getHttpErrorsMetadata } from './errors';
 import { HttpNamespaceType } from './types';
@@ -215,6 +216,11 @@ const getTypeFromMembers = (
 
       case 'variables': {
         route.variables = getLinkedVariablesObject(member, errorList);
+        break;
+      }
+
+      case 'scope': {
+        route.scope = getWebScopeMetadata(member, errorList);
         break;
       }
     }

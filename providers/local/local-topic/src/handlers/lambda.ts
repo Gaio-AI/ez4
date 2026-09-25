@@ -2,6 +2,7 @@ import type { TopicImport, TopicLambdaSubscription, TopicService } from '@ez4/to
 import type { EmulateServiceContext, ServeOptions } from '@ez4/project/library';
 import type { AnyObject } from '@ez4/utils';
 import type { Topic } from '@ez4/topic';
+import type { MessageTrace } from '@ez4/local-common';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/local-common';
 import { getRandomUUID, pickObject } from '@ez4/utils';
@@ -12,14 +13,15 @@ export const processLambdaEvent = async (
   options: ServeOptions,
   context: EmulateServiceContext,
   subscription: TopicLambdaSubscription,
-  event: AnyObject
+  event: AnyObject,
+  trace: MessageTrace
 ) => {
   const { services } = service;
 
-  const servicesInUse = event.handler.references ? pickObject(services, event.handler.references) : services;
+  const servicesInUse = subscription.handler.references ? pickObject(services, subscription.handler.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = getRandomUUID();
+  const traceId = trace.traceId ?? getRandomUUID();
 
   const module = await createModule({
     listener: subscription.listener,
@@ -47,9 +49,7 @@ export const processLambdaEvent = async (
       traceId
     };
 
-    Runtime.setScope({
-      traceId
-    });
+    Runtime.importScope(traceId, trace.scope);
 
     await onReady(module, serviceClients, currentRequest);
     await module.handler(currentRequest, serviceClients);

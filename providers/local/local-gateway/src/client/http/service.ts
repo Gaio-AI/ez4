@@ -7,6 +7,7 @@ import { getServiceName } from '@ez4/project/library';
 import { prepareRequestUrl } from '@ez4/http';
 import { isAnyString } from '@ez4/utils';
 import { HttpError } from '@ez4/gateway';
+import { Runtime } from '@ez4/common';
 import { Logger } from '@ez4/logger';
 
 export type HttpServiceClientOptions = CommonOptions & {
@@ -39,6 +40,8 @@ export const createHttpServiceClient = <T extends Http.Service>(
         return async (request: HttpClientRequest) => {
           const { authorize, method, path, namingStyle, querySchema, bodySchema, responseSchema } = operations[property];
 
+          const scopeHeaders = Runtime.getScopeRequestHeaders();
+
           const requestUrl = prepareRequestUrl(gatewayHost, path, {
             ...request,
             querySchema,
@@ -53,6 +56,10 @@ export const createHttpServiceClient = <T extends Http.Service>(
               bodySchema,
               responseSchema,
               namingStyle,
+              headers: {
+                ...scopeHeaders,
+                ...request.headers
+              },
               ...(authorize && {
                 authorization
               })

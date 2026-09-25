@@ -8,7 +8,6 @@ import type { Http } from '@ez4/gateway';
 import { HttpError, HttpInternalServerError } from '@ez4/gateway';
 import { isObjectSchema, isScalarSchema } from '@ez4/schema';
 import { ServiceEventType, Runtime, ServiceError } from '@ez4/common';
-import { getRandomUUID } from '@ez4/utils';
 
 import {
   resolveHeaders,
@@ -32,6 +31,7 @@ declare const __EZ4_BODY_SCHEMA: ObjectSchema | UnionSchema | ArraySchema | Scal
 declare const __EZ4_RESPONSE_SCHEMA: ObjectSchema | UnionSchema | ArraySchema | ScalarSchema | null;
 declare const __EZ4_ERRORS_MAP: Record<string, number> | null;
 declare const __EZ4_PREFERENCES: HttpPreferences;
+declare const __EZ4_SCOPE: Runtime.ScopeHeaders | undefined;
 declare const __EZ4_CONTEXT: object;
 
 declare function handle(request: Http.Incoming<Http.Request>, context: object): Promise<Http.Response>;
@@ -46,7 +46,7 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
   const milliseconds = Math.max(0, context.getRemainingTimeInMillis() - 1000);
   const timeoutEvent = setTimeout(() => onTimeout(request, milliseconds), milliseconds);
 
-  const traceId = event.headers['x-trace-id'] ?? getRandomUUID();
+  const traceId = Runtime.readTraceId(event.headers);
 
   const request: Http.Incoming<Http.Request> = {
     requestId: context.awsRequestId,
@@ -58,9 +58,13 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
     traceId
   };
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.setScope(
+    {
+      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers),
+      traceId
+    },
+    __EZ4_SCOPE
+  );
 
   try {
     await onBegin(request);

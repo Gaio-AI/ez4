@@ -82,6 +82,7 @@ const buildHttpRoutes = (service: HttpService) => {
   };
 
   const defaultPreferences = service.defaults?.preferences;
+  const defaultScope = service.defaults?.scope;
 
   for (const route of service.routes) {
     const [method, path] = route.path.split(' ', 2);
@@ -96,6 +97,7 @@ const buildHttpRoutes = (service: HttpService) => {
       variables: route.variables,
       authorizer: route.authorizer,
       listener: route.listener,
+      scope: { ...defaultScope, ...route.scope },
       handler: route.handler
     };
   }

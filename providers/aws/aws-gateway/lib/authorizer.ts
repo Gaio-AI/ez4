@@ -14,7 +14,6 @@ import type {
 import { resolveHeaders, resolvePathParameters, resolveQueryStrings, resolveValidation } from '@ez4/gateway/utils';
 import { HttpForbiddenError, HttpUnauthorizedError } from '@ez4/gateway';
 import { ServiceEventType, Runtime } from '@ez4/common';
-import { getRandomUUID } from '@ez4/utils';
 
 type IncomingRequest = Http.Incoming<Http.AuthRequest> | Ws.Incoming<Ws.AuthRequest>;
 type ServiceEvent = Http.ServiceEvent<Http.AuthRequest> | Ws.ServiceEvent<Ws.AuthRequest>;
@@ -26,6 +25,7 @@ declare const __EZ4_HEADERS_SCHEMA: ObjectSchema | null;
 declare const __EZ4_PARAMETERS_SCHEMA: ObjectSchema | null;
 declare const __EZ4_QUERY_SCHEMA: ObjectSchema | null;
 declare const __EZ4_PREFERENCES: HttpPreferences;
+declare const __EZ4_SCOPE: Runtime.ScopeHeaders | undefined;
 declare const __EZ4_CONTEXT: object;
 
 declare function handle(request: IncomingRequest, context: object): Promise<Http.AuthResponse>;
@@ -41,7 +41,10 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
   const timeoutEvent = setTimeout(() => onTimeout(request, milliseconds), milliseconds);
 
   const resourceArn = event.methodArn ?? event.routeArn;
-  const traceId = event.headers['x-trace-id'] ?? getRandomUUID();
+  // WS connections send the scope in the query string, since browsers cannot set WebSocket headers.
+  const connectionQuery = requestContext.http ? undefined : event.queryStringParameters;
+
+  const traceId = Runtime.readTraceId(event.headers, connectionQuery);
 
   const request: Http.Incoming<Http.AuthRequest> = {
     timestamp: new Date(requestContext.timeEpoch),
@@ -51,9 +54,13 @@ export async function apiEntryPoint(event: RequestEvent, context: Context): Prom
     traceId
   };
 
-  Runtime.setScope({
-    traceId
-  });
+  Runtime.setScope(
+    {
+      ...Runtime.readScopeValues(__EZ4_SCOPE, event.headers, connectionQuery),
+      traceId
+    },
+    __EZ4_SCOPE
+  );
 
   try {
     await onBegin(request);

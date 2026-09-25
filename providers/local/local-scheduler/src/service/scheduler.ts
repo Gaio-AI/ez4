@@ -1,17 +1,20 @@
 import type { Cron, ScheduleEvent } from '@ez4/scheduler';
+import type { MessageTrace } from '@ez4/local-common';
 
 import { deepClone, deepMerge } from '@ez4/utils';
 
 type InMemorySchedulerData<T extends Cron.Event> = InMemoryScheduler.SchedulerParameters & {
-  events: Record<string, ScheduleEvent<T>>;
+  events: Record<string, InMemoryScheduler.ScheduledEvent<T>>;
   timers: Record<string, NodeJS.Timeout>;
 };
 
 const ALL_SCHEDULERS: Record<string, InMemorySchedulerData<any>> = {};
 
 export namespace InMemoryScheduler {
+  export type ScheduledEvent<T extends Cron.Event> = ScheduleEvent<T> & MessageTrace;
+
   export type SchedulerParameters = {
-    handler: (event: Cron.Event | null) => Promise<void> | void;
+    handler: (event: Cron.Event | null, trace?: MessageTrace) => Promise<void> | void;
   };
 
   export const createScheduler = (schedulerName: string, parameters: SchedulerParameters) => {
@@ -70,7 +73,7 @@ export namespace InMemoryScheduler {
     });
   };
 
-  export const setEvent = <T extends Cron.Event>(schedulerName: string, identifier: string, input: ScheduleEvent<T>) => {
+  export const setEvent = <T extends Cron.Event>(schedulerName: string, identifier: string, input: ScheduledEvent<T>) => {
     const instance = getScheduler(schedulerName);
     const interval = input.date.getTime() - Date.now();
 
@@ -80,11 +83,11 @@ export namespace InMemoryScheduler {
 
     clearTimeout(instance.timers[identifier]);
 
-    instance.timers[identifier] = setTimeout(() => instance.handler(input.event), interval);
+    instance.timers[identifier] = setTimeout(() => instance.handler(input.event, { traceId: input.traceId, scope: input.scope }), interval);
     instance.events[identifier] = input;
   };
 
-  export const createEvent = <T extends Cron.Event>(schedulerName: string, identifier: string, input: ScheduleEvent<T>) => {
+  export const createEvent = <T extends Cron.Event>(schedulerName: string, identifier: string, input: ScheduledEvent<T>) => {
     const instance = getScheduler(schedulerName);
     const interval = input.date.getTime() - Date.now();
 
@@ -92,7 +95,7 @@ export namespace InMemoryScheduler {
       throw new Error(`Event for scheduler ${schedulerName} is too old.`);
     }
 
-    instance.timers[identifier] = setTimeout(() => instance.handler(input.event), interval);
+    instance.timers[identifier] = setTimeout(() => instance.handler(input.event, { traceId: input.traceId, scope: input.scope }), interval);
     instance.events[identifier] = input;
   };
 

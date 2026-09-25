@@ -16,7 +16,7 @@ export const createAuthorizerFunction = <E extends EntryState>(
   logGroupState: LogGroupState,
   parameters: AuthorizerFunctionParameters
 ) => {
-  const { authorizer, variables, debug, architecture, preferences } = parameters;
+  const { authorizer, variables, debug, architecture, preferences, scope } = parameters;
   const { headersSchema, parametersSchema, querySchema } = parameters;
 
   return createFunction(state, roleState, logGroupState, {
@@ -50,6 +50,7 @@ export const createAuthorizerFunction = <E extends EntryState>(
         parametersSchema,
         querySchema,
         preferences,
+        scope,
         debug
       });
     }

@@ -219,6 +219,7 @@ export namespace Client {
 
     return JSON.stringify({
       traceId: scope?.traceId ?? getRandomUUID(),
+      scope: Runtime.exportScope(),
       event: data
     });
   };

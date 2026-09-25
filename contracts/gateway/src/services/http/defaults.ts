@@ -31,4 +31,21 @@ export interface HttpDefaults<T extends HttpRequest> extends WebDefaults {
    * ```
    */
   readonly httpErrors?: HttpErrors;
+
+  /**
+   * Maps scope keys to the request headers they are read from.
+   *
+   * - Each declared header is read by the route handler and authorizer and exposed through `Runtime.getScope()`.
+   * - Values longer than 256 characters are truncated.
+   * - Declared headers are added to the CORS allowed headers.
+   * - The HTTP client, queues, topics and schedulers carry the scope to the next handler.
+   *
+   * @example
+   * ```ts
+   * scope: {
+   *   clientVersion: 'x-client-version';
+   * }
+   * ```
+   */
+  readonly scope?: Record<string, string>;
 }

@@ -13,6 +13,7 @@ import { IntegrationFunctionType } from '../integration/function/types';
 import { createIntegrationFunction } from '../integration/function/service';
 import { getIntegration, createIntegration } from '../integration/service';
 import { getFunctionName, getInternalName } from './utils/name';
+import { mergeScopeHeaders } from './utils/scope';
 import { RoleMissingError } from './errors';
 
 export const getIntegrationRequestFunction = (
@@ -23,7 +24,7 @@ export const getIntegrationRequestFunction = (
   options: DeployOptions,
   context: EventContext
 ) => {
-  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.HttpRequest, options, context);
+  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.HttpRequest, true, options, context);
 };
 
 export const getIntegrationConnectionFunction = (
@@ -34,7 +35,18 @@ export const getIntegrationConnectionFunction = (
   options: DeployOptions,
   context: EventContext
 ) => {
-  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.WsConnection, options, context);
+  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.WsConnection, true, options, context);
+};
+
+export const getIntegrationDisconnectionFunction = (
+  state: EntryStates,
+  service: HttpService | WsService,
+  gatewayState: GatewayState,
+  target: WsConnection,
+  options: DeployOptions,
+  context: EventContext
+) => {
+  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.WsConnection, false, options, context);
 };
 
 export const getIntegrationMessageFunction = (
@@ -45,7 +57,7 @@ export const getIntegrationMessageFunction = (
   options: DeployOptions,
   context: EventContext
 ) => {
-  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.WsMessage, options, context);
+  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.WsMessage, false, options, context);
 };
 
 const getIntegrationFunction = (
@@ -54,6 +66,7 @@ const getIntegrationFunction = (
   gatewayState: GatewayState,
   target: HttpRoute | WsConnection | WsMessage,
   type: IntegrationFunctionType,
+  readsScope: boolean,
   options: DeployOptions,
   context: EventContext
 ) => {
@@ -133,6 +146,7 @@ const getIntegrationFunction = (
         ...defaults.preferences,
         ...target.preferences
       },
+      scope: readsScope ? mergeScopeHeaders(defaults, target) : undefined,
       architecture,
       logLevel,
       runtime,

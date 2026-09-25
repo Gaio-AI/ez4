@@ -15,7 +15,7 @@ import { createGateway } from '../../gateway/service';
 import { GatewayProtocol } from '../../gateway/types';
 import { createResponse } from '../../response/service';
 import { getDisplayName, getInternalName } from '../utils/name';
-import { getIntegrationConnectionFunction, getIntegrationMessageFunction } from '../integration';
+import { getIntegrationConnectionFunction, getIntegrationDisconnectionFunction, getIntegrationMessageFunction } from '../integration';
 import { getAuthorizerFunction } from '../authorizer';
 import { RoleMissingError } from '../errors';
 import { prepareLinkedClient } from './client';
@@ -125,7 +125,7 @@ const createDisconnectAction = (
 ) => {
   const { disconnect } = service;
 
-  const integrationState = getIntegrationConnectionFunction(state, service, gatewayState, disconnect, options, context);
+  const integrationState = getIntegrationDisconnectionFunction(state, service, gatewayState, disconnect, options, context);
 
   createRoute(state, gatewayState, integrationState, undefined, {
     routePath: '$disconnect'

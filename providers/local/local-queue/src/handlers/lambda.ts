@@ -3,6 +3,7 @@ import type { EmulateServiceContext, ServeOptions } from '@ez4/project/library';
 import type { ValidationCustomContext } from '@ez4/validator';
 import type { AnyObject } from '@ez4/utils';
 import type { Queue } from '@ez4/queue';
+import type { MessageTrace } from '@ez4/local-common';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/local-common';
 import { getJsonMessage, resolveValidation } from '@ez4/queue/utils';
@@ -15,6 +16,7 @@ export const processLambdaMessage = async (
   context: EmulateServiceContext,
   subscription: QueueSubscription,
   message: AnyObject,
+  trace: MessageTrace,
   retry: (delay: number) => void
 ) => {
   const { services } = service;
@@ -22,7 +24,7 @@ export const processLambdaMessage = async (
   const servicesInUse = subscription.handler.references ? pickObject(services, subscription.handler.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
 
-  const traceId = getRandomUUID();
+  const traceId = trace.traceId ?? getRandomUUID();
 
   const module = await createModule({
     listener: subscription.listener,
@@ -60,9 +62,7 @@ export const processLambdaMessage = async (
       }
     };
 
-    Runtime.setScope({
-      traceId
-    });
+    Runtime.importScope(traceId, trace.scope);
 
     await onReady(module, serviceClients, currentRequest);
     await module.handler(currentRequest, serviceClients);

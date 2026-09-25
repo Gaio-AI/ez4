@@ -107,9 +107,7 @@ const processAllRecords = async (request: Queue.Request, schema: MessageSchema, 
         retry
       };
 
-      Runtime.setScope({
-        traceId
-      });
+      Runtime.importScope(traceId, record.messageAttributes['EZ4.SCOPE']?.stringValue);
 
       await onReady(currentRequest);
 

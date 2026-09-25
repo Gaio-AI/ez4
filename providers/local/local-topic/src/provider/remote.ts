@@ -1,7 +1,7 @@
 import type { EmulateServiceContext, EmulatorRequestEvent, ServeOptions } from '@ez4/project/library';
 import type { TopicImport } from '@ez4/topic/library';
 
-import { getErrorResponse, getSuccessResponse } from '@ez4/local-common';
+import { getErrorResponse, getMessageTraceFromHeaders, getSuccessResponse } from '@ez4/local-common';
 import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
 import { getJsonEvent, MalformedEventError } from '@ez4/topic/utils';
 import { TopicSubscriptionType } from '@ez4/topic/library';
@@ -60,7 +60,7 @@ const handleTopicRequest = async (
   context: EmulateServiceContext,
   request: EmulatorRequestEvent
 ) => {
-  const { method, path, body } = request;
+  const { method, path, body, headers } = request;
 
   if (method !== 'POST' || path !== '/' || !body) {
     throw new Error('Unsupported topic request.');
@@ -69,14 +69,15 @@ const handleTopicRequest = async (
   try {
     const jsonEvent = JSON.parse(body.toString());
     const safeEvent = await getJsonEvent(jsonEvent, service.schema);
+    const trace = getMessageTraceFromHeaders(headers);
 
     const allSubscriptions = service.subscriptions.map((subscription) => {
       switch (subscription.type) {
         case TopicSubscriptionType.Lambda:
-          return processLambdaEvent(service, options, context, subscription, safeEvent);
+          return processLambdaEvent(service, options, context, subscription, safeEvent, trace);
 
         case TopicSubscriptionType.Queue:
-          return processQueueEvent(context, subscription, safeEvent);
+          return processQueueEvent(context, subscription, safeEvent, trace);
       }
     });
 

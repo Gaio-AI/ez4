@@ -39,6 +39,7 @@ export const bundleRequestFunction = async (parameters: IntegrationFunctionParam
     identitySchema,
     responseSchema,
     errorsMap,
+    scope,
     context,
     references,
     debug
@@ -60,7 +61,8 @@ export const bundleRequestFunction = async (parameters: IntegrationFunctionParam
       __EZ4_BODY_SCHEMA: bodySchema ? JSON.stringify(bodySchema) : 'undefined',
       __EZ4_RESPONSE_SCHEMA: responseSchema ? JSON.stringify(responseSchema) : 'undefined',
       __EZ4_PREFERENCES: preferences ? JSON.stringify(preferences) : 'undefined',
-      __EZ4_ERRORS_MAP: errorsMap ? JSON.stringify(errorsMap) : 'undefined'
+      __EZ4_ERRORS_MAP: errorsMap ? JSON.stringify(errorsMap) : 'undefined',
+      __EZ4_SCOPE: scope ? JSON.stringify(scope) : 'undefined'
     },
     handler,
     listener,
@@ -69,7 +71,7 @@ export const bundleRequestFunction = async (parameters: IntegrationFunctionParam
 };
 
 export const bundleConnectionFunction = async (parameters: IntegrationFunctionParameters, connections: EntryState[]) => {
-  const { handler, listener, preferences, functionName, headersSchema, querySchema, identitySchema, context, references, debug } =
+  const { handler, listener, preferences, functionName, headersSchema, querySchema, identitySchema, scope, context, references, debug } =
     parameters;
 
   const definitions = getDefinitionsObject(connections);
@@ -84,7 +86,8 @@ export const bundleConnectionFunction = async (parameters: IntegrationFunctionPa
       __EZ4_HEADERS_SCHEMA: headersSchema ? JSON.stringify(headersSchema) : 'undefined',
       __EZ4_QUERY_SCHEMA: querySchema ? JSON.stringify(querySchema) : 'undefined',
       __EZ4_IDENTITY_SCHEMA: identitySchema ? JSON.stringify(identitySchema) : 'undefined',
-      __EZ4_PREFERENCES: preferences ? JSON.stringify(preferences) : 'undefined'
+      __EZ4_PREFERENCES: preferences ? JSON.stringify(preferences) : 'undefined',
+      __EZ4_SCOPE: scope ? JSON.stringify(scope) : 'undefined'
     },
     handler,
     listener,
