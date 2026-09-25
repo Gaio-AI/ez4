@@ -1,7 +1,7 @@
 {
   "name": "@ez4/scheduler",
   "description": "EZ4: Components to build scheduler services",
-  "version": "0.53.908",
+  "version": "0.53.909",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
