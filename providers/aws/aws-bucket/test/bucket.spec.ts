@@ -1,6 +1,8 @@
 import type { EntryState, EntryStates } from '@ez4/state';
+import type { LifecycleRule } from '@aws-sdk/client-s3';
 
 import { ok, equal, deepEqual, rejects } from 'node:assert/strict';
+import { setTimeout } from 'node:timers/promises';
 import { describe, it } from 'node:test';
 import { join } from 'node:path';
 
@@ -27,10 +29,14 @@ import {
 } from '@aws-sdk/client-s3';
 import { deepClone } from '@ez4/utils';
 
+import { getBucketName } from './common/names';
 import { getRoleDocument } from './common/role';
 
 const assertDeploy = async <E extends EntryState>(resourceId: string, newState: EntryStates<E>, oldState: EntryStates<E> | undefined) => {
-  const { result: state } = await deploy(newState, oldState);
+  const { result: state, errors } = await deploy(newState, oldState);
+
+  // A failed update keeps the resource's previous state, so only the errors tell it apart.
+  deepEqual(errors, []);
 
   const resource = state[resourceId];
 
@@ -49,10 +55,32 @@ const assertDeploy = async <E extends EntryState>(resourceId: string, newState: 
 
 const s3 = new S3Client(getAwsClientOptions());
 
-const fetchLifecycleRules = async (bucketName: string) => {
-  const { Rules = [] } = await s3.send(new GetBucketLifecycleConfigurationCommand({ Bucket: bucketName }));
+// S3 serves the previous lifecycle configuration for a moment after a change, so the read waits,
+// for a while, until it sees the rules the change leaves in place.
+const fetchLifecycleRules = async (bucketName: string, expectedIds: string[]) => {
+  const expected = [...expectedIds].sort().join();
 
-  return Rules;
+  for (let attempt = 1; ; attempt++) {
+    let rules: LifecycleRule[] = [];
+
+    try {
+      const { Rules = [] } = await s3.send(new GetBucketLifecycleConfigurationCommand({ Bucket: bucketName }));
+
+      rules = Rules;
+    } catch (error) {
+      if (!(error instanceof Error) || error.name !== 'NoSuchLifecycleConfiguration') {
+        throw error;
+      }
+    }
+
+    const ruleIds = rules.map(({ ID }) => ID ?? '');
+
+    if (ruleIds.sort().join() === expected || attempt === 20) {
+      return rules;
+    }
+
+    await setTimeout(1000);
+  }
 };
 
 describe('bucket resources', { timeout: 60000 }, () => {
@@ -91,7 +119,7 @@ describe('bucket resources', { timeout: 60000 }, () => {
     });
 
     const resource = createBucket(localState, {
-      bucketName: 'ez4-test-bucket',
+      bucketName: getBucketName('bucket'),
       autoExpireDays: 5,
       tags: {
         test1: 'ez4-tag1',
@@ -110,7 +138,7 @@ describe('bucket resources', { timeout: 60000 }, () => {
       eventGetters: [
         (context) => {
           return {
-            functionArn: getBucketEventFunctionAliasArn('ez4-test-bucket', lambdaResource.entryId, context),
+            functionArn: getBucketEventFunctionAliasArn(getBucketName('bucket'), lambdaResource.entryId, context),
             events: ['s3:ObjectCreated:*'],
             path: '*'
           };
@@ -124,7 +152,7 @@ describe('bucket resources', { timeout: 60000 }, () => {
 
     lastState = state;
 
-    const [rule, ...otherRules] = await fetchLifecycleRules(result.bucketName);
+    const [rule, ...otherRules] = await fetchLifecycleRules(result.bucketName, ['ez4-auto-expire']);
 
     equal(otherRules.length, 0);
     equal(rule?.ID, 'ez4-auto-expire');
@@ -161,7 +189,7 @@ describe('bucket resources', { timeout: 60000 }, () => {
 
     lastState = state;
 
-    await rejects(fetchLifecycleRules(result.bucketName), { name: 'NoSuchLifecycleConfiguration' });
+    deepEqual(await fetchLifecycleRules(result.bucketName, []), []);
   });
 
   it('assert :: update tags', async () => {
@@ -206,7 +234,7 @@ describe('bucket stale lifecycle', { timeout: 60000 }, () => {
     const localState: EntryStates = {};
 
     const resource = createBucket(localState, {
-      bucketName: 'ez4-test-bucket-stale',
+      bucketName: getBucketName('bucket-stale'),
       staleExpireDays: 7
     });
 
@@ -217,7 +245,7 @@ describe('bucket stale lifecycle', { timeout: 60000 }, () => {
     bucketName = result.bucketName;
     lastState = state;
 
-    const [rule, ...otherRules] = await fetchLifecycleRules(bucketName);
+    const [rule, ...otherRules] = await fetchLifecycleRules(bucketName, ['ez4-stale-expire']);
 
     equal(otherRules.length, 0);
     equal(rule?.ID, 'ez4-stale-expire');
@@ -239,7 +267,7 @@ describe('bucket stale lifecycle', { timeout: 60000 }, () => {
 
     lastState = state;
 
-    const rules = await fetchLifecycleRules(bucketName);
+    const rules = await fetchLifecycleRules(bucketName, ['ez4-auto-expire', 'ez4-stale-expire']);
 
     deepEqual(rules.map(({ ID, Expiration }) => [ID, Expiration?.Days]).sort(), [
       ['ez4-auto-expire', 30],

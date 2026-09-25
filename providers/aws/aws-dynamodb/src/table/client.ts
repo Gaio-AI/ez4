@@ -301,7 +301,7 @@ export const deleteTable = async (logger: OperationLogLine, tableName: string) =
         throw error;
       }
     }
-  });
+  }, ['ResourceInUseException']);
 
   await waitUntilTableNotExists(getDynamoDBWaiter(client), {
     TableName: tableName
