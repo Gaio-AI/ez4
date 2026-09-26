@@ -14,6 +14,7 @@ import {
 
 import { getCloudWatchLogsClient } from '../utils/deploy';
 import { getLogGroupArn } from '../utils/group';
+import { hasUnexpiredLogs } from './utils';
 
 export type CreateRequest = {
   groupName: string;
@@ -98,18 +99,32 @@ export const untagGroup = async (logger: OperationLogLine, groupArn: Arn, tagKey
   );
 };
 
-export const canDeleteGroup = async (logger: OperationLogLine, groupName: string) => {
+/**
+ * A log group can go once it holds no event its retention has yet to expire. Its streams are no
+ * answer: CloudWatch keeps a stream after all of its events expire, so a group that ever logged has
+ * streams for good. Neither is `storedBytes`, which lags behind fresh events. What decides is the
+ * newest stream's activity against the retention the group was deployed with.
+ */
+export const canDeleteGroup = async (logger: OperationLogLine, groupName: string, retentionInDays: number | undefined) => {
   logger.update(`Validating deletion`);
 
   try {
-    const response = await getCloudWatchLogsClient().send(
+    const { logStreams } = await getCloudWatchLogsClient().send(
       new DescribeLogStreamsCommand({
         logGroupName: groupName,
+        orderBy: 'LastEventTime',
+        descending: true,
         limit: 1
       })
     );
 
-    return !!response.logStreams?.length;
+    const [stream] = logStreams ?? [];
+
+    // The event timestamps are eventually consistent; the stream's creation is not, and it bounds the
+    // activity of a stream whose events haven't been accounted yet.
+    const lastActivity = stream && Math.max(stream.lastEventTimestamp ?? 0, stream.lastIngestionTime ?? 0, stream.creationTime ?? 0);
+
+    return !hasUnexpiredLogs(retentionInDays, lastActivity || undefined);
   } catch (error) {
     if (!(error instanceof ResourceNotFoundException)) {
       throw error;
