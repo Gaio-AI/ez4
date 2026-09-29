@@ -26,7 +26,9 @@ export namespace Client {
     }
 
     return PgClient.make({
-      driver: new ClientDriver(DB_POOL[database]),
+      driver: new ClientDriver(DB_POOL[database], {
+        dataApi: connection.dataApi
+      }),
       repository,
       debug
     });
@@ -40,7 +42,7 @@ export const createPool = (connection: ClientConnection) => {
     idleTimeoutMillis: 15000,
     maxUses: 500,
     min: 0,
-    max: 2,
+    max: connection.poolSize ?? 2,
     ssl: connection.ssl
   };
 
