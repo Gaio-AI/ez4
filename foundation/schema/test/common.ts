@@ -13,18 +13,20 @@ export type TestFileOptions = SchemaContextOptions & {
   nullish?: boolean;
 };
 
-export const testFile = (fileName: string, options?: TestFileOptions) => {
-  const outputFile = `./test/output/${options?.fileName ?? fileName}.json`;
-  const sourceFile = `./test/input/${fileName}.ts`;
-
-  const reflection = buildReflection([sourceFile]);
+export const getTestSchema = (fileName: string, options?: SchemaContextOptions) => {
+  const reflection = buildReflection([`./test/input/${fileName}.ts`]);
 
   const entryKey = Object.keys(reflection).find((key) => key.endsWith('TestSchema'));
 
   ok(entryKey);
 
-  const testType = reflection[entryKey];
-  const schema = getAnySchema(testType, reflection, createSchemaContext(options));
+  return getAnySchema(reflection[entryKey], reflection, createSchemaContext(options));
+};
+
+export const testFile = (fileName: string, options?: TestFileOptions) => {
+  const outputFile = `./test/output/${options?.fileName ?? fileName}.json`;
+
+  const schema = getTestSchema(fileName, options);
 
   if (options?.overwrite) {
     writeFileSync(outputFile, JSON.stringify(schema, undefined, 2));
