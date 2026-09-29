@@ -46,4 +46,5 @@ describe('reflection types', () => {
   it('assert :: comments', () => testFile('comments'));
   it('assert :: internal', () => testFile('internal'));
   it('assert :: conditional', () => testFile('conditional'));
+  it('assert :: checker', () => testFile('checker'));
 });

@@ -9,6 +9,7 @@ import { isTypeTuple } from '../types/type-tuple';
 import { getPropertyName } from '../helpers/identifier';
 import { tryTypeReference } from './type-reference';
 import { createUnion } from './type-union';
+import { tryInstanceType } from './checker-type';
 
 export type TypeArguments = NodeArray<TypeNode>;
 
@@ -33,8 +34,12 @@ export const tryIndexReference = (node: Node, context: Context, state: State) =>
     }
   }
 
+  if (reflectedType === undefined) {
+    return tryInstanceType(node, context, state);
+  }
+
   if (!reflectedType || !isTypeReference(reflectedType)) {
-    return reflectedType;
+    return (reflectedType && tryInstanceType(node, context, state)) ?? reflectedType;
   }
 
   const index = getPropertyName(node.indexType, context.checker);
