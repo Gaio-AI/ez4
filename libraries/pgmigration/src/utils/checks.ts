@@ -96,6 +96,10 @@ export const getCheckRunningValidationQuery = (builder: SqlBuilder, name: string
     .from('pg_stat_activity')
     .where({
       state: builder.rawString('active'),
+      // This query holds the name it looks for, so its own session is left out.
+      pid: {
+        not: builder.rawValue('pg_backend_pid()')
+      },
       query: {
         contains: builder.rawString(`"${name}"`),
         insensitive: true

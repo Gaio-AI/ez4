@@ -115,7 +115,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
             name: 'table_index_uk'
           }
         ],
@@ -165,7 +165,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
             name: 'table_index_sk'
           }
         ],
@@ -256,7 +256,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
             name: 'table_index_uk'
           }
         ],
@@ -307,7 +307,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
             name: 'table_index_sk'
           }
         ],
@@ -355,7 +355,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
             name: 'table_index_sk'
           }
         ],
@@ -468,7 +468,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'renamed_table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"renamed_table_index_uk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"renamed_table_index_uk"' || '%' LIMIT 1`,
             name: 'renamed_table_index_uk'
           }
         ],
@@ -529,7 +529,7 @@ describe('migration :: create index tests', () => {
         validations: [
           {
             check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'renamed_table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "query" ILIKE '%' || '"renamed_table_index_sk"' || '%' LIMIT 1`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"renamed_table_index_sk"' || '%' LIMIT 1`,
             name: 'renamed_table_index_sk'
           }
         ],
