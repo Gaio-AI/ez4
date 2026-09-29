@@ -1,11 +1,17 @@
 import { deepEqual, equal, rejects } from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { Readable } from 'node:stream';
 
 import { BucketTester } from '@ez4/local-storage/test';
 import { ok } from 'node:assert';
 
 describe('local storage tests', () => {
   const defaultContent = 'This is a mocked content';
+
+  const missingKeyError = {
+    name: 'NoSuchKey',
+    message: 'The specified key does not exist.'
+  };
 
   it('assert :: key exists (not found)', async () => {
     const client = BucketTester.getClientMock('bucket');
@@ -59,8 +65,9 @@ describe('local storage tests', () => {
     equal(client.stat.mock.callCount(), 1);
 
     deepEqual(stats, {
-      type: 'application/octet-stream',
-      size: 24
+      type: 'binary/octet-stream',
+      size: 24,
+      metadata: {}
     });
   });
 
@@ -76,12 +83,13 @@ describe('local storage tests', () => {
     equal(client.stat.mock.callCount(), 1);
 
     deepEqual(stats, {
-      type: 'application/octet-stream',
-      size: 24
+      type: 'binary/octet-stream',
+      size: 24,
+      metadata: {}
     });
   });
 
-  it('assert :: key stat (mime type detection)', async () => {
+  it('assert :: key stat (content is not inspected)', async () => {
     // Minimal valid PNG (1x1 transparent pixel)
     const pngContent = Buffer.from([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
@@ -101,9 +109,52 @@ describe('local storage tests', () => {
     equal(client.stat.mock.callCount(), 1);
 
     deepEqual(stats, {
-      type: 'image/png',
-      size: pngContent.length
+      type: 'binary/octet-stream',
+      size: pngContent.length,
+      metadata: {}
     });
+  });
+
+  it('assert :: write key (content type and metadata)', async () => {
+    const client = BucketTester.getClientMock('bucket');
+
+    await client.write('foo.json', '{}', {
+      metadata: {
+        origin: 'upload'
+      }
+    });
+
+    await client.write('bar', defaultContent, {
+      contentType: 'text/plain'
+    });
+
+    equal(client.write.mock.callCount(), 2);
+
+    deepEqual(await client.stat('foo.json'), {
+      type: 'application/json',
+      size: 2,
+      metadata: {
+        origin: 'upload'
+      }
+    });
+
+    deepEqual(await client.stat('bar'), {
+      type: 'text/plain',
+      size: 24,
+      metadata: {}
+    });
+  });
+
+  it('assert :: write key (readable content)', async () => {
+    const client = BucketTester.getClientMock('bucket');
+
+    await client.write('foo', Readable.from([Buffer.from('This is '), Buffer.from('a streamed content')]));
+
+    equal(client.write.mock.callCount(), 1);
+
+    const result = await client.read('foo');
+
+    equal(result.toString(), 'This is a streamed content');
   });
 
   it('assert :: write key (create key)', async () => {
@@ -140,7 +191,7 @@ describe('local storage tests', () => {
   it('assert :: read key (not found)', async () => {
     const client = BucketTester.getClientMock('bucket');
 
-    await rejects(() => client.read('random-key'));
+    await rejects(() => client.read('random-key'), missingKeyError);
 
     equal(client.read.mock.callCount(), 1);
   });
@@ -172,9 +223,10 @@ describe('local storage tests', () => {
   it('assert :: delete key (not found)', async () => {
     const client = BucketTester.getClientMock('bucket');
 
-    await rejects(() => client.delete('random-key'));
+    await client.delete('random-key');
 
     equal(client.delete.mock.callCount(), 1);
+    equal(await client.exists('random-key'), false);
   });
 
   it('assert :: delete key (from default)', async () => {
@@ -212,9 +264,31 @@ describe('local storage tests', () => {
   it('assert :: copy key (not found)', async () => {
     const client = BucketTester.getClientMock('bucket');
 
-    await rejects(() => client.copy('random-key', 'foo'));
+    await rejects(() => client.copy('random-key', 'foo'), missingKeyError);
 
     equal(client.copy.mock.callCount(), 1);
+  });
+
+  it('assert :: copy key (content type and metadata)', async () => {
+    const client = BucketTester.getClientMock('bucket');
+
+    await client.write('foo.csv', 'a,b', {
+      metadata: {
+        origin: 'upload'
+      }
+    });
+
+    await client.copy('foo.csv', 'bar');
+
+    equal(client.copy.mock.callCount(), 1);
+
+    deepEqual(await client.stat('bar'), {
+      type: 'text/csv',
+      size: 3,
+      metadata: {
+        origin: 'upload'
+      }
+    });
   });
 
   it('assert :: copy key (from default)', async () => {

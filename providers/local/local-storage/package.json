@@ -49,6 +49,9 @@
     "clean:registry": "rm -rf ../../../.registry/@ez4/local-storage",
     "live:publish": "npm run build && npm publish --access public"
   },
+  "devDependencies": {
+    "@types/mime": "^3.0.0"
+  },
   "dependencies": {
     "@ez4/common": "^0.53.0",
     "@ez4/local-common": "^0.53.0",
@@ -56,6 +59,6 @@
     "@ez4/project": "^0.53.0",
     "@ez4/storage": "^0.53.0",
     "@ez4/utils": "^0.53.0",
-    "file-type": "^21.3.0"
+    "mime": "^3.0.0"
   }
 }

@@ -7,7 +7,10 @@ import { Logger } from '@ez4/logger';
 
 import { processLambdaEvent } from '../handlers/lambda';
 import { BucketManifest } from '../service/manifest';
+import { readObjectAttributes } from '../utils/attributes';
 import { createLocalClient } from '../client/local';
+
+const METADATA_HEADER_PREFIX = 'x-amz-meta-';
 
 export const registerLocalService = async (service: BucketService, options: ServeOptions, context: EmulateServiceContext) => {
   const client = await getStorageClient(service, options, context);
@@ -22,7 +25,7 @@ export const registerLocalService = async (service: BucketService, options: Serv
       Logger.log(`📂 ${options.local ? 'Local' : 'Remote'} storage [${resourceName}] in use.`);
     },
     requestHandler: (request: EmulatorRequestEvent) => {
-      return handleRequest(client, request);
+      return handleRequest(resourceName, client, request);
     },
     exportHandler: () => {
       return client;
@@ -58,19 +61,21 @@ const getStorageClient = async (service: BucketService, options: ServeOptions, c
   });
 };
 
-const handleRequest = async (client: StorageClient, request: EmulatorRequestEvent) => {
-  const { method, path, body } = request;
+const handleRequest = async (resourceName: string, client: StorageClient, request: EmulatorRequestEvent) => {
+  const { method, path, headers, body } = request;
 
   if (!path || path === '/') {
     throw new Error(`File path wasn't given.`);
   }
 
+  const key = getObjectKey(path);
+
   switch (method) {
     case 'HEAD':
-      return headFile(client, path);
+      return headFile(client, key);
 
     case 'GET':
-      return loadFile(client, path);
+      return loadFile(resourceName, client, key);
 
     case 'POST':
     case 'PUT': {
@@ -78,7 +83,7 @@ const handleRequest = async (client: StorageClient, request: EmulatorRequestEven
         throw new Error("File content wasn't given.");
       }
 
-      return storeFile(client, path, body);
+      return storeFile(client, key, body, headers);
     }
 
     default:
@@ -86,28 +91,74 @@ const handleRequest = async (client: StorageClient, request: EmulatorRequestEven
   }
 };
 
-const loadFile = async (client: StorageClient, path: string) => {
-  const [buffer, stat] = await Promise.all([client.read(path), client.stat(path)]);
+// Signed URLs carry the object key in their path, which S3 decodes.
+const getObjectKey = (path: string) => {
+  const key = path.substring(1);
+
+  try {
+    return decodeURIComponent(key);
+  } catch {
+    return key;
+  }
+};
+
+const getRequestMetadata = (headers: Record<string, string>) => {
+  const metadata: Record<string, string> = {};
+
+  for (const name in headers) {
+    if (name.startsWith(METADATA_HEADER_PREFIX)) {
+      metadata[name.substring(METADATA_HEADER_PREFIX.length)] = headers[name];
+    }
+  }
+
+  return metadata;
+};
+
+const loadFile = async (resourceName: string, client: StorageClient, key: string) => {
+  const stat = await client.stat(key);
+
+  if (!stat) {
+    return {
+      status: 404
+    };
+  }
+
+  const [buffer, attributes] = await Promise.all([client.read(key), readObjectAttributes(resourceName, key)]);
 
   return {
     status: 200,
     body: buffer,
     headers: {
-      ['content-type']: stat?.type ?? 'application/octet-stream'
+      ['content-type']: stat.type,
+      ...(attributes?.cacheControl && {
+        ['cache-control']: attributes.cacheControl
+      }),
+      ...(attributes?.expires && {
+        ['expires']: new Date(attributes.expires).toUTCString()
+      })
     }
   };
 };
 
-const storeFile = async (client: StorageClient, path: string, buffer: Buffer) => {
-  await client.write(path, buffer);
+const storeFile = async (client: StorageClient, key: string, buffer: Buffer, headers: Record<string, string>) => {
+  const expires = headers['expires'] ? new Date(headers['expires']) : undefined;
+
+  await client.write(key, buffer, {
+    contentType: headers['content-type'],
+    metadata: getRequestMetadata(headers),
+    headers: {
+      cacheControl: headers['cache-control'],
+      ...(expires && !isNaN(expires.getTime()) && { expires })
+    }
+  });
 
   return {
     status: 204
   };
 };
 
-const headFile = async (client: StorageClient, path: string) => {
-  const stat = await client.stat(path);
+const headFile = async (client: StorageClient, key: string) => {
+  const stat = await client.stat(key);
 
   if (!stat) {
     return {
