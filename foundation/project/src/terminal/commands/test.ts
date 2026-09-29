@@ -1,7 +1,7 @@
 import type { InputOptions } from '../options';
 
 import { Logger, DynamicLogger, LogLevel } from '@ez4/logger';
-import { Tester } from '@ez4/project/library';
+import { configureVariables, Tester } from '@ez4/project/library';
 
 import { buildMetadata } from '../../library/metadata';
 import { warnUnsupportedFlags } from '../../utils/flags';
@@ -25,6 +25,11 @@ const EXCLUDE_PATTERN = /^node_modules\//;
 export const testCommand = async (input: InputOptions) => {
   const project = await loadProject(input.project);
   const options = getServeOptions(input, project);
+
+  configureVariables({
+    strict: project.serveOptions?.strictVariables,
+    allowed: project.serveOptions?.allowedVariables
+  });
 
   if (options.debug) {
     Logger.setLevel(LogLevel.Debug);

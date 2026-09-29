@@ -1,7 +1,7 @@
 import type { InputOptions } from '../options';
 
 import { Logger, DynamicLogger, LogLevel } from '@ez4/logger';
-import { Runner } from '@ez4/project/library';
+import { configureVariables, Runner } from '@ez4/project/library';
 
 import { buildMetadata } from '../../library/metadata';
 import { warnUnsupportedFlags } from '../../utils/flags';
@@ -20,6 +20,11 @@ import { join } from 'node:path';
 export const runCommand = async (input: InputOptions) => {
   const project = await loadProject(input.project);
   const options = getServeOptions(input, project);
+
+  configureVariables({
+    strict: project.serveOptions?.strictVariables,
+    allowed: project.serveOptions?.allowedVariables
+  });
 
   if (options.debug) {
     Logger.setLevel(LogLevel.Debug);
