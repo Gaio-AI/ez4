@@ -155,6 +155,15 @@ describe('declared optional properties with invalid values', () => {
     deepEqual(transform(encode(entries), encodedUnionSchema), entries);
   });
 
+  it('assert :: null on a non-nullable optional is dropped and the branch still matches', () => {
+    const schema: AnySchema = { type: SchemaType.Union, elements: [customField, workflowNode] };
+
+    deepEqual(transform({ workflow_id: workflowId, node_id: 'n', count: null }, schema, createTransformContext({ convert: false })), {
+      workflow_id: workflowId,
+      node_id: 'n'
+    });
+  });
+
   it('assert :: unknown keys and extra tuple elements are still dropped', () => {
     const schema: AnySchema = { type: SchemaType.Tuple, elements: [workflowNode] };
 
