@@ -8,6 +8,9 @@ import { mock } from 'node:test';
 
 import { createClientMock } from '../client/mock';
 
+// A tracker of its own, so `mock.restoreAll()` in another spec of the same process leaves these mocks alone.
+const tracker = new (mock.constructor as new () => typeof mock)();
+
 export namespace BucketTester {
   export type MockOptions = ClientMockOptions;
 
@@ -31,23 +34,27 @@ export namespace BucketTester {
   export const getClientMock = (resourceName: string, options?: MockOptions) => {
     const client = createClientMock(resourceName, options);
 
-    mock.method(client, 'stat');
-    mock.method(client, 'exists');
-    mock.method(client, 'write');
-    mock.method(client, 'read');
-    mock.method(client, 'delete');
-    mock.method(client, 'copy');
-    mock.method(client, 'scan');
+    tracker.method(client, 'stat');
+    tracker.method(client, 'exists');
+    tracker.method(client, 'write');
+    tracker.method(client, 'read');
+    tracker.method(client, 'delete');
+    tracker.method(client, 'copy');
+    tracker.method(client, 'scan');
 
-    mock.method(client, 'getStatUrl');
-    mock.method(client, 'getWriteUrl');
-    mock.method(client, 'getReadUrl');
+    tracker.method(client, 'getStatUrl');
+    tracker.method(client, 'getWriteUrl');
+    tracker.method(client, 'getReadUrl');
 
     return client as ClientMock;
   };
 
   export const setClientMock = (resourceName: string, options: MockOptions) => {
-    Tester.mockServiceClient(resourceName, getClientMock(resourceName, options));
+    const client = getClientMock(resourceName, options);
+
+    Tester.mockServiceClient(resourceName, client);
+
+    return client;
   };
 
   export const restoreClient = (resourceName: string) => {

@@ -1,12 +1,13 @@
 import type { AnyObject } from '@ez4/utils';
 import type { ServiceEmulators } from './service';
 import type { EmulatorExportHandler } from './types';
+import type { ServiceMetadata } from '../types/service';
 
 import { getServiceName } from '../utils/service';
 import { EmulatorClientNotFoundError, EmulatorNotFoundError } from './errors';
 
 type TesterContext = {
-  mocks?: Record<string, EmulatorExportHandler | undefined>;
+  originals?: Record<string, EmulatorExportHandler | undefined>;
   emulators?: ServiceEmulators;
   options?: TesterOptions;
 };
@@ -32,7 +33,7 @@ export namespace Tester {
     }
 
     Object.assign(CONTEXT, {
-      mocks: {},
+      originals: {},
       emulators,
       options
     });
@@ -63,6 +64,17 @@ export namespace Tester {
     return serviceClient;
   };
 
+  // Unlike its siblings it doesn't throw: a mock falls back to not checking what it can't find a contract for.
+  export const getServiceMetadata = (resourceName: string): ServiceMetadata | undefined => {
+    if (!ensureContext(CONTEXT)) {
+      return undefined;
+    }
+
+    const serviceName = getServiceName(resourceName, CONTEXT.options);
+
+    return CONTEXT.emulators[serviceName]?.service;
+  };
+
   export const mockServiceClient = (resourceName: string, client: unknown) => {
     if (!ensureContext(CONTEXT)) {
       throw new Error('Tester is not configured yet.');
@@ -75,7 +87,10 @@ export namespace Tester {
       throw new EmulatorNotFoundError(resourceName);
     }
 
-    CONTEXT.mocks[serviceName] = serviceEmulator.exportHandler;
+    // Only the handler from before the first mock is kept, so a mock over a mock still restores the real client.
+    if (!(serviceName in CONTEXT.originals)) {
+      CONTEXT.originals[serviceName] = serviceEmulator.exportHandler;
+    }
 
     CONTEXT.emulators[serviceName] = {
       ...serviceEmulator,
@@ -95,9 +110,16 @@ export namespace Tester {
       throw new EmulatorNotFoundError(resourceName);
     }
 
+    // Restoring a client that was never mocked would drop its real handler.
+    if (!(serviceName in CONTEXT.originals)) {
+      return;
+    }
+
     CONTEXT.emulators[serviceName] = {
       ...serviceEmulator,
-      exportHandler: CONTEXT.mocks[serviceName]
+      exportHandler: CONTEXT.originals[serviceName]
     };
+
+    delete CONTEXT.originals[serviceName];
   };
 }
