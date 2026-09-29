@@ -2,7 +2,7 @@ import type { Node } from 'typescript';
 import type { EveryType } from '../types';
 import type { Context, State } from './common';
 
-import { isNamedTupleMember, isParenthesizedTypeNode, isRestTypeNode } from 'typescript';
+import { isNamedTupleMember, isParenthesizedTypeNode, isRestTypeNode, isTypeOperatorNode, SyntaxKind } from 'typescript';
 
 import { tryTypeAny } from './type-any';
 import { tryTypeVoid } from './type-void';
@@ -23,6 +23,7 @@ import { tryTypeParameter } from './type-parameter';
 import { tryTypeCallback } from './type-callback';
 import { tryTypeOf } from './type-of';
 import { tryEnumReference } from './enum-reference';
+import { tryTypeConditional } from './type-conditional';
 
 export const tryTypes = (node: Node, context: Context, state: State): EveryType | undefined => {
   if (isParenthesizedTypeNode(node)) {
@@ -35,6 +36,10 @@ export const tryTypes = (node: Node, context: Context, state: State): EveryType 
 
   if (isRestTypeNode(node)) {
     return tryTypes(node.type, context, { ...state, spread: true });
+  }
+
+  if (isTypeOperatorNode(node) && node.operator === SyntaxKind.ReadonlyKeyword) {
+    return tryTypes(node.type, context, state);
   }
 
   return (
@@ -56,6 +61,7 @@ export const tryTypes = (node: Node, context: Context, state: State): EveryType 
     tryTypeParameter(node, context, state) ||
     tryTypeCallback(node, context, state) ||
     tryTypeOf(node, context, state) ||
+    tryTypeConditional(node, context, state) ||
     tryEnumReference(node, context)
   );
 };

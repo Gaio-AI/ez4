@@ -1,0 +1,133 @@
+{
+  "872b05f1802759c9e82ba0d1959049d5:Conditional": {
+    "type": "interface",
+    "name": "Conditional",
+    "file": "test/types/conditional.ts",
+    "position": {
+      "line": 9,
+      "character": 1
+    },
+    "modifiers": {
+      "export": true
+    },
+    "members": [
+      {
+        "type": "property",
+        "name": "concrete",
+        "value": {
+          "type": "number"
+        }
+      },
+      {
+        "type": "property",
+        "name": "list",
+        "value": {
+          "type": "string",
+          "literal": "list"
+        }
+      },
+      {
+        "type": "property",
+        "name": "tuple",
+        "value": {
+          "type": "string",
+          "literal": "list"
+        }
+      },
+      {
+        "type": "property",
+        "name": "item",
+        "value": {
+          "type": "string",
+          "literal": "item"
+        }
+      },
+      {
+        "type": "property",
+        "name": "object",
+        "value": {
+          "type": "string",
+          "literal": "item"
+        }
+      },
+      {
+        "type": "property",
+        "name": "element",
+        "value": {
+          "type": "boolean"
+        }
+      },
+      {
+        "type": "property",
+        "name": "tupleElement",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "distributed",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "mixed",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "text"
+            },
+            {
+              "type": "string",
+              "literal": "other"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "flag",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "other"
+            },
+            {
+              "type": "string",
+              "literal": "other"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "readonly",
+        "value": {
+          "type": "array",
+          "element": {
+            "type": "string"
+          }
+        }
+      }
+    ]
+  }
+}
