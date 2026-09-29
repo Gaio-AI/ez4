@@ -13,6 +13,7 @@ import { createUnion } from './type-union';
 import { createUndefined } from './type-undefined';
 import { getNewState } from './common';
 import { tryTypes } from './types';
+import { bindInstanceType } from './checker-type';
 
 export type PropertyNodes = PropertySignature | PropertyDeclaration;
 
@@ -42,14 +43,15 @@ export const tryModelProperty = (node: Node, context: Context, state: State) => 
     return undefined;
   }
 
-  const newState = getNewState({ types: state.types });
+  const name = getPropertyName(node.name, context.checker);
+
+  const newState = bindInstanceType(getNewState({ types: state.types }), node.type, getPropertyInstanceType(node, name, context, state));
   const valueType = tryTypes(node.type, context, newState);
 
   if (!valueType) {
     return undefined;
   }
 
-  const name = getPropertyName(node.name, context.checker);
   const documentation = getNodeDocumentation(node.name, context.checker);
   const modifiers = getNodeModifiers(node);
 
@@ -62,4 +64,17 @@ export const tryModelProperty = (node: Node, context: Context, state: State) => 
   unionType.elements.push(createUndefined());
 
   return createProperty(name, unionType, modifiers, documentation?.description, documentation?.tags);
+};
+
+const getPropertyInstanceType = (node: PropertyNodes, name: string, context: Context, state: State) => {
+  if (state.instance?.node !== node.parent) {
+    return undefined;
+  }
+
+  const { checker } = context;
+
+  const ownerType = checker.getNonNullableType(state.instance.type);
+  const property = checker.getPropertyOfType(ownerType, name);
+
+  return property && checker.getTypeOfSymbol(property);
 };

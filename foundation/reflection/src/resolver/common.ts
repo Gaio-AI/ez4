@@ -1,4 +1,4 @@
-import type { Node, NodeArray, TypeChecker } from 'typescript';
+import type { Node, NodeArray, Type, TypeChecker } from 'typescript';
 import type { ResolverEvents, ResolverOptions } from '../resolver';
 import type { AllType, EveryType } from '../types';
 
@@ -22,7 +22,14 @@ export type ArrayState = {
   spread?: boolean;
 };
 
-export type State = TypeState & ArrayState;
+export type InstanceState = {
+  instance?: {
+    node: Node;
+    type: Type;
+  };
+};
+
+export type State = TypeState & ArrayState & InstanceState;
 
 export const getNewState = (partial?: Partial<State>): State => {
   return {

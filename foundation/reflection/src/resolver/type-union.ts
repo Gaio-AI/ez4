@@ -6,6 +6,7 @@ import { isUnionTypeNode } from 'typescript';
 import { TypeName } from '../types';
 import { getNewState } from './common';
 import { tryTypes } from './types';
+import { getBoundInstanceType, tryCheckerType } from './checker-type';
 
 export const createUnion = (elements: EveryType[]): TypeUnion => {
   return {
@@ -34,5 +35,7 @@ export const tryTypeUnion = (node: Node, context: Context, state: State) => {
     }
   });
 
-  return createUnion(allTypes);
+  const instanceType = allTypes.length < node.types.length ? getBoundInstanceType(node, state) : undefined;
+
+  return (instanceType && tryCheckerType(instanceType, context)) || createUnion(allTypes);
 };

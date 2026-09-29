@@ -1,0 +1,856 @@
+{
+  "type": "object",
+  "description": "Union of filter objects inside base64-encoded arrays.",
+  "properties": {
+    "handwritten": {
+      "type": "array",
+      "definitions": {
+        "encoded": true
+      },
+      "element": {
+        "type": "union",
+        "elements": [
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "search"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "contains"
+                }
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "identity": 2
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "score"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "between"
+                }
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "identity": 3
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "tag"
+                }
+              },
+              "operator": {
+                "type": "enum",
+                "options": [
+                  {
+                    "value": "in"
+                  },
+                  {
+                    "value": "not_in"
+                  }
+                ]
+              },
+              "value": {
+                "type": "array",
+                "element": {
+                  "type": "string",
+                  "definitions": {
+                    "lower": true,
+                    "trim": true
+                  },
+                  "format": "uuid"
+                }
+              }
+            },
+            "identity": 4
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "provider"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "in"
+                }
+              },
+              "value": {
+                "type": "array",
+                "element": {
+                  "type": "enum",
+                  "options": [
+                    {
+                      "value": "instagram"
+                    },
+                    {
+                      "value": "whatsapp"
+                    }
+                  ]
+                }
+              }
+            },
+            "identity": 5
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "date"
+                }
+              },
+              "operator": {
+                "type": "enum",
+                "options": [
+                  {
+                    "value": "before"
+                  },
+                  {
+                    "value": "after"
+                  }
+                ]
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "string",
+                    "definitions": {
+                      "trim": true
+                    },
+                    "format": "date-time"
+                  }
+                ]
+              }
+            },
+            "identity": 6
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "date"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "between"
+                }
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "string",
+                    "definitions": {
+                      "trim": true
+                    },
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "string",
+                    "definitions": {
+                      "trim": true
+                    },
+                    "format": "date-time"
+                  }
+                ]
+              }
+            },
+            "identity": 7
+          }
+        ]
+      }
+    },
+    "generic": {
+      "type": "array",
+      "definitions": {
+        "encoded": true
+      },
+      "element": {
+        "type": "union",
+        "elements": [
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "search"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "contains"
+                }
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "identity": 8
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "score"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "between"
+                }
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "identity": 9
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "tag"
+                }
+              },
+              "operator": {
+                "type": "enum",
+                "options": [
+                  {
+                    "value": "in"
+                  },
+                  {
+                    "value": "not_in"
+                  }
+                ]
+              },
+              "value": {
+                "type": "array",
+                "element": {
+                  "type": "string",
+                  "definitions": {
+                    "lower": true,
+                    "trim": true
+                  },
+                  "format": "uuid"
+                }
+              }
+            },
+            "identity": 10
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "provider"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "in"
+                }
+              },
+              "value": {
+                "type": "array",
+                "element": {
+                  "type": "enum",
+                  "options": [
+                    {
+                      "value": "instagram"
+                    },
+                    {
+                      "value": "whatsapp"
+                    }
+                  ]
+                }
+              }
+            },
+            "identity": 11
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "date"
+                }
+              },
+              "operator": {
+                "type": "enum",
+                "options": [
+                  {
+                    "value": "before"
+                  },
+                  {
+                    "value": "after"
+                  }
+                ]
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "string",
+                    "definitions": {
+                      "trim": true
+                    },
+                    "format": "date-time"
+                  }
+                ]
+              }
+            },
+            "identity": 12
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "definitions": {
+                  "value": "date"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "definitions": {
+                  "value": "between"
+                }
+              },
+              "value": {
+                "type": "tuple",
+                "elements": [
+                  {
+                    "type": "string",
+                    "definitions": {
+                      "trim": true
+                    },
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "string",
+                    "definitions": {
+                      "trim": true
+                    },
+                    "format": "date-time"
+                  }
+                ]
+              }
+            },
+            "identity": 13
+          }
+        ]
+      }
+    },
+    "indexed": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "array",
+          "definitions": {
+            "encoded": true
+          },
+          "element": {
+            "type": "union",
+            "elements": [
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "search"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "contains"
+                    }
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "identity": 15
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "score"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "between"
+                    }
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  }
+                },
+                "identity": 16
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "tag"
+                    }
+                  },
+                  "operator": {
+                    "type": "enum",
+                    "options": [
+                      {
+                        "value": "in"
+                      },
+                      {
+                        "value": "not_in"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "type": "array",
+                    "element": {
+                      "type": "string",
+                      "definitions": {
+                        "lower": true,
+                        "trim": true
+                      },
+                      "format": "uuid"
+                    }
+                  }
+                },
+                "identity": 17
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "provider"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "in"
+                    }
+                  },
+                  "value": {
+                    "type": "array",
+                    "element": {
+                      "type": "enum",
+                      "options": [
+                        {
+                          "value": "instagram"
+                        },
+                        {
+                          "value": "whatsapp"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "identity": 18
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "date"
+                    }
+                  },
+                  "operator": {
+                    "type": "enum",
+                    "options": [
+                      {
+                        "value": "before"
+                      },
+                      {
+                        "value": "after"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "string",
+                        "definitions": {
+                          "trim": true
+                        },
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                },
+                "identity": 19
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "date"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "between"
+                    }
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "string",
+                        "definitions": {
+                          "trim": true
+                        },
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "string",
+                        "definitions": {
+                          "trim": true
+                        },
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                },
+                "identity": 20
+              }
+            ]
+          },
+          "optional": true
+        }
+      },
+      "identity": 14
+    },
+    "conditional": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "array",
+          "definitions": {
+            "encoded": true
+          },
+          "element": {
+            "type": "union",
+            "elements": [
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "search"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "contains"
+                    }
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "identity": 22
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "score"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "between"
+                    }
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  }
+                },
+                "identity": 23
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "tag"
+                    }
+                  },
+                  "operator": {
+                    "type": "enum",
+                    "options": [
+                      {
+                        "value": "in"
+                      },
+                      {
+                        "value": "not_in"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "type": "array",
+                    "element": {
+                      "type": "string",
+                      "definitions": {
+                        "lower": true,
+                        "trim": true
+                      },
+                      "format": "uuid"
+                    }
+                  }
+                },
+                "identity": 24
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "provider"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "in"
+                    }
+                  },
+                  "value": {
+                    "type": "array",
+                    "element": {
+                      "type": "enum",
+                      "options": [
+                        {
+                          "value": "instagram"
+                        },
+                        {
+                          "value": "whatsapp"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "identity": 25
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "date"
+                    }
+                  },
+                  "operator": {
+                    "type": "enum",
+                    "options": [
+                      {
+                        "value": "before"
+                      },
+                      {
+                        "value": "after"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "string",
+                        "definitions": {
+                          "trim": true
+                        },
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                },
+                "identity": 26
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "date"
+                    }
+                  },
+                  "operator": {
+                    "type": "string",
+                    "definitions": {
+                      "value": "between"
+                    }
+                  },
+                  "value": {
+                    "type": "tuple",
+                    "elements": [
+                      {
+                        "type": "string",
+                        "definitions": {
+                          "trim": true
+                        },
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "string",
+                        "definitions": {
+                          "trim": true
+                        },
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                },
+                "identity": 27
+              }
+            ]
+          },
+          "optional": true
+        }
+      },
+      "identity": 21
+    },
+    "conditionalObject": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "object",
+          "definitions": {
+            "encoded": true
+          },
+          "properties": {
+            "search": {
+              "type": "string"
+            }
+          },
+          "identity": 29,
+          "optional": true
+        }
+      },
+      "identity": 28
+    }
+  },
+  "identity": 1
+}

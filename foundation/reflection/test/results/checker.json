@@ -1,0 +1,616 @@
+{
+  "60ab087aea286deb25128dff56a59edc:ThroughGeneric": {
+    "type": "interface",
+    "name": "ThroughGeneric",
+    "file": "test/types/checker.ts",
+    "position": {
+      "line": 42,
+      "character": 1
+    },
+    "modifiers": {
+      "export": true
+    },
+    "members": [
+      {
+        "type": "property",
+        "name": "value",
+        "value": {
+          "type": "object",
+          "file": "test/types/checker.ts",
+          "position": {
+            "line": 27,
+            "character": 1
+          },
+          "members": [
+            {
+              "type": "property",
+              "name": "unwrap",
+              "value": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "property",
+              "name": "isShape",
+              "value": {
+                "type": "string",
+                "literal": "yes"
+              }
+            },
+            {
+              "type": "property",
+              "name": "elem",
+              "value": {
+                "type": "object",
+                "file": "test/types/checker.ts",
+                "position": {
+                  "line": 18,
+                  "character": 12
+                },
+                "members": [
+                  {
+                    "type": "property",
+                    "name": "field",
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "kind",
+                    "value": {
+                      "type": "string",
+                      "literal": "circle"
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "size",
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "shape",
+                    "value": {
+                      "type": "reference",
+                      "path": "60ab087aea286deb25128dff56a59edc:Shape"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "optionals",
+              "value": {
+                "type": "object",
+                "file": "test/types/checker.ts",
+                "position": {
+                  "line": 16,
+                  "character": 21
+                },
+                "members": [
+                  {
+                    "type": "property",
+                    "name": "field",
+                    "value": {
+                      "type": "union",
+                      "elements": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "undefined"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "kind",
+                    "value": {
+                      "type": "union",
+                      "elements": [
+                        {
+                          "type": "string",
+                          "literal": "circle"
+                        },
+                        {
+                          "type": "undefined"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "size",
+                    "value": {
+                      "type": "union",
+                      "elements": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "undefined"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "shape",
+                    "value": {
+                      "type": "union",
+                      "elements": [
+                        {
+                          "type": "reference",
+                          "path": "60ab087aea286deb25128dff56a59edc:Shape"
+                        },
+                        {
+                          "type": "undefined"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "record",
+              "value": {
+                "type": "object",
+                "members": [
+                  {
+                    "type": "property",
+                    "name": "kind",
+                    "value": {
+                      "type": "boolean"
+                    }
+                  },
+                  {
+                    "type": "property",
+                    "name": "size",
+                    "value": {
+                      "type": "boolean"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "keys",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "string",
+                    "literal": "kind"
+                  },
+                  {
+                    "type": "string",
+                    "literal": "size"
+                  },
+                  {
+                    "type": "string",
+                    "literal": "field"
+                  },
+                  {
+                    "type": "string",
+                    "literal": "shape"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "index",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "literal": "circle"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "literalIndex",
+              "value": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "property",
+              "name": "nonNull",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "literal": "circle"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "nullable",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null",
+                    "literal": true
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "list",
+              "value": {
+                "type": "array",
+                "element": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "property",
+              "name": "shape",
+              "value": {
+                "type": "reference",
+                "path": "60ab087aea286deb25128dff56a59edc:Shape"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "60ab087aea286deb25128dff56a59edc:Direct": {
+    "type": "interface",
+    "name": "Direct",
+    "file": "test/types/checker.ts",
+    "position": {
+      "line": 46,
+      "character": 1
+    },
+    "modifiers": {
+      "export": true
+    },
+    "members": [
+      {
+        "type": "property",
+        "name": "unwrap",
+        "value": {
+          "type": "string"
+        }
+      },
+      {
+        "type": "property",
+        "name": "isShape",
+        "value": {
+          "type": "string",
+          "literal": "yes"
+        }
+      },
+      {
+        "type": "property",
+        "name": "elem",
+        "value": {
+          "type": "object",
+          "file": "test/types/checker.ts",
+          "position": {
+            "line": 18,
+            "character": 12
+          },
+          "members": [
+            {
+              "type": "property",
+              "name": "field",
+              "value": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "property",
+              "name": "kind",
+              "value": {
+                "type": "string",
+                "literal": "circle"
+              }
+            },
+            {
+              "type": "property",
+              "name": "size",
+              "value": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "property",
+              "name": "shape",
+              "value": {
+                "type": "reference",
+                "path": "60ab087aea286deb25128dff56a59edc:Shape"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "optionals",
+        "value": {
+          "type": "object",
+          "file": "test/types/checker.ts",
+          "position": {
+            "line": 16,
+            "character": 21
+          },
+          "members": [
+            {
+              "type": "property",
+              "name": "field",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "undefined"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "kind",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "string",
+                    "literal": "circle"
+                  },
+                  {
+                    "type": "undefined"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "size",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "undefined"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "property",
+              "name": "shape",
+              "value": {
+                "type": "union",
+                "elements": [
+                  {
+                    "type": "reference",
+                    "path": "60ab087aea286deb25128dff56a59edc:Shape"
+                  },
+                  {
+                    "type": "undefined"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "record",
+        "value": {
+          "type": "object",
+          "members": [
+            {
+              "type": "property",
+              "name": "kind",
+              "value": {
+                "type": "boolean"
+              }
+            },
+            {
+              "type": "property",
+              "name": "size",
+              "value": {
+                "type": "boolean"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "keys",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "kind"
+            },
+            {
+              "type": "string",
+              "literal": "size"
+            },
+            {
+              "type": "string",
+              "literal": "field"
+            },
+            {
+              "type": "string",
+              "literal": "shape"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "index",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "literal": "circle"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "literalIndex",
+        "value": {
+          "type": "number"
+        }
+      },
+      {
+        "type": "property",
+        "name": "nonNull",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "literal": "circle"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "shape",
+        "value": {
+          "type": "reference",
+          "path": "60ab087aea286deb25128dff56a59edc:Shape"
+        }
+      },
+      {
+        "type": "property",
+        "name": "colors",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "red"
+            },
+            {
+              "type": "string",
+              "literal": "green"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "template",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "on_a"
+            },
+            {
+              "type": "string",
+              "literal": "on_b"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "prefixed",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "on_a"
+            },
+            {
+              "type": "string",
+              "literal": "on_b"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "60ab087aea286deb25128dff56a59edc:Shape": {
+    "type": "interface",
+    "name": "Shape",
+    "file": "test/types/checker.ts",
+    "position": {
+      "line": 1,
+      "character": 1
+    },
+    "members": [
+      {
+        "type": "property",
+        "name": "kind",
+        "value": {
+          "type": "union",
+          "elements": [
+            {
+              "type": "string",
+              "literal": "circle"
+            },
+            {
+              "type": "string",
+              "literal": "square"
+            }
+          ]
+        }
+      },
+      {
+        "type": "property",
+        "name": "size",
+        "value": {
+          "type": "number"
+        }
+      }
+    ]
+  }
+}
