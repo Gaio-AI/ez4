@@ -51,7 +51,7 @@ export const transformObject = (value: unknown, schema: ObjectSchema, context = 
       continue;
     }
 
-    if (!propertySchema.optional) {
+    if (!propertySchema.optional || rawValue !== undefined) {
       complete = false;
     }
   }
