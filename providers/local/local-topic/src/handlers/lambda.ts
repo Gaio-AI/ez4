@@ -7,6 +7,36 @@ import type { MessageTrace } from '@ez4/local-common';
 import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/local-common';
 import { getRandomUUID, pickObject } from '@ez4/utils';
 import { Runtime } from '@ez4/common';
+import { Logger } from '@ez4/logger';
+
+// SNS invokes the Lambda asynchronously, and AWS retries a failed asynchronous invocation twice.
+const RETRY_DELAYS = [1000, 2000];
+
+export const processLambdaSubscription = async (
+  service: TopicService | TopicImport,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  subscription: TopicLambdaSubscription,
+  event: AnyObject,
+  trace: MessageTrace,
+  attempt = 0
+) => {
+  try {
+    await processLambdaEvent(service, options, context, subscription, event, trace);
+    //
+  } catch {
+    const delay = RETRY_DELAYS[attempt];
+    const label = `Topic [${service.name}] subscription ${subscription.handler.name}`;
+
+    if (delay === undefined) {
+      return Logger.error(`${label} failed after ${attempt + 1} attempts and was dropped.`);
+    }
+
+    Logger.warn(`${label} failed, retry ${attempt + 1} of ${RETRY_DELAYS.length} in ${delay / 1000}s.`);
+
+    setTimeout(() => processLambdaSubscription(service, options, context, subscription, event, trace, attempt + 1), delay);
+  }
+};
 
 export const processLambdaEvent = async (
   service: TopicService | TopicImport,

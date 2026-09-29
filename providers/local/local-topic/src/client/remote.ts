@@ -13,6 +13,22 @@ export type RemoteClientOptions = CommonOptions & {
   serviceHost: string;
 };
 
+export type RemoteSubscription = {
+  stop: () => Promise<void>;
+};
+
+const enum SubscriptionState {
+  Pending = 'pending',
+  Subscribed = 'subscribed',
+  Lost = 'lost'
+}
+
+// The owner keeps subscriptions by resource name, so renewing one is idempotent and brings it back after the owner restarts.
+const SUBSCRIPTION_RENEWAL_DELAY = 15000;
+
+const SUBSCRIPTION_FIRST_RETRY_DELAY = 1000;
+const SUBSCRIPTION_MAX_RETRY_DELAY = 10000;
+
 export const createRemoteClient = <T extends Topic.Event = any>(
   resourceName: string,
   eventSchema: EventSchema,
@@ -57,19 +73,88 @@ export const unsubscribeRemoteClient = async (resourceName: string, clientOption
   }
 };
 
-export const subscribeRemoteClient = async (resourceName: string, remoteHost: string, clientOptions: RemoteClientOptions) => {
+// Projects start together and restart on their own, so the subscription is retried until the owner
+// answers and renewed while it's running.
+export const subscribeRemoteClient = async (
+  resourceName: string,
+  remoteHost: string,
+  clientOptions: RemoteClientOptions
+): Promise<RemoteSubscription> => {
   const topicIdentifier = getServiceName(resourceName, clientOptions);
   const topicHost = getTopicServiceHost(clientOptions.serviceHost, topicIdentifier);
 
-  try {
-    await subscribeToTopicService(topicHost, {
-      serviceHost: remoteHost,
-      resourceName
-    });
+  let state = SubscriptionState.Pending;
+  let failures = 0;
 
-    Logger.log(`✉️  Subscribed to topic [${resourceName}] at ${topicHost}`);
-    //
-  } catch {
-    Logger.warn(`Remote topic [${resourceName}] at ${topicHost} isn't available.`);
-  }
+  let timer: NodeJS.Timeout | undefined;
+  let isStopped = false;
+
+  const subscribe = async () => {
+    try {
+      await subscribeToTopicService(topicHost, {
+        serviceHost: remoteHost,
+        resourceName
+      });
+
+      if (state === SubscriptionState.Pending) {
+        Logger.log(`✉️  Subscribed to topic [${resourceName}] at ${topicHost}`);
+      }
+
+      if (state === SubscriptionState.Lost) {
+        Logger.log(`✉️  Subscribed again to topic [${resourceName}] at ${topicHost}`);
+      }
+
+      state = SubscriptionState.Subscribed;
+      failures = 0;
+      //
+    } catch {
+      if (state === SubscriptionState.Subscribed) {
+        Logger.warn(`Subscription to topic [${resourceName}] at ${topicHost} was lost.`);
+
+        state = SubscriptionState.Lost;
+      }
+
+      if (state === SubscriptionState.Pending && !failures) {
+        Logger.warn(`Remote topic [${resourceName}] at ${topicHost} isn't available.`);
+      }
+
+      failures++;
+    }
+  };
+
+  let request = subscribe();
+
+  const scheduleSubscription = () => {
+    if (isStopped) {
+      return;
+    }
+
+    const delay =
+      state === SubscriptionState.Subscribed
+        ? SUBSCRIPTION_RENEWAL_DELAY
+        : Math.min(SUBSCRIPTION_FIRST_RETRY_DELAY * 2 ** (failures - 1), SUBSCRIPTION_MAX_RETRY_DELAY);
+
+    timer = setTimeout(async () => {
+      request = subscribe();
+
+      await request;
+
+      scheduleSubscription();
+    }, delay);
+  };
+
+  await request;
+
+  scheduleSubscription();
+
+  return {
+    stop: async () => {
+      isStopped = true;
+
+      clearTimeout(timer);
+
+      // A subscription still on its way must not reach the owner after the unsubscription.
+      await request;
+    }
+  };
 };

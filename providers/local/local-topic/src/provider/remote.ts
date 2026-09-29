@@ -1,5 +1,6 @@
 import type { EmulateServiceContext, EmulatorRequestEvent, ServeOptions } from '@ez4/project/library';
 import type { TopicImport } from '@ez4/topic/library';
+import type { RemoteSubscription } from '../client/remote';
 
 import { getErrorResponse, getMessageTraceFromHeaders, getSuccessResponse } from '@ez4/local-common';
 import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
@@ -8,7 +9,7 @@ import { TopicSubscriptionType } from '@ez4/topic/library';
 import { Logger } from '@ez4/logger';
 
 import { createRemoteClient, subscribeRemoteClient, unsubscribeRemoteClient } from '../client/remote';
-import { processLambdaEvent } from '../handlers/lambda';
+import { processLambdaSubscription } from '../handlers/lambda';
 import { processQueueEvent } from '../handlers/queue';
 import { getTopicServiceHost } from '../utils/topic';
 
@@ -25,6 +26,8 @@ export const registerRemoteService = (service: TopicImport, options: ServeOption
     remoteHost: options.serviceHost,
     remoteName: resourceName
   };
+
+  let subscription: RemoteSubscription | undefined;
 
   return {
     type: 'Topic',
@@ -44,10 +47,11 @@ export const registerRemoteService = (service: TopicImport, options: ServeOption
       const topicIdentifier = getServiceName(resourceName, options);
       const topicHost = getTopicServiceHost(options.serviceHost, topicIdentifier);
 
-      await subscribeRemoteClient(referenceName, topicHost, clientOptions);
+      subscription = await subscribeRemoteClient(referenceName, topicHost, clientOptions);
     },
     shutdownHandler: async () => {
       if (!options.suppress) {
+        await subscription?.stop();
         await unsubscribeRemoteClient(referenceName, clientOptions);
       }
     }
@@ -74,7 +78,7 @@ const handleTopicRequest = async (
     const allSubscriptions = service.subscriptions.map((subscription) => {
       switch (subscription.type) {
         case TopicSubscriptionType.Lambda:
-          return processLambdaEvent(service, options, context, subscription, safeEvent, trace);
+          return processLambdaSubscription(service, options, context, subscription, safeEvent, trace);
 
         case TopicSubscriptionType.Queue:
           return processQueueEvent(context, subscription, safeEvent, trace);

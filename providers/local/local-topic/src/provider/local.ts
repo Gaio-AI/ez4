@@ -10,7 +10,7 @@ import { getServiceName } from '@ez4/project/library';
 
 import { TopicEmulatorSubscriptionType } from '../types/subscription';
 import { processRemoteEvent } from '../handlers/remote';
-import { processLambdaEvent } from '../handlers/lambda';
+import { processLambdaSubscription } from '../handlers/lambda';
 import { processQueueEvent } from '../handlers/queue';
 import { createLocalClient } from '../client/local';
 import { TopicManifest } from '../service/manifest';
@@ -125,7 +125,7 @@ const handleTopicEvent = async (
   const allSubscriptions = [...InMemoryTopic.getSubscriptions(service.name), ...service.subscriptions].map((subscription) => {
     switch (subscription.type) {
       case TopicSubscriptionType.Lambda:
-        return processLambdaEvent(service, options, context, subscription, event, trace);
+        return processLambdaSubscription(service, options, context, subscription, event, trace);
 
       case TopicSubscriptionType.Queue:
         return processQueueEvent(context, subscription, event, trace);
