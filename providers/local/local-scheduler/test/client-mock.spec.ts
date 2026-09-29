@@ -66,6 +66,21 @@ describe('local scheduler tests', () => {
     deepEqual(event, defaultEvent);
   });
 
+  it('assert :: create event (already exists)', async () => {
+    const client = CronTester.getClientMock<TestEvent>('cron', {
+      events: {
+        foo: defaultEvent
+      }
+    });
+
+    await rejects(() => client.createEvent('foo', defaultEvent), {
+      name: 'ConflictException',
+      message: 'Schedule foo already exists.'
+    });
+
+    equal(client.createEvent.mock.callCount(), 1);
+  });
+
   it('assert :: update event (not found)', async () => {
     const client = CronTester.getClientMock<TestEvent>('cron');
 

@@ -25,7 +25,9 @@ export const registerLocalService = (service: CronService, options: ServeOptions
     },
     bootstrapHandler: () => {
       InMemoryScheduler.createScheduler(resourceName, {
-        handler: (event, trace) => processSchedulerEvent(service, options, context, event, trace)
+        handler: (event, trace) => processSchedulerEvent(service, options, context, event, trace),
+        maxRetries: service.maxRetries,
+        maxAge: service.maxAge
       });
 
       if (options.suppress) {
@@ -36,7 +38,7 @@ export const registerLocalService = (service: CronService, options: ServeOptions
         return Logger.log(`⌚ Dynamic scheduler [${resourceName}] is ready`);
       }
 
-      processTimerEvent(service, options, context);
+      processTimerEvent(service);
     },
     requestHandler: (request: EmulatorRequestEvent) => {
       return handleSchedulerRequest(service, options, context, request);
