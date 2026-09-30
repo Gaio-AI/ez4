@@ -207,7 +207,7 @@ const onTimeout = (request: Partial<Ws.Incoming<Ws.Request>>, timeoutAfter: numb
 };
 
 const onError = (error: unknown, request: Partial<Ws.Incoming<Ws.Request>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error);
 
   return dispatch(
     {

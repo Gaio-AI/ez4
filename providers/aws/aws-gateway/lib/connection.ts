@@ -12,6 +12,7 @@ import type {
 } from 'aws-lambda';
 
 import { resolveHeaders, resolveIdentity, resolveQueryStrings, resolveValidation } from '@ez4/gateway/utils';
+import { HttpError } from '@ez4/gateway';
 import { ServiceEventType, Runtime } from '@ez4/common';
 
 type RequestEvent = APIGatewayProxyEventV2WithRequestContext<APIGatewayEventWebsocketRequestContextV2> &
@@ -168,7 +169,7 @@ const onTimeout = (request: Partial<Ws.Incoming<Ws.Event>>, timeoutAfter: number
 };
 
 const onError = (error: unknown, request: Partial<Ws.Incoming<Ws.Event>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error, error instanceof HttpError ? error.status : undefined);
 
   return dispatch(
     {

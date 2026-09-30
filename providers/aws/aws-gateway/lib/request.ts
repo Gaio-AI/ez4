@@ -295,8 +295,22 @@ const onTimeout = (request: Partial<Http.Incoming<Http.Request>>, timeoutAfter: 
   );
 };
 
+const getErrorStatus = (error: unknown) => {
+  if (error instanceof HttpError) {
+    return error.status;
+  }
+
+  if (error instanceof Error) {
+    const errorName = Object.getPrototypeOf(error)?.constructor?.name;
+
+    return (errorName && __EZ4_ERRORS_MAP?.[errorName]) || 500;
+  }
+
+  return 500;
+};
+
 const onError = (error: unknown, request: Partial<Http.Incoming<Http.Request>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error, getErrorStatus(error));
 
   return dispatch(
     {

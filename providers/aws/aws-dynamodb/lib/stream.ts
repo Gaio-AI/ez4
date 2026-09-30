@@ -183,7 +183,7 @@ const onTimeout = (request: Partial<Database.Incoming<Database.Schema>>, timeout
 };
 
 const onError = (error: unknown, request: Partial<Database.Request | Database.Incoming<Database.Schema>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error);
 
   return dispatch(
     {
