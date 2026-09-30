@@ -5,7 +5,7 @@ import type { Client } from '@ez4/topic';
 import type { ObservedScope } from './fixtures/scope-probe';
 
 import { deepEqual, equal, match } from 'node:assert/strict';
-import { afterEach, describe, it, type TestContext } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 import { Runtime } from '@ez4/common';
 
@@ -13,6 +13,8 @@ import { registerLocalService } from '../src/provider/local';
 import { processLambdaEvent } from '../src/handlers/lambda';
 import { processRemoteEvent } from '../src/handlers/remote';
 import { createRemoteClient } from '../src/client/remote';
+import { startTestServer } from './server';
+import { waitFor } from './clock';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -91,15 +93,6 @@ const exportScope = (traceId: string) => {
   Runtime.setScope({ traceId, clientVersion: '1.2.3' }, SCOPE_HEADERS);
 
   return Runtime.exportScope();
-};
-
-const mockFetch = (t: TestContext) => {
-  return new Promise<Record<string, string>>((resolve) => {
-    t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
-      resolve(init?.headers as Record<string, string>);
-      return new Response(null, { status: 201 });
-    });
-  });
 };
 
 const scopedEntry = (traceId: string) => ({
@@ -205,41 +198,51 @@ describe('local topic scope', () => {
     }
   });
 
-  it('assert :: remote subscriber receives trace headers', async (t) => {
-    const sent = mockFetch(t);
+  it('assert :: remote subscriber receives trace headers', async () => {
+    const subscriber = await startTestServer();
     const scope = exportScope('trace-subscriber');
 
     const subscription = {
       type: 'remote',
       resourceName: 'subscriber',
-      serviceHost: 'http://localhost:0/subscriber'
+      serviceHost: `http://${subscriber.host}/subscriber`
     } as unknown as TopicRemoteSubscription;
 
-    await processRemoteEvent(subscription, { foo: 'bar' }, { traceId: 'trace-subscriber', scope });
+    try {
+      await processRemoteEvent(subscription, { foo: 'bar' }, { traceId: 'trace-subscriber', scope });
 
-    const headers = await sent;
+      const [{ headers }] = subscriber.requests;
 
-    equal(headers['x-trace-id'], 'trace-subscriber');
-    equal(headers['x-ez4-scope'], scope);
+      equal(headers['x-trace-id'], 'trace-subscriber');
+      equal(headers['x-ez4-scope'], scope);
+    } finally {
+      await subscriber.close();
+    }
   });
 
-  it('assert :: remote client sends trace headers', async (t) => {
-    const sent = mockFetch(t);
+  it('assert :: remote client sends trace headers', async () => {
+    const owner = await startTestServer();
 
     const client = createRemoteClient('scopeTopic', topicService.schema, {
       prefix: 'ez4',
       projectName: 'other',
       branchName: '',
-      serviceHost: 'localhost:0'
+      serviceHost: owner.host
     });
 
     const scope = exportScope('trace-publish');
 
-    await client.publishEvent({ foo: 'bar' });
+    try {
+      await client.publishEvent({ foo: 'bar' });
 
-    const headers = await sent;
+      await waitFor(() => owner.requests.length === 1);
 
-    equal(headers['x-trace-id'], 'trace-publish');
-    equal(headers['x-ez4-scope'], scope);
+      const [{ headers }] = owner.requests;
+
+      equal(headers['x-trace-id'], 'trace-publish');
+      equal(headers['x-ez4-scope'], scope);
+    } finally {
+      await owner.close();
+    }
   });
 });
