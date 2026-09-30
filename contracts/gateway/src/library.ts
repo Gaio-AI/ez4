@@ -7,6 +7,7 @@ export * from './metadata/auth/types';
 export * from './metadata/http/service';
 export * from './metadata/http/import';
 export * from './metadata/http/types';
+export * from './metadata/http/cors';
 export * from './metadata/ws/service';
 export * from './metadata/ws/types';
 

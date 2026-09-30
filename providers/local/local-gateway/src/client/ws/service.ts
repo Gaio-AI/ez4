@@ -17,15 +17,17 @@ export const createWsServiceClient = <T extends Ws.JsonBody = any>(resourceName:
 
   return new (class {
     async sendMessage<T extends Ws.JsonBody>(connectionId: string, message: T) {
+      const content = await resolveResponseBody(message, messageSchema, preferences);
       const connection = allConnections[connectionId];
 
-      if (!connection) {
-        throw new Error('Connection not found.');
+      // The AWS client ignores the `GoneException` of a connection that no longer exists.
+      if (!connection?.live) {
+        Logger.debug(`✉️  Connection [${connectionId}] is gone [${resourceName}]`);
+        return;
       }
 
       Logger.log(`✉️  Sending message to connection [${resourceName}]`);
 
-      const content = await resolveResponseBody(message, messageSchema, preferences);
       const payload = JSON.stringify(content);
 
       connection.write(payload);

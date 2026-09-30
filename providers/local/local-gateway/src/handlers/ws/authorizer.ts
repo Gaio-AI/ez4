@@ -10,7 +10,17 @@ import { Runtime } from '@ez4/common';
 
 import { getIncomingRequestHeaders, getIncomingRequestQuery } from '../../utils/request';
 
-export const processWsAuthorization = async (
+export const processWsAuthorization = (
+  service: WsService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  event: EmulatorConnectionEvent
+): Promise<Ws.Identity | undefined> => {
+  // A scope of its own, as each Lambda invocation has, so concurrent connections don't overwrite each other's.
+  return Runtime.runWithScope(() => handleWsAuthorization(service, options, context, event));
+};
+
+const handleWsAuthorization = async (
   service: WsService,
   options: ServeOptions,
   context: EmulateServiceContext,

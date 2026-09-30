@@ -1,11 +1,13 @@
 import type { HttpErrors, HttpResponse } from '@ez4/gateway/library';
+import type { EmulatorResponse } from '@ez4/project/library';
 import type { AnyObject } from '@ez4/utils';
 import type { Http } from '@ez4/gateway';
 
 import { getJsonError, resolveResponseBody } from '@ez4/gateway/utils';
 import { getErrorResponse, getSuccessResponse } from '@ez4/local-common';
+import { HttpError, HttpInternalServerError } from '@ez4/gateway';
+import { Runtime, ServiceError } from '@ez4/common';
 import { isScalarSchema } from '@ez4/schema';
-import { HttpError } from '@ez4/gateway';
 
 export const getHttpSuccessResponse = (metadata: HttpResponse, response: Http.Response, preferences?: Http.Preferences) => {
   const { status, body, headers } = response;
@@ -25,24 +27,45 @@ export const getHttpSuccessResponse = (metadata: HttpResponse, response: Http.Re
   return getSuccessResponse(status, headers, 'application/json', payload);
 };
 
-export const getHttpErrorResponse = (error: Error, errorsMap?: HttpErrors | null) => {
+export const getHttpErrorResponse = (error: unknown, errorsMap?: HttpErrors | null) => {
   if (error instanceof HttpError) {
-    const { status, body } = getJsonError(error);
-
-    return getErrorResponse(status, body);
+    return getJsonErrorResponse(error);
   }
 
-  if (error && errorsMap) {
-    const errorData = getMappedErrorData(error, errorsMap);
+  const errorData = error instanceof Error && errorsMap ? getMappedErrorData(error, errorsMap) : undefined;
 
-    if (errorData) {
-      const { status, body } = getJsonError(errorData);
+  // As the gateway runtime, any other error answers without its details.
+  return getJsonErrorResponse(errorData ?? new HttpInternalServerError());
+};
 
-      return getErrorResponse(status, body);
+// What API Gateway answers by itself when the Lambda of the route or of its authorizer times out.
+export const getHttpTimeoutResponse = () => {
+  return getErrorResponse(500, {
+    message: 'Internal Server Error'
+  });
+};
+
+// As the gateway runtime, each response of a handler carries the trace id of its scope.
+export const getTracedResponse = <T extends EmulatorResponse>(response: T): T => {
+  const scope = Runtime.getScope();
+
+  if (!scope) {
+    return response;
+  }
+
+  return {
+    ...response,
+    headers: {
+      ...response.headers,
+      ['x-trace-id']: scope.traceId
     }
-  }
+  };
+};
 
-  throw error;
+const getJsonErrorResponse = (error: HttpError) => {
+  const { status, body } = getJsonError(error);
+
+  return getErrorResponse(status, body);
 };
 
 const getMappedErrorData = (error: Error, errorsMap: HttpErrors) => {
@@ -59,6 +82,9 @@ const getMappedErrorData = (error: Error, errorsMap: HttpErrors) => {
   return {
     status: statusCode,
     message: error.message,
-    name: errorName
+    name: errorName,
+    ...(error instanceof ServiceError && {
+      context: error.context
+    })
   };
 };

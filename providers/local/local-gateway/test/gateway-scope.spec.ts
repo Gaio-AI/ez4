@@ -11,6 +11,7 @@ import { Runtime } from '@ez4/common';
 import { registerHttpLocalService } from '../src/provider/http/local';
 import { registerWsLocalService } from '../src/provider/ws/local';
 import { createHttpServiceClient } from '../src/client/http/service';
+import { startServer } from './common/server';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -120,9 +121,100 @@ const getWsEvent = (live: boolean): EmulatorConnectionEvent => ({
   }
 });
 
+const concurrentHandler = {
+  ...probeHandler,
+  name: 'probeConcurrentScope'
+};
+
+const concurrentAuthorizer = {
+  ...probeHandler,
+  name: 'probeConcurrentAuthorizer'
+};
+
+const getConcurrentHttpService = (authorizer?: typeof probeHandler) => {
+  return {
+    name: 'concurrentApi',
+    services: {},
+    variables: {},
+    defaults: {
+      scope: {
+        clientVersion: 'x-client-version'
+      }
+    },
+    routes: [
+      {
+        path: 'GET /concurrent',
+        authorizer,
+        handler: {
+          ...concurrentHandler,
+          response: {
+            status: 204
+          }
+        }
+      }
+    ]
+  } as unknown as HttpService;
+};
+
+const concurrentWsService = {
+  name: 'concurrentWs',
+  services: {},
+  variables: {},
+  schema: {
+    type: 'object',
+    properties: {}
+  },
+  defaults: {
+    scope: {
+      clientVersion: 'x-client-version'
+    }
+  },
+  connect: {
+    handler: concurrentHandler,
+    authorizer: concurrentAuthorizer
+  },
+  disconnect: {
+    handler: concurrentHandler
+  },
+  message: {
+    handler: concurrentHandler
+  }
+} as unknown as WsService;
+
+// Each gate opens once `count` invocations reach it, so all of them set their scope before any reads it.
+const setScopeGates = (count: number) => {
+  const gates: Record<string, () => Promise<void>> = {};
+
+  globalThis.scopeGate = (name) => {
+    if (!gates[name]) {
+      let arrived = 0;
+      let open = () => {};
+
+      const opened = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+
+      gates[name] = () => {
+        if (++arrived === count) {
+          open();
+        }
+
+        return opened;
+      };
+    }
+
+    return gates[name]();
+  };
+};
+
+const getSeenScopes = (observed: ObservedScope[]) => {
+  return observed.map(({ traceId, scope }) => [traceId, scope?.traceId, scope?.clientVersion]).sort();
+};
+
 describe('local gateway scope', () => {
   afterEach(() => {
     globalThis.observeScope = undefined;
+    globalThis.scopeGate = undefined;
     Runtime.clearScope();
   });
 
@@ -239,31 +331,147 @@ describe('local gateway scope', () => {
     deepEqual(headers, {});
   });
 
-  it('assert :: http client forwards trace id and scope headers', async (t) => {
-    const sent = new Promise<RequestInit | undefined>((resolve) => {
-      t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
-        resolve(init);
-        return new Response(null, { status: 204 });
-      });
-    });
+  it('assert :: http client forwards trace id and scope headers', async () => {
+    const server = await startServer(() => ({ status: 204 }));
 
-    const client = createHttpServiceClient('scopeApi', {
-      ...options,
-      operations: {
-        probe: {
-          method: 'GET',
-          path: '/probe'
+    try {
+      const client = createHttpServiceClient('scopeApi', {
+        ...options,
+        serviceHost: server.host,
+        operations: {
+          probe: {
+            method: 'GET',
+            path: '/probe'
+          }
         }
-      }
-    }) as unknown as { probe: (request: HttpClientRequest) => Promise<unknown> };
+      }) as unknown as { probe: (request: HttpClientRequest) => Promise<unknown> };
 
-    Runtime.setScope({ traceId: 'trace-out', clientVersion: '1.2.3' }, { clientVersion: 'x-client-version' });
+      Runtime.setScope({ traceId: 'trace-out', clientVersion: '1.2.3' }, { clientVersion: 'x-client-version' });
 
-    await client.probe({});
+      await client.probe({});
 
-    const headers = (await sent)?.headers as Record<string, string>;
+      const [{ headers }] = server.received;
 
-    equal(headers['X-Trace-Id'], 'trace-out');
-    equal(headers['x-client-version'], '1.2.3');
+      equal(headers['x-trace-id'], 'trace-out');
+      equal(headers['x-client-version'], '1.2.3');
+      //
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('assert :: concurrent http requests keep their own scope', async () => {
+    const api = registerHttpLocalService(getConcurrentHttpService(), options, context);
+    const observed = observeScopes(2);
+
+    setScopeGates(2);
+
+    await Promise.all(
+      ['trace-a', 'trace-b'].map((traceId) => {
+        return api.requestHandler({
+          method: 'GET',
+          path: '/concurrent',
+          query: {},
+          headers: {
+            'x-trace-id': traceId,
+            'x-client-version': `version-${traceId}`
+          }
+        });
+      })
+    );
+
+    deepEqual(getSeenScopes(await observed), [
+      ['trace-a', 'trace-a', 'version-trace-a'],
+      ['trace-b', 'trace-b', 'version-trace-b']
+    ]);
+  });
+
+  it('assert :: concurrent http authorizers keep their own scope', async () => {
+    const api = registerHttpLocalService(getConcurrentHttpService(concurrentAuthorizer), options, context);
+    const observed = observeScopes(4);
+
+    setScopeGates(2);
+
+    await Promise.all(
+      ['trace-a', 'trace-b'].map((traceId) => {
+        return api.requestHandler({
+          method: 'GET',
+          path: '/concurrent',
+          query: {},
+          headers: {
+            'x-trace-id': traceId,
+            'x-client-version': `version-${traceId}`
+          }
+        });
+      })
+    );
+
+    deepEqual(getSeenScopes(await observed), [
+      ['trace-a', 'trace-a', 'version-trace-a'],
+      ['trace-a', 'trace-a', 'version-trace-a'],
+      ['trace-b', 'trace-b', 'version-trace-b'],
+      ['trace-b', 'trace-b', 'version-trace-b']
+    ]);
+  });
+
+  it('assert :: concurrent ws connections keep their own scope', async () => {
+    const ws = registerWsLocalService(concurrentWsService, options, context);
+    const observed = observeScopes(4);
+
+    setScopeGates(2);
+
+    await Promise.all(
+      ['trace-a', 'trace-b'].map((traceId) => {
+        return ws.connectHandler({
+          connection: {
+            id: `connection-${traceId}`,
+            live: true,
+            write: () => {},
+            close: () => {}
+          },
+          headers: {
+            'x-client-version': `version-${traceId}`
+          },
+          query: {
+            'x-trace-id': traceId
+          }
+        });
+      })
+    );
+
+    deepEqual(getSeenScopes(await observed), [
+      ['trace-a', 'trace-a', 'version-trace-a'],
+      ['trace-a', 'trace-a', 'version-trace-a'],
+      ['trace-b', 'trace-b', 'version-trace-b'],
+      ['trace-b', 'trace-b', 'version-trace-b']
+    ]);
+  });
+
+  it('assert :: concurrent ws messages keep their own scope', async () => {
+    const ws = registerWsLocalService(concurrentWsService, options, context);
+    const observed = observeScopes(2);
+
+    setScopeGates(2);
+
+    await Promise.all(
+      ['connection-a', 'connection-b'].map((connectionId) => {
+        return ws.messageHandler({
+          connection: {
+            id: connectionId,
+            live: true,
+            write: () => {},
+            close: () => {}
+          },
+          body: Buffer.from('{}')
+        });
+      })
+    );
+
+    const [first, second] = await observed;
+
+    notEqual(first.traceId, second.traceId);
+
+    equal(first.scope?.traceId, first.traceId);
+    equal(second.scope?.traceId, second.traceId);
   });
 });

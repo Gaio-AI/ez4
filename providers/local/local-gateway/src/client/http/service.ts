@@ -2,13 +2,14 @@ import type { ClientAuthorization, ClientOperation } from '@ez4/gateway/library'
 import type { HttpClient, HttpClientRequest, Http } from '@ez4/gateway';
 import type { CommonOptions } from '@ez4/project/library';
 
-import { sendClientRequest } from '@ez4/gateway/utils';
 import { getServiceName } from '@ez4/project/library';
 import { prepareRequestUrl } from '@ez4/http';
 import { isAnyString } from '@ez4/utils';
 import { HttpError } from '@ez4/gateway';
 import { Runtime } from '@ez4/common';
 import { Logger } from '@ez4/logger';
+
+import { sendEmulatorRequest } from './request';
 
 export type HttpServiceClientOptions = CommonOptions & {
   authorization?: ClientAuthorization;
@@ -51,7 +52,7 @@ export const createHttpServiceClient = <T extends Http.Service>(
           try {
             Logger.log(`🌐 Sending request to gateway [${resourceName}] at ${requestUrl}`);
 
-            return await sendClientRequest(requestUrl, method, {
+            return await sendEmulatorRequest(requestUrl, method, {
               ...request,
               bodySchema,
               responseSchema,

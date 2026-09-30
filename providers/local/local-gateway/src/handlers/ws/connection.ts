@@ -10,7 +10,18 @@ import { Runtime } from '@ez4/common';
 
 import { getIncomingRequestIdentity, getIncomingRequestHeaders, getIncomingRequestQuery } from '../../utils/request';
 
-export const processWsConnection = async (
+export const processWsConnection = (
+  service: WsService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  event: EmulatorConnectionEvent,
+  identity?: Ws.Identity
+) => {
+  // A scope of its own, as each Lambda invocation has, so concurrent connections don't overwrite each other's.
+  return Runtime.runWithScope(() => handleWsConnection(service, options, context, event, identity));
+};
+
+const handleWsConnection = async (
   service: WsService,
   options: ServeOptions,
   context: EmulateServiceContext,
@@ -45,7 +56,8 @@ export const processWsConnection = async (
   const currentRequest: Ws.Incoming<Ws.Event> = {
     connectionId: connection.id,
     requestId: getRandomUUID(),
-    timestamp: new Date()
+    timestamp: new Date(),
+    traceId
   };
 
   const onCustomValidation = (value: unknown, context: ValidationCustomContext) => {

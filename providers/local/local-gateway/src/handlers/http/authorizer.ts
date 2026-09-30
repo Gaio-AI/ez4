@@ -4,14 +4,25 @@ import type { HttpService } from '@ez4/gateway/library';
 import type { Http } from '@ez4/gateway';
 import type { MatchingRoute } from '../../utils/route';
 
-import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/local-common';
+import { createModule, onBegin, onReady, onDone, onError, onEnd, onTimeout } from '@ez4/local-common';
 import { resolveValidation } from '@ez4/gateway/utils';
 import { getRandomUUID, pickObject } from '@ez4/utils';
 import { Runtime } from '@ez4/common';
 
 import { getIncomingRequestHeaders, getIncomingRequestParameters, getIncomingRequestQuery } from '../../utils/request';
+import { getLambdaTimeout, runWithLambdaTimeout } from '../../utils/timeout';
 
-export const processHttpAuthorization = async (
+export const processHttpAuthorization = (
+  service: HttpService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  route: MatchingRoute
+): Promise<Http.Identity | undefined> => {
+  // A scope of its own, as each Lambda invocation has, so concurrent requests don't overwrite each other's.
+  return Runtime.runWithScope(() => handleHttpAuthorization(service, options, context, route));
+};
+
+const handleHttpAuthorization = async (
   service: HttpService,
   options: ServeOptions,
   context: EmulateServiceContext,
@@ -55,29 +66,41 @@ export const processHttpAuthorization = async (
     return resolveValidation(value, serviceClients, context.type);
   };
 
-  try {
-    await onBegin(module, serviceClients, currentRequest);
+  const invokeAuthorizer = async () => {
+    try {
+      await onBegin(module, serviceClients, currentRequest);
 
-    if (route.authorizer?.request) {
-      Object.assign(currentRequest, await getIncomingRequestHeaders(route.authorizer.request, route, onCustomValidation));
-      Object.assign(currentRequest, await getIncomingRequestParameters(route.authorizer.request, route, onCustomValidation));
-      Object.assign(currentRequest, await getIncomingRequestQuery(route.authorizer.request, route, onCustomValidation));
+      if (route.authorizer?.request) {
+        Object.assign(currentRequest, await getIncomingRequestHeaders(route.authorizer.request, route, onCustomValidation));
+        Object.assign(currentRequest, await getIncomingRequestParameters(route.authorizer.request, route, onCustomValidation));
+        Object.assign(currentRequest, await getIncomingRequestQuery(route.authorizer.request, route, onCustomValidation));
+      }
+
+      await onReady(module, serviceClients, currentRequest);
+
+      const { identity } = await module.handler<Http.AuthResponse>(currentRequest, serviceClients);
+
+      await onDone(module, serviceClients, currentRequest);
+
+      return identity;
+      //
+    } catch (error) {
+      await onError(module, serviceClients, currentRequest, error);
+
+      throw error;
+      //
+    } finally {
+      await onEnd(module, serviceClients, currentRequest);
     }
+  };
 
-    await onReady(module, serviceClients, currentRequest);
-
-    const { identity } = await module.handler<Http.AuthResponse>(currentRequest, serviceClients);
-
-    await onDone(module, serviceClients, currentRequest);
-
-    return identity;
-    //
-  } catch (error) {
-    await onError(module, serviceClients, currentRequest, error);
-
-    throw error;
-    //
-  } finally {
-    await onEnd(module, serviceClients, currentRequest);
-  }
+  // The authorizer Lambda gets its timeout from the route, as the deploy creates it.
+  return runWithLambdaTimeout(
+    {
+      timeout: getLambdaTimeout(route.timeout),
+      source: module.source,
+      onTimeout: () => onTimeout(module, serviceClients, currentRequest)
+    },
+    invokeAuthorizer
+  );
 };
