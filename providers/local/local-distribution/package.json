@@ -1,7 +1,7 @@
 {
   "name": "@ez4/local-distribution",
   "description": "EZ4: Local distribution emulator",
-  "version": "0.53.912",
+  "version": "0.53.913",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
