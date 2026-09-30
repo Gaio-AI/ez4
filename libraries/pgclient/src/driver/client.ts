@@ -1,4 +1,4 @@
-import type { PgClientDriver, PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
+import type { ClientDataApiOptions, PgClientDriver, PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { AnySchema } from '@ez4/schema';
 import type { Pool, PoolClient } from 'pg';
 
@@ -10,16 +10,23 @@ import { DatabaseError } from 'pg';
 
 import { logQueryError, logQuerySuccess } from './utils/logger';
 import { detectFieldData, prepareFieldData } from './utils/fields';
+import { sendDataApiStatement } from './utils/data-api';
 import { prepareStatement } from './utils/prepare';
 import { parseRecords } from '../utils/records';
 
 const ALL_TRANSACTIONS: Record<string, PoolClient> = {};
 
+export type ClientDriverOptions = {
+  dataApi?: boolean | ClientDataApiOptions;
+};
+
 export class ClientDriver implements PgClientDriver {
   protected pool?: Pool;
+  protected dataApi?: ClientDataApiOptions;
 
-  constructor(pool?: Pool) {
+  constructor(pool?: Pool, options?: ClientDriverOptions) {
     this.pool = pool;
+    this.dataApi = getDataApiOptions(options?.dataApi);
   }
 
   async getConnection() {
@@ -42,9 +49,7 @@ export class ClientDriver implements PgClientDriver {
     }
 
     try {
-      const [query, variables] = prepareStatement(statement.query, statement.variables);
-
-      const { rows: records, rowCount: rows } = await client.query(query, variables);
+      const { rows: records, rowCount: rows } = await sendStatement(client, statement, this.dataApi, options);
 
       if (options?.debug || Runtime.isDebug()) {
         logQuerySuccess(statement, transactionId);
@@ -168,3 +173,21 @@ export class ClientDriver implements PgClientDriver {
     return detectFieldData(name, value);
   }
 }
+
+const getDataApiOptions = (dataApi: boolean | ClientDataApiOptions | undefined) => {
+  if (dataApi === true) {
+    return {};
+  }
+
+  return dataApi || undefined;
+};
+
+const sendStatement = (client: PoolClient, statement: PgExecuteStatement, dataApi?: ClientDataApiOptions, options?: PgExecuteOptions) => {
+  if (dataApi) {
+    return sendDataApiStatement(client, statement, dataApi, options);
+  }
+
+  const [query, variables] = prepareStatement(statement.query, statement.variables);
+
+  return client.query(query, variables);
+};

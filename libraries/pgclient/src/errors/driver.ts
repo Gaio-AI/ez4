@@ -12,3 +12,27 @@ export class DuplicateUniqueKeyError extends Error {
     super(`Duplicate key for table was detected.`);
   }
 }
+
+export class InternalFailure extends Error {
+  constructor(message: string) {
+    super(message);
+
+    this.name = 'InternalFailure';
+  }
+}
+
+export class UnsupportedResultException extends Error {
+  constructor(message: string) {
+    super(message);
+
+    this.name = 'UnsupportedResultException';
+  }
+}
+
+export class StatementTimeoutException extends Error {
+  constructor(message: string) {
+    super(message);
+
+    this.name = 'StatementTimeoutException';
+  }
+}

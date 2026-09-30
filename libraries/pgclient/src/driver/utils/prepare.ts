@@ -1,6 +1,10 @@
 import type { FieldParameter } from './fields';
 
-export const prepareStatement = (query: string, variables?: FieldParameter[]): [string, unknown[] | undefined] => {
+export const prepareStatement = (
+  query: string,
+  variables?: FieldParameter[],
+  bindEachOccurrence?: boolean
+): [string, unknown[] | undefined] => {
   if (!variables?.length) {
     return [query, undefined];
   }
@@ -24,7 +28,7 @@ export const prepareStatement = (query: string, variables?: FieldParameter[]): [
 
     const { type, value } = parameter;
 
-    if (!fieldIndexes[fieldName]) {
+    if (!fieldIndexes[fieldName] || bindEachOccurrence) {
       fieldIndexes[fieldName] = ++totalFields;
       preparedValues.push(value);
     }
