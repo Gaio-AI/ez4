@@ -43,6 +43,7 @@
     "providers/local/local-gateway",
     "providers/local/local-queue",
     "providers/local/local-topic",
+    "providers/local/local-distribution",
     "providers/docs/docs-database",
     "providers/docs/docs-gateway",
     "providers/docs/docs-gateway-ui",

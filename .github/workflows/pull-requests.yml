@@ -92,6 +92,7 @@ jobs:
             workspaces: >-
               -w @ez4/local-common -w @ez4/local-gateway -w @ez4/local-database -w @ez4/local-cache
               -w @ez4/local-scheduler -w @ez4/local-storage -w @ez4/local-queue -w @ez4/local-topic
+              -w @ez4/local-distribution
           - group: docs providers
             workspaces: -w @ez4/docs-gateway -w @ez4/docs-database -w @ez4/docs-topology
 

@@ -1,0 +1,56 @@
+{
+  "name": "@ez4/local-distribution",
+  "description": "EZ4: Local distribution emulator",
+  "version": "0.53.911",
+  "author": "Silas B.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "ez4",
+    "local",
+    "emulator",
+    "distribution",
+    "cdn"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sbalmt/ez4.git",
+    "directory": "providers/local/local-distribution"
+  },
+  "engines": {
+    "node": ">=22.7"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "require": "./dist/main.cjs",
+      "import": "./dist/main.mjs"
+    }
+  },
+  "workspaces": [
+    "foundation/*",
+    "providers/local/*"
+  ],
+  "scripts": {
+    "lint": "eslint --cache",
+    "clean": "rm -rf dist/* *.tsbuildinfo .eslintcache",
+    "build": "tsc -p tsconfig.pack.json && node tools/bundler.mjs",
+    "test": "npm run build && tsc -p tsconfig.test.json --noEmit && ez4 test",
+    "local:publish": "npm run build && npm run clean:registry && npm publish --registry http://localhost:4873 --@ez4:registry=http://localhost:4873/",
+    "clean:registry": "rm -rf ../../../.registry/@ez4/local-distribution",
+    "live:publish": "npm run build && npm publish --access public"
+  },
+  "devDependencies": {
+    "@ez4/common": "^0.53.0",
+    "@ez4/local-storage": "^0.53.0",
+    "@types/mime": "^3.0.0"
+  },
+  "dependencies": {
+    "@ez4/distribution": "^0.53.0",
+    "@ez4/logger": "^0.53.0",
+    "@ez4/project": "^0.53.0",
+    "@ez4/storage": "^0.53.0",
+    "@ez4/utils": "^0.53.0",
+    "mime": "^3.0.0"
+  }
+}
