@@ -55,6 +55,7 @@ export type ServiceEmulator = {
   type: string;
   name: string;
   identifier: string;
+  service?: ServiceMetadata;
   options?: AnyObject;
   inheritOptions?: boolean;
   exportHandler?: EmulatorExportHandler;

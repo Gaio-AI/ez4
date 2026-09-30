@@ -8,6 +8,9 @@ import { mock } from 'node:test';
 
 import { createClientMock } from '../client/mock';
 
+// A tracker of its own, so `mock.restoreAll()` in another spec of the same process leaves these mocks alone.
+const tracker = new (mock.constructor as new () => typeof mock)();
+
 export namespace CronTester {
   export type MockOptions<T extends Cron.Event> = ClientMockOptions<T>;
 
@@ -25,16 +28,20 @@ export namespace CronTester {
   export const getClientMock = <T extends Cron.Event>(resourceName: string, options?: MockOptions<T>) => {
     const client = createClientMock(resourceName, options) as ClientMock<T>;
 
-    mock.method(client, 'getEvent');
-    mock.method(client, 'createEvent');
-    mock.method(client, 'updateEvent');
-    mock.method(client, 'deleteEvent');
+    tracker.method(client, 'getEvent');
+    tracker.method(client, 'createEvent');
+    tracker.method(client, 'updateEvent');
+    tracker.method(client, 'deleteEvent');
 
     return client;
   };
 
   export const setClientMock = <T extends Cron.Event>(resourceName: string, options?: MockOptions<T>) => {
-    Tester.mockServiceClient(resourceName, getClientMock<T>(resourceName, options));
+    const client = getClientMock<T>(resourceName, options);
+
+    Tester.mockServiceClient(resourceName, client);
+
+    return client;
   };
 
   export const restoreClient = (resourceName: string) => {

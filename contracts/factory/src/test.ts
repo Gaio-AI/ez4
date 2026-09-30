@@ -20,7 +20,11 @@ export namespace FactoryTester {
   };
 
   export const setClientMock = <T extends AnyObject>(resourceName: string, options: MockOptions<T>) => {
-    Tester.mockServiceClient(resourceName, getClientMock(resourceName, options));
+    const client = getClientMock(resourceName, options);
+
+    Tester.mockServiceClient(resourceName, client);
+
+    return client;
   };
 
   export const restoreClient = (resourceName: string) => {

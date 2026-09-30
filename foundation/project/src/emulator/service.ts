@@ -48,9 +48,11 @@ export const getServiceEmulators = async (metadata: MetadataReflection, options:
       throw new MissingEmulatorProvider(service.name);
     }
 
-    if (result) {
-      emulators[result.identifier] = result;
-    }
+    // Testers read the service contract (schemas, FIFO mode, routes) to make mocks that validate like the real client.
+    emulators[result.identifier] = {
+      ...result,
+      service: result.service ?? service
+    };
   }
 
   return emulators;
