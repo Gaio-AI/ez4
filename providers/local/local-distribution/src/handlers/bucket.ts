@@ -2,8 +2,6 @@ import type { EmulateServiceContext, EmulatorRequestEvent, EmulatorResponse } fr
 import type { CdnBucketOrigin } from '@ez4/distribution/library';
 import type { Client } from '@ez4/storage';
 
-import mime from 'mime';
-
 import { isAnyObject } from '@ez4/utils';
 
 import { getBucketErrorResponse } from '../utils/response';
@@ -35,9 +33,8 @@ export const sendBucketRequest = async (
     return getBucketErrorResponse(404, 'NoSuchKey', 'The specified key does not exist.', objectKey);
   }
 
-  // S3 answers the content type stored on upload, which the deploy and the bucket client take from the key
-  // extension. The local bucket stores none, so the type it detects from the content only fills unknown extensions.
-  const contentType = mime.getType(objectKey) ?? objectStat.type;
+  // S3 answers the content type stored on upload, as the local bucket keeps it.
+  const contentType = objectStat.type;
 
   if (method === 'HEAD') {
     return {

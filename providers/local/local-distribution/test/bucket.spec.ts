@@ -29,7 +29,8 @@ describe('local distribution bucket origin', () => {
       client.write('app/main.js', 'console.log(1);'),
       client.write('hello world.txt', 'spaced key'),
       client.write('site/docs/page.html', '<p>docs page</p>'),
-      client.write('images/logo', PNG_CONTENT)
+      client.write('images/logo', PNG_CONTENT),
+      client.write('reports/summary.png', 'plain summary', { contentType: 'text/plain' })
     ]);
 
     const service = createService('BucketCdn', {
@@ -62,11 +63,18 @@ describe('local distribution bucket origin', () => {
     equal(getBody(page), '<p>bucket home</p>');
   });
 
-  it('assert :: object without extension keeps the stored content type', async () => {
+  it('assert :: object without extension gets the default content type of S3', async () => {
     const response = await sendRequest(distribution, 'GET', '/images/logo');
 
     equal(response.status, 200);
-    equal(response.headers?.['content-type'], 'image/png');
+    equal(response.headers?.['content-type'], 'binary/octet-stream');
+  });
+
+  it('assert :: object is served with the content type it was written with', async () => {
+    const response = await sendRequest(distribution, 'GET', '/reports/summary.png');
+
+    equal(response.status, 200);
+    equal(response.headers?.['content-type'], 'text/plain');
   });
 
   it('assert :: origin location prefixes the object key', async () => {
