@@ -4,7 +4,10 @@
 export default {
   prefix: 'ez4',
   projectName: 'local-gateway',
-  sourceFiles: [],
+  sourceFiles: ['./test/fixtures/items.ts'],
+  customProviders: {
+    packages: ['@ez4/local-gateway']
+  },
   stateFile: {
     path: 'ez4-state'
   }

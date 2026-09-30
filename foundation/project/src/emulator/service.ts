@@ -3,9 +3,10 @@ import type { EmulatorLinkedServices, ServiceEmulator, EmulatorServiceClients } 
 import type { MetadataReflection } from '../types/metadata';
 import type { ServeOptions } from '../types/options';
 
-import { getServiceName, triggerAllAsync } from '@ez4/project/library';
-import { hashObject, isAnyString } from '@ez4/utils';
+import { triggerAllAsync } from '@ez4/project/library';
+import { hashObject } from '@ez4/utils';
 
+import { getInvocationClient, makeEmulatorClient, makeEmulatorClients, makeLazyClients } from './clients';
 import { MissingEmulatorProvider } from './errors';
 
 export type ServiceEmulators = Record<string, ServiceEmulator>;
@@ -16,7 +17,7 @@ export const getServiceEmulators = async (metadata: MetadataReflection, options:
 
   const context = {
     makeClient: (resourceName: string, resourceOptions?: AnyObject) => {
-      return makeEmulatorClient(resourceName, resourceOptions, undefined, emulators, options);
+      return getInvocationClient(resourceName, options) ?? makeEmulatorClient(resourceName, resourceOptions, undefined, emulators, options);
     },
     makeClients: (linkedServices: EmulatorLinkedServices, linkedOptions?: AnyObject) => {
       const clientKey = hashObject({ linkedServices, linkedOptions });
@@ -29,7 +30,7 @@ export const getServiceEmulators = async (metadata: MetadataReflection, options:
         Object.assign(clientsCache[clientKey], allClients);
       }
 
-      return makeLazyClients(clientsCache[clientKey]);
+      return makeLazyClients(clientsCache[clientKey], linkedServices, options);
     }
   };
 
@@ -56,70 +57,4 @@ export const getServiceEmulators = async (metadata: MetadataReflection, options:
   }
 
   return emulators;
-};
-
-const makeEmulatorClients = (
-  linkedServices: EmulatorLinkedServices,
-  linkedOptions: AnyObject | undefined,
-  emulators: ServiceEmulators,
-  options: ServeOptions
-) => {
-  const allClients: EmulatorServiceClients = {};
-
-  for (const linkedServiceName in linkedServices) {
-    const { reference: resourceName, options: resourceOptions } = linkedServices[linkedServiceName];
-
-    const resourceClient = makeEmulatorClient(resourceName, resourceOptions, linkedOptions, emulators, options);
-
-    allClients[linkedServiceName] = resourceClient;
-  }
-
-  return allClients;
-};
-
-const makeEmulatorClient = (
-  resourceName: string,
-  resourceOptions: AnyObject | undefined,
-  linkedOptions: AnyObject | undefined,
-  emulators: ServiceEmulators,
-  options: ServeOptions
-) => {
-  const serviceName = getServiceName(resourceName, options);
-  const serviceEmulator = emulators[serviceName];
-
-  if (!serviceEmulator) {
-    throw new Error(`Service '${resourceName}' has no emulators.`);
-  }
-
-  const serviceClient = serviceEmulator.exportHandler?.({
-    ...(serviceEmulator.inheritOptions && linkedOptions),
-    ...serviceEmulator.options,
-    ...resourceOptions
-  });
-
-  if (!serviceClient) {
-    throw new Error(`Service '${resourceName}' has no client emulator.`);
-  }
-
-  return serviceClient;
-};
-
-const makeLazyClients = (clients: EmulatorServiceClients) => {
-  return new Proxy(clients, {
-    get: (target, property) => {
-      if (!isAnyString(property) || !(property in target)) {
-        if (property !== 'then') {
-          throw new Error(`Context service '${property.toString()}' not found.`);
-        }
-
-        return undefined;
-      }
-
-      if (target[property] instanceof Function) {
-        target[property] = target[property]();
-      }
-
-      return target[property];
-    }
-  });
 };

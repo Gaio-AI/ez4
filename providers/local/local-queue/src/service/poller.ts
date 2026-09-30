@@ -2,6 +2,8 @@ import type { LocalQueue, ReceivedMessage } from './queue';
 
 import { Logger } from '@ez4/logger';
 
+import { AsyncResource } from 'node:async_hooks';
+
 export type QueuePollerParameters = {
   batchSize: number;
   batchWindow: number;
@@ -86,7 +88,10 @@ export const startQueuePoller = (queue: LocalQueue, parameters: QueuePollerParam
     }
   };
 
-  const unsubscribe = queue.subscribe(pollQueue);
+  // The queue calls its listeners in the async context of whatever changed it, like a send. Bound to the context it
+  // started in, the poller keeps the invocation of a sender, with its client overrides, out of a batch that carries
+  // messages from other senders too.
+  const unsubscribe = queue.subscribe(AsyncResource.bind(pollQueue));
 
   pollQueue();
 

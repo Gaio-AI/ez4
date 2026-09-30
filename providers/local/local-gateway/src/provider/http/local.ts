@@ -2,9 +2,9 @@ import type { EmulateServiceContext, EmulatorRequestEvent, ServeOptions } from '
 import type { HttpService } from '@ez4/gateway/library';
 import type { RouteData } from '../../utils/route';
 
+import { getCurrentInvocation, getServiceName, triggerAllAsync } from '@ez4/project/library';
 import { getClientOperations, getCorsConfiguration } from '@ez4/gateway/library';
 import { HttpError, HttpForbiddenError, HttpNotFoundError } from '@ez4/gateway';
-import { getServiceName, triggerAllAsync } from '@ez4/project/library';
 import { Logger } from '@ez4/logger';
 
 import { HttpManifest } from '../../service/manifest/http';
@@ -74,7 +74,8 @@ export const registerHttpLocalService = (service: HttpService, options: ServeOpt
           return await processHttpRequest(service, options, context, currentRoute);
         }
 
-        const identity = await processHttpAuthorization(service, options, context, currentRoute);
+        // A test request can bring the identity, which takes the place of the authorizer for that request only.
+        const identity = getCurrentInvocation()?.identity ?? (await processHttpAuthorization(service, options, context, currentRoute));
 
         if (identity) {
           return await processHttpRequest(service, options, context, currentRoute, identity);

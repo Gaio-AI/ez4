@@ -4,7 +4,10 @@
 export default {
   prefix: 'ez4',
   projectName: 'local-scheduler',
-  sourceFiles: [],
+  sourceFiles: ['./test/fixtures/reports.ts'],
+  customProviders: {
+    packages: ['@ez4/local-scheduler']
+  },
   stateFile: {
     path: 'ez4-state'
   }
