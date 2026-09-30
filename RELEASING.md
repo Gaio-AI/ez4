@@ -12,8 +12,6 @@ merging the release pull request publishes to CodeArtifact on its own.
 - **`changeset-release/main`** — the release branch. The Release workflow keeps it, and its pull
   request (`chore: version <version>`), up to date with every changeset waiting on `main`. Never push
   to it by hand.
-- **`upstream-main`** — mirrors `sbalmt/ez4`. Kept only so we can diff against upstream and pick
-  changes from it. Never develop here.
 - Work happens on `fix/*` or `feat/*`, opened against `main` and merged with a squash: one commit per
   change.
 
@@ -22,9 +20,11 @@ since there is nothing to release. The `🦋 Changeset` job fails any other pull
 without one; a package change that must not release adds `npx changeset add --empty`. An empty
 changeset opens no release pull request: it waits on `main` and goes out with the next release.
 
-Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. In a fork `gh` resolves to the parent
-repository unless told otherwise: run `gh repo set-default Gaio-AI/ez4` once, or pass
-`-R Gaio-AI/ez4`.
+Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. The fork follows its own line and
+does not track or rebase onto upstream: `upstream` is there to read, and a change worth having is
+taken on its own (see [Taking a change from upstream](#taking-a-change-from-upstream)). In a fork
+`gh` resolves to the parent repository unless told otherwise: run `gh repo set-default Gaio-AI/ez4`
+once, or pass `-R Gaio-AI/ez4`.
 
 ## Every published version has a tag
 
@@ -39,20 +39,19 @@ version on `main` without its tag is a version still to publish.
 
 ## Only patches
 
-The fork never goes above upstream's minor. While upstream is on `0.54`, every release of ours is a
-`0.54` patch: a caret range on a `0.x` version stops at the minor, so the backend and the frontend
-take any of them by changing their lockfile alone, and go back by reverting it. A consumer change
-that works with both versions can land first to make that true: `0.53.904` typed Postgres reads as
-`T | null`, and the backend was fixed to compile against both sets of types before a lockfile-only
-pull request took the version.
+Every release is a patch of the current minor: a caret range on a `0.x` version stops at the minor,
+so the backend and the frontend take any of them by changing their lockfile alone, and go back by
+reverting it. A consumer change that works with both versions can land first to make that true:
+`0.53.904` typed Postgres reads as `T | null`, and the backend was fixed to compile against both sets
+of types before a lockfile-only pull request took the version.
 
 A `minor` or `major` changeset fails the pull request (`npm run changeset:check`), and the release
 workflow refuses to version it too. A change that would need consumers to change code or
-configuration in the same step waits until it can be made compatible, or rides the next upstream
-minor.
+configuration in the same step waits until it can be made compatible, or goes out with a
+[new minor](#moving-to-a-new-minor).
 
-Patch numbers start at `900` on each minor, clear of the patches upstream publishes on its own
-(`0.53.1`, `0.53.2`).
+Patch numbers start at `900` on each minor, clear of the patches upstream published under the same
+names (`0.53.1`, `0.53.2`).
 
 ## Releasing
 
@@ -111,10 +110,11 @@ Patch numbers start at `900` on each minor, clear of the patches upstream publis
 
 A published version is immutable. A mistake means publishing the next one.
 
-### Adopting an upstream minor
+### Moving to a new minor
 
-The one version change that is not a changeset. When upstream moves to a new minor and we take it,
-bump everything by hand to our first patch of that minor, in a pull request against `main`:
+The one version change that is not a changeset, taken on purpose for a change that cannot be made
+compatible with the consumers. Bump everything by hand to the first patch of the new minor, in a pull
+request against `main`:
 
 ```bash
 npm version <minor>.900 --workspaces --no-workspaces-update --no-git-tag-version --allow-same-version
@@ -139,12 +139,14 @@ real AWS.
 
 ## Taking a change from upstream
 
-`cherry-pick` usually conflicts: the upstream `v0.54.0` branch diverged from our base. Check that the
-file differs only by the fix, then take the file:
+Upstream is read for ideas, one change at a time, from the `upstream` remote (`git fetch upstream`).
+`cherry-pick` usually conflicts, since the two lines diverged. When the file differs only by the fix,
+take the file:
 
 ```bash
 git diff --stat <our-base> <commit>^ -- <file>   # empty means only the fix separates them
 git checkout <commit> -- <file>
 ```
 
-Keep the original author with `git commit --author`.
+Keep the original author with `git commit --author`. When our side of the file has changed too, port
+the change by hand and name the upstream commit in the pull request.

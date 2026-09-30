@@ -10,6 +10,6 @@ const offending = readdirSync(changesetDir)
   });
 
 if (offending.length) {
-  console.error(`Only patch changesets are allowed, the minor follows upstream (see RELEASING.md): ${offending.join(', ')}`);
+  console.error(`Only patch changesets are allowed, a new minor is a deliberate bump (see RELEASING.md): ${offending.join(', ')}`);
   process.exit(1);
 }
