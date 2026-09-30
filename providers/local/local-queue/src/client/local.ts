@@ -1,47 +1,43 @@
-import type { Client, Queue, SendOptions } from '@ez4/queue';
-import type { ServeOptions } from '@ez4/project/library';
-import type { MessageSchema } from '@ez4/queue/utils';
-import type { AnyObject } from '@ez4/utils';
-import type { MessageTrace } from '@ez4/local-common';
+import type { Client, Queue, ReceiveOptions, SendOptions } from '@ez4/queue';
+import type { QueueService } from '@ez4/queue/library';
+import type { LocalQueueHandle } from '../utils/handle';
+import type { LocalQueue } from '../service/queue';
 
-import { setTimeout } from 'node:timers/promises';
-
-import { getJsonMessage } from '@ez4/queue/utils';
 import { captureMessageTrace } from '@ez4/local-common';
+import { getJsonMessage } from '@ez4/queue/utils';
 import { Logger } from '@ez4/logger';
 
-export type LocalClientOptions = ServeOptions & {
-  handler: (message: AnyObject, trace: MessageTrace) => Promise<void>;
-  delay: number;
-};
+import { getOutgoingMessage } from '../utils/message';
+import { LocalQueueHandleKey } from '../utils/handle';
 
 export const createLocalClient = <T extends Queue.Message = any, U extends Queue.Mode = any>(
-  resourceName: string,
-  messageSchema: MessageSchema,
-  clientOptions: LocalClientOptions
+  service: QueueService,
+  queue: LocalQueue,
+  handle: LocalQueueHandle
 ): Client<T, U> => {
+  const { name: resourceName, schema } = service;
+
   return new (class {
+    get [LocalQueueHandleKey]() {
+      return handle;
+    }
+
     async sendMessage(message: T, options?: SendOptions<U>) {
+      // The trace is taken before anything else, callers import the scope right before sending.
       const trace = captureMessageTrace();
 
       Logger.log(`✉️  Sending message to queue [${resourceName}]`);
 
-      const payload = await getJsonMessage(message, messageSchema);
-      const delay = options?.delay ?? clientOptions.delay;
+      const outgoingMessage = await getOutgoingMessage(message, service, trace, options?.delay);
 
-      setImmediate(async () => {
-        try {
-          await setTimeout(delay * 1000);
-          await clientOptions.handler(payload, trace);
-        } catch (error) {
-          Logger.error(`Local queue [${resourceName}] finished with errors.`);
-          Logger.error(`    ${error}`);
-        }
-      });
+      queue.sendMessage(outgoingMessage);
     }
 
-    receiveMessage(): Promise<T[]> {
-      throw new Error(`Receive message isn't supported yet.`);
+    async receiveMessage(options?: ReceiveOptions): Promise<T[]> {
+      const receivedMessages = await queue.pollMessages(options?.messages, options?.polling);
+
+      // Like the real client, the messages aren't deleted and come back after the visibility timeout.
+      return Promise.all(receivedMessages.map(({ body }) => getJsonMessage(JSON.parse(body), schema)));
     }
   })();
 };

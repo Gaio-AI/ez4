@@ -7,6 +7,7 @@ import { Tester } from '@ez4/project/library';
 import { mock } from 'node:test';
 
 import { createClientMock } from '../client/mock';
+import { getLocalQueueHandle } from '../utils/handle';
 
 // A tracker of its own, so `mock.restoreAll()` in another spec of the same process leaves these mocks alone.
 const tracker = new (mock.constructor as new () => typeof mock)();
@@ -51,7 +52,32 @@ export namespace QueueTester {
   export const restoreClient = (resourceName: string) => {
     Tester.restoreServiceClient(resourceName);
   };
+
+  /**
+   * Messages the queue moved to its dead-letter queue, as the consumer receives them.
+   */
+  export const getDeadLetterMessages = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
+    return getLocalQueue(resourceName).getDeadLetterMessages() as T['schema'][];
+  };
+
+  /**
+   * Resolves once the queue has no message waiting, delayed or in flight, and its consumers are done.
+   * A message that keeps failing without a dead-letter queue keeps it waiting until the message expires.
+   */
+  export const waitForDrain = (resourceName: string) => {
+    return getLocalQueue(resourceName).waitForDrain();
+  };
 }
+
+const getLocalQueue = (resourceName: string) => {
+  const handle = getLocalQueueHandle(Tester.getServiceClient(resourceName));
+
+  if (!handle) {
+    throw new Error(`Queue [${resourceName}] has no local emulator to inspect, it's mocked or imported.`);
+  }
+
+  return handle;
+};
 
 const getQueueContract = (resourceName: string) => {
   const service = Tester.getServiceMetadata(resourceName);
