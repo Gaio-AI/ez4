@@ -1,11 +1,15 @@
-import type { Client, Content, ObjectEntry, SignReadOptions, SignWriteOptions } from '@ez4/storage';
+import type { Client, Content, ObjectEntry, SignReadOptions, SignWriteOptions, WriteOptions } from '@ez4/storage';
+import type { ObjectAttributes } from '../utils/attributes';
 
 import { Readable } from 'node:stream';
 
-import { fileTypeFromBuffer } from 'file-type';
+import mime from 'mime';
 
 import { toKebabCase } from '@ez4/utils';
 import { Logger } from '@ez4/logger';
+
+import { getObjectMetadata } from '../utils/attributes';
+import { ObjectNotFoundError } from '../utils/errors';
 
 export type ClientMockOptions = {
   keys?: Record<string, Buffer>;
@@ -16,6 +20,8 @@ export const createClientMock = (serviceName: string, options?: ClientMockOption
   const storageIdentifier = toKebabCase(serviceName);
   const storageMemory = options?.keys ?? {};
 
+  const attributesMemory: Record<string, ObjectAttributes> = {};
+
   return new (class {
     async stat(key: string) {
       const content = storageMemory[key] ?? options?.default;
@@ -24,12 +30,13 @@ export const createClientMock = (serviceName: string, options?: ClientMockOption
         return undefined;
       }
 
-      const type = await fileTypeFromBuffer(content);
+      const attributes = attributesMemory[key];
 
-      return {
-        type: type?.mime ?? 'application/octet-stream',
+      return Promise.resolve({
+        type: attributes?.contentType ?? 'binary/octet-stream',
+        metadata: attributes?.metadata ?? {},
         size: content.byteLength
-      };
+      });
     }
 
     async exists(key: string) {
@@ -38,23 +45,24 @@ export const createClientMock = (serviceName: string, options?: ClientMockOption
       return Promise.resolve(!!content);
     }
 
-    async write(key: string, contents: Content) {
+    async write(key: string, contents: Content, writeOptions: WriteOptions = {}) {
+      const { contentType = mime.getType(key), metadata } = writeOptions;
+
       Logger.log(`⬆️  File ${key} uploaded.`);
 
-      if (contents instanceof Readable) {
-        storageMemory[key] = contents.read();
-      } else {
-        storageMemory[key] = Buffer.from(contents);
-      }
+      storageMemory[key] = await getContentBuffer(contents);
 
-      return Promise.resolve();
+      attributesMemory[key] = {
+        ...(contentType && { contentType }),
+        ...(metadata && { metadata: getObjectMetadata(metadata) })
+      };
     }
 
     async read(key: string): Promise<Buffer> {
       const content = storageMemory[key] ?? options?.default;
 
       if (!content) {
-        throw new Error(`Key ${key} not found.`);
+        throw new ObjectNotFoundError();
       }
 
       Logger.log(`⬇️  File ${key} downloaded.`);
@@ -63,17 +71,13 @@ export const createClientMock = (serviceName: string, options?: ClientMockOption
     }
 
     async delete(key: string) {
-      if (!storageMemory[key]) {
-        if (!options?.default) {
-          throw new Error(`Key ${key} not found.`);
-        }
+      if (storageMemory[key]) {
+        Logger.log(`ℹ️  File ${key} deleted.`);
 
-        return Promise.resolve();
+        delete storageMemory[key];
       }
 
-      Logger.log(`ℹ️  File ${key} deleted.`);
-
-      delete storageMemory[key];
+      delete attributesMemory[key];
 
       return Promise.resolve();
     }
@@ -82,12 +86,13 @@ export const createClientMock = (serviceName: string, options?: ClientMockOption
       const content = storageMemory[sourceKey] ?? options?.default;
 
       if (!content) {
-        throw new Error(`Key ${sourceKey} not found.`);
+        throw new ObjectNotFoundError();
       }
 
       Logger.log(`ℹ️  File ${sourceKey} copied.`);
 
       storageMemory[targetKey] = content;
+      attributesMemory[targetKey] = attributesMemory[sourceKey];
 
       return Promise.resolve();
     }
@@ -120,4 +125,18 @@ export const createClientMock = (serviceName: string, options?: ClientMockOption
       return Promise.resolve(`http://${storageIdentifier}/${key}`);
     }
   })();
+};
+
+const getContentBuffer = async (contents: Content) => {
+  if (!(contents instanceof Readable)) {
+    return Buffer.from(contents);
+  }
+
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of contents) {
+    chunks.push(Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks);
 };
