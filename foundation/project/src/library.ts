@@ -13,6 +13,7 @@ export * from './errors/provider';
 
 export * from './emulator/errors';
 export * from './emulator/module';
+export * from './emulator/utils/environment';
 export * from './emulator/invocation';
 export * from './emulator/tester';
 export * from './emulator/runner';

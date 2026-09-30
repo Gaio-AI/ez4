@@ -16,6 +16,8 @@ import { loadEnvironment } from '../../config/environment';
 import { loadProviders } from '../../config/providers';
 import { loadProject } from '../../config/project';
 import { loadPaths } from '../../config/tsconfig';
+import { configureVariables } from '@ez4/project/library';
+
 import { watchMetadata } from '../../library/metadata';
 import { upgradeHandler } from '../../serve/upgrade';
 import { requestHandler } from '../../serve/request';
@@ -23,6 +25,11 @@ import { requestHandler } from '../../serve/request';
 export const serveCommand = async (input: InputOptions) => {
   const project = await loadProject(input.project);
   const options = getServeOptions(input, project);
+
+  configureVariables({
+    strict: project.serveOptions?.strictVariables,
+    allowed: project.serveOptions?.allowedVariables
+  });
 
   if (options.debug) {
     Logger.setLevel(LogLevel.Debug);

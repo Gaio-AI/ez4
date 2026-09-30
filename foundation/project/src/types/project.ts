@@ -189,6 +189,18 @@ export type ProjectServeOptions = {
    * Default is: `localhost`
    */
   localHost?: string;
+
+  /**
+   * When enabled, a handler run by the `serve`, `test` or `run` commands reads only the variables it declares,
+   * the runtime ones and the `allowedVariables`, as its Lambda would.
+   * Default is: `false`
+   */
+  strictVariables?: boolean;
+
+  /**
+   * Variables a handler may read in strict mode without declaring them.
+   */
+  allowedVariables?: string[];
 };
 
 export type ProjectWatchOptions = {
