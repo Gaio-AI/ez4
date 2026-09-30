@@ -1,0 +1,6 @@
+---
+'@ez4/aws-dynamodb': patch
+'@ez4/local-database': patch
+---
+
+In `ez4 serve --local`, the `stream` handler of a DynamoDB table now runs on the changes of the table. The emulator follows the table's stream on DynamoDB Local from its tip, about once a second, and calls the handler and its listener with the same insert, update and delete changes the stream function gets in production, each record in its own trace scope; a handler error is logged and the next record goes on, as in production. Items whose `Index.TTL` column is at or before now are deleted every 30 seconds by a local sweeper with a regular delete, so the handler receives them as deletes; `ttlInterval` (seconds) and `ttlSweeper: false` in the service's local options change the interval or turn the sweeper off. Neither runs in `ez4 test`, `ez4 run` or `serve --suppress`, and a reload or the end of `serve` stops both. Every emulator start, `ez4 test` included, now brings the local tables in line with their declaration: it enables or disables the stream, creates added indexes and deletes removed ones before serving, and recreates a table whose key schema changed, which drops its local data with a warning. The table's own TTL stays off on DynamoDB Local, since `serve` and `test` share tables.

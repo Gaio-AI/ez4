@@ -7,7 +7,7 @@ import { tryCreateTrigger } from '@ez4/project/library';
 
 import { registerTableProvider } from '../table/provider';
 import { connectDatabaseServices, prepareDatabaseServices, prepareLinkedServices } from './service';
-import { prepareEmulatorStart, prepareEmulatorReset } from './migration';
+import { prepareEmulatorStart, prepareEmulatorStop, prepareEmulatorReset } from './migration';
 import { prepareExecutionPolicy } from './policy';
 import { prepareEmulatorClient } from './client';
 
@@ -24,6 +24,7 @@ export const registerTriggers = () => {
     'deploy:connectResources': connectDatabaseServices,
     'emulator:clientFactory': prepareEmulatorClient,
     'emulator:startService': prepareEmulatorStart,
+    'emulator:stopService': prepareEmulatorStop,
     'emulator:resetService': prepareEmulatorReset
   });
 

@@ -25,6 +25,9 @@ export const registerDatabaseEmulator = async (
     bootstrapHandler: async () => {
       await runDatabaseMigration(service, options, context);
     },
+    shutdownHandler: async () => {
+      await runDatabaseStop(service, options, context);
+    },
     exportHandler: (serviceOptions) => {
       return clientFactory.make(serviceOptions);
     }
@@ -41,6 +44,10 @@ const runDatabaseReset = async (service: DatabaseService, options: ServeOptions,
 
 const runDatabaseMigration = (service: DatabaseService, options: ServeOptions, context: EmulateServiceContext) => {
   return triggerAllAsync('emulator:startService', (handler) => handler({ service, options, context }));
+};
+
+const runDatabaseStop = (service: DatabaseService, options: ServeOptions, context: EmulateServiceContext) => {
+  return triggerAllAsync('emulator:stopService', (handler) => handler({ service, options, context }));
 };
 
 const getDatabaseClient = (service: DatabaseService, options: ServeOptions) => {
