@@ -8,6 +8,7 @@ import { warnUnsupportedFlags } from '../../utils/flags';
 import { getServeOptions } from '../../emulator/options';
 import { getServiceEmulators } from '../../emulator/service';
 import { bootstrapServices, prepareServices, shutdownServices } from '../../emulator/utils/hooks';
+import { useLambdaTimezone } from '../../emulator/utils/timezone';
 import { loadEnvironment } from '../../config/environment';
 import { loadReferences } from '../../config/references';
 import { loadProviders } from '../../config/providers';
@@ -37,6 +38,8 @@ export const runCommand = async (input: InputOptions) => {
   if (input.environment) {
     loadEnvironment(input.environment);
   }
+
+  useLambdaTimezone();
 
   warnUnsupportedFlags(input, {
     reset: options.local,
