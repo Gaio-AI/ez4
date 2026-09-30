@@ -1,6 +1,0 @@
----
-'@ez4/pgclient': patch
-'@ez4/aws-aurora': patch
----
-
-A local Aurora service in the Data API connection mode (the default) can now run the way the Data API does, opted in with `dataApi: true` (or `dataApi: { statementTimeout }`) in its `localOptions`. Every occurrence of a named parameter gets its own bind, so a `GROUP BY` that repeats a parameterized expression fails with 42803 as in production. Raw query results come back as the Data API driver returns them: `bigint`, `numeric`, `count(*)` and their arrays as numbers, `timestamptz` as a UTC `YYYY-MM-DD HH:MM:SS` string with a millisecond or microsecond fraction when there is one, and `timestamp`, `date` and `time` as strings. A result with an `interval` or `timetz` column, or over 1 MiB, fails with `UnsupportedResultException`, and a statement running past 45 seconds (or the `statementTimeout` in milliseconds) fails with `StatementTimeoutException`. Local migrations run without a timeout, like deployed ones. `localOptions.<service>.poolSize` sets the local pool size (default 2). Without the opt-in, services in the native connection mode and the `raw-pg` provider, nothing changes. Before opting in, expect local tests that assert on the previous shapes, such as `Date` objects or numeric strings from `rawQuery`, to need updating: those shapes never happen in production.
