@@ -17,3 +17,9 @@ export class EmulatorClientNotFoundError extends Error {
     super(`Resource ${resourceName} doesn't provide any service client.`);
   }
 }
+
+export class EmulatorRequestHandlerNotFoundError extends Error {
+  constructor(resourceName: string) {
+    super(`Resource ${resourceName} doesn't handle any request.`);
+  }
+}

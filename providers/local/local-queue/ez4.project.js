@@ -4,7 +4,10 @@
 export default {
   prefix: 'ez4',
   projectName: 'local-queue',
-  sourceFiles: [],
+  sourceFiles: ['./test/fixtures/orders.ts'],
+  customProviders: {
+    packages: ['@ez4/local-queue']
+  },
   stateFile: {
     path: 'ez4-state'
   }

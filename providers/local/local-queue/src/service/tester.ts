@@ -1,13 +1,18 @@
-import type { Client, Queue } from '@ez4/queue';
+import type { Client, Queue, SendOptions, StandardSendOptions } from '@ez4/queue';
+import type { Service } from '@ez4/common';
 import type { Mock } from 'node:test';
 
+import { getJsonMessage, resolveValidation } from '@ez4/queue/utils';
 import { isQueueImport, isQueueService } from '@ez4/queue/library';
 import { Tester } from '@ez4/project/library';
+import { getRandomUUID } from '@ez4/utils';
 
 import { mock } from 'node:test';
 
 import { createClientMock } from '../client/mock';
 import { getLocalQueueHandle } from '../utils/handle';
+import { getMessageDelayHeaders, getOutgoingMessage } from '../utils/message';
+import { Defaults } from '../utils/defaults';
 
 // A tracker of its own, so `mock.restoreAll()` in another spec of the same process leaves these mocks alone.
 const tracker = new (mock.constructor as new () => typeof mock)();
@@ -27,6 +32,14 @@ export namespace QueueTester {
   export type ClientMode<T extends Queue.Service<any, Queue.Mode>> = T extends { fairMode: never }
     ? { fifoMode: true }
     : { fairMode: true };
+
+  export type Incoming<T extends Queue.Message> = Queue.Incoming<T> & {
+    retry: Mock<Queue.Incoming<T>['retry']>;
+  };
+
+  export type IncomingOverrides = Partial<
+    Pick<Queue.Incoming<Queue.Message>, 'requestId' | 'traceId' | 'attempt' | 'maxAttempts' | 'retry'>
+  >;
 
   export const getClient = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
     return Tester.getServiceClient(resourceName) as Client<T['schema'], ClientMode<T>>;
@@ -66,6 +79,64 @@ export namespace QueueTester {
    */
   export const waitForDrain = (resourceName: string) => {
     return getLocalQueue(resourceName).waitForDrain();
+  };
+
+  /**
+   * Send a message to the queue through its emulator, which checks it the way the real client does before sending
+   * (400 when it refuses it). The consumers take it out of the test's async context, so client overrides don't
+   * reach them; `waitForDrain` resolves once they're done.
+   */
+  export const send = <T extends Queue.Service<any, Queue.Mode>>(
+    resourceName: string,
+    message: T['schema'],
+    options?: SendOptions<ClientMode<T>>
+  ) => {
+    const { delay }: StandardSendOptions = { ...options };
+
+    return Tester.request(resourceName, {
+      headers: getMessageDelayHeaders(delay),
+      body: message
+    });
+  };
+
+  /**
+   * Make the request a subscription handler receives for the given message, to call the handler directly. The
+   * message goes through the checks of the real client and then the queue schema, as it reaches the runtime, so a
+   * message either would refuse fails with its error. `retry` records its calls.
+   */
+  export const incoming = async <T extends Queue.Service<any, Queue.Mode>>(
+    resourceName: string,
+    message: T['schema'],
+    overrides?: IncomingOverrides
+  ): Promise<Incoming<T['schema']>> => {
+    const service = getQueueContract(resourceName);
+
+    if (!service) {
+      throw new Error(`Queue [${resourceName}] isn't a queue the tester knows.`);
+    }
+
+    const { body, attributes } = await getOutgoingMessage(message, service, { traceId: overrides?.traceId });
+
+    const safeMessage = await getJsonMessage(JSON.parse(body), service.schema, (value, validation) => {
+      return resolveValidation(value, Tester.getContext(resourceName), validation.type);
+    });
+
+    return {
+      requestId: overrides?.requestId ?? getRandomUUID(),
+      traceId: attributes.traceId,
+      attempt: overrides?.attempt ?? 1,
+      maxAttempts: overrides?.maxAttempts ?? service.deadLetter?.maxAttempts ?? Defaults.MaxAttempts,
+      retry: tracker.fn(overrides?.retry ?? (() => Promise.resolve())),
+      message: safeMessage
+    };
+  };
+
+  /**
+   * Get the context the subscription handlers of the queue receive, where a client in `overrides` takes the place
+   * of the linked one with its name.
+   */
+  export const getContext = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string, overrides?: Partial<Service.Context<T>>) => {
+    return Tester.getContext<Service.Context<T>>(resourceName, overrides);
   };
 }
 
