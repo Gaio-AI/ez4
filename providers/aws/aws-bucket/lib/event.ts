@@ -117,7 +117,7 @@ const onTimeout = (request: Partial<Bucket.Incoming>, timeoutAfter: number) => {
 };
 
 const onError = (error: unknown, request: Partial<Bucket.Request | Bucket.Incoming>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error);
 
   return dispatch(
     {

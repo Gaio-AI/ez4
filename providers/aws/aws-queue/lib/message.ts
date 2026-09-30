@@ -375,7 +375,7 @@ const importRecordScope = (traceId: string, record: SQSRecord) => {
 };
 
 const onError = (error: unknown, request: Partial<Queue.Request | Queue.Incoming<Queue.Message>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error);
 
   return dispatch(
     {

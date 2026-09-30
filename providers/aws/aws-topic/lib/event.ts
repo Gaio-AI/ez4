@@ -105,7 +105,7 @@ const onTimeout = (request: Partial<Topic.Incoming<Topic.Event>>, timeoutAfter: 
 };
 
 const onError = (error: unknown, request: Partial<Topic.Request | Topic.Incoming<Topic.Event>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error);
 
   return dispatch(
     {

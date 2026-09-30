@@ -95,7 +95,7 @@ const onTimeout = (request: Partial<Cron.Incoming<Cron.Event | null>>, timeoutAf
 };
 
 const onError = (error: unknown, request: Partial<Cron.Incoming<Cron.Event | null>>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error);
 
   return dispatch(
     {

@@ -12,7 +12,7 @@ import type {
 } from 'aws-lambda';
 
 import { resolveHeaders, resolvePathParameters, resolveQueryStrings, resolveValidation } from '@ez4/gateway/utils';
-import { HttpForbiddenError, HttpUnauthorizedError } from '@ez4/gateway';
+import { HttpError, HttpForbiddenError, HttpUnauthorizedError } from '@ez4/gateway';
 import { ServiceEventType, Runtime } from '@ez4/common';
 
 type IncomingRequest = Http.Incoming<Http.AuthRequest> | Ws.Incoming<Ws.AuthRequest>;
@@ -192,7 +192,7 @@ const onTimeout = (request: Partial<IncomingRequest>, timeoutAfter: number) => {
 };
 
 const onError = (error: unknown, request: Partial<IncomingRequest>) => {
-  console.error({ ...Runtime.getScope(), error });
+  Runtime.reportError(error, error instanceof HttpError ? error.status : undefined);
 
   return dispatch(
     {
