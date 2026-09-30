@@ -2,6 +2,8 @@ import type { Client, Cron, ScheduleEvent } from '@ez4/scheduler';
 
 import { Logger } from '@ez4/logger';
 
+import { ScheduleConflictError } from '../utils/errors';
+
 export type ClientMockOptions<T extends Cron.Event> = {
   events?: Record<string, ScheduleEvent<T>>;
   default?: ScheduleEvent<T>;
@@ -28,6 +30,10 @@ export const createClientMock = (_serviceName: string, options?: ClientMockOptio
     }
 
     async createEvent(identifier: string, input: ScheduleEvent<any>) {
+      if (schedulerMemory[identifier]) {
+        throw new ScheduleConflictError(identifier);
+      }
+
       schedulerMemory[identifier] = input;
 
       const isoDate = input.date.toISOString();

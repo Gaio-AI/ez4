@@ -53,6 +53,8 @@ export const processSchedulerEvent = async (
     //
   } catch (error) {
     await onError(module, serviceClients, currentRequest, error);
+
+    throw error;
     //
   } finally {
     await onEnd(module, serviceClients, currentRequest);
