@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ServiceEmulators } from '../emulator/service';
-import type { EmulatorResponse } from '../emulator/types';
+import type { EmulatorCorsHandler, EmulatorRequestEvent, EmulatorResponse } from '../emulator/types';
 import type { ServeOptions } from '../types/options';
 
 import { Logger, LogFormat, LogColor } from '@ez4/logger';
@@ -8,30 +8,43 @@ import { Logger, LogFormat, LogColor } from '@ez4/logger';
 import { getIncomingService } from './incoming';
 import { getServicesManifest } from '../manifest/service';
 
+type ResponseCors = {
+  headers: Record<string, string>;
+  replace: boolean;
+};
+
 export const requestHandler = (request: IncomingMessage, stream: ServerResponse, emulators: ServiceEmulators, options: ServeOptions) => {
   const service = getIncomingService(emulators, request, options);
 
   Logger.log(`➡️  ${request.method} ${request.url}`);
 
   if (request.method === 'GET' && service?.request.path === `/${options.projectName}/manifest`) {
-    return sendSuccessResponse(stream, request, {
+    return sendSuccessResponse(stream, request, getAnyOriginCors(request), {
       body: JSON.stringify(getServicesManifest(emulators, options)),
       status: 200
     });
   }
 
   if (!service?.emulator) {
-    return sendErrorResponse(stream, request, 404, 'Service emulator not found.');
+    return sendErrorResponse(stream, request, getAnyOriginCors(request), 404, 'Service emulator not found.');
   }
 
-  if (request.method === 'OPTIONS') {
-    return sendSuccessResponse(stream, request, { status: 204 });
-  }
+  const { requestHandler, corsHandler, ...emulator } = service.emulator;
 
-  const { requestHandler, ...emulator } = service.emulator;
+  const event = {
+    ...service.request,
+    method: request.method ?? 'GET'
+  };
+
+  const cors = corsHandler ? getEmulatorCors(corsHandler, event) : getAnyOriginCors(request);
+
+  // The serve answers OPTIONS requests for the emulators without their own CORS answer.
+  if (request.method === 'OPTIONS' && !corsHandler) {
+    return sendSuccessResponse(stream, request, cors, { status: 204 });
+  }
 
   if (!requestHandler) {
-    return sendErrorResponse(stream, request, 422, `Service '${emulator.name}' can't handle requests.`);
+    return sendErrorResponse(stream, request, cors, 422, `Service '${emulator.name}' can't handle requests.`);
   }
 
   const buffer: Buffer[] = [];
@@ -45,15 +58,14 @@ export const requestHandler = (request: IncomingMessage, stream: ServerResponse,
       const payload = buffer.length ? Buffer.concat(buffer) : undefined;
 
       const response = await requestHandler({
-        ...service.request,
-        method: request.method ?? 'GET',
+        ...event,
         body: payload
       });
 
       if (!response) {
-        sendSuccessResponse(stream, request, { status: 204 });
+        sendSuccessResponse(stream, request, cors, { status: 204 });
       } else {
-        sendSuccessResponse(stream, request, response);
+        sendSuccessResponse(stream, request, cors, response);
       }
     } catch (error) {
       if (error instanceof Error && error.stack) {
@@ -62,25 +74,33 @@ export const requestHandler = (request: IncomingMessage, stream: ServerResponse,
         Logger.error(`${emulator.type} [${emulator.name}] ${error}`);
       }
 
-      sendErrorResponse(stream, request, 500, `${error}`);
+      sendErrorResponse(stream, request, cors, 500, `${error}`);
     }
   });
 };
 
-const sendSuccessResponse = (stream: ServerResponse<IncomingMessage>, request: IncomingMessage, response: EmulatorResponse) => {
+const sendSuccessResponse = (
+  stream: ServerResponse<IncomingMessage>,
+  request: IncomingMessage,
+  cors: ResponseCors,
+  response: EmulatorResponse
+) => {
   Logger.log(`⬅️  ${response.status} ${request.url ?? '/'}`);
 
-  if (request.headers.origin) {
-    setCorsHeaders(stream, request);
-  }
-
-  writeResponse(stream, response);
+  writeResponse(stream, cors, response);
 };
 
-const sendErrorResponse = (stream: ServerResponse<IncomingMessage>, request: IncomingMessage, status: number, message: string) => {
+const sendErrorResponse = (
+  stream: ServerResponse<IncomingMessage>,
+  request: IncomingMessage,
+  cors: ResponseCors,
+  status: number,
+  message: string
+) => {
   Logger.log(LogFormat.toColor(LogColor.Red, `⬅️  ${status} ${request.url ?? '/'}`));
 
-  writeResponse(stream, {
+  // Errors carry CORS headers too, or the browser hides their status behind a CORS failure.
+  writeResponse(stream, cors, {
     status,
     headers: {
       ['Content-Type']: 'application/json'
@@ -92,33 +112,54 @@ const sendErrorResponse = (stream: ServerResponse<IncomingMessage>, request: Inc
   });
 };
 
-const setCorsHeaders = (stream: ServerResponse<IncomingMessage>, request: IncomingMessage) => {
+const getEmulatorCors = (corsHandler: EmulatorCorsHandler, event: EmulatorRequestEvent): ResponseCors => {
+  const headers = corsHandler(event);
+
+  return {
+    headers: headers ?? {},
+    replace: !!headers
+  };
+};
+
+// Any origin, method and headers, under the ones the response sets itself.
+const getAnyOriginCors = (request: IncomingMessage): ResponseCors => {
   const responseOrigin = request.headers.origin;
 
+  const cors: ResponseCors = {
+    headers: {},
+    replace: false
+  };
+
   if (responseOrigin) {
-    stream.setHeader('Access-Control-Allow-Origin', responseOrigin);
-    stream.setHeader('Access-Control-Allow-Credentials', 'true');
+    cors.headers['Access-Control-Allow-Origin'] = responseOrigin;
+    cors.headers['Access-Control-Allow-Credentials'] = 'true';
 
     if (request.method !== 'OPTIONS') {
-      return;
+      return cors;
     }
 
     const responseMethod = request.headers['access-control-request-method'] ?? request.method;
     const responseHeaders = request.headers['access-control-request-headers'];
 
     if (responseHeaders) {
-      stream.setHeader('Access-Control-Allow-Headers', responseHeaders);
+      cors.headers['Access-Control-Allow-Headers'] = responseHeaders;
     }
 
-    stream.setHeader('Access-Control-Allow-Methods', responseMethod);
+    cors.headers['Access-Control-Allow-Methods'] = responseMethod;
   }
+
+  return cors;
 };
 
-const writeResponse = (stream: ServerResponse<IncomingMessage>, response: EmulatorResponse) => {
+const writeResponse = (stream: ServerResponse<IncomingMessage>, cors: ResponseCors, response: EmulatorResponse) => {
   const { status, headers, body } = response;
 
+  for (const headerName in cors.headers) {
+    stream.setHeader(headerName, cors.headers[headerName]);
+  }
+
   stream.writeHead(status, {
-    ...headers,
+    ...(cors.replace ? getHeadersWithoutCors(headers) : headers),
     ...(body && {
       ['Content-Length']: Buffer.byteLength(body).toString()
     })
@@ -129,4 +170,10 @@ const writeResponse = (stream: ServerResponse<IncomingMessage>, response: Emulat
   }
 
   stream.end();
+};
+
+const getHeadersWithoutCors = (headers: Record<string, string> | undefined) => {
+  return Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([headerName]) => !headerName.toLowerCase().startsWith('access-control-'))
+  );
 };

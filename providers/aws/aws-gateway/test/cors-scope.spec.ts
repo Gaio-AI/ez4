@@ -3,7 +3,7 @@ import type { HttpRoute } from '@ez4/gateway/library';
 import { deepEqual } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { getCorsConfiguration } from '../src/triggers/http/cors';
+import { getCorsConfiguration } from '@ez4/gateway/library';
 
 const getRoute = (path: HttpRoute['path'], route: Partial<HttpRoute> = {}): HttpRoute => {
   return {

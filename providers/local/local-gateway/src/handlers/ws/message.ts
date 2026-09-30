@@ -11,7 +11,18 @@ import { Runtime } from '@ez4/common';
 import { getIncomingRequestIdentity, getIncomingRequestBody } from '../../utils/request';
 import { getWsSuccessResponse } from '../../utils/ws/response';
 
-export const processWsMessage = async (
+export const processWsMessage = (
+  service: WsService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  event: EmulatorMessageEvent,
+  identity?: Ws.Identity
+) => {
+  // A scope of its own, as each Lambda invocation has, so concurrent messages don't overwrite each other's.
+  return Runtime.runWithScope(() => handleWsMessage(service, options, context, event, identity));
+};
+
+const handleWsMessage = async (
   service: WsService,
   options: ServeOptions,
   context: EmulateServiceContext,

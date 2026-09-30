@@ -19,6 +19,10 @@ export type EmulatorMessageHandler = (event: EmulatorMessageEvent) => Promise<Bu
 
 export type EmulatorRequestHandler = (event: EmulatorRequestEvent) => Promise<EmulatorResponse | void> | EmulatorResponse | void;
 
+// CORS headers for the response to the request, in place of the ones the response carries, or `undefined` to leave
+// the response as it is. An emulator with it answers its own preflights, since the serve sends them as any request.
+export type EmulatorCorsHandler = (event: EmulatorRequestEvent) => Record<string, string> | undefined;
+
 export type EmulatorConnectionEvent = {
   connection: EmulatorConnection;
   headers: Record<string, string>;
@@ -67,6 +71,7 @@ export type ServiceEmulator = {
   disconnectHandler?: EmulatorConnectionHandler;
   messageHandler?: EmulatorMessageHandler;
   requestHandler?: EmulatorRequestHandler;
+  corsHandler?: EmulatorCorsHandler;
 };
 
 export type EmulatorLinkedServices = Record<string, LinkedService>;

@@ -1,7 +1,7 @@
 import type { AllType, ReflectionTypes, TypeModel, TypeObject } from '@ez4/reflection';
 import type { MemberType } from '@ez4/common/library';
 import type { Incomplete } from '@ez4/utils';
-import type { HttpCors } from './types';
+import type { HttpCors, HttpDefaults, HttpRoute } from './types';
 
 import {
   InvalidServicePropertyError,
@@ -105,4 +105,53 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, parent: TypeModel, mem
   }
 
   return cors;
+};
+
+export const getCorsConfiguration = (routes: HttpRoute[], cors: HttpCors, defaults?: HttpDefaults): HttpCors => {
+  const allowHeaders = new Set<string>(cors.allowHeaders?.map((header) => header.toLowerCase()));
+  const allowMethods = new Set<string>(cors.allowMethods);
+
+  allowHeaders.add('x-trace-id');
+
+  Object.values(defaults?.scope ?? {}).forEach((header) => {
+    allowHeaders.add(header.toLowerCase());
+  });
+
+  for (const route of routes) {
+    if (!route.cors) {
+      continue;
+    }
+
+    const [method] = route.path.split(' ', 2);
+
+    allowMethods.add(method);
+
+    getCorsHeaderNames(route).forEach((header) => {
+      allowHeaders.add(header.toLowerCase());
+    });
+  }
+
+  const allowCredentials = cors.allowCredentials ?? allowHeaders.has('authorization');
+
+  if (['POST', 'PATCH', 'PUT'].some((method) => allowMethods.has(method))) {
+    allowHeaders.add('content-type');
+  }
+
+  return {
+    ...cors,
+    allowCredentials,
+    allowHeaders: [...allowHeaders.values()],
+    allowMethods: [...allowMethods.values()]
+  };
+};
+
+const getCorsHeaderNames = (route: HttpRoute) => {
+  const { authorizer, handler, scope } = route;
+
+  const headerNames = Object.keys({
+    ...authorizer?.request?.headers?.properties,
+    ...handler.request?.headers?.properties
+  });
+
+  return [...headerNames, ...Object.values(scope ?? {})];
 };
