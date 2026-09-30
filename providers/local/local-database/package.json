@@ -49,6 +49,12 @@
     "clean:registry": "rm -rf ../../../.registry/@ez4/local-database",
     "live:publish": "npm run build && npm publish --access public"
   },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1127.0",
+    "@aws-sdk/client-dynamodb-streams": "^3.1127.0",
+    "@ez4/aws-dynamodb": "^0.53.0",
+    "@ez4/common": "^0.53.0"
+  },
   "dependencies": {
     "@ez4/logger": "^0.53.0",
     "@ez4/local-common": "^0.53.0",

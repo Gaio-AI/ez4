@@ -58,6 +58,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1127.0",
+    "@aws-sdk/client-dynamodb-streams": "^3.1127.0",
     "@aws-sdk/lib-dynamodb": "^3.1127.0",
     "@aws-sdk/util-dynamodb": "^3.996.9",
     "@ez4/aws-common": "^0.53.0",
@@ -66,6 +67,7 @@
     "@ez4/aws-logs": "^0.53.0",
     "@ez4/common": "^0.53.0",
     "@ez4/database": "^0.53.0",
+    "@ez4/logger": "^0.53.0",
     "@ez4/project": "^0.53.0",
     "@ez4/schema": "^0.53.0",
     "@ez4/state": "^0.53.0",
