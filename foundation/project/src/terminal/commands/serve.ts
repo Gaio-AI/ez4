@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { warnUnsupportedFlags } from '../../utils/flags';
 import { getServiceAddress, getServicePort } from '../../utils/project';
 import { bootstrapServices, prepareServices, shutdownServices } from '../../emulator/utils/hooks';
+import { useLambdaTimezone } from '../../emulator/utils/timezone';
 import { getServiceEmulators } from '../../emulator/service';
 import { getServeOptions } from '../../emulator/options';
 import { loadReferences } from '../../config/references';
@@ -42,6 +43,8 @@ export const serveCommand = async (input: InputOptions) => {
   if (input.environment) {
     loadEnvironment(input.environment);
   }
+
+  useLambdaTimezone();
 
   warnUnsupportedFlags(input, {
     reset: options.local,
