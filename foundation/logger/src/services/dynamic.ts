@@ -4,6 +4,17 @@ import { TTY } from '../utils/tty';
 import { Logger } from './logger';
 
 export namespace DynamicLogger {
+  let elapsedTimeVisible = true;
+
+  /**
+   * Show or hide the elapsed time that ends each execution line.
+   *
+   * @param visible Whether the elapsed time is shown.
+   */
+  export const showElapsedTime = (visible: boolean) => {
+    elapsedTimeVisible = visible;
+  };
+
   /**
    * Write a log line and produce a handler to update the log line dynamically.
    *
@@ -62,7 +73,7 @@ export namespace DynamicLogger {
 
       const elapsedTime = (performance.now() - startTime).toFixed(2);
 
-      logger.update(`${message} (${elapsedTime}ms)`);
+      logger.update(elapsedTimeVisible ? `${message} (${elapsedTime}ms)` : message);
 
       if (TTY.hasBuffer()) {
         process.stdout.write(TTY.getBuffer().join(''));

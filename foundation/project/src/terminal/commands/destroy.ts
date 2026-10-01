@@ -13,6 +13,7 @@ import { loadEnvironment } from '../../config/environment';
 import { loadProviders } from '../../config/providers';
 import { loadProject } from '../../config/project';
 import { waitConfirmation } from '../../utils/prompt';
+import { exitWithPlannedChanges } from '../../utils/plan';
 import { exposeAllWarnings } from '../../utils/warnings';
 import { assertNoErrors } from '../../utils/errors';
 
@@ -22,6 +23,11 @@ export const destroyCommand = async (input: InputOptions) => {
 
   if (options.debug) {
     Logger.setLevel(LogLevel.Debug);
+  }
+
+  if (input.plan) {
+    // A plan is read by comparing it with another one, and elapsed times differ in every run.
+    DynamicLogger.showElapsedTime(false);
   }
 
   await DynamicLogger.logExecution('⚡ Initializing', () => {
@@ -38,7 +44,8 @@ export const destroyCommand = async (input: InputOptions) => {
 
   warnUnsupportedFlags(input, {
     environment: true,
-    force: true
+    force: true,
+    plan: true
   });
 
   const oldState = await DynamicLogger.logExecution('🔄️ Loading state', () => loadState(project.stateFile, options));
@@ -48,6 +55,11 @@ export const destroyCommand = async (input: InputOptions) => {
 
   if (!hasChanges) {
     return Logger.log('ℹ️  No changes');
+  }
+
+  // Checked before the confirmation, so a project that destroys without asking still stops here.
+  if (input.plan) {
+    return exitWithPlannedChanges();
   }
 
   if (project.confirmMode !== false) {

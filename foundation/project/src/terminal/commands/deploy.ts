@@ -21,6 +21,7 @@ import { loadPaths } from '../../config/tsconfig';
 import { buildMetadata } from '../../library/metadata';
 import { warnUnsupportedFlags } from '../../utils/flags';
 import { waitConfirmation } from '../../utils/prompt';
+import { exitWithPlannedChanges } from '../../utils/plan';
 import { exposeAllWarnings } from '../../utils/warnings';
 import { assertNoErrors } from '../../utils/errors';
 
@@ -30,6 +31,11 @@ export const deployCommand = async (input: InputOptions) => {
 
   if (options.debug) {
     Logger.setLevel(LogLevel.Debug);
+  }
+
+  if (input.plan) {
+    // A plan is read by comparing it with another one, and elapsed times differ in every run.
+    DynamicLogger.showElapsedTime(false);
   }
 
   const [paths, references] = await DynamicLogger.logExecution('⚡ Initializing', () => {
@@ -46,7 +52,8 @@ export const deployCommand = async (input: InputOptions) => {
 
   warnUnsupportedFlags(input, {
     environment: true,
-    force: true
+    force: true,
+    plan: true
   });
 
   options.imports = references.imports;
@@ -82,6 +89,11 @@ export const deployCommand = async (input: InputOptions) => {
 
     reportResourcesOutput(newState);
     return;
+  }
+
+  // Checked before the confirmation, so a project that deploys without asking still stops here.
+  if (input.plan) {
+    return exitWithPlannedChanges();
   }
 
   if (project.confirmMode !== false) {
