@@ -27,6 +27,8 @@ export const registerRemoteService = (service: TopicImport, options: ServeOption
     remoteName: resourceName
   };
 
+  const topicHost = getTopicServiceHost(options.serviceHost, getServiceName(resourceName, options));
+
   let subscription: RemoteSubscription | undefined;
 
   return {
@@ -44,15 +46,12 @@ export const registerRemoteService = (service: TopicImport, options: ServeOption
         return Logger.warn(`Topic [${resourceName}] subscription is suppressed`);
       }
 
-      const topicIdentifier = getServiceName(resourceName, options);
-      const topicHost = getTopicServiceHost(options.serviceHost, topicIdentifier);
-
       subscription = await subscribeRemoteClient(referenceName, topicHost, clientOptions);
     },
     shutdownHandler: async () => {
       if (!options.suppress) {
         await subscription?.stop();
-        await unsubscribeRemoteClient(referenceName, clientOptions);
+        await unsubscribeRemoteClient(referenceName, topicHost, clientOptions);
       }
     }
   };
