@@ -1,12 +1,12 @@
-import type { AllType, ReflectionTypes } from '@ez4/reflection';
+import type { AllType, ReflectionTypes, TypeClass } from '@ez4/reflection';
 import type { MetadataDependencies, MetadataReflection } from '../types/metadata';
 
-import { getReflectionFiles, TypeName } from '@ez4/reflection';
+import { getReflectionFiles, isTypeClass, isTypeInterface, TypeName } from '@ez4/reflection';
 import { triggerAllSync } from '@ez4/project/library';
 import { Logger } from '@ez4/logger';
 
 import { assertNoErrors } from '../utils/errors';
-import { DuplicateMetadataError } from '../errors/metadata';
+import { DuplicateMetadataError, UnhandledServiceError } from '../errors/metadata';
 import { buildReflection, watchReflection } from './reflection';
 
 export type MetadataReadyListener = (metadata: MetadataReflection) => Promise<void> | void;
@@ -36,6 +36,8 @@ export const buildMetadata = (sourceFiles: string[], options?: BuildMetadataOpti
 
     return null;
   });
+
+  assertNoErrors(getUnhandledServiceErrors(reflectionTypes, metadata));
 
   return {
     metadata,
@@ -76,6 +78,10 @@ export const watchMetadata = (sourceFiles: string[], options: WatchMetadataOptio
         return null;
       });
 
+      for (const error of getUnhandledServiceErrors(reflectionTypes, metadata)) {
+        Logger.error(error.message);
+      }
+
       await onMetadataReady(metadata);
     }
   });
@@ -89,6 +95,69 @@ const assignMetadataServices = (metadata: MetadataReflection, services: Metadata
 
     metadata[identity] = services[identity];
   }
+};
+
+// Contracts and providers are found through the `@ez4/*` dependencies of the project, while a service
+// declaration compiles with any package the workspace installs. A service whose contract package is
+// missing is read by nobody: without this check it is left out of the deploy and the deploy succeeds.
+const getUnhandledServiceErrors = (reflection: ReflectionTypes, metadata: MetadataReflection) => {
+  const errors: UnhandledServiceError[] = [];
+
+  for (const identity in reflection) {
+    const declaration = reflection[identity];
+
+    if (!isTypeClass(declaration) || !declaration.modifiers?.declare || declaration.modifiers.abstract) {
+      continue;
+    }
+
+    // It needs to be a file in the project's root.
+    if (!declaration.file || declaration.file.startsWith('..') || declaration.name in metadata) {
+      continue;
+    }
+
+    const packageName = getServiceContractPackage(reflection, declaration);
+
+    if (packageName) {
+      errors.push(new UnhandledServiceError(declaration.name, packageName));
+    }
+  }
+
+  return errors;
+};
+
+const getServiceContractPackage = (reflection: ReflectionTypes, declaration: TypeClass) => {
+  for (const { path } of declaration.heritage ?? []) {
+    const parent = reflection[path];
+
+    if (parent?.module && isServiceProvider(reflection, parent, new Set())) {
+      return parent.module;
+    }
+  }
+
+  return undefined;
+};
+
+// Every service and import of a contract implements `Service.Provider` from `@ez4/common`.
+const isServiceProvider = (reflection: ReflectionTypes, type: AllType, visited: Set<string>): boolean => {
+  if (!isTypeClass(type) && !isTypeInterface(type)) {
+    return false;
+  }
+
+  if (type.module === '@ez4/common' && type.name === 'Provider') {
+    return true;
+  }
+
+  return !!type.heritage?.some(({ path }) => {
+    const parent = reflection[path];
+
+    if (!parent || visited.has(path)) {
+      return false;
+    }
+
+    visited.add(path);
+
+    return isServiceProvider(reflection, parent, visited);
+  });
 };
 
 const getMetadataFiles = (reflection: ReflectionTypes) => {
