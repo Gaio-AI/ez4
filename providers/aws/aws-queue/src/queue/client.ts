@@ -12,7 +12,6 @@ import {
 } from '@aws-sdk/client-sqs';
 
 import { waitCreation } from '@ez4/aws-common';
-import { isEmptyObject } from '@ez4/utils';
 
 import { getSQSClient } from '../utils/deploy';
 
@@ -90,11 +89,11 @@ export const createQueue = async (logger: OperationLogLine, request: CreateReque
 export const updateQueue = async (logger: OperationLogLine, queueUrl: string, request: UpdateRequest) => {
   logger.update(`Updating queue`);
 
-  const attributes = upsertQueueAttributes(request);
-
-  if (isEmptyObject(attributes)) {
-    return;
-  }
+  const attributes = {
+    ...upsertQueueAttributes(request),
+    // SQS keeps a redrive policy the request leaves out, and an empty one removes it.
+    ...(!request.deadLetter && { RedrivePolicy: '' })
+  };
 
   await getSQSClient().send(
     new SetQueueAttributesCommand({
