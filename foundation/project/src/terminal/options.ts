@@ -17,6 +17,7 @@ export type InputOptions = {
   arguments?: string[];
   suppress?: boolean;
   force?: boolean;
+  plan?: boolean;
   inspect?: boolean;
   coverage?: boolean;
   debug?: boolean;
@@ -80,6 +81,10 @@ export const getInputOptions = () => {
 
       case '--force':
         options.force = true;
+        break;
+
+      case '--plan':
+        options.plan = true;
         break;
 
       case '--local':

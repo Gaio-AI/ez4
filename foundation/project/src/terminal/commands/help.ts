@@ -34,6 +34,7 @@ const HELP_LINES = [
   '  --reset            Reset local resources when serving, running, or testing',
   '  --debug            Enable debug mode for all provider resources',
   '  --force            Force deployment or destruction of resources',
+  '  --plan             Show the deployment or destruction plan and exit without applying it (exit code 2 when it has changes)',
   '  --local            Use local options when serving or testing',
   ''
 ];
