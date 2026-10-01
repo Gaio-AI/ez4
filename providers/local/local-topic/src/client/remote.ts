@@ -57,12 +57,13 @@ export const createRemoteClient = <T extends Topic.Event = any>(
   })();
 };
 
-export const unsubscribeRemoteClient = async (resourceName: string, clientOptions: RemoteClientOptions) => {
+export const unsubscribeRemoteClient = async (resourceName: string, remoteHost: string, clientOptions: RemoteClientOptions) => {
   const topicIdentifier = getServiceName(resourceName, clientOptions);
   const topicHost = getTopicServiceHost(clientOptions.serviceHost, topicIdentifier);
 
   try {
     await unsubscribeFromTopicService(topicHost, {
+      serviceHost: remoteHost,
       resourceName
     });
 

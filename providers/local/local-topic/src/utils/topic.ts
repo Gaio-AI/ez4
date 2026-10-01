@@ -4,6 +4,7 @@ export type TopicServiceSubscribeRequest = {
 };
 
 export type TopicServiceUnsubscribeRequest = {
+  serviceHost: string;
   resourceName: string;
 };
 

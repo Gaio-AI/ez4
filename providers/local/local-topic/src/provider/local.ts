@@ -96,10 +96,12 @@ const handleEventRequest = async (
   }
 };
 
+// Every project that imports the topic subscribes with the same resource name, the name of the topic it
+// imports, so each subscription is kept by the address that receives its events.
 const handleSubscribeRequest = (service: TopicService, body: string) => {
   const { resourceName, serviceHost } = JSON.parse(body);
 
-  InMemoryTopic.createSubscription(service.name, resourceName, {
+  InMemoryTopic.createSubscription(service.name, serviceHost, {
     resourceName,
     serviceHost
   });
@@ -108,9 +110,9 @@ const handleSubscribeRequest = (service: TopicService, body: string) => {
 };
 
 const handleUnsubscribeRequest = (service: TopicService, body: string) => {
-  const { resourceName } = JSON.parse(body);
+  const { serviceHost } = JSON.parse(body);
 
-  InMemoryTopic.deleteSubscription(service.name, resourceName);
+  InMemoryTopic.deleteSubscription(service.name, serviceHost);
 
   return getSuccessResponse(204);
 };
