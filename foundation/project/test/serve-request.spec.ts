@@ -53,6 +53,7 @@ const emulators: ServiceEmulators = {
     type: 'Gateway',
     name: 'Plain',
     identifier: 'plain',
+    aliases: ['plain-api-name'],
     requestHandler: handleGatewayRequest,
     corsHandler: () => {
       return undefined;
@@ -121,6 +122,17 @@ describe('project serve requests', () => {
   const sendRequest = (path: string, init?: RequestInit) => {
     return fetch(`http://${serviceHost}${path}`, init);
   };
+
+  it('assert :: emulator answers under its alias', async () => {
+    const response = await sendRequest('/plain-api-name/items?page=2');
+
+    equal(response.status, 200);
+
+    deepEqual(
+      handledRequests.map(({ method, path, query }) => [method, path, query]),
+      [['GET', '/items', { page: '2' }]]
+    );
+  });
 
   it('assert :: emulator not found answers with cors', async () => {
     const response = await sendRequest('/unknown/path', { headers: { origin: ORIGIN } });

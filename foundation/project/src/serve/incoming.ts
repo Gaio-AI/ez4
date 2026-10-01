@@ -12,7 +12,7 @@ export const getIncomingService = (emulators: ServiceEmulators, request: Incomin
   const { pathname, searchParams } = new URL(request.url, `ez4://${options.serviceHost}`);
   const [, identifier, ...path] = pathname.split('/');
 
-  const emulator = emulators[identifier];
+  const emulator = emulators[identifier] ?? getAliasedEmulator(emulators, identifier);
 
   return {
     identifier,
@@ -23,6 +23,10 @@ export const getIncomingService = (emulators: ServiceEmulators, request: Incomin
       query: getQueryParameters(searchParams)
     }
   };
+};
+
+const getAliasedEmulator = (emulators: ServiceEmulators, identifier: string) => {
+  return Object.values(emulators).find(({ aliases }) => aliases?.includes(identifier));
 };
 
 const getQueryParameters = (allParameters: URLSearchParams) => {

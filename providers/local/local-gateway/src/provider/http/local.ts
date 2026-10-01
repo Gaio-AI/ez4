@@ -17,7 +17,7 @@ import { LambdaTimeoutError } from '../../utils/timeout';
 import { getMatchingRoute } from '../../utils/route';
 
 export const registerHttpLocalService = (service: HttpService, options: ServeOptions, context: EmulateServiceContext) => {
-  const { name: resourceName, routes, cors, defaults } = service;
+  const { name: resourceName, displayName, routes, cors, defaults } = service;
 
   const httpRoutes = buildHttpRoutes(service);
 
@@ -33,6 +33,9 @@ export const registerHttpLocalService = (service: HttpService, options: ServeOpt
     type: 'Gateway',
     name: resourceName,
     identifier: getServiceName(resourceName, options),
+    // An import finds a deployed API by the name API Gateway shows, so it may reference another class
+    // with the same name (a narrower contract of the same API); the alias lets it find this one locally.
+    aliases: displayName ? [getServiceName(displayName, options)] : undefined,
     exportHandler: () => {
       return createHttpServiceClient(resourceName, clientOptions);
     },

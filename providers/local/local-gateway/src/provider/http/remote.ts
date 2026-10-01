@@ -7,7 +7,7 @@ import { getClientAuthorization, getClientOperations } from '@ez4/gateway/librar
 import { createHttpServiceClient } from '../../client/http/service';
 
 export const registerHttpRemoteService = (service: HttpImport, options: ServeOptions, _context: EmulateServiceContext) => {
-  const { name: resourceName, reference: referenceName, project } = service;
+  const { name: resourceName, reference: referenceName, displayName, project } = service;
   const { imports } = options;
 
   if (!imports || !imports[project]) {
@@ -25,7 +25,8 @@ export const registerHttpRemoteService = (service: HttpImport, options: ServeOpt
     name: resourceName,
     identifier: getServiceName(resourceName, options),
     exportHandler: () => {
-      return createHttpServiceClient(referenceName, clientOptions);
+      // As the deploy does, the API is found by its name when it has one, and by the referenced class otherwise.
+      return createHttpServiceClient(displayName ?? referenceName, clientOptions);
     }
   };
 };
