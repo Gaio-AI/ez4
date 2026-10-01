@@ -27,7 +27,15 @@ export const prepareServices = (event: PrepareResourceEvent) => {
     return false;
   }
 
-  const { fifoMode, retention = Defaults.Retention, timeout = Defaults.Timeout, polling, delay } = service;
+  // Every attribute gets its value, declared or default, so a declaration taken out of the code shows in the
+  // plan and goes back to the default in AWS, where SQS would keep the old value of an attribute left out.
+  const {
+    fifoMode,
+    retention = Defaults.Retention,
+    timeout = Defaults.Timeout,
+    polling = Defaults.Polling,
+    delay = Defaults.Delay
+  } = service;
 
   const queueDeadLetter = getDeadLetterQueue(state, service, options);
 
@@ -72,6 +80,8 @@ const getDeadLetterQueue = (state: EntryStates, service: QueueService, options: 
   const queueState = createQueue(state, undefined, {
     queueName: getDeadLetterQueueName(service, options),
     timeout: Defaults.Timeout,
+    polling: Defaults.Polling,
+    delay: Defaults.Delay,
     fifoMode: !!fifoMode,
     tags: options.tags,
     retention

@@ -65,4 +65,9 @@ export namespace Defaults {
    * Default queue delay.
    */
   export const Delay = 0;
+
+  /**
+   * Default queue long polling wait (in seconds).
+   */
+  export const Polling = 0;
 }
