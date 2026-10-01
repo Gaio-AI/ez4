@@ -18,6 +18,7 @@ import { getIntegrationRequestFunction } from '../integration';
 import { getAuthorizerFunction } from '../authorizer';
 import { RoleMissingError } from '../errors';
 import { prepareLinkedClient } from './client';
+import { assertIntegrationLimit } from './limits';
 
 export const prepareHttpLinkedService = (event: ServiceEvent) => {
   const { service, options, context } = event;
@@ -52,6 +53,8 @@ export const prepareHttpServices = (event: PrepareResourceEvent) => {
     });
 
     createRoutes(state, service, gatewayState, options, context);
+
+    assertIntegrationLimit(state, gatewayState);
 
     context.setServiceState(service, options, gatewayState);
 
