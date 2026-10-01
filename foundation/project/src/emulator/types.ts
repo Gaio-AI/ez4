@@ -59,6 +59,10 @@ export type ServiceEmulator = {
   type: string;
   name: string;
   identifier: string;
+  /**
+   * Other identifiers that route requests to this emulator.
+   */
+  aliases?: string[];
   service?: ServiceMetadata;
   options?: AnyObject;
   inheritOptions?: boolean;
