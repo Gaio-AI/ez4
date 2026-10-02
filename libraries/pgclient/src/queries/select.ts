@@ -34,6 +34,12 @@ export const prepareSelectQuery = <T extends InternalTableMetadata, S extends Qu
 
   if ('order' in input) {
     query.order(input.order);
+
+    // An unqualified ORDER BY name binds to the output column, which is the formatted text for date and
+    // time fields, so the source gets an alias and the order references the table column and its index.
+    if (input.order && !isEmptyObject(input.order) && !query.alias) {
+      query.as(builder.alias('R'));
+    }
   }
 
   if ('skip' in input && isAnyNumber(input.skip)) {
