@@ -38,6 +38,13 @@ const HELP_LINES = [
   '  --plan             Show the deployment or destruction plan and exit without applying it (exit code 2 when it has changes)',
   '  --local            Use local options when serving or testing',
   '  --detach, -d       Run in background when using proxy run',
+  '',
+  LogFormat.toBold('Proxy:'),
+  '  ez4 proxy run [-d] <name> -- <command>  Serve <command> at http://<name>.localhost with PORT and HOST set',
+  '  ez4 proxy ls                            List the running routes',
+  '  ez4 proxy stop <name>                   Stop the process behind a route',
+  '  ez4 proxy setup                         Allow port 80 without root on Linux (system-wide sysctl, sudo)',
+  '  proxy run targets POSIX shells (Linux, macOS); killing its wrapper with SIGKILL orphans the command.',
   ''
 ];
 

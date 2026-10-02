@@ -1,7 +1,8 @@
 import type { AddressInfo } from 'node:net';
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, openSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { connect, createServer } from 'node:net';
 import { setTimeout } from 'node:timers/promises';
 import { join } from 'node:path';
@@ -12,13 +13,17 @@ import { getProxyHome } from './routes';
 // Both bin/cli.mjs and bin/application.mjs bundle this module, so the CLI sits beside the running bundle.
 export const getCliPath = () => join(import.meta.dirname, 'cli.mjs');
 
+const getLogsPath = () => {
+  return process.env.EZ4_PROXY_HOME ? join(getProxyHome(), 'logs') : join(homedir(), '.ez4', 'logs');
+};
+
 export const openLogFile = (name: string) => {
-  const logsPath = join(getProxyHome(), '..', 'logs');
+  const logsPath = getLogsPath();
   const logFile = join(logsPath, `${name}.log`);
 
-  mkdirSync(logsPath, { recursive: true });
+  mkdirSync(logsPath, { recursive: true, mode: 0o700 });
 
-  return { logFile, fd: openSync(logFile, 'a') };
+  return { logFile, fd: openSync(logFile, 'a', 0o600) };
 };
 
 export const getFreePort = () => {
@@ -48,6 +53,8 @@ const startDaemon = (listenPort: number) => {
     stdio: ['ignore', fd, fd],
     env: { ...process.env, EZ4_PROXY_LISTEN: `${listenPort}` }
   }).unref();
+
+  closeSync(fd);
 
   return logFile;
 };
