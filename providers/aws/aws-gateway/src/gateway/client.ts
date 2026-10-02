@@ -61,17 +61,17 @@ export const fetchGateway = async (logger: OperationLogLine, gatewayName: string
       })
     );
 
-    if (!Items?.length) {
+    const response = Items?.find(({ Name }) => Name === gatewayName);
+
+    if (response) {
+      return response;
+    }
+
+    if (!NextToken) {
       throw new Error(`API resource '${gatewayName}' wasn't found.`);
     }
 
-    const response = Items.find(({ Name }) => Name === gatewayName);
-
-    if (!response) {
-      return findApiGateway(NextToken);
-    }
-
-    return response;
+    return findApiGateway(NextToken);
   };
 
   const response = await findApiGateway();
