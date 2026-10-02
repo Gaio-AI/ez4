@@ -69,6 +69,7 @@ export type CreateRequest = {
   origins?: AdditionalOrigin[];
   rewriteFunctionArn?: Arn;
   certificateArn?: Arn;
+  firewallArn?: Arn;
   originAccessId?: string;
   description?: string;
   compress?: boolean;
@@ -240,8 +241,18 @@ const upsertDistributionRequest = (request: CreateRequest | UpdateRequest, defau
   const allOrigins = combineAllOrigins(prepareAllOrigins(request), defaults?.Origins?.Items);
   const allCustomErrors = prepareAllCustomErrors(request);
 
-  const { distributionName, description, certificateArn, defaultIndex, defaultOrigin, rewriteFunctionArn, aliases, enabled, compress } =
-    request;
+  const {
+    distributionName,
+    description,
+    certificateArn,
+    firewallArn,
+    defaultIndex,
+    defaultOrigin,
+    rewriteFunctionArn,
+    aliases,
+    enabled,
+    compress
+  } = request;
 
   return {
     CallerReference: distributionName,
@@ -251,7 +262,8 @@ const upsertDistributionRequest = (request: CreateRequest | UpdateRequest, defau
     HttpVersion: defaults?.HttpVersion ?? HttpVersion.http2and3,
     Comment: description ?? defaults?.Comment ?? '',
     IsIPV6Enabled: defaults?.IsIPV6Enabled ?? true,
-    WebACLId: defaults?.WebACLId ?? '',
+    // Always sent, an empty one included, so a web ACL taken out of the code leaves the distribution.
+    WebACLId: firewallArn ?? '',
     Enabled: enabled,
     Staging: false,
     Aliases: {

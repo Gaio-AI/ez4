@@ -8,6 +8,7 @@ export type CdnService = ServiceMetadata & {
   file?: string;
   aliases: string[];
   certificate?: CdnCertificate;
+  firewall?: string;
   description?: string;
   defaultOrigin: CdnOrigin;
   defaultIndex?: string;

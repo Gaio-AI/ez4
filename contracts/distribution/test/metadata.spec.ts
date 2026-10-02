@@ -29,7 +29,9 @@ describe('distribution metadata', () => {
   registerTriggers();
 
   process.env.TEST_ENV_VAR = 'test-env-var-value';
+  process.env.TEST_FIREWALL_ARN = 'arn:aws:wafv2:us-east-1:000000000000:global/webacl/test-env/f0e1d2c3-0000-1111-2222-333344445555';
 
   it('assert :: basic distribution', () => testFile('service'));
   it('assert :: rewrite rules', () => testFile('rewrite'));
+  it('assert :: firewall', () => testFile('firewall'));
 });

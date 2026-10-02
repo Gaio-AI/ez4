@@ -74,6 +74,12 @@ export namespace Cdn {
     readonly certificate?: Certificate;
 
     /**
+     * ARN of the web ACL (AWS WAF, CloudFront scope) associated to the distribution.
+     * When omitted, the distribution has no web ACL.
+     */
+    readonly firewall?: string;
+
+    /**
      * Default index file name (e.g. `index.html`).
      */
     readonly defaultIndex?: string;

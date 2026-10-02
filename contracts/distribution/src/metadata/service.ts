@@ -23,6 +23,7 @@ import { formatUri } from '../utils/uri';
 import { IncompleteServiceError } from '../errors/service';
 import { getCdnOriginsMetadata, getCdnOriginMetadata } from './origin';
 import { getCdnCertificateMetadata } from './certificate';
+import { getCdnFirewallMetadata } from './firewall';
 import { getCndFallbacksMetadata } from './fallback';
 import { createCdnService } from './types';
 
@@ -76,6 +77,11 @@ export const getCdnServicesMetadata = (reflection: ReflectionTypes) => {
 
         case 'certificate': {
           service.certificate = getCdnCertificateMetadata(member.value, declaration, reflection, errorList);
+          break;
+        }
+
+        case 'firewall': {
+          service.firewall = getCdnFirewallMetadata(member, errorList, fileName);
           break;
         }
 

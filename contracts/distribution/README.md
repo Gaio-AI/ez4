@@ -55,9 +55,12 @@ With your distribution defined, EZ4 handles provisioning, certificate wiring, or
 | defaultOrigin | Cdn.UseDefaultOrigin<> | Default origin for the distribution.                                 |
 | origins       | Cdn.UseOrigin<>        | Distribution origins.                                                |
 | aliases       | string[]               | List of CNAME aliases for the distribution.                          |
+| firewall      | string                 | ARN of the AWS WAF web ACL (CloudFront scope) for the distribution.  |
 | disabled      | boolean                | Determines whether or not the distribution is disabled.              |
 
 > Use type helpers for `origins`, `defaultOrigin`, `certificate` and `fallbacks` properties.
+
+> The `firewall` web ACL is usually created outside the project, so it comes from `Environment.Variable<'NAME'>`. Removing the field takes the web ACL away from the distribution, and a variable that isn't set fails the build instead.
 
 ## Examples
 
