@@ -81,10 +81,18 @@ Ensure the user performing deployments has the permissions below:
         "cloudfront:PublishFunction"
       ],
       "Resource": ["arn:aws:cloudfront::{account-id}:function/{prefix}-*"]
+    },
+    {
+      "Sid": "FirewallAssociation",
+      "Effect": "Allow",
+      "Action": ["wafv2:GetWebACL"],
+      "Resource": ["arn:aws:wafv2:us-east-1:{account-id}:global/webacl/*/*"]
     }
   ]
 }
 ```
+
+> CloudFront reads the web ACL of a distribution's `firewall` with the deployer's own permissions, so `FirewallAssociation` is only needed when a distribution declares one.
 
 ## License
 

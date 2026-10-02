@@ -1,4 +1,5 @@
 import type { PrepareResourceEvent, ConnectResourceEvent } from '@ez4/project/library';
+import type { Arn } from '@ez4/aws-common';
 
 import { isCdnBucketOrigin, isCdnService } from '@ez4/distribution/library';
 import { getServiceName } from '@ez4/project/library';
@@ -22,7 +23,7 @@ export const prepareCdnServices = (event: PrepareResourceEvent) => {
     return false;
   }
 
-  const { description, fallbacks, certificate, defaultIndex } = service;
+  const { description, fallbacks, certificate, firewall, defaultIndex } = service;
   const { cache: defaultCache } = service.defaultOrigin;
 
   const defaultOrigin = getDefaultOriginCache(state, service, options, context);
@@ -40,6 +41,9 @@ export const prepareCdnServices = (event: PrepareResourceEvent) => {
     tags: options.tags,
     description,
     defaultIndex,
+    ...(firewall && {
+      firewallArn: firewall as Arn
+    }),
     originAccessState: createOriginAccess(state, {
       accessName: getOriginAccessName(service, options),
       description

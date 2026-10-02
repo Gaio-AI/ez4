@@ -12,6 +12,7 @@ export * from './metadata/types';
 
 export * from './errors/service';
 export * from './errors/certificate';
+export * from './errors/firewall';
 export * from './errors/origin';
 export * from './errors/fallback';
 export * from './errors/cache';

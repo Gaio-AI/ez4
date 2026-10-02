@@ -1,0 +1,24 @@
+{
+  "TestCdn": {
+    "type": "@ez4/cdn",
+    "name": "TestCdn",
+    "file": "test/input/output-firewall.ts",
+    "context": {},
+    "defaultOrigin": {
+      "type": "bucket",
+      "bucket": "TestBucket"
+    },
+    "firewall": "arn:aws:wafv2:us-east-1:000000000000:global/webacl/test-env/f0e1d2c3-0000-1111-2222-333344445555"
+  },
+  "TestLiteralCdn": {
+    "type": "@ez4/cdn",
+    "name": "TestLiteralCdn",
+    "file": "test/input/output-firewall.ts",
+    "context": {},
+    "defaultOrigin": {
+      "type": "bucket",
+      "bucket": "TestBucket"
+    },
+    "firewall": "arn:aws:wafv2:us-east-1:000000000000:global/webacl/test-literal/a1b2c3d4-0000-1111-2222-333344445555"
+  }
+}
