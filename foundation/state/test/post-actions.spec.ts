@@ -1,7 +1,7 @@
 import type { EntryStates, StepContext, StepHandlers } from '@ez4/state';
 import type { TestEntryState } from './common/entry';
 
-import { planSteps, applySteps, SkipFailedEntryError, SkipFailedEntryDependencyError } from '@ez4/state';
+import { planSteps, applySteps, SkipFailedEntryError, SkipFailedEntryDependencyError, SkipFailedEntryDependentError } from '@ez4/state';
 import { deepEqual, equal, ok } from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 
@@ -477,5 +477,174 @@ describe('post actions tests', () => {
     const [error1] = errors;
 
     ok(error1 instanceof SkipFailedEntryError);
+  });
+
+  it('assert :: dependents post action', async () => {
+    const postActionHandler = mock.fn(() => {});
+
+    const createHandler = mock.fn((_candidate: TestEntryState, context: StepContext) => {
+      context.postAction(() => context.postAction(postActionHandler, { requireDependents: true }));
+    });
+
+    const handlers: StepHandlers<TestEntryState> = {
+      ...commonStepHandlers,
+      [TestEntryType.C]: {
+        ...commonStepHandler,
+        create: createHandler
+      }
+    };
+
+    const steps = await planSteps(baseState, undefined, {
+      handlers
+    });
+
+    const { result, errors, warnings } = await applySteps(steps, baseState, undefined, {
+      handlers
+    });
+
+    equal(createHandler.mock.callCount(), 1);
+    equal(postActionHandler.mock.callCount(), 1);
+    equal(warnings.length, 0);
+    equal(errors.length, 0);
+
+    ok(!result.entryC?.partial);
+  });
+
+  it('assert :: prevent dependents post action (update dependent error)', async () => {
+    const postActionHandler = mock.fn(() => {});
+
+    const updateHandlerC = mock.fn((_candidate: TestEntryState, _current: TestEntryState, context: StepContext) => {
+      context.postAction(postActionHandler, { requireDependents: true });
+    });
+
+    const updateHandlerA = mock.fn(() => {
+      throw new TestError();
+    });
+
+    const handlers: StepHandlers<TestEntryState> = {
+      ...commonStepHandlers,
+      [TestEntryType.A]: {
+        ...commonStepHandler,
+        update: updateHandlerA
+      },
+      [TestEntryType.C]: {
+        ...commonStepHandler,
+        update: updateHandlerC
+      }
+    };
+
+    const newState = { ...baseState };
+
+    const steps = await planSteps(newState, baseState, {
+      handlers
+    });
+
+    const { result, errors, warnings } = await applySteps(steps, newState, baseState, {
+      handlers
+    });
+
+    equal(updateHandlerC.mock.callCount(), 1);
+    equal(updateHandlerA.mock.callCount(), 1);
+    equal(postActionHandler.mock.callCount(), 0);
+    equal(warnings.length, 0);
+    equal(errors.length, 2);
+
+    const [error1, error2] = errors;
+
+    ok(error1 instanceof TestError);
+    ok(error2 instanceof SkipFailedEntryDependentError);
+
+    ok(result.entryC?.partial);
+  });
+
+  it('assert :: prevent dependents post action (dependent post action error)', async () => {
+    const postActionHandler = mock.fn(() => {});
+
+    const createHandlerC = mock.fn((_candidate: TestEntryState, context: StepContext) => {
+      context.postAction(() => context.postAction(postActionHandler, { requireDependents: true }));
+    });
+
+    const createHandlerB = mock.fn((_candidate: TestEntryState, context: StepContext) => {
+      context.postAction(() => {
+        throw new TestError();
+      });
+    });
+
+    const handlers: StepHandlers<TestEntryState> = {
+      ...commonStepHandlers,
+      [TestEntryType.B]: {
+        ...commonStepHandler,
+        create: createHandlerB
+      },
+      [TestEntryType.C]: {
+        ...commonStepHandler,
+        create: createHandlerC
+      }
+    };
+
+    const steps = await planSteps(baseState, undefined, {
+      handlers
+    });
+
+    const { result, errors, warnings } = await applySteps(steps, baseState, undefined, {
+      handlers
+    });
+
+    equal(createHandlerC.mock.callCount(), 1);
+    equal(createHandlerB.mock.callCount(), 1);
+    equal(postActionHandler.mock.callCount(), 0);
+    equal(warnings.length, 0);
+    equal(errors.length, 2);
+
+    const [error1, error2] = errors;
+
+    ok(error1 instanceof TestError);
+    ok(error2 instanceof SkipFailedEntryDependentError);
+
+    ok(result.entryC?.partial);
+  });
+
+  it('assert :: post action (dependent post action error)', async () => {
+    const postActionHandler = mock.fn(() => {});
+
+    const createHandlerC = mock.fn((_candidate: TestEntryState, context: StepContext) => {
+      context.postAction(() => context.postAction(postActionHandler));
+    });
+
+    const createHandlerB = mock.fn((_candidate: TestEntryState, context: StepContext) => {
+      context.postAction(() => {
+        throw new TestError();
+      });
+    });
+
+    const handlers: StepHandlers<TestEntryState> = {
+      ...commonStepHandlers,
+      [TestEntryType.B]: {
+        ...commonStepHandler,
+        create: createHandlerB
+      },
+      [TestEntryType.C]: {
+        ...commonStepHandler,
+        create: createHandlerC
+      }
+    };
+
+    const steps = await planSteps(baseState, undefined, {
+      handlers
+    });
+
+    const { result, errors, warnings } = await applySteps(steps, baseState, undefined, {
+      handlers
+    });
+
+    equal(postActionHandler.mock.callCount(), 1);
+    equal(warnings.length, 0);
+    equal(errors.length, 1);
+
+    const [error1] = errors;
+
+    ok(error1 instanceof TestError);
+
+    ok(!result.entryC?.partial);
   });
 });
