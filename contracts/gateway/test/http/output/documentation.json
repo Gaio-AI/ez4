@@ -1,0 +1,57 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestService": {
+    "type": "@ez4/http",
+    "name": "TestService",
+    "context": {},
+    "file": "test/http/input/output-documentation.ts",
+    "variables": {},
+    "services": {},
+    "routes": [
+      {
+        "path": "GET /test-route-1",
+        "handler": {
+          "name": "testRoute1",
+          "file": "test/http/input/output-documentation.ts",
+          "position": [
+            23,
+            1
+          ],
+          "description": "Route with every documentation tag.",
+          "summary": "Documented route.",
+          "deprecated": true,
+          "tags": [
+            "Test Tag A",
+            "Test Tag B"
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      },
+      {
+        "path": "GET /test-route-2",
+        "handler": {
+          "name": "testRoute2",
+          "file": "test/http/input/output-documentation.ts",
+          "position": [
+            29,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      }
+    ]
+  }
+}

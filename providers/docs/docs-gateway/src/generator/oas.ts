@@ -1,10 +1,13 @@
 import type { HttpService } from '@ez4/gateway/library';
 
+import { isEmptyObject } from '@ez4/utils';
+
 import { getIndentedOutput } from '../utils/format';
 import { getServiceRoutesOutput } from './route';
 import { getSecurityOutput } from './security';
-import { getRequestOutput } from './request';
-import { getResponseOutput } from './response';
+import { getRequestSchemas } from './request';
+import { getResponseSchemas } from './response';
+import { getErrorSchemas } from './errors';
 
 export namespace OpenApiGenerator {
   export const getGatewayOutput = (service: HttpService) => {
@@ -16,7 +19,7 @@ export namespace OpenApiGenerator {
     output.push(...getInformationOutput(service));
     output.push(...getServiceRoutesOutput(service));
 
-    const components = [...getSecurityOutput(service), ...getRequestOutput(service), ...getResponseOutput(service)];
+    const components = [...getSecurityOutput(service), ...getSchemasOutput(service)];
 
     if (components.length) {
       output.push('components:', ...getIndentedOutput(components));
@@ -27,5 +30,23 @@ export namespace OpenApiGenerator {
 
   const getInformationOutput = (service: HttpService) => {
     return ['info:', ...getIndentedOutput([`title: ${service.displayName ?? service.name}`, 'version: 1.0.0']), ''];
+  };
+
+  const getSchemasOutput = (service: HttpService) => {
+    const schemas = {
+      ...getResponseSchemas(service),
+      ...getRequestSchemas(service),
+      ...getErrorSchemas(service)
+    };
+
+    if (isEmptyObject(schemas)) {
+      return [];
+    }
+
+    return [
+      'schemas:',
+      ...getIndentedOutput(Object.entries(schemas).flatMap(([name, lines]) => [`${name}:`, ...getIndentedOutput(lines)])),
+      ''
+    ];
   };
 }

@@ -1,4 +1,4 @@
-import type { AuthRequest, HttpService } from '@ez4/gateway/library';
+import type { AuthHandler, HttpService } from '@ez4/gateway/library';
 
 import { getIndentedOutput, getNameOutput } from '../utils/format';
 import { isEmptyObject } from '@ez4/utils';
@@ -9,17 +9,9 @@ export const getSecurityOutput = (service: HttpService) => {
   for (const route of service.routes) {
     const { authorizer } = route;
 
-    if (!authorizer?.request) {
-      continue;
+    if (authorizer) {
+      Object.assign(output, getSecuritySchemes(authorizer));
     }
-
-    const { name, request } = authorizer;
-
-    if (output[name]) {
-      continue;
-    }
-
-    output[name] = getAuthorizationOutput(request);
   }
 
   if (isEmptyObject(output)) {
@@ -28,29 +20,44 @@ export const getSecurityOutput = (service: HttpService) => {
 
   return [
     'securitySchemes:',
-    ...getIndentedOutput(Object.entries(output).flatMap(([path, lines]) => [`${path}:`, ...getIndentedOutput(lines)])),
+    ...getIndentedOutput(Object.entries(output).flatMap(([name, lines]) => [`${getNameOutput(name)}:`, ...getIndentedOutput(lines)])),
     ''
   ];
 };
 
-const getAuthorizationOutput = (request: AuthRequest) => {
-  const output = [];
+export const getSecuritySchemes = (authorizer: AuthHandler): Record<string, string[]> => {
+  const { name, request } = authorizer;
 
-  if (request.headers?.properties) {
+  const schemes: [string, string, string[]][] = [];
+
+  if (request?.headers) {
     for (const headerKey in request.headers.properties) {
       if (headerKey.toLowerCase() !== 'authorization') {
-        output.push(`type: apiKey`, 'in: header', `name: ${getNameOutput(headerKey)}`);
+        schemes.push(['header', headerKey, [`type: apiKey`, 'in: header', `name: ${getNameOutput(headerKey)}`]]);
       } else {
-        output.push(`type: http`, 'scheme: bearer', `bearerFormat: JWT`);
+        schemes.push(['header', headerKey, [`type: http`, 'scheme: bearer']]);
       }
     }
   }
 
-  if (request.query?.properties) {
+  if (request?.query) {
     for (const queryKey in request.query.properties) {
-      output.push(`type: apiKey`, 'in: query', `name: ${getNameOutput(queryKey)}`);
+      schemes.push(['query', queryKey, [`type: apiKey`, 'in: query', `name: ${getNameOutput(queryKey)}`]]);
     }
   }
 
-  return output;
+  if (schemes.length === 1) {
+    const [[, , lines]] = schemes;
+
+    return {
+      [name]: lines
+    };
+  }
+
+  // Each key is a scheme of its own, the gateway requires all of them.
+  return Object.fromEntries(schemes.map(([target, key, lines]) => [`${name}.${target}.${getSchemeName(key)}`, lines]));
+};
+
+const getSchemeName = (key: string) => {
+  return key.replaceAll(/[^a-zA-Z0-9._-]/g, '_');
 };

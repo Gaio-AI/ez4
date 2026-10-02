@@ -13,14 +13,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/requestSchemes/testHandler'
+              $ref: '#/components/schemas/testHandlerRequest'
       responses:
-        204:
+        '204':
           description: "Successful response."
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
 
 components:
-  requestSchemes:
-    testHandler:
+  schemas:
+    testHandlerRequest:
       type: object
       description: "PATCH route request."
       additionalProperties: false
@@ -29,3 +35,19 @@ components:
           type: string
         bar:
           type: number
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message

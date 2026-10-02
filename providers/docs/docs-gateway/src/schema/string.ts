@@ -24,7 +24,7 @@ export const getStringSchemaOutput = (schema: StringSchema) => {
     }
 
     if (pattern) {
-      output.push(`pattern: "${pattern.replaceAll('\\', '\\\\')}"`);
+      output.push(`pattern: "${getMultilineOutput(pattern)}"`);
     }
 
     if (isAnyNumber(minLength)) {

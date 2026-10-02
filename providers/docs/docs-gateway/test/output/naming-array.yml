@@ -5,17 +5,16 @@ info:
   version: 1.0.0
 
 paths:
-  /route:
+  /items:
     post:
       operationId: testHandler
-      summary: "Test the POST route documentation."
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/testHandlerRequest'
       responses:
-        '201':
+        '200':
           description: "Successful response."
           content:
             application/json:
@@ -32,26 +31,47 @@ components:
   schemas:
     testHandler:
       type: object
-      description: "POST route response."
       additionalProperties: false
       properties:
-        id:
-          type: string
-          format: uuid
+        item_list:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              item_name:
+                type: string
+              tag_list:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    tag_name:
+                      type: string
+                  required:
+                    - tag_name
+            required:
+              - item_name
+              - tag_list
       required:
-        - id
+        - item_list
     testHandlerRequest:
       type: object
-      description: "POST route request."
       additionalProperties: false
       properties:
-        foo:
-          type: string
-        bar:
-          type: number
+        item_list:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              item_name:
+                type: string
+            required:
+              - item_name
       required:
-        - foo
-        - bar
+        - item_list
     HttpError:
       type: object
       description: "Error returned by the service."

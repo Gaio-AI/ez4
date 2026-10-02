@@ -21,15 +21,21 @@ paths:
           schema:
             type: number
       responses:
-        200:
+        '200':
           description: "Successful response."
           content:
             application/json:
               schema:
-                $ref: '#/components/responseSchemes/testHandler'
+                $ref: '#/components/schemas/testHandler'
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
 
 components:
-  responseSchemes:
+  schemas:
     testHandler:
       type: object
       description: "GET route response."
@@ -42,3 +48,19 @@ components:
       required:
         - foo
         - bar
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message

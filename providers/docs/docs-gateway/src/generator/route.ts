@@ -1,9 +1,14 @@
-import type { HttpResponse, HttpRoute, HttpService } from '@ez4/gateway/library';
+import type { HttpRoute, HttpService } from '@ez4/gateway/library';
 import { getPropertyName, type NamingStyle, type ObjectSchema } from '@ez4/schema';
 
 import { isAnyArray, isEmptyObject } from '@ez4/utils';
 
 import { getIndentedOutput, getMultilineOutput, getNameOutput } from '../utils/format';
+import { getSchemaReference } from '../utils/reference';
+import { getErrorDescription, getRouteErrors } from './errors';
+import { getResponseSchemaName } from './response';
+import { getRequestSchemaName } from './request';
+import { getSecuritySchemes } from './security';
 import { getSchemaOutput } from './schema';
 
 export const getServiceRoutesOutput = (service: HttpService) => {
@@ -20,17 +25,17 @@ export const getServiceRoutesOutput = (service: HttpService) => {
       output[path] = [];
     }
 
-    output[path].push(`${verb.toLowerCase()}:`, ...getIndentedOutput(getRouteOutput(route, namingStyle)));
+    output[path].push(`${verb.toLowerCase()}:`, ...getIndentedOutput(getRouteOutput(service, route, namingStyle)));
   }
 
   if (isEmptyObject(output)) {
-    return [];
+    return ['paths: {}', ''];
   }
 
   return ['paths:', ...getIndentedOutput(Object.entries(output).flatMap(([path, lines]) => [`${path}:`, ...getIndentedOutput(lines)])), ''];
 };
 
-const getRouteOutput = (route: HttpRoute, namingStyle?: NamingStyle) => {
+const getRouteOutput = (service: HttpService, route: HttpRoute, namingStyle?: NamingStyle) => {
   const output = [];
 
   const { name, authorizer, handler } = route;
@@ -46,8 +51,16 @@ const getRouteOutput = (route: HttpRoute, namingStyle?: NamingStyle) => {
     output.push(`description: "${getMultilineOutput(handler.description)}"`);
   }
 
-  if (authorizer?.request) {
-    output.push(`security:`, ...getIndentedOutput([`- ${authorizer.name}: []`]));
+  if (handler.tags?.length) {
+    output.push('tags:', ...getIndentedOutput(handler.tags.map((tag) => `- "${getMultilineOutput(tag)}"`)));
+  }
+
+  if (handler.deprecated) {
+    output.push('deprecated: true');
+  }
+
+  if (authorizer) {
+    output.push(...getSecurityRequirementOutput(Object.keys(getSecuritySchemes(authorizer))));
   }
 
   if (request) {
@@ -70,13 +83,24 @@ const getRouteOutput = (route: HttpRoute, namingStyle?: NamingStyle) => {
     }
 
     if (request.body) {
-      output.push('requestBody:', ...getIndentedOutput(getBodyOutput('requestSchemes', handler.name)));
+      output.push('requestBody:', ...getIndentedOutput(getContentOutput([getRequestSchemaName(handler)])));
     }
   }
 
-  output.push('responses:', ...getIndentedOutput(getResponseOutput(handler.name, handler.response)));
+  output.push('responses:', ...getIndentedOutput(getResponsesOutput(service, route)));
 
   return output;
+};
+
+const getSecurityRequirementOutput = (schemeNames: string[]) => {
+  if (!schemeNames.length) {
+    return [];
+  }
+
+  // A single requirement with all the schemes, since the request needs all of them.
+  const [firstScheme, ...otherSchemes] = schemeNames.map((schemeName) => `${getNameOutput(schemeName)}: []`);
+
+  return ['security:', ...getIndentedOutput([`- ${firstScheme}`, ...getIndentedOutput(otherSchemes)])];
 };
 
 const getParametersOutput = (target: string, schema: ObjectSchema, namingStyle?: NamingStyle) => {
@@ -95,30 +119,41 @@ const getParametersOutput = (target: string, schema: ObjectSchema, namingStyle?:
   return output;
 };
 
-const getBodyOutput = (schemaPath: string, schemaName: string) => {
-  return [
-    'content:',
-    ...getIndentedOutput([
-      'application/json:',
-      ...getIndentedOutput(['schema:', ...getIndentedOutput([`$ref: '#/components/${schemaPath}/${schemaName}'`])])
-    ])
-  ];
+const getContentOutput = (schemaNames: string[]) => {
+  const schemaOutput =
+    schemaNames.length > 1
+      ? ['anyOf:', ...getIndentedOutput(schemaNames.map((schemaName) => `- $ref: '${getSchemaReference(schemaName)}'`))]
+      : schemaNames.map((schemaName) => `$ref: '${getSchemaReference(schemaName)}'`);
+
+  return ['content:', ...getIndentedOutput(['application/json:', ...getIndentedOutput(['schema:', ...getIndentedOutput(schemaOutput)])])];
 };
 
-const getResponseOutput = (schemaName: string, response: HttpResponse) => {
+const getResponsesOutput = (service: HttpService, route: HttpRoute) => {
+  const { handler } = route;
+  const { response } = handler;
+
   const statuses = isAnyArray(response.status) ? response.status : [response.status];
-  const body = response.body;
 
   const output = [];
 
   for (const status of statuses) {
     const content = [`description: "Successful response."`];
 
-    if (body) {
-      content.push(...getBodyOutput('responseSchemes', schemaName));
+    if (response.body) {
+      content.push(...getContentOutput([getResponseSchemaName(handler)]));
     }
 
-    output.push(`${status}:`, ...getIndentedOutput(content));
+    output.push(`'${status}':`, ...getIndentedOutput(content));
+  }
+
+  for (const [status, schemaNames] of getRouteErrors(service, route)) {
+    if (statuses.includes(status)) {
+      continue;
+    }
+
+    const content = [`description: "${getMultilineOutput(getErrorDescription(status))}"`, ...getContentOutput(schemaNames)];
+
+    output.push(`'${status}':`, ...getIndentedOutput(content));
   }
 
   return output;

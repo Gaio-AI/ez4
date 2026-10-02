@@ -1,12 +1,14 @@
-import type { ArraySchema } from '@ez4/schema';
+import type { ArraySchema, NamingStyle } from '@ez4/schema';
+import type { SchemaOutputContext } from '../utils/reference';
 
 import { isAnyNumber } from '@ez4/utils';
 
 import { getIndentedOutput } from '../utils/format';
 import { getCommonSchemaOutput } from '../utils/schema';
+import { getChildSchemaOutputContext } from '../utils/reference';
 import { getAnySchemaOutput } from './any';
 
-export const getArraySchemaOutput = (schema: ArraySchema) => {
+export const getArraySchemaOutput = (schema: ArraySchema, namingStyle?: NamingStyle, context?: SchemaOutputContext) => {
   if (schema.definitions?.encoded) {
     return ['type: string', ...getCommonSchemaOutput(schema), 'format: byte'];
   }
@@ -25,7 +27,7 @@ export const getArraySchemaOutput = (schema: ArraySchema) => {
     }
   }
 
-  const schemaOutput = getAnySchemaOutput(schema.element);
+  const schemaOutput = getAnySchemaOutput(schema.element, namingStyle, getChildSchemaOutputContext(context, 'items'));
 
   if (schemaOutput.length) {
     output.push('items:', ...getIndentedOutput(schemaOutput));

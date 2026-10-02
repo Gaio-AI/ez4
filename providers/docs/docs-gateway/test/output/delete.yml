@@ -10,5 +10,5 @@ paths:
       operationId: testHandler
       summary: "Test the DELETE route documentation."
       responses:
-        204:
+        '204':
           description: "Successful response."

@@ -20,8 +20,14 @@ paths:
           schema:
             type: boolean
       responses:
-        204:
+        '204':
           description: "Successful response."
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
   /route_b:
     get:
       operationId: testHandler
@@ -37,5 +43,30 @@ paths:
           schema:
             type: boolean
       responses:
-        204:
+        '204':
           description: "Successful response."
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+components:
+  schemas:
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message
