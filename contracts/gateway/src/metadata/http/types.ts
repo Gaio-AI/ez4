@@ -71,6 +71,8 @@ export type HttpHandler = FunctionSignature & {
   response: HttpResponse;
   request?: HttpRequest;
   isolated?: boolean;
+  deprecated?: boolean;
+  tags?: string[];
 };
 
 export type HttpErrors = {

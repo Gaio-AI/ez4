@@ -9,5 +9,5 @@ paths:
     get:
       operationId: operationName
       responses:
-        204:
+        '204':
           description: "Successful response."

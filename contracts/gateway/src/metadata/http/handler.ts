@@ -28,7 +28,8 @@ export const getHttpHandlerMetadata = (
   }
 
   const handler: Incomplete<HttpHandler> = {
-    ...getFunctionSignature(type)
+    ...getFunctionSignature(type),
+    ...getHandlerDocumentation(type)
   };
 
   const properties = new Set(['response']);
@@ -64,6 +65,24 @@ export const getHttpHandlerMetadata = (
   }
 
   return handler;
+};
+
+const getHandlerDocumentation = (type: TypeCallback | TypeFunction) => {
+  const deprecated = type.tags?.some(({ name }) => name === 'deprecated');
+  const tags = [];
+
+  for (const { name, text } of type.tags ?? []) {
+    const tag = text?.trim();
+
+    if (name === 'tag' && tag) {
+      tags.push(tag);
+    }
+  }
+
+  return {
+    ...(deprecated && { deprecated }),
+    ...(tags.length && { tags })
+  };
 };
 
 const isCompleteHandler = (type: Incomplete<HttpHandler>): type is HttpHandler => {

@@ -3,17 +3,8 @@ export const getIndentedOutput = (input: string[]) => {
 };
 
 export const getMultilineOutput = (input: string) => {
-  return input.replaceAll(/[\r\n]/g, (match) => {
-    switch (match) {
-      case '\n':
-        return '\\n';
-
-      case '\r':
-        return '';
-    }
-
-    return '';
-  });
+  // JSON escaping is valid inside a double-quoted YAML string.
+  return JSON.stringify(input.replaceAll('\r', '')).slice(1, -1);
 };
 
 export const getNameOutput = (input: string) => {

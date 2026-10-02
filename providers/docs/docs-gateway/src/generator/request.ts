@@ -1,35 +1,31 @@
-import type { HttpService } from '@ez4/gateway/library';
+import type { HttpHandler, HttpService } from '@ez4/gateway/library';
 
-import { isEmptyObject } from '@ez4/utils';
-
-import { getIndentedOutput } from '../utils/format';
+import { createSchemaOutputContext } from '../utils/reference';
 import { getAnySchemaOutput } from '../schema/any';
 
-export const getRequestOutput = (service: HttpService) => {
+export const getRequestSchemaName = (handler: HttpHandler) => {
+  return `${handler.name}Request`;
+};
+
+export const getRequestSchemas = (service: HttpService) => {
   const output: Record<string, string[]> = {};
 
   const defaultPreferences = service.defaults?.preferences;
 
   for (const route of service.routes) {
     const { preferences, handler } = route;
-    const { name, request } = handler;
+    const { request } = handler;
 
-    if (!request?.body || output[name]) {
+    const schemaName = getRequestSchemaName(handler);
+
+    if (!request?.body || output[schemaName]) {
       continue;
     }
 
     const namingStyle = preferences?.namingStyle ?? defaultPreferences?.namingStyle;
 
-    output[name] = getAnySchemaOutput(request.body, namingStyle);
+    output[schemaName] = getAnySchemaOutput(request.body, namingStyle, createSchemaOutputContext(schemaName));
   }
 
-  if (isEmptyObject(output)) {
-    return [];
-  }
-
-  return [
-    'requestSchemes:',
-    ...getIndentedOutput(Object.entries(output).flatMap(([path, lines]) => [`${path}:`, ...getIndentedOutput(lines)])),
-    ''
-  ];
+  return output;
 };

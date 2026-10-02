@@ -44,6 +44,10 @@
     "clean:registry": "rm -rf ../../../.registry/@ez4/docs-gateway",
     "live:publish": "npm run build && npm publish --access public"
   },
+  "devDependencies": {
+    "@readme/openapi-parser": "^9.0.0",
+    "yaml": "^2.9.1"
+  },
   "dependencies": {
     "@ez4/logger": "^0.53.0",
     "@ez4/project": "^0.53.0",

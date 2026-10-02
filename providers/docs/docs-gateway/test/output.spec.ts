@@ -33,8 +33,10 @@ describe('gateway documentation (open api output)', () => {
   it('assert :: put route', () => testFile('put'));
   it('assert :: delete route', () => testFile('delete'));
   it('assert :: naming style', () => testFile('naming-style'));
+  it('assert :: naming style in arrays', () => testFile('naming-array'));
   it('assert :: operation', () => testFile('operation'));
   it('assert :: auth header', () => testFile('auth-header'));
   it('assert :: auth query', () => testFile('auth-query'));
   it('assert :: auth jwt', () => testFile('auth-jwt'));
+  it('assert :: complete api', () => testFile('complete'));
 });

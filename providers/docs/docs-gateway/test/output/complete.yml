@@ -1,0 +1,261 @@
+# Auto-generated Open API specification, any manual modifications will be lost during regeneration.
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+
+paths:
+  /items:
+    post:
+      operationId: createItemHandler
+      summary: "Create an item."
+      description: "Create an item named after the \"name\" field."
+      tags:
+        - "Items"
+        - "Writes"
+      security:
+        - bearerAuthorizer: []
+      parameters:
+        - name: x-request-id
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createItemHandlerRequest'
+      responses:
+        '201':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/createItemHandler'
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '401':
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayError'
+        '403':
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayError'
+        '404':
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '409':
+          description: "Conflict"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '422':
+          description: "Unprocessable Entity"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+    delete:
+      operationId: deleteItemsHandler
+      summary: "Delete all items."
+      deprecated: true
+      responses:
+        '204':
+          description: "Successful response."
+        '404':
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '409':
+          description: "Conflict"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+  /items/{itemId}:
+    get:
+      operationId: readItemHandler
+      summary: "Read an item."
+      tags:
+        - "Items"
+      security:
+        - 'keysAuthorizer.header.x-api-key': []
+          'keysAuthorizer.query.secret': []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fields
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/readItemHandler'
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '401':
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayError'
+        '403':
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/HttpError'
+                  - $ref: '#/components/schemas/GatewayError'
+        '409':
+          description: "Conflict"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+  /tree:
+    get:
+      operationId: readTreeHandler
+      responses:
+        '200':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/readTreeHandler'
+        '404':
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '409':
+          description: "Conflict"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+components:
+  securitySchemes:
+    bearerAuthorizer:
+      type: http
+      scheme: bearer
+    'keysAuthorizer.header.x-api-key':
+      type: apiKey
+      in: header
+      name: x-api-key
+    'keysAuthorizer.query.secret':
+      type: apiKey
+      in: query
+      name: secret
+
+  schemas:
+    createItemHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+      required:
+        - id
+    readItemHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+        - id
+        - name
+    readTreeHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              name:
+                type: string
+              children:
+                type: array
+                items:
+                  $ref: '#/components/schemas/readTreeHandler/properties/nodes/items'
+            required:
+              - name
+              - children
+      required:
+        - nodes
+    createItemHandlerRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        labels:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message
+    GatewayError:
+      type: object
+      description: "Error returned by the gateway when it denies the request authorization."
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+      required:
+        - message

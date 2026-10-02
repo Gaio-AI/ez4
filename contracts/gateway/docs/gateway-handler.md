@@ -50,6 +50,24 @@ Exceptions are automatically captured:
 - Exceptions mapped in `httpErrors` use the mapped status code.
 - All other errors become internal server errors.
 
+#### HTTP Documentation
+
+The handler JSDoc documents the route operation in the generated OpenAPI specification (see [docs-gateway](../../../providers/docs/docs-gateway/)):
+
+- `@summary` and `@description` - Operation summary and description.
+- `@deprecated` - Marks the operation as deprecated.
+- `@tag <name>` - Groups the operation under the tag, one `@tag` per tag.
+
+```ts
+/**
+ * @summary Read a user.
+ * @tag Users
+ */
+export function readUserHandler(request: Http.Incoming<ReadUserRequest>): ReadUserResponse {
+  // ...
+}
+```
+
 ## WS implementation
 
 WebSocket services have two types of handlers.

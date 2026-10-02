@@ -11,8 +11,20 @@ paths:
       security:
         - testAuthorizer: []
       responses:
-        204:
+        '204':
           description: "Successful response."
+        '401':
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayError'
+        '403':
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayError'
 
 components:
   securitySchemes:
@@ -20,3 +32,14 @@ components:
       type: apiKey
       in: query
       name: secret
+
+  schemas:
+    GatewayError:
+      type: object
+      description: "Error returned by the gateway when it denies the request authorization."
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+      required:
+        - message
