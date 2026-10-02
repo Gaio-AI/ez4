@@ -54,6 +54,14 @@ const getRouteHost = (name: string | undefined) => {
   return host;
 };
 
+const assertRouteFree = (host: string) => {
+  const route = findRoute(host);
+
+  if (route && route.pid !== process.pid) {
+    throw new Error(`${host} is already running (pid ${route.pid}). Stop it with \`ez4 proxy stop ${host}\`.`);
+  }
+};
+
 const setupProxyPort = () => {
   if (process.platform !== 'linux') {
     Logger.log('ez4 proxy setup is not available on this OS; use EZ4_PROXY_PORT=1355.');
@@ -110,6 +118,8 @@ const listenLoopback = (port: number, host: string, onListening: () => void) => 
 };
 
 const runAttached = async (host: string, command: string[]) => {
+  assertRouteFree(host);
+
   await ensureProxy(getProxyPort());
 
   const port = await getFreePort();
@@ -151,6 +161,8 @@ const forwardToGroup = (signal: NodeJS.Signals) => {
 };
 
 const runDetached = async (host: string, command: string[]) => {
+  assertRouteFree(host);
+
   await ensureProxy(getProxyPort());
 
   const { logFile, fd } = openLogFile(host);

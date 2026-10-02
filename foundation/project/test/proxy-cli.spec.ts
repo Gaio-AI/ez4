@@ -1,8 +1,8 @@
 import type { AddressInfo } from 'node:net';
 
 import { describe, it } from 'node:test';
-import { deepEqual, equal } from 'node:assert/strict';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { deepEqual, equal, match } from 'node:assert/strict';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,13 @@ import { once } from 'node:events';
 import { getInputOptions } from '../src/terminal/options';
 import { createProxyServer } from '../src/proxy/server';
 import { toRouteHost } from '../src/terminal/commands/proxy';
+
+const runCli = (home: string, ...argv: string[]) => {
+  return spawnSync(process.execPath, ['bin/cli.mjs', ...argv], {
+    env: { ...process.env, EZ4_PROXY_HOME: home, EZ4_PROXY_PORT: '1' },
+    encoding: 'utf8'
+  });
+};
 
 const parse = (...argv: string[]) => {
   const previousArgv = process.argv;
@@ -66,5 +73,21 @@ describe('proxy cli', () => {
     equal(output.owner, 'demo.wt.localhost');
     equal(output.route, `${output.port} ${result.pid}`);
     equal(existsSync(routeFile), false);
+  });
+
+  it('assert :: run refuses a route owned by another live process', () => {
+    const home = mkdtempSync(join(tmpdir(), 'ez4-proxy-'));
+    const routeFile = join(home, 'routes', 'busy.wt.localhost');
+
+    mkdirSync(join(home, 'routes'));
+    writeFileSync(routeFile, `4000 ${process.pid}`);
+
+    for (const detach of [[], ['-d']]) {
+      const result = runCli(home, 'proxy', 'run', ...detach, 'busy.wt', '--', process.execPath, '-e', '');
+
+      equal(result.status, 1);
+      match(result.stderr + result.stdout, new RegExp(`busy.wt.localhost is already running \\(pid ${process.pid}\\)`));
+      equal(readFileSync(routeFile, 'utf8'), `4000 ${process.pid}`);
+    }
   });
 });
