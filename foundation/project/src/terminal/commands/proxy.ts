@@ -4,7 +4,7 @@ import { Logger } from '@ez4/logger';
 
 import { spawn } from 'node:child_process';
 
-import { canBindPort, hasDocker, planProxyListen, setupUnprivilegedPort } from '../../proxy/port';
+import { ensureForwarder, planProxyListen, setupUnprivilegedPort, systemPortProbe } from '../../proxy/port';
 import { ensureProxy, getCliPath, getFreePort, openLogFile } from '../../proxy/daemon';
 import { addRoute, findRoute, listRoutes, removeRoute } from '../../proxy/routes';
 import { createProxyServer } from '../../proxy/server';
@@ -47,13 +47,50 @@ const getRouteName = (name: string | undefined) => {
   return name;
 };
 
-const serveProxy = async () => {
-  const port =
-    Number(process.env.EZ4_PROXY_LISTEN) || (await planProxyListen(getProxyPort(), { canBind: canBindPort, hasDocker })).listenPort;
+const getListenPort = async () => {
+  const daemonPort = Number(process.env.EZ4_PROXY_LISTEN);
 
-  createProxyServer().listen({ port, host: '::', ipv6Only: false }, () => {
-    Logger.log(`🔀 ez4 proxy listening on port ${port}`);
+  if (daemonPort) {
+    return daemonPort;
+  }
+
+  const plan = await planProxyListen(getProxyPort(), systemPortProbe);
+
+  if (plan.forwarder) {
+    ensureForwarder(plan.listenPort);
+  }
+
+  return plan.listenPort;
+};
+
+const serveProxy = async () => {
+  const port = await getListenPort();
+
+  // IPv6 is bound only after IPv4 is won, so two racing daemons never end up holding half each.
+  listenLoopback(port, '127.0.0.1', () => {
+    listenLoopback(port, '::1', () => Logger.log(`🔀 ez4 proxy listening on 127.0.0.1 and ::1 port ${port}`));
   });
+};
+
+const listenLoopback = (port: number, host: string, onListening: () => void) => {
+  const server = createProxyServer();
+
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (host === '::1') {
+      Logger.warn(`ez4 proxy listening on 127.0.0.1 only (${error.message})`);
+      return;
+    }
+
+    if (error.code === 'EADDRINUSE') {
+      Logger.log(`ez4 proxy is already listening on port ${port}`);
+      process.exit(0);
+    }
+
+    Logger.error(error.message);
+    process.exit(1);
+  });
+
+  server.listen(port, host, onListening);
 };
 
 const runAttached = async (name: string, command: string[]) => {
