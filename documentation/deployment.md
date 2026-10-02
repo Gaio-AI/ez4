@@ -83,7 +83,7 @@ Common deployment flags include:
 
 - `--force`: Apply the deployment even when the plan appears to be unchanged.
 - `--debug`: Show more detailed logs during the deployment process.
-- `--branch`: Target a different deployment branch name.
+- `--branch`: Target a different deployment branch name. Separators such as `/` and `_` become `-` in resource names (see [branch names](./configuration.md#proxy-host)).
 - `--environment`: Load environment-specific values for the deploy.
 
 ## Summary
