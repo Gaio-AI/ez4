@@ -12,6 +12,7 @@ import { logQueryError, logQuerySuccess } from './utils/logger';
 import { detectFieldData, prepareFieldData } from './utils/fields';
 import { sendDataApiStatement } from './utils/data-api';
 import { prepareStatement } from './utils/prepare';
+import { rollbackFailedTransaction } from '../utils/transaction';
 import { parseRecords } from '../utils/records';
 
 const ALL_TRANSACTIONS: Record<string, PoolClient> = {};
@@ -73,7 +74,7 @@ export class ClientDriver implements PgClientDriver {
         logQueryError(statement, transactionId);
       }
 
-      if (error instanceof DatabaseError && error.code === '23505') {
+      if (isDuplicateUniqueKeyError(error)) {
         throw new DuplicateUniqueKeyError({ cause: error });
       }
 
@@ -101,20 +102,23 @@ export class ClientDriver implements PgClientDriver {
   async executeTransaction(statements: PgExecuteStatement[], options?: PgExecuteOptions) {
     const transactionId = await this.beginTransaction();
 
+    let results;
+
     try {
-      const results = await this.executeStatements(statements, {
+      results = await this.executeStatements(statements, {
         ...options,
         transactionId
       });
-
-      await this.commitTransaction(transactionId);
-
-      return results;
     } catch (error) {
-      //
-      await this.rollbackTransaction(transactionId);
+      await rollbackFailedTransaction(this, transactionId, error);
+
       throw error;
     }
+
+    // Out of the try: a failed commit has already ended the transaction (or left it unknown), and a rollback would replace its error.
+    await this.commitTransaction(transactionId);
+
+    return results;
   }
 
   async beginTransaction() {
@@ -141,6 +145,10 @@ export class ClientDriver implements PgClientDriver {
     try {
       await client.query('COMMIT');
     } catch (error) {
+      if (isDuplicateUniqueKeyError(error)) {
+        throw new DuplicateUniqueKeyError({ cause: error });
+      }
+
       throw error;
     } finally {
       delete ALL_TRANSACTIONS[transactionId];
@@ -157,8 +165,6 @@ export class ClientDriver implements PgClientDriver {
 
     try {
       await client.query('ROLLBACK');
-    } catch (error) {
-      throw error;
     } finally {
       delete ALL_TRANSACTIONS[transactionId];
       client.release();
@@ -190,4 +196,8 @@ const sendStatement = (client: PoolClient, statement: PgExecuteStatement, dataAp
   const [query, variables] = prepareStatement(statement.query, statement.variables);
 
   return client.query(query, variables);
+};
+
+const isDuplicateUniqueKeyError = (error: unknown) => {
+  return error instanceof DatabaseError && error.code === '23505';
 };
