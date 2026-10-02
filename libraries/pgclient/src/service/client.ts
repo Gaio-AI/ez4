@@ -7,6 +7,7 @@ import { MissingRepositoryTableError } from '@ez4/pgclient';
 import { isAnyArray } from '@ez4/utils';
 
 import { prepareDeleteOne, prepareInsertOne, prepareUpdateOne } from '../queries/queries';
+import { rollbackFailedTransaction } from '../utils/transaction';
 import { getRelationsWithSchema } from './relations';
 import { Table } from './table';
 
@@ -126,22 +127,25 @@ const executeInteractiveTransaction = async (context: PgClientContext, operation
 
   const transactionId = await driver.beginTransaction();
 
+  let result;
+
   try {
     const instance = PgClient.make({
       ...context,
       transactionId
     });
 
-    const result = await operation(instance);
-
-    await driver.commitTransaction(transactionId);
-
-    return result;
+    result = await operation(instance);
   } catch (error) {
-    await driver.rollbackTransaction(transactionId);
+    await rollbackFailedTransaction(driver, transactionId, error);
 
     throw error;
   }
+
+  // Out of the try: a failed commit has already ended the transaction (or left it unknown), and a rollback would replace its error.
+  await driver.commitTransaction(transactionId);
+
+  return result;
 };
 
 const executeStaticTransaction = async <T extends Database.Service<any>>(

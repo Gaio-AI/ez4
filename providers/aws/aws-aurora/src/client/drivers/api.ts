@@ -14,7 +14,7 @@ import {
 
 import { DatabaseResumingException } from '@aws-sdk/client-rds-data';
 import { DuplicateUniqueKeyError } from '@ez4/pgclient';
-import { parseRecords } from '@ez4/pgclient/utils';
+import { parseRecords, rollbackFailedTransaction } from '@ez4/pgclient/utils';
 import { Runtime } from '@ez4/common';
 import { Wait } from '@ez4/utils';
 
@@ -124,20 +124,23 @@ export class ApiClientDriver implements PgClientDriver {
   async executeTransaction(statements: PgExecuteStatement[], options?: PgExecuteOptions) {
     const transactionId = await this.beginTransaction();
 
+    let results;
+
     try {
-      const results = await this.executeStatements(statements, {
+      results = await this.executeStatements(statements, {
         ...options,
         transactionId
       });
-
-      await this.commitTransaction(transactionId);
-
-      return results;
     } catch (error) {
-      await this.rollbackTransaction(transactionId);
+      await rollbackFailedTransaction(this, transactionId, error);
 
       throw error;
     }
+
+    // Out of the try: a failed commit has already ended the transaction (or left it unknown), and a rollback would replace its error.
+    await this.commitTransaction(transactionId);
+
+    return results;
   }
 
   async beginTransaction() {
@@ -149,12 +152,20 @@ export class ApiClientDriver implements PgClientDriver {
   }
 
   async commitTransaction(transactionId: string) {
-    await client.send(
-      new CommitTransactionCommand({
-        ...this.connection,
-        transactionId
-      })
-    );
+    try {
+      await client.send(
+        new CommitTransactionCommand({
+          ...this.connection,
+          transactionId
+        })
+      );
+    } catch (error) {
+      if (isDuplicateUniqueKeyException(error)) {
+        throw new DuplicateUniqueKeyError({ cause: error });
+      }
+
+      throw error;
+    }
   }
 
   async rollbackTransaction(transactionId: string) {
