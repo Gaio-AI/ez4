@@ -2,10 +2,11 @@ import type { PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
 
 import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
 import { isHttpImport } from '@ez4/gateway/library';
+import { Logger } from '@ez4/logger';
 
 import { createGateway } from '../../gateway/service';
 import { GatewayProtocol } from '../../gateway/types';
-import { prepareLinkedClient } from './client';
+import { prepareDisabledClient, prepareLinkedClient } from './client';
 
 export const prepareHttpLinkedImport = (event: ServiceEvent) => {
   const { service, options, context } = event;
@@ -16,6 +17,10 @@ export const prepareHttpLinkedImport = (event: ServiceEvent) => {
 
     if (!imports || !imports[project]) {
       throw new MissingImportedProjectError(project);
+    }
+
+    if (imports[project].disabled) {
+      return prepareDisabledClient(service);
     }
 
     return prepareLinkedClient(context, service, options);
@@ -35,7 +40,13 @@ export const prepareHttpImports = (event: PrepareResourceEvent) => {
       throw new MissingImportedProjectError(project);
     }
 
-    const { reference, displayName, description } = service;
+    const { name, reference, displayName, description } = service;
+
+    // Said while preparing, so the plan doesn't read the missing gateway as drift.
+    if (imports[project].disabled) {
+      Logger.warn(`Import ${project} is disabled: ${name} isn't looked up and its client fails with 503.`);
+      return true;
+    }
 
     const gatewayState = createGateway(state, {
       gatewayId: getServiceName(service, options),

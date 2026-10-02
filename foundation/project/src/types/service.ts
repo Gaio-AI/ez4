@@ -20,6 +20,7 @@ export type LinkedContext = {
   dependencyIds?: string[];
   connectionIds?: string[];
   requireVpc?: boolean;
+  disabledProject?: string;
   constructor: string;
   module: string;
   from: string;
@@ -43,6 +44,13 @@ export type ContextSource = {
   dependencyIds?: string[];
   connectionIds?: string[];
   requireVpc?: boolean;
+
+  /**
+   * Imported project whose reference is disabled, when the source is a client of it. Functions linking it take
+   * the project into their hash, so switching the reference rebundles them.
+   */
+  disabledProject?: string;
+
   constructor: string;
   module: string;
   from: string;

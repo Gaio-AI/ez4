@@ -138,6 +138,15 @@ export type ProjectReferenceOptions = {
    * Project options file path.
    */
   projectFile: string;
+
+  /**
+   * Determines whether the referenced project exists where this one is deployed (e.g. `false` in a
+   * stage that doesn't have it). A disabled reference still provides its types, but nothing of it is
+   * looked up or linked: each `Http.Import` client fails every operation with `503`, and any other
+   * import of it fails the deploy.
+   * Default is: `true`
+   */
+  enabled?: boolean;
 };
 
 export type ProjectCustomProviders = {

@@ -4,6 +4,7 @@ import type { ClientAuthorization, ClientOperation } from '@ez4/gateway/library'
 import { sendClientRequest } from '@ez4/gateway/utils';
 import { isAnyString } from '@ez4/utils';
 import { prepareRequestUrl } from '@ez4/http';
+import { HttpError } from '@ez4/gateway';
 import { Runtime } from '@ez4/common';
 
 export type ClientOperations = Record<string, ClientOperation>;
@@ -12,10 +13,15 @@ export namespace HttpClient {
   export type Options = {
     authorization?: ClientAuthorization;
     operations: ClientOperations;
+
+    /**
+     * Imported project whose reference is disabled, every operation then fails with `503`.
+     */
+    disabledProject?: string;
   };
 
   export const make = <T extends Http.Service>(gatewayUrl: string, options: Options): HttpClientType<T> => {
-    const { authorization, operations } = options;
+    const { authorization, operations, disabledProject } = options;
 
     return new Proxy(
       {},
@@ -24,6 +30,10 @@ export namespace HttpClient {
           return (request: HttpClientRequest) => {
             if (!isAnyString(property) || !(property in operations)) {
               throw new Error(`Operation '${property.toString()}' wasn't found.`);
+            }
+
+            if (disabledProject) {
+              return Promise.reject(new HttpError(503, `Imported service '${disabledProject}' is disabled in this deployment.`));
             }
 
             const { authorize, method, path, namingStyle, querySchema, bodySchema, responseSchema } = operations[property];

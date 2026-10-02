@@ -2,7 +2,7 @@ import type { EmulatorRequestEvent, ServeOptions } from '@ez4/project/library';
 import type { QueueImport } from '@ez4/queue/library';
 import type { QueueForwarder } from '../client/remote';
 
-import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
+import { getServiceName, MissingImportedProjectError, UnsupportedDisabledImportError } from '@ez4/project/library';
 import { getErrorResponse, getMessageTraceFromHeaders } from '@ez4/local-common';
 import { MalformedMessageError, MissingMessageGroupError } from '@ez4/queue/utils';
 import { getRandomUUID } from '@ez4/utils';
@@ -18,6 +18,10 @@ export const registerRemoteService = (service: QueueImport, options: ServeOption
 
   if (!imports || !imports[project]) {
     throw new MissingImportedProjectError(project);
+  }
+
+  if (imports[project].disabled) {
+    throw new UnsupportedDisabledImportError(resourceName, project);
   }
 
   const forwarder = createQueueForwarder(referenceName, imports[project]);

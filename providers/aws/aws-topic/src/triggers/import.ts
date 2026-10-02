@@ -1,6 +1,6 @@
 import type { ConnectResourceEvent, PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
 
-import { MissingImportedProjectError } from '@ez4/project/library';
+import { MissingImportedProjectError, UnsupportedDisabledImportError } from '@ez4/project/library';
 import { getServiceName } from '@ez4/project/library';
 import { isTopicImport } from '@ez4/topic/library';
 
@@ -22,6 +22,10 @@ export const prepareLinkedImports = (event: ServiceEvent) => {
     throw new MissingImportedProjectError(project);
   }
 
+  if (imports[project].disabled) {
+    throw new UnsupportedDisabledImportError(service.name, project);
+  }
+
   return prepareLinkedClient(context, service, options);
 };
 
@@ -37,6 +41,10 @@ export const prepareImports = (event: PrepareResourceEvent) => {
 
   if (!imports || !imports[project]) {
     throw new MissingImportedProjectError(project);
+  }
+
+  if (imports[project].disabled) {
+    throw new UnsupportedDisabledImportError(service.name, project);
   }
 
   const topicState = createTopic(state, {

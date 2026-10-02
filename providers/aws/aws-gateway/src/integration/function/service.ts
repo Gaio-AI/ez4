@@ -5,6 +5,7 @@ import type { LogGroupState } from '@ez4/aws-logs';
 import type { IntegrationFunctionParameters } from './types';
 import type { BundleFunction } from './bundler';
 
+import { getDisabledProjects } from '@ez4/project/library';
 import { createFunction } from '@ez4/aws-function';
 import { hashObject } from '@ez4/utils';
 import { LogLevel } from '@ez4/project';
@@ -52,6 +53,8 @@ export const createIntegrationFunction = <E extends EntryState>(
       return [handler.sourceFile, [...handler.dependencies, getIntegrationTemplateFile(type)]];
     },
     getFunctionHash: () => {
+      const disabledProjects = getDisabledProjects(parameters.context, parameters.references);
+
       return hashObject({
         architecture,
         headersSchema,
@@ -63,7 +66,10 @@ export const createIntegrationFunction = <E extends EntryState>(
         preferences,
         errorsMap,
         scope,
-        debug
+        debug,
+        ...(disabledProjects.length > 0 && {
+          disabledProjects
+        })
       });
     }
   });

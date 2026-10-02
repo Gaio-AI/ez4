@@ -17,7 +17,10 @@ export const registerHttpRemoteService = (service: HttpImport, options: ServeOpt
   const clientOptions = {
     authorization: getClientAuthorization(service),
     operations: getClientOperations(service),
-    ...imports[project]
+    ...imports[project],
+    ...(imports[project].disabled && {
+      disabledProject: project
+    })
   };
 
   return {

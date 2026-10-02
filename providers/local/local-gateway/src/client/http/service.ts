@@ -15,13 +15,18 @@ export type HttpServiceClientOptions = CommonOptions & {
   authorization?: ClientAuthorization;
   operations: Record<string, ClientOperation>;
   serviceHost: string;
+
+  /**
+   * Imported project whose reference is disabled, every operation then fails with `503` as the deployed client does.
+   */
+  disabledProject?: string;
 };
 
 export const createHttpServiceClient = <T extends Http.Service>(
   resourceName: string,
   clientOptions: HttpServiceClientOptions
 ): HttpClient<T> => {
-  const { serviceHost, authorization, operations } = clientOptions;
+  const { serviceHost, authorization, operations, disabledProject } = clientOptions;
 
   const gatewayIdentifier = getServiceName(resourceName, clientOptions);
   const gatewayHost = `http://${serviceHost}/${gatewayIdentifier}`;
@@ -39,6 +44,10 @@ export const createHttpServiceClient = <T extends Http.Service>(
         }
 
         return async (request: HttpClientRequest) => {
+          if (disabledProject) {
+            throw new HttpError(503, `Imported service '${disabledProject}' is disabled in this deployment.`);
+          }
+
           const { authorize, method, path, namingStyle, querySchema, bodySchema, responseSchema } = operations[property];
 
           const scopeHeaders = Runtime.getScopeRequestHeaders();
