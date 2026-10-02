@@ -26,6 +26,26 @@ export const getCheckConstraintExistsQuery = (builder: SqlBuilder, name: string)
   return query;
 };
 
+export const getCheckConstraintMissingQuery = (builder: SqlBuilder, name: string) => {
+  const [query] = builder
+    .select()
+    .rawColumn(1)
+    .where({
+      NOT: {
+        exists: builder
+          .select()
+          .rawColumn(1)
+          .from('pg_constraint')
+          .where({
+            conname: builder.rawString(name)
+          })
+      }
+    })
+    .build();
+
+  return query;
+};
+
 export const getCheckColumnExistsQuery = (builder: SqlBuilder, table: string, column: string) => {
   const [query] = builder
     .select()
