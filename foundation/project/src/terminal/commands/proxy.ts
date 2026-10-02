@@ -56,7 +56,7 @@ const getRouteHost = (name: string | undefined) => {
 
 const setupProxyPort = () => {
   if (process.platform !== 'linux') {
-    Logger.log('ez4 proxy setup is only needed on Linux, port 80 is already available here.');
+    Logger.log('ez4 proxy setup is not available on this OS; use EZ4_PROXY_PORT=1355.');
     return;
   }
 

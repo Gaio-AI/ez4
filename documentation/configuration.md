@@ -156,11 +156,13 @@ The proxy and every process behind it listen on `127.0.0.1` and `::1` only. Rout
 
 `EZ4_PROXY_PORT` sets the proxy port (default `80`, or `proxy.port`). `EZ4_PROXY_HOME` moves the proxy state (default `~/.ez4/proxy`), and logs then go to `<EZ4_PROXY_HOME>/logs`.
 
-On Linux, port `80` needs permission. The proxy uses the first option that works:
+Port `80` needs permission. On Linux the proxy uses the first option that works:
 
-1. Bind port `80` directly (macOS, Windows, or Linux after `ez4 proxy setup`).
+1. Bind port `80` directly (after `ez4 proxy setup`, or with the `CAP_NET_BIND_SERVICE` capability).
 2. Listen on port `1355` behind a Docker container named `ez4-proxy-80` that forwards loopback port `80` to it (`alpine/socat`, host network, restarted with Docker). Remove it with `docker rm -f ez4-proxy-80`.
 3. Fail, asking to run `ez4 proxy setup`, install Docker or set `EZ4_PROXY_PORT=1355`.
+
+On macOS and Windows, binding loopback port `80` needs root and Docker Desktop's host network does not reach host loopback, so without root the proxy fails and asks for `EZ4_PROXY_PORT=1355` (URLs then carry `:1355`).
 
 `ez4 proxy setup` writes `net.ipv4.ip_unprivileged_port_start=80` to `/etc/sysctl.d/50-ez4-proxy.conf` with sudo. This is system-wide: every user and process on the machine may then bind ports from `80` up. Delete that file and run `sudo sysctl --system` to undo it.
 
