@@ -5,5 +5,5 @@ export const getServicePrefix = (prefix?: string) => {
 };
 
 export const getServiceBranch = (branch?: string) => {
-  return branch ? toKebabCase(branch) : '';
+  return branch ? toKebabCase(branch.replace(/[^A-Za-z0-9]+/g, '-')) : '';
 };
