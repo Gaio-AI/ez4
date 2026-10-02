@@ -90,4 +90,15 @@ describe('proxy cli', () => {
       equal(readFileSync(routeFile, 'utf8'), `4000 ${process.pid}`);
     }
   });
+
+  it('assert :: run without a command is a usage error', () => {
+    const home = mkdtempSync(join(tmpdir(), 'ez4-proxy-'));
+
+    for (const detach of [[], ['-d']]) {
+      const result = runCli(home, 'proxy', 'run', ...detach, 'idle.wt');
+
+      equal(result.status, 1);
+      match(result.stderr + result.stdout, /Missing command, e\.g\. `ez4 proxy run idle\.wt -- npm run serve`/);
+    }
+  });
 });
