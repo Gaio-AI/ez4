@@ -84,7 +84,8 @@ export default {
   references: {
     // Identification key for the imported project
     another_project: {
-      projectFile: '../frontend/ez4.project.js' // Path to the EZ4's configuration
+      projectFile: '../frontend/ez4.project.js', // Path to the EZ4's configuration
+      enabled: true // Set false where the imported project isn't deployed (see below)
     }
   },
 
@@ -96,6 +97,30 @@ export default {
 ```
 
 With the configuration file in place, EZ4 knows how to build, deploy, and serve your project.
+
+## Disabled references
+
+A project that exists only in some environments (e.g. only in production) can still be referenced from the others by disabling its reference there:
+
+```js
+const { STAGE } = process.env;
+
+export default {
+  // ...
+  references: {
+    '@my-project/collector': {
+      projectFile: '../collector/ez4.project.js',
+      enabled: STAGE === 'prd'
+    }
+  }
+};
+```
+
+A disabled reference still provides its types, so the code importing them keeps compiling, but nothing of the referenced project is looked up or linked:
+
+- Each `Http.Import` of it has no gateway, the deploy says so with an `Import <project> is disabled` warning, and its client fails every operation with `503` (`Imported service '<project>' is disabled in this deployment.`), deployed or served locally.
+- Any other import of it (e.g. `Queue.Import` or `Topic.Import`) fails the deploy, as only `Http.Import` supports a disabled reference.
+- Switching the reference on or off redeploys the code of every function using its imports, so they get the right client.
 
 ## Examples
 

@@ -12,6 +12,11 @@ export type CommonOptions = {
 
 export type ImportOptions = CommonOptions & {
   serviceHost: string;
+
+  /**
+   * Set when the project reference is disabled, so providers neither look up nor link its services.
+   */
+  disabled?: boolean;
 };
 
 export type DeployOptions = CommonOptions & {

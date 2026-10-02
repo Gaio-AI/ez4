@@ -3,7 +3,7 @@ import type { TopicImport } from '@ez4/topic/library';
 import type { RemoteSubscription } from '../client/remote';
 
 import { getErrorResponse, getMessageTraceFromHeaders, getSuccessResponse } from '@ez4/local-common';
-import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
+import { getServiceName, MissingImportedProjectError, UnsupportedDisabledImportError } from '@ez4/project/library';
 import { getJsonEvent, MalformedEventError } from '@ez4/topic/utils';
 import { TopicSubscriptionType } from '@ez4/topic/library';
 import { Logger } from '@ez4/logger';
@@ -19,6 +19,10 @@ export const registerRemoteService = (service: TopicImport, options: ServeOption
 
   if (!imports || !imports[project]) {
     throw new MissingImportedProjectError(project);
+  }
+
+  if (imports[project].disabled) {
+    throw new UnsupportedDisabledImportError(resourceName, project);
   }
 
   const clientOptions = {

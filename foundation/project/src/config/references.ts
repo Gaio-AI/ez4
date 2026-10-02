@@ -17,17 +17,21 @@ export const loadReferences = async (projectOptions: ProjectOptions, workspacePa
   const paths: Record<string, string[]> = {};
 
   for (const alias in references) {
-    const { projectFile } = references[alias];
+    const { projectFile, enabled = true } = references[alias];
 
     const projectRoot = join(workspacePath ?? '.', dirname(projectFile));
     const projectOptions = await loadProject(projectFile, projectRoot);
     const projectPaths = await getPathsFrom(projectOptions, projectRoot);
 
+    // A disabled reference is only marked, its paths still load below so the types imported from it keep compiling.
     imports[alias] = {
       prefix: getServicePrefix(projectOptions.prefix),
       projectName: toKebabCase(projectOptions.projectName),
       branchName: getServiceBranch(projectOptions.branchName),
-      serviceHost: getServiceHost(projectOptions.serveOptions)
+      serviceHost: getServiceHost(projectOptions.serveOptions),
+      ...(!enabled && {
+        disabled: true
+      })
     };
 
     for (const prefix in projectPaths) {

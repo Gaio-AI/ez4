@@ -4,6 +4,7 @@ import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
 import type { BucketEventFunctionParameters } from './types';
 
+import { getDisabledProjects } from '@ez4/project/library';
 import { createFunction } from '@ez4/aws-function';
 import { hashObject } from '@ez4/utils';
 import { LogLevel } from '@ez4/project';
@@ -42,9 +43,14 @@ export const createBucketEventFunction = <E extends EntryState>(
       return [handler.sourceFile, [...handler.dependencies, getBucketEventTemplateFile()]];
     },
     getFunctionHash: () => {
+      const disabledProjects = getDisabledProjects(parameters.context, parameters.references);
+
       return hashObject({
         architecture,
-        debug
+        debug,
+        ...(disabledProjects.length > 0 && {
+          disabledProjects
+        })
       });
     }
   });

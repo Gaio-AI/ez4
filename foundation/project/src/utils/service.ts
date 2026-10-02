@@ -75,6 +75,42 @@ export const linkServiceContext = (state: EntryStates, entryId: string, context:
   }
 };
 
+/**
+ * Get the projects of the disabled references whose clients a function bundles, from its linked `context` (only the
+ * `references` it uses, when given), sorted. A function puts them in its hash only when there's any, so switching a
+ * reference rebundles the functions using it and leaves every other hash as it was.
+ */
+export const getDisabledProjects = (context?: Record<string, LinkedContext>, references?: string[]) => {
+  const projects = new Set<string>();
+  const visited = new Set<LinkedContext>();
+
+  const collectProjects = (linkedContext: Record<string, LinkedContext>, serviceNames: string[]) => {
+    for (const serviceName of serviceNames) {
+      const linkedService = linkedContext[serviceName];
+
+      if (!linkedService || visited.has(linkedService)) {
+        continue;
+      }
+
+      visited.add(linkedService);
+
+      if (linkedService.disabledProject) {
+        projects.add(linkedService.disabledProject);
+      }
+
+      if (linkedService.context) {
+        collectProjects(linkedService.context, Object.keys(linkedService.context));
+      }
+    }
+  };
+
+  if (context) {
+    collectProjects(context, references ?? Object.keys(context));
+  }
+
+  return [...projects].sort();
+};
+
 export const isLinkedContextVpcRequired = (context: Record<string, LinkedContext>, services?: LinkedServices) => {
   const resolutionCache: Record<string, boolean> = {};
 

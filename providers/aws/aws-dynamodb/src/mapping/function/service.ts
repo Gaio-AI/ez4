@@ -4,6 +4,7 @@ import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
 import type { StreamFunctionParameters } from './types';
 
+import { getDisabledProjects } from '@ez4/project/library';
 import { createFunction } from '@ez4/aws-function';
 import { hashObject } from '@ez4/utils';
 import { LogLevel } from '@ez4/project';
@@ -43,10 +44,15 @@ export const createStreamFunction = <E extends EntryState>(
       return [handler.sourceFile, [...handler.dependencies, getStreamTemplateFile()]];
     },
     getFunctionHash: () => {
+      const disabledProjects = getDisabledProjects(parameters.context, parameters.references);
+
       return hashObject({
         architecture,
         tableSchema,
-        debug
+        debug,
+        ...(disabledProjects.length > 0 && {
+          disabledProjects
+        })
       });
     }
   });

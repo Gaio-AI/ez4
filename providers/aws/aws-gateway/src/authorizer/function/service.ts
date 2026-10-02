@@ -4,6 +4,7 @@ import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
 import type { AuthorizerFunctionParameters } from './types';
 
+import { getDisabledProjects } from '@ez4/project/library';
 import { createFunction } from '@ez4/aws-function';
 import { hashObject } from '@ez4/utils';
 import { LogLevel } from '@ez4/project';
@@ -44,6 +45,8 @@ export const createAuthorizerFunction = <E extends EntryState>(
       return [authorizer.sourceFile, [...authorizer.dependencies, getAuthorizerTemplateFile()]];
     },
     getFunctionHash: () => {
+      const disabledProjects = getDisabledProjects(parameters.context, parameters.references);
+
       return hashObject({
         architecture,
         headersSchema,
@@ -51,7 +54,10 @@ export const createAuthorizerFunction = <E extends EntryState>(
         querySchema,
         preferences,
         scope,
-        debug
+        debug,
+        ...(disabledProjects.length > 0 && {
+          disabledProjects
+        })
       });
     }
   });

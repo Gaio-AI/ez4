@@ -28,3 +28,18 @@ export const prepareLinkedClient = (context: EventContext, service: HttpService 
     connectionIds: [gatewayId]
   };
 };
+
+export const prepareDisabledClient = (service: HttpImport): ContextSource => {
+  // Without a gateway there's no endpoint to depend on or to call.
+  const clientOptions = JSON.stringify({
+    operations: getClientOperations(service),
+    disabledProject: service.project
+  });
+
+  return {
+    module: 'HttpClient',
+    from: '@ez4/aws-gateway/client/http',
+    constructor: `@{EZ4_MODULE_IMPORT}.make('', ${clientOptions})`,
+    disabledProject: service.project
+  };
+};

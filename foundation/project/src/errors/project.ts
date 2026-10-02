@@ -10,6 +10,15 @@ export class MissingImportedProjectError extends Error {
   }
 }
 
+export class UnsupportedDisabledImportError extends Error {
+  constructor(
+    public serviceName: string,
+    public projectName: string
+  ) {
+    super(`Import ${serviceName} of ${projectName} can't be disabled, only Http.Import supports a disabled project reference.`);
+  }
+}
+
 export class MissingProjectFileError extends Error {
   constructor(public projectFile: string) {
     super(`Project file ${projectFile} wasn't found.`);
