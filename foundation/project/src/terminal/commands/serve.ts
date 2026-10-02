@@ -1,13 +1,17 @@
 import type { ServiceEmulators } from '../../emulator/service';
 import type { ServeOptions } from '../../types/options';
 import type { InputOptions } from '../options';
+import type { AddressInfo } from 'node:net';
 
 import { Logger, DynamicLogger, LogLevel } from '@ez4/logger';
 
 import { createServer } from 'node:http';
 
 import { warnUnsupportedFlags } from '../../utils/flags';
-import { getServiceAddress, getServicePort } from '../../utils/project';
+import { getProxyPort, getServeBind } from '../../utils/project';
+import { addRoute, removeRoute } from '../../proxy/routes';
+import { ensureProxy } from '../../proxy/daemon';
+import { toRouteHost } from './proxy';
 import { bootstrapServices, prepareServices, shutdownServices } from '../../emulator/utils/hooks';
 import { useLambdaTimezone } from '../../emulator/utils/timezone';
 import { getServiceEmulators } from '../../emulator/service';
@@ -94,8 +98,7 @@ export const serveCommand = async (input: InputOptions) => {
 
   const server = createServer();
 
-  const bindHost = getServiceAddress(project.serveOptions);
-  const bindPort = getServicePort(project.serveOptions);
+  const bind = getServeBind(project.serveOptions);
 
   server.on('request', (request, stream) => {
     return requestHandler(request, stream, emulators, options);
@@ -111,7 +114,21 @@ export const serveCommand = async (input: InputOptions) => {
     sourceWatcher.stop();
   });
 
-  server.listen(bindPort, bindHost, () => {
+  server.listen(bind.port, bind.host, async () => {
+    if (bind.register) {
+      const host = toRouteHost(options.serviceHost);
+      const { port } = server.address() as AddressInfo;
+
+      try {
+        await ensureProxy(getProxyPort(project.serveOptions?.proxy));
+      } catch (error) {
+        Logger.error((error as Error).message);
+      }
+
+      addRoute({ host, port, pid: process.pid });
+      process.once('exit', () => removeRoute(host));
+    }
+
     Logger.log(`🚀 Project [${project.projectName}] up and running`);
   });
 };
