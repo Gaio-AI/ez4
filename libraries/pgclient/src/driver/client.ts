@@ -74,7 +74,7 @@ export class ClientDriver implements PgClientDriver {
       }
 
       if (error instanceof DatabaseError && error.code === '23505') {
-        throw new DuplicateUniqueKeyError();
+        throw new DuplicateUniqueKeyError({ cause: error });
       }
 
       throw error;
