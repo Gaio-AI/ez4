@@ -21,7 +21,7 @@ const dynamoDbWaiter = {
   client: dynamoDbClient
 };
 
-export const acquireExclusiveLock = async (lockId: string) => {
+export const acquireExclusiveLock = async (lockId: string, ownerId: string) => {
   const tableName = await getLockTableName();
 
   const client = await ensureLockTableExists(tableName);
@@ -34,6 +34,7 @@ export const acquireExclusiveLock = async (lockId: string) => {
         Item: {
           created_at: new Date().toISOString(),
           user_name: userInfo().username,
+          owner_id: ownerId,
           lock_id: lockId
         }
       })
@@ -50,19 +51,34 @@ export const acquireExclusiveLock = async (lockId: string) => {
   }
 };
 
-export const releaseExclusiveLock = async (lockId: string) => {
+/**
+ * Removes the lock only while `ownerId` holds it, so a run never releases the lock of another one. A lock written
+ * without an owner is left to the version that wrote it, which releases it unconditionally.
+ */
+export const releaseExclusiveLock = async (lockId: string, ownerId: string) => {
   const tableName = await getLockTableName();
 
   const client = await ensureLockTableExists(tableName);
 
-  await client.send(
-    new DeleteCommand({
-      TableName: tableName,
-      Key: {
-        lock_id: lockId
-      }
-    })
-  );
+  try {
+    await client.send(
+      new DeleteCommand({
+        TableName: tableName,
+        ConditionExpression: 'owner_id = :owner_id',
+        ExpressionAttributeValues: {
+          ':owner_id': ownerId
+        },
+        Key: {
+          lock_id: lockId
+        }
+      })
+    );
+    //
+  } catch (error) {
+    if (!(error instanceof ConditionalCheckFailedException)) {
+      throw error;
+    }
+  }
 };
 
 const ensureLockTableExists = async (tableName: string) => {

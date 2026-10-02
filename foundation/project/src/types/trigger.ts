@@ -124,6 +124,11 @@ export type DeployEvent = {
 
 export type DeployLockEvent = {
   lockId: string;
+
+  /**
+   * Identifies the deploy run, which owns the lock it acquires: a release only removes a lock of the same owner.
+   */
+  ownerId: string;
 };
 
 export type StateEvent = {

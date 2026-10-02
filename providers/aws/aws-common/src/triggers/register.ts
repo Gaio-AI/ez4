@@ -29,7 +29,7 @@ const applyDeploy = async (event: DeployEvent) => {
 };
 
 const deployLock = async (event: DeployLockEvent) => {
-  const success = await acquireExclusiveLock(event.lockId);
+  const success = await acquireExclusiveLock(event.lockId, event.ownerId);
 
   if (!success) {
     throw new Error('Failed to acquire exclusive lock.');
@@ -37,7 +37,7 @@ const deployLock = async (event: DeployLockEvent) => {
 };
 
 const deployUnlock = async (event: DeployLockEvent) => {
-  await releaseExclusiveLock(event.lockId);
+  await releaseExclusiveLock(event.lockId, event.ownerId);
 };
 
 const loadState = async (event: StateEvent) => {
