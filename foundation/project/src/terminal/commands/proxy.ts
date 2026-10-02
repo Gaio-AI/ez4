@@ -28,7 +28,9 @@ export const proxyCommand = async (input: InputOptions) => {
     case undefined:
       return serveProxy();
     case 'run':
-      return input.detach ? runDetached(getRouteHost(name), input.arguments ?? []) : runAttached(getRouteHost(name), input.arguments ?? []);
+      return input.detach
+        ? runDetached(getRouteHost(name), getRunCommand(name, input))
+        : runAttached(getRouteHost(name), getRunCommand(name, input));
     case 'ls':
       return listProxyRoutes();
     case 'stop':
@@ -52,6 +54,14 @@ const getRouteHost = (name: string | undefined) => {
   }
 
   return host;
+};
+
+const getRunCommand = (name: string, input: InputOptions) => {
+  if (!input.arguments?.length) {
+    throw new Error(`Missing command, e.g. \`ez4 proxy run ${name} -- npm run serve\`.`);
+  }
+
+  return input.arguments;
 };
 
 const assertRouteFree = (host: string) => {
