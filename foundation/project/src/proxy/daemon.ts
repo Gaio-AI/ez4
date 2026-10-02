@@ -6,7 +6,7 @@ import { connect, createServer } from 'node:net';
 import { setTimeout } from 'node:timers/promises';
 import { join } from 'node:path';
 
-import { canBindPort, ensureForwarder, hasDocker, planProxyListen } from './port';
+import { ensureForwarder, planProxyListen, systemPortProbe } from './port';
 import { getProxyHome } from './routes';
 
 // Both bin/cli.mjs and bin/application.mjs bundle this module, so the CLI sits beside the running bundle.
@@ -67,11 +67,7 @@ const waitListening = async (port: number, timeout: number, logFile: string) => 
 };
 
 export const ensureProxy = async (port: number) => {
-  if (await isListening(port)) {
-    return;
-  }
-
-  const plan = await planProxyListen(port, { canBind: canBindPort, hasDocker });
+  const plan = await planProxyListen(port, systemPortProbe);
 
   if (plan.forwarder) {
     ensureForwarder(plan.listenPort);
