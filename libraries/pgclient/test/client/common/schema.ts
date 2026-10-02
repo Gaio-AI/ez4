@@ -48,7 +48,7 @@ export type TestSchemaType = {
   };
 };
 
-export const makeSchemaClient = async (debug?: boolean) => {
+export const makeSchemaClient = async (debug?: boolean, dataApi?: boolean) => {
   return Client.make<TestSchemaDb>({
     repository: TestSchemaRepository,
     debug,
@@ -56,7 +56,8 @@ export const makeSchemaClient = async (debug?: boolean) => {
       database: 'postgres',
       password: 'postgres',
       user: 'postgres',
-      host: '127.0.0.1'
+      host: '127.0.0.1',
+      dataApi
     }
   });
 };
