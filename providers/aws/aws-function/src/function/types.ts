@@ -1,6 +1,6 @@
 import type { EntryState, StepContext } from '@ez4/state';
 import type { LinkedVariables } from '@ez4/project/library';
-import type { Arn } from '@ez4/aws-common';
+import type { Arn, BundledPackage } from '@ez4/aws-common';
 import type { CreateRequest, CreateResponse } from './client';
 
 export const FunctionServiceName = 'AWS:Lambda/Function';
@@ -33,6 +33,8 @@ export type FunctionResult = CreateResponse & {
   sourceHash: string;
   bundleHash: string;
   filesHash?: string;
+  bundledPackages?: BundledPackage[];
+  packagesHash?: string;
   logGroup?: string;
   roleArn: Arn;
 };

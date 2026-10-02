@@ -11,6 +11,7 @@ export * from './errors/providers';
 export * from './errors/resource';
 
 export * from './common/bundler';
+export * from './common/packages';
 export * from './common/provider';
 export * from './common/logger';
 export * from './common/state';
