@@ -117,6 +117,8 @@ query: {
 
 > Query strings field names are affected by the `NamingStyle` preference.
 
+With the `strictQueryStrings` preference, an unknown query string fails the request with `400 Malformed query strings.` instead of being excluded, even on routes that declare no query strings. Names are compared in the `NamingStyle` of the route, and an extensible query type still accepts any name. Query strings read only by the route authorizer must also be declared in the route request.
+
 #### Body (optional)
 
 Typed request body payload.

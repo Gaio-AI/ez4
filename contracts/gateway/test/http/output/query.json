@@ -23,7 +23,7 @@
           "name": "testRouteA",
           "file": "test/http/input/output-query.ts",
           "position": [
-            26,
+            29,
             1
           ],
           "request": {
@@ -48,11 +48,14 @@
       },
       {
         "path": "GET /test-route-b",
+        "preferences": {
+          "strictQueryStrings": true
+        },
         "handler": {
           "name": "testRouteB",
           "file": "test/http/input/output-query.ts",
           "position": [
-            32,
+            35,
             1
           ],
           "request": {

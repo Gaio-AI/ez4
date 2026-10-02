@@ -6,7 +6,7 @@ import type { MatchingRoute } from '../../utils/route';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd, onTimeout } from '@ez4/local-common';
 import { getRandomUUID, pickObject } from '@ez4/utils';
-import { resolveValidation } from '@ez4/gateway/utils';
+import { assertQueryStrings, resolveValidation } from '@ez4/gateway/utils';
 import { Runtime } from '@ez4/common';
 
 import { getHttpErrorResponse, getHttpSuccessResponse, getTracedResponse } from '../../utils/http/response';
@@ -79,6 +79,9 @@ const handleHttpRequest = async (
   const invokeHandler = async () => {
     try {
       await onBegin(module, serviceClients, currentRequest);
+
+      // As the gateway runtime, a strict route checks the query strings even when its request declares none.
+      await assertQueryStrings(route.query ?? {}, handler.request?.query, route.preferences);
 
       if (handler.request) {
         Object.assign(currentRequest, await getIncomingRequestIdentity(handler.request, identity, onCustomValidation));
