@@ -2,7 +2,14 @@ import type { HttpRequest, WsEvent, WsRequest } from '@ez4/gateway/library';
 import type { ValidationCustomHandler } from '@ez4/validator';
 import type { Http, Ws } from '@ez4/gateway';
 
-import { resolveHeaders, resolveIdentity, resolvePathParameters, resolveQueryStrings, resolveRequestBody } from '@ez4/gateway/utils';
+import {
+  resolveHeaders,
+  resolveIdentity,
+  resolvePathParameters,
+  resolveQueryStrings,
+  parseRequestBody,
+  resolveRequestBody
+} from '@ez4/gateway/utils';
 import { isObjectSchema, isScalarSchema } from '@ez4/schema';
 
 export type IncomingRequest = {
@@ -93,7 +100,7 @@ export const getIncomingRequestBody = async (
     };
   }
 
-  const content = data && JSON.parse(data);
+  const content = parseRequestBody(data);
   const payload = await resolveRequestBody(content, body, preferences, onCustomValidation);
 
   return {

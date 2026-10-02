@@ -3,9 +3,32 @@ import type { AnySchema } from '@ez4/schema';
 import type { Http } from '../services/http/contract';
 
 import { createTransformContext, transform } from '@ez4/transform';
-import { validate, createValidatorContext, getErrorDetails } from '@ez4/validator';
+import { validate, createValidatorContext, getErrorDetails, ValidationError } from '@ez4/validator';
 import { isAnyArray, isAnyObject } from '@ez4/utils';
 import { HttpBadRequestError } from '@ez4/gateway';
+
+/**
+ * Parse the given raw request body as JSON.
+ *
+ * @param body Raw request body.
+ * @returns Returns the parsed body, or the given one when it's empty.
+ * @throws HttpBadRequestError when the body isn't valid JSON.
+ */
+export const parseRequestBody = (body: string | undefined) => {
+  if (!body) {
+    return body;
+  }
+
+  try {
+    return JSON.parse(body);
+    //
+  } catch (error) {
+    // The parser message quotes the payload, which is whatever the client sent, so it stays out of the answer and the logs.
+    throw new HttpBadRequestError('Malformed body payload.', {
+      details: getErrorDetails([new ValidationError('Valid JSON for [$body] is expected.', '$body', undefined, error as Error)])
+    });
+  }
+};
 
 export const resolveRequestBody = async <T extends Http.JsonBody | Http.RawBody>(
   input: T | undefined,

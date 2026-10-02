@@ -11,7 +11,14 @@ import type {
   Context
 } from 'aws-lambda';
 
-import { resolveIdentity, getJsonError, resolveRequestBody, resolveResponseBody, resolveValidation } from '@ez4/gateway/utils';
+import {
+  resolveIdentity,
+  getJsonError,
+  parseRequestBody,
+  resolveRequestBody,
+  resolveResponseBody,
+  resolveValidation
+} from '@ez4/gateway/utils';
 import { HttpError, HttpInternalServerError } from '@ez4/gateway';
 import { isObjectSchema, isScalarSchema } from '@ez4/schema';
 import { ServiceEventType, Runtime } from '@ez4/common';
@@ -111,17 +118,9 @@ const getIncomingRequestBody = (event: RequestEvent) => {
     return resolveRequestBody(body, __EZ4_BODY_SCHEMA, undefined, onCustomValidation);
   }
 
-  try {
-    const payload = body && JSON.parse(body);
-    return resolveRequestBody(payload, __EZ4_BODY_SCHEMA, __EZ4_PREFERENCES, onCustomValidation);
-    //
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      console.error({ body });
-    }
+  const payload = parseRequestBody(body);
 
-    throw error;
-  }
+  return resolveRequestBody(payload, __EZ4_BODY_SCHEMA, __EZ4_PREFERENCES, onCustomValidation);
 };
 
 const getOutgoingResponseBody = (body: Ws.JsonBody | Ws.RawBody) => {
