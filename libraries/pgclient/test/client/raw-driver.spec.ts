@@ -1,10 +1,12 @@
 import type { Database, Client as DbClient } from '@ez4/database';
 import type { PostgresEngine } from '@ez4/pgclient';
 
-import { deepEqual } from 'assert/strict';
+import { deepEqual, rejects } from 'assert/strict';
 import { describe, it } from 'node:test';
 
+import { DuplicateUniqueKeyError } from '@ez4/pgclient';
 import { Client } from '@ez4/pgclient/driver';
+import { DatabaseError } from 'pg';
 
 declare class TestDb extends Database.Service<PostgresEngine> {
   tables: [];
@@ -38,6 +40,14 @@ describe('client raw driver', () => {
     const result = await client.rawQuery('SELECT (:1 + :0 + :1 + :2)::int AS alive', [1, 2, 3]);
 
     deepEqual(result, [{ alive: 8 }]);
+  });
+
+  it('assert :: raw query (duplicate unique key)', async () => {
+    const query = 'CREATE TEMP TABLE ez4_test_duplicate (id int PRIMARY KEY); INSERT INTO ez4_test_duplicate VALUES (1), (1)';
+
+    await rejects(client.rawQuery(query), (error) => {
+      return error instanceof DuplicateUniqueKeyError && error.cause instanceof DatabaseError && error.cause.code === '23505';
+    });
   });
 
   it('assert :: transaction', async () => {
