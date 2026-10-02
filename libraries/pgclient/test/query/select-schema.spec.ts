@@ -251,9 +251,48 @@ describe('select schema', () => {
       }
     );
 
-    assert.equal(statement, `SELECT "foo" FROM "ez4-test-select-schema" ORDER BY "foo" DESC`);
+    assert.equal(statement, `SELECT "R0"."foo" FROM "ez4-test-select-schema" AS "R0" ORDER BY "R0"."foo" DESC`);
 
     assert.deepEqual(variables, []);
+  });
+
+  it('assert :: prepare select schema (with order on formatted field)', ({ assert }) => {
+    const [statement, variables] = prepareSelect(
+      {
+        type: SchemaType.Object,
+        properties: {
+          bar: {
+            type: SchemaType.Number
+          },
+          baz: {
+            type: SchemaType.String,
+            format: 'date-time'
+          }
+        }
+      },
+      {
+        select: {
+          baz: true
+        },
+        where: {
+          bar: 123
+        },
+        order: {
+          baz: Order.Desc
+        },
+        take: 1
+      }
+    );
+
+    assert.equal(
+      statement,
+      `SELECT to_char("R0"."baz", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "baz" FROM "ez4-test-select-schema" AS "R0" ` +
+        `WHERE "R0"."bar" = :0 ` +
+        `ORDER BY "R0"."baz" DESC ` +
+        `LIMIT 1`
+    );
+
+    assert.deepEqual(variables, [123]);
   });
 
   it('assert :: prepare select schema (with lock)', ({ assert }) => {
