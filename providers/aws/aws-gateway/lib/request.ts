@@ -12,6 +12,7 @@ import { ServiceEventType, Runtime, ServiceError } from '@ez4/common';
 import {
   resolveHeaders,
   resolvePathParameters,
+  assertQueryStrings,
   resolveQueryStrings,
   resolveIdentity,
   parseRequestBody,
@@ -101,7 +102,7 @@ const getIncomingRequest = async (event: RequestEvent) => {
   return {
     headers: __EZ4_HEADERS_SCHEMA ? await getIncomingRequestHeaders(event) : undefined,
     parameters: __EZ4_PARAMETERS_SCHEMA ? await getIncomingRequestParameters(event) : undefined,
-    query: __EZ4_QUERY_SCHEMA ? await getIncomingRequestQueryStrings(event) : undefined,
+    query: await getIncomingRequestQueryStrings(event),
     identity: __EZ4_IDENTITY_SCHEMA ? await getIncomingRequestIdentity(event) : undefined,
     body: __EZ4_BODY_SCHEMA ? await getIncomingRequestBody(event) : undefined
   };
@@ -123,9 +124,14 @@ const getIncomingRequestParameters = (event: RequestEvent) => {
   return undefined;
 };
 
-const getIncomingRequestQueryStrings = (event: RequestEvent) => {
+const getIncomingRequestQueryStrings = async (event: RequestEvent) => {
+  const queryStrings = event.queryStringParameters ?? {};
+
+  // A strict route checks the query strings even when its request declares none.
+  await assertQueryStrings(queryStrings, __EZ4_QUERY_SCHEMA, __EZ4_PREFERENCES);
+
   if (__EZ4_QUERY_SCHEMA) {
-    return resolveQueryStrings(event.queryStringParameters ?? {}, __EZ4_QUERY_SCHEMA, __EZ4_PREFERENCES, onCustomValidation);
+    return resolveQueryStrings(queryStrings, __EZ4_QUERY_SCHEMA, __EZ4_PREFERENCES, onCustomValidation);
   }
 
   return undefined;

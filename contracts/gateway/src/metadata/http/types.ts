@@ -45,6 +45,7 @@ export type HttpImport = ServiceMetadata & {
 
 export type HttpPreferences = {
   namingStyle?: NamingStyle;
+  strictQueryStrings?: boolean;
 };
 
 export type HttpAuthorization = {

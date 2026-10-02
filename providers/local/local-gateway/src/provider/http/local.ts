@@ -131,7 +131,8 @@ const buildHttpRoutes = (service: HttpService) => {
 
     httpRoutes[method][path] = {
       httpErrors: { ...defaultErrors, ...route.httpErrors },
-      preferences: route.preferences ?? defaultPreferences,
+      // As the deploy, each preference of the route takes the place of the default one, and the others stay.
+      preferences: { ...defaultPreferences, ...route.preferences },
       timeout: route.timeout ?? defaultTimeout,
       variables: route.variables,
       authorizer: route.authorizer,

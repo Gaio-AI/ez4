@@ -89,10 +89,17 @@ Defines handler‑specific preference options.
 ```ts
 preferences: {
   namingStyle: NamingStyle.SnakeCase;
+  strictQueryStrings: true;
 }
 ```
 
+- `namingStyle` sets the naming style of the query strings and payloads.
+- `strictQueryStrings` fails the request with `400 Malformed query strings.` when it has a query string the request doesn't declare, instead of dropping it.
+
 > Use the type helper `Http.UsePreferences` or `Ws.UsePreferences` to get typing suggestions.
+
+> [!WARNING]
+> `strictQueryStrings` is only supported by HTTP services.
 
 #### Log retention (optional)
 

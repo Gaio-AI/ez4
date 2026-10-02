@@ -9,6 +9,9 @@ export declare class TestService extends Http.Service {
     Http.UseRoute<{
       path: 'GET /test-route-b';
       handler: typeof testRouteB;
+      preferences: {
+        strictQueryStrings: true;
+      };
     }>
   ];
 }

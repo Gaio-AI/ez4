@@ -14,6 +14,9 @@ export declare class TestService extends Http.Service {
     timeout: 15;
     memory: 192;
     debug: true;
+    preferences: {
+      strictQueryStrings: true;
+    };
     httpErrors: {
       400: [CustomError];
     };

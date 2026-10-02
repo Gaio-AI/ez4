@@ -8,6 +8,7 @@ import {
   getObjectMembers,
   getModelMembers,
   getReferenceType,
+  getPropertyBoolean,
   getPropertyStringIn,
   hasHeritageType
 } from '@ez4/common/library';
@@ -84,6 +85,11 @@ const getTypeFromMembers = (parent: TypeModel, members: MemberType[], errorList:
           NamingStyle.SnakeCase,
           NamingStyle.KebabCase
         ]);
+        break;
+      }
+
+      case 'strictQueryStrings': {
+        preferences.strictQueryStrings = getPropertyBoolean(member);
         break;
       }
     }
