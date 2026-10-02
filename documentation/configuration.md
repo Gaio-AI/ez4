@@ -122,6 +122,23 @@ A disabled reference still provides its types, so the code importing them keeps 
 - Any other import of it (e.g. `Queue.Import` or `Topic.Import`) fails the deploy, as only `Http.Import` supports a disabled reference.
 - Switching the reference on or off redeploys the code of every function using its imports, so they get the right client.
 
+## Proxy host
+
+Projects served side by side (e.g. one per git worktree) can share the `ez4 proxy` instead of picking a port each:
+
+```js
+export default {
+  // ...
+  serveOptions: {
+    proxy: {
+      domain: 'acme'
+    }
+  }
+};
+```
+
+The project is then reached at `<project>.<branch>.<domain>.localhost`, where the branch comes from `--branch` or `branchName` and is left out when empty. The proxy listens on port `80` unless `proxy.port` or the `EZ4_PROXY_PORT` variable sets another one, which is then added to the host. Clients of imported services use the same host, so a reference with `proxy` is called through the proxy.
+
 ## Examples
 
 - [Storage manager](../examples/aws-storage-manager)
