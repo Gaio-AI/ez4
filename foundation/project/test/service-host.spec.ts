@@ -25,6 +25,18 @@ describe('service host', () => {
     equal(getServiceHost(project, 'two'), 'console.two.gaio.localhost');
   });
 
+  it('assert :: the namespace labels the host without a branch', () => {
+    const project = { projectName: 'console', serveOptions: { proxy: { domain: 'gaio', namespace: 'feat/x' } } };
+
+    equal(getServiceHost(project), 'console.feat-x.gaio.localhost');
+  });
+
+  it('assert :: the namespace wins over the branch', () => {
+    const project = { projectName: 'console', branchName: 'other', serveOptions: { proxy: { domain: 'gaio', namespace: 'wt' } } };
+
+    equal(getServiceHost(project), 'console.wt.gaio.localhost');
+  });
+
   it('assert :: a non-default proxy port is kept', () => {
     process.env.EZ4_PROXY_PORT = '1355';
 

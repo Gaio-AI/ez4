@@ -224,6 +224,11 @@ export type ProjectProxyOptions = {
   domain: string;
 
   /**
+   * Label used in the host instead of the branch name; does not affect resource names.
+   */
+  namespace?: string;
+
+  /**
    * Proxy port, overridden by `EZ4_PROXY_PORT`.
    * Default is: `80`
    */

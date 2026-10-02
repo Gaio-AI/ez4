@@ -31,8 +31,8 @@ export const getServiceHost = (project: Pick<ProjectOptions, 'projectName' | 'br
     return `${serveOptions?.localHost ?? 'localhost'}:${getServicePort(serveOptions)}`;
   }
 
-  const branchName = getServiceBranch(branch ?? project.branchName);
-  const labels = [toKebabCase(project.projectName), branchName, toKebabCase(serveOptions.proxy.domain), 'localhost'];
+  const hostLabel = getServiceBranch(serveOptions.proxy.namespace ?? branch ?? project.branchName);
+  const labels = [toKebabCase(project.projectName), hostLabel, toKebabCase(serveOptions.proxy.domain), 'localhost'];
   const hostname = labels.filter(Boolean).join('.');
   const port = getProxyPort(serveOptions.proxy);
 

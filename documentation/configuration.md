@@ -132,13 +132,16 @@ export default {
   serveOptions: {
     proxy: {
       domain: 'acme', // Required: label added before `.localhost`
-      port: 80 // Optional: proxy port (default `80`)
+      port: 80, // Optional: proxy port (default `80`)
+      namespace: 'feat-1' // Optional: host label used instead of the branch
     }
   }
 };
 ```
 
 The project is then reached at `<project>.<branch>.<domain>.localhost`, where the branch comes from `--branch` or `branchName` and is left out when empty. The proxy listens on port `80` unless `EZ4_PROXY_PORT` or `proxy.port` (in that order) sets another one, which is then added to the host (`<project>.<branch>.<domain>.localhost:1355`). Clients of imported services use the same host, so a reference with `proxy` is called through the proxy. Without `proxy`, `serve` keeps `localHost` and `localPort`.
+
+`proxy.namespace` replaces the branch in the host (`<project>.<namespace>.<domain>.localhost`), sanitized like a branch, and wins over `--branch` and `branchName`. It only changes the host, not resource names, so a worktree can serve against the remote resources of an environment without a branch and still get its own host.
 
 With `proxy`, `ez4 serve` binds a free port on `127.0.0.1` (or `PORT` when set), starts the proxy when needed and registers its host; the route is removed when `serve` exits. Under `ez4 proxy run`, `serve` uses the given `PORT` and leaves the route to `proxy run`.
 
