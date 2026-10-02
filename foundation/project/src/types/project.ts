@@ -210,6 +210,24 @@ export type ProjectServeOptions = {
    * Variables a handler may read in strict mode without declaring them.
    */
   allowedVariables?: string[];
+
+  /**
+   * Serve behind the shared `ez4 proxy` with a stable `<project>.<branch>.<domain>.localhost` host.
+   */
+  proxy?: ProjectProxyOptions;
+};
+
+export type ProjectProxyOptions = {
+  /**
+   * Domain label shared by every project of the workspace.
+   */
+  domain: string;
+
+  /**
+   * Proxy port, overridden by `EZ4_PROXY_PORT`.
+   * Default is: `80`
+   */
+  port?: number;
 };
 
 export type ProjectWatchOptions = {
