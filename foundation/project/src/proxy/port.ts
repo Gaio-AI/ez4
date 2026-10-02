@@ -13,6 +13,7 @@ export type ProxyListenPlan = {
 export type BindResult = 'ok' | 'EACCES' | 'EADDRINUSE';
 
 export type ProxyPortProbe = {
+  platform: NodeJS.Platform;
   canBind(port: number): Promise<BindResult>;
   hasDocker(): boolean;
   isForwarderRunning(): boolean;
@@ -21,9 +22,13 @@ export type ProxyPortProbe = {
 
 const PORT_80_HELP = 'Port 80 needs permission. Run `ez4 proxy setup` once (sudo), install Docker, or set EZ4_PROXY_PORT=1355.';
 
+const PORT_80_ROOT_ONLY = 'Port 80 needs root on this OS for a loopback-only proxy. Set EZ4_PROXY_PORT=1355 (URLs will carry :1355).';
+
 const PORT_80_TAKEN = 'Port 80 is used by another server. Stop it or set EZ4_PROXY_PORT=1355.';
 
-// Binding 80 is tried before Docker: macOS, Windows and Linux with the sysctl or capability need no container.
+// Binding 80 is tried before Docker: Linux with the sysctl or capability needs no container.
+// Elsewhere the loopback bind needs root (macOS only frees 80 on the wildcard address) and Docker Desktop's
+// host network does not reach host loopback, so no forwarder can help.
 export const planProxyListen = async (port: number, probe: ProxyPortProbe): Promise<ProxyListenPlan> => {
   if (port !== 80) {
     return { listenPort: port, forwarder: false };
@@ -45,6 +50,10 @@ export const planProxyListen = async (port: number, probe: ProxyPortProbe): Prom
     }
 
     throw new Error(PORT_80_TAKEN);
+  }
+
+  if (probe.platform !== 'linux') {
+    throw new Error(PORT_80_ROOT_ONLY);
   }
 
   if (probe.hasDocker()) {
@@ -107,7 +116,13 @@ const getForwarderState = () => {
 
 export const isForwarderRunning = () => getForwarderState().stdout?.trim() === 'true';
 
-export const systemPortProbe: ProxyPortProbe = { canBind: canBindPort, hasDocker, isForwarderRunning, isOwnProxy };
+export const systemPortProbe: ProxyPortProbe = {
+  platform: process.platform,
+  canBind: canBindPort,
+  hasDocker,
+  isForwarderRunning,
+  isOwnProxy
+};
 
 export const ensureForwarder = (internalPort: number) => {
   const state = getForwarderState();

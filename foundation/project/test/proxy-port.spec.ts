@@ -12,7 +12,11 @@ import { once } from 'node:events';
 import { canBindPort, getForwarderArgs, isOwnProxy, planProxyListen } from '../src/proxy/port';
 import { createProxyServer } from '../src/proxy/server';
 
-const probe = (bind: BindResult, options: { docker?: boolean; forwarder?: boolean; ownProxy?: boolean } = {}) => ({
+const probe = (
+  bind: BindResult,
+  options: { docker?: boolean; forwarder?: boolean; ownProxy?: boolean; platform?: NodeJS.Platform } = {}
+) => ({
+  platform: options.platform ?? 'linux',
   canBind: async () => bind,
   hasDocker: () => !!options.docker,
   isForwarderRunning: () => !!options.forwarder,
@@ -36,6 +40,13 @@ describe('proxy port', () => {
 
   it('assert :: port 80 falls back to the docker forwarder', async () => {
     deepEqual(await planProxyListen(80, probe('EACCES', { docker: true })), { listenPort: 1355, forwarder: true });
+  });
+
+  it('assert :: port 80 without permission outside linux asks for another port instead of docker', async () => {
+    await rejects(
+      planProxyListen(80, probe('EACCES', { docker: true, platform: 'darwin' })),
+      /EZ4_PROXY_PORT=1355 \(URLs will carry :1355\)/
+    );
   });
 
   it('assert :: port 80 without permission nor docker points to setup', async () => {
