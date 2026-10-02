@@ -216,6 +216,7 @@ const getDefaultErrorResponse = (error?: HttpError) => {
     statusCode: response.status,
     body: JSON.stringify(response.body),
     headers: {
+      ...response.headers,
       ['content-type']: 'application/json',
       ...(scope && {
         ['x-trace-id']: scope.traceId

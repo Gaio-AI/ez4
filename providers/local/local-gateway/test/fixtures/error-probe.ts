@@ -1,4 +1,4 @@
-import { HttpConflictError } from '@ez4/gateway';
+import { HttpConflictError, HttpTooManyRequestsError } from '@ez4/gateway';
 import { ServiceError } from '@ez4/common';
 
 export class OrderLockedError extends ServiceError {}
@@ -24,6 +24,18 @@ export const failWithoutError = () => {
 
 export const failWithHttpError = () => {
   throw new HttpConflictError('Order exists.', { orderId: 'order-1' });
+};
+
+export const failWithRateLimit = () => {
+  throw new HttpTooManyRequestsError('Slow down.', undefined, { 'retry-after': '30' });
+};
+
+export const failWithReservedHeaders = () => {
+  throw new HttpTooManyRequestsError('Slow down.', undefined, {
+    'retry-after': '30',
+    'content-type': 'text/plain',
+    'X-Trace-Id': 'forged'
+  });
 };
 
 export const failWithServiceError = () => {

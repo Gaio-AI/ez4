@@ -1,4 +1,5 @@
 import type { ServiceErrorContext } from '@ez4/common';
+import type { HttpErrorHeaders } from '@ez4/gateway';
 
 import {
   HttpBadRequestError,
@@ -8,23 +9,35 @@ import {
   HttpConflictError,
   HttpUnsupportedMediaTypeError,
   HttpUnprocessableEntityError,
+  HttpTooManyRequestsError,
   HttpError
 } from '@ez4/gateway';
+
+// The gateway sets them for every error response: the body is always JSON, and the trace id is the request's.
+const RESERVED_HEADERS = new Set(['content-type', 'x-trace-id']);
 
 /**
  * Get a JSON error response for the given HTTP error.
  *
- * @returns Returns an error response containing `status`, `message` and `details`.
+ * @returns Returns an error response containing `status`, the error `headers` (when it has any)
+ * and a body with `message` and `context`.
  */
-export const getJsonError = ({ status, message, context }: HttpError) => {
+export const getJsonError = ({ status, message, context, headers }: HttpError) => {
   return {
     status,
+    ...(headers && {
+      headers: getErrorHeaders(headers)
+    }),
     body: {
       type: 'error',
       message,
       context
     }
   };
+};
+
+const getErrorHeaders = (headers: HttpErrorHeaders) => {
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !RESERVED_HEADERS.has(name.toLowerCase())));
 };
 
 /**
@@ -57,6 +70,9 @@ export const getHttpException = (status: number, message: string, context?: Serv
 
     case 422:
       return new HttpUnprocessableEntityError(message, context);
+
+    case 429:
+      return new HttpTooManyRequestsError(message, context);
 
     default:
       return new HttpError(status, message, context);
