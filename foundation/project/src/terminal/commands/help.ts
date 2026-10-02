@@ -21,6 +21,7 @@ const HELP_LINES = [
   '  run       Execute script files for the given project',
   '  serve     Emulate all resources for the given project',
   '  test      Run test suites for the given project',
+  '  proxy     Route <name>.localhost to local processes (run, ls, stop, setup)',
   '  help      Display the command line options',
   '',
   LogFormat.toBold('Options:'),
@@ -36,6 +37,7 @@ const HELP_LINES = [
   '  --force            Force deployment or destruction of resources',
   '  --plan             Show the deployment or destruction plan and exit without applying it (exit code 2 when it has changes)',
   '  --local            Use local options when serving or testing',
+  '  --detach, -d       Run in background when using proxy run',
   ''
 ];
 

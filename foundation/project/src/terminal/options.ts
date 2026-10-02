@@ -6,6 +6,7 @@ export const enum CommandType {
   Run = 'run',
   Serve = 'serve',
   Test = 'test',
+  Proxy = 'proxy',
   Help = 'help'
 }
 
@@ -23,6 +24,8 @@ export type InputOptions = {
   debug?: boolean;
   reset?: boolean;
   local?: boolean;
+  detach?: boolean;
+  positionals?: string[];
 };
 
 export const getInputOptions = () => {
@@ -32,6 +35,11 @@ export const getInputOptions = () => {
   for (let index = 0; index < input.length; index++) {
     const argument = input[index];
 
+    if (options.command === CommandType.Proxy && !argument.startsWith('-')) {
+      options.positionals = [...(options.positionals ?? []), argument];
+      continue;
+    }
+
     switch (argument) {
       case CommandType.Deploy:
       case CommandType.Destroy:
@@ -40,6 +48,7 @@ export const getInputOptions = () => {
       case CommandType.Run:
       case CommandType.Serve:
       case CommandType.Test:
+      case CommandType.Proxy:
       case CommandType.Help:
         options.command = argument;
         break;
@@ -91,8 +100,14 @@ export const getInputOptions = () => {
         options.local = true;
         break;
 
+      case '-d':
+      case '--detach':
+        options.detach = true;
+        break;
+
       case '--':
-        options.arguments = input.slice(++index);
+        options.arguments = input.slice(index + 1);
+        index = input.length;
         break;
     }
   }
