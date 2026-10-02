@@ -55,6 +55,7 @@ Typed request body payload.
 - Automatically parsed into the declared types.
 - Supports JSON objects and raw string payloads.
 - Shape is determined by the declared request type.
+- A JSON message that doesn't parse is answered with the `Malformed body payload.` error, as one that doesn't match the type.
 
 JSON payload (preferred):
 

@@ -14,6 +14,7 @@ import {
   resolvePathParameters,
   resolveQueryStrings,
   resolveIdentity,
+  parseRequestBody,
   resolveRequestBody,
   resolveValidation,
   resolveResponseBody,
@@ -151,17 +152,9 @@ const getIncomingRequestBody = (event: RequestEvent) => {
     return resolveRequestBody(body, __EZ4_BODY_SCHEMA, undefined, onCustomValidation);
   }
 
-  try {
-    const payload = body && JSON.parse(body);
-    return resolveRequestBody(payload, __EZ4_BODY_SCHEMA, __EZ4_PREFERENCES, onCustomValidation);
-    //
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      console.error({ body });
-    }
+  const payload = parseRequestBody(body);
 
-    throw error;
-  }
+  return resolveRequestBody(payload, __EZ4_BODY_SCHEMA, __EZ4_PREFERENCES, onCustomValidation);
 };
 
 const getOutgoingResponseBody = (body: Http.JsonBody | Http.RawBody, headers?: AnyObject) => {
