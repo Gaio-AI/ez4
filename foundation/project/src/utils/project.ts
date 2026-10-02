@@ -16,6 +16,14 @@ export const getProxyPort = (proxy?: ProjectProxyOptions) => {
   return Number(process.env.EZ4_PROXY_PORT) || proxy?.port || 80;
 };
 
+export const getServeBind = (options?: ProjectServeOptions, env = process.env) => {
+  if (!options?.proxy) {
+    return { host: getServiceAddress(options), port: getServicePort(options), register: false };
+  }
+
+  return { host: '127.0.0.1', port: Number(env.PORT ?? 0), register: !env.EZ4_PROXY_ROUTE };
+};
+
 export const getServiceHost = (project: Pick<ProjectOptions, 'projectName' | 'branchName' | 'serveOptions'>, branch?: string) => {
   const { serveOptions } = project;
 
