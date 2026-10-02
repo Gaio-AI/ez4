@@ -126,7 +126,7 @@ export const serveCommand = async (input: InputOptions) => {
       }
 
       addRoute({ host, port, pid: process.pid });
-      process.once('exit', () => removeRoute(host));
+      process.once('exit', () => removeRoute(host, process.pid));
     }
 
     Logger.log(`🚀 Project [${project.projectName}] up and running`);
