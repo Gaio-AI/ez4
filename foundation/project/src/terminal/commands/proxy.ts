@@ -3,10 +3,11 @@ import type { InputOptions } from '../options';
 import { Logger } from '@ez4/logger';
 
 import { spawn } from 'node:child_process';
+import { closeSync } from 'node:fs';
 
 import { ensureForwarder, planProxyListen, setupUnprivilegedPort, systemPortProbe } from '../../proxy/port';
 import { ensureProxy, getCliPath, getFreePort, openLogFile } from '../../proxy/daemon';
-import { addRoute, findRoute, listRoutes, removeRoute } from '../../proxy/routes';
+import { addRoute, findRoute, isRouteHost, listRoutes, removeRoute } from '../../proxy/routes';
 import { createProxyServer } from '../../proxy/server';
 import { getProxyPort } from '../../utils/project';
 
@@ -27,24 +28,39 @@ export const proxyCommand = async (input: InputOptions) => {
     case undefined:
       return serveProxy();
     case 'run':
-      return input.detach ? runDetached(getRouteName(name), input.arguments ?? []) : runAttached(getRouteName(name), input.arguments ?? []);
+      return input.detach ? runDetached(getRouteHost(name), input.arguments ?? []) : runAttached(getRouteHost(name), input.arguments ?? []);
     case 'ls':
       return listProxyRoutes();
     case 'stop':
-      return stopProxyRoute(getRouteName(name));
+      return stopProxyRoute(getRouteHost(name));
     case 'setup':
-      process.exit(setupUnprivilegedPort());
+      return setupProxyPort();
   }
 
   throw new Error(`Unknown proxy action: ${action}. Use run, ls, stop or setup.`);
 };
 
-const getRouteName = (name: string | undefined) => {
+const getRouteHost = (name: string | undefined) => {
   if (!name) {
     throw new Error('Missing route name, e.g. `ez4 proxy run console.wt -- npm run serve`.');
   }
 
-  return name;
+  const host = toRouteHost(name);
+
+  if (!isRouteHost(host)) {
+    throw new Error(`Invalid route name: ${name}. Use letters, digits, dashes and dots.`);
+  }
+
+  return host;
+};
+
+const setupProxyPort = () => {
+  if (process.platform !== 'linux') {
+    Logger.log('ez4 proxy setup is only needed on Linux, port 80 is already available here.');
+    return;
+  }
+
+  process.exit(setupUnprivilegedPort());
 };
 
 const getListenPort = async () => {
@@ -93,27 +109,20 @@ const listenLoopback = (port: number, host: string, onListening: () => void) => 
   server.listen(port, host, onListening);
 };
 
-const runAttached = async (name: string, command: string[]) => {
-  const host = toRouteHost(name);
-
+const runAttached = async (host: string, command: string[]) => {
   await ensureProxy(getProxyPort());
 
   const port = await getFreePort();
 
   addRoute({ host, port, pid: process.pid });
 
-  // A process group of its own lets signals reach the whole chain (npm → sh → node).
+  // The child stays in the foreground process group so it keeps the terminal (no SIGTTIN on stdin reads).
   const child = spawn(command[0], command.slice(1), {
     stdio: 'inherit',
-    detached: true,
-    env: { ...process.env, PORT: `${port}`, HOST: '127.0.0.1', EZ4_PROXY_ROUTE: host }
+    env: { ...process.env, PORT: `${port}`, HOST: '127.0.0.1', EZ4_PROXY_ROUTE: host, EZ4_PROXY_GROUP_LEADER: undefined }
   });
 
-  const forward = (signal: NodeJS.Signals) => {
-    try {
-      process.kill(-child.pid!, signal);
-    } catch {}
-  };
+  const forward = process.env.EZ4_PROXY_GROUP_LEADER ? forwardToGroup : (signal: NodeJS.Signals) => child.kill(signal);
 
   process.on('SIGINT', forward);
   process.on('SIGTERM', forward);
@@ -130,14 +139,29 @@ const runAttached = async (name: string, command: string[]) => {
   });
 };
 
-const runDetached = (name: string, command: string[]) => {
-  const host = toRouteHost(name);
+let isForwardingToGroup = false;
+
+// The background wrapper leads its own process group, so the signal reaches shells that do not forward it.
+// It is delivered back to the wrapper too, which then keeps running until the child exits.
+const forwardToGroup = (signal: NodeJS.Signals) => {
+  if (!isForwardingToGroup) {
+    isForwardingToGroup = true;
+    process.kill(-process.pid, signal);
+  }
+};
+
+const runDetached = async (host: string, command: string[]) => {
+  await ensureProxy(getProxyPort());
+
   const { logFile, fd } = openLogFile(host);
 
-  spawn(process.execPath, [getCliPath(), 'proxy', 'run', name, '--', ...command], {
+  spawn(process.execPath, [getCliPath(), 'proxy', 'run', host, '--', ...command], {
     detached: true,
-    stdio: ['ignore', fd, fd]
+    stdio: ['ignore', fd, fd],
+    env: { ...process.env, EZ4_PROXY_GROUP_LEADER: '1' }
   }).unref();
+
+  closeSync(fd);
 
   Logger.log(getRouteUrl(host));
   Logger.log(`Logs: ${logFile}`);
@@ -149,8 +173,7 @@ const listProxyRoutes = () => {
   }
 };
 
-const stopProxyRoute = (name: string) => {
-  const host = toRouteHost(name);
+const stopProxyRoute = (host: string) => {
   const route = findRoute(host);
 
   if (!route) {

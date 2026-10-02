@@ -121,12 +121,11 @@ export const serveCommand = async (input: InputOptions) => {
 
       try {
         await ensureProxy(getProxyPort(project.serveOptions?.proxy));
+        addRoute({ host, port, pid: process.pid });
+        process.once('exit', () => removeRoute(host, process.pid));
       } catch (error) {
-        Logger.error((error as Error).message);
+        Logger.error(`Not reachable at http://${options.serviceHost}: ${(error as Error).message}`);
       }
-
-      addRoute({ host, port, pid: process.pid });
-      process.once('exit', () => removeRoute(host, process.pid));
     }
 
     Logger.log(`🚀 Project [${project.projectName}] up and running`);
