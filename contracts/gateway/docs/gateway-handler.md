@@ -50,6 +50,14 @@ Exceptions are automatically captured:
 - Exceptions mapped in `httpErrors` use the mapped status code.
 - All other errors become internal server errors.
 
+An `HttpError` can also carry response headers, which the error response includes, except `content-type` and `x-trace-id`, which the gateway sets:
+
+```ts
+throw new HttpTooManyRequestsError('Rate limit exceeded.', undefined, {
+  'retry-after': '30'
+});
+```
+
 #### HTTP Documentation
 
 The handler JSDoc documents the route operation in the generated OpenAPI specification (see [docs-gateway](../../../providers/docs/docs-gateway/)):

@@ -9,6 +9,7 @@ import {
   HttpError,
   HttpForbiddenError,
   HttpNotFoundError,
+  HttpTooManyRequestsError,
   HttpUnauthorizedError,
   HttpUnprocessableEntityError,
   HttpUnsupportedMediaTypeError
@@ -92,6 +93,17 @@ describe('http error utils', () => {
     deepEqual(error.context, { reason: 'test' });
   });
 
+  it('assert :: map too many requests', () => {
+    const error = getHttpException(429, 'Too many requests', { reason: 'test' });
+
+    ok(error instanceof HttpTooManyRequestsError);
+
+    equal(error.status, 429);
+    equal(error.message, 'Too many requests');
+
+    deepEqual(error.context, { reason: 'test' });
+  });
+
   it('assert :: map unsupported status', () => {
     const error = getHttpException(500, 'Internal server error', { reason: 'test' });
 
@@ -115,6 +127,38 @@ describe('http error utils', () => {
         context: {
           reason: 'test'
         }
+      }
+    });
+  });
+
+  it('assert :: error with headers', () => {
+    const error = new HttpError(429, 'Too many requests', undefined, { 'retry-after': '30' });
+
+    deepEqual(error.headers, { 'retry-after': '30' });
+
+    deepEqual(new HttpTooManyRequestsError(undefined, undefined, { 'retry-after': '30' }).headers, { 'retry-after': '30' });
+    deepEqual(new HttpBadRequestError('Bad request', { reason: 'test' }, { 'x-reason': 'test' }).headers, { 'x-reason': 'test' });
+
+    equal(new HttpTooManyRequestsError().message, 'Too many requests');
+    equal(new HttpTooManyRequestsError().headers, undefined);
+  });
+
+  it('assert :: format error (with headers)', () => {
+    const error = new HttpTooManyRequestsError('Slow down.', undefined, {
+      'retry-after': '30',
+      'Content-Type': 'text/plain',
+      'X-Trace-Id': 'forged'
+    });
+
+    deepEqual(getJsonError(error), {
+      status: 429,
+      headers: {
+        'retry-after': '30'
+      },
+      body: {
+        type: 'error',
+        message: 'Slow down.',
+        context: undefined
       }
     });
   });

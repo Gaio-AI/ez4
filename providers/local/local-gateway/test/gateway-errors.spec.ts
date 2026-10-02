@@ -38,6 +38,8 @@ const errorService = {
     getRoute('GET /unexpected', 'failUnexpectedly'),
     getRoute('GET /non-error', 'failWithoutError'),
     getRoute('GET /http-error', 'failWithHttpError'),
+    getRoute('GET /rate-limit', 'failWithRateLimit'),
+    getRoute('GET /reserved-headers', 'failWithReservedHeaders'),
     getRoute('GET /service-error', 'failWithServiceError', { OrderLockedError: 423 }),
     getRoute('GET /mapped-error', 'failWithMappedError')
   ]
@@ -118,6 +120,37 @@ describe('local gateway errors', () => {
         }
       })
     );
+  });
+
+  it('assert :: http error answers its headers', async (t) => {
+    t.mock.method(Logger, 'error', () => {});
+
+    const response = await sendRequest('/rate-limit', 'trace-rate-limit');
+
+    deepEqual(response, {
+      status: 429,
+      body: JSON.stringify({
+        type: 'error',
+        message: 'Slow down.'
+      }),
+      headers: {
+        ['retry-after']: '30',
+        ['content-type']: 'application/json',
+        ['x-trace-id']: 'trace-rate-limit'
+      }
+    });
+  });
+
+  it('assert :: http error headers keep the content type and trace id', async (t) => {
+    t.mock.method(Logger, 'error', () => {});
+
+    const response = await sendRequest('/reserved-headers', 'trace-reserved-headers');
+
+    deepEqual(response.headers, {
+      ['retry-after']: '30',
+      ['content-type']: 'application/json',
+      ['x-trace-id']: 'trace-reserved-headers'
+    });
   });
 
   it('assert :: mapped service error answers its context', async (t) => {

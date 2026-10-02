@@ -63,9 +63,17 @@ export const getTracedResponse = <T extends EmulatorResponse>(response: T): T =>
 };
 
 const getJsonErrorResponse = (error: HttpError) => {
-  const { status, body } = getJsonError(error);
+  const { status, headers, body } = getJsonError(error);
 
-  return getErrorResponse(status, body);
+  const response = getErrorResponse(status, body);
+
+  return {
+    ...response,
+    headers: {
+      ...headers,
+      ...response.headers
+    }
+  };
 };
 
 const getMappedErrorData = (error: Error, errorsMap: HttpErrors) => {
