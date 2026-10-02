@@ -120,6 +120,22 @@ access: Http.UseAccess<{
 }>;
 ```
 
+#### Throttling (optional)
+
+Defines a request ceiling shared by all routes of the service.
+
+- `rateLimit` is the steady-state number of requests per second; `burstLimit` is how many requests are accepted at once on top of it.
+- Both must be positive integers.
+- Requests over the limit are answered with `429 Too Many Requests` without reaching the handlers.
+- Removing the field takes the service's own limit away again; the provider's account-wide limits keep applying.
+
+```ts
+throttling: Http.UseThrottling<{
+  rateLimit: 100;
+  burstLimit: 50;
+}>;
+```
+
 #### Services (optional)
 
 Declares service bindings available to all handlers using the HTTP service as its context provider.

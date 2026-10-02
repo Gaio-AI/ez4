@@ -33,6 +33,7 @@ describe('http metadata', () => {
   it('assert :: service cache', () => testFile('cache'));
   it('assert :: service access', () => testFile('access'));
   it('assert :: service cors', () => testFile('cors'));
+  it('assert :: service throttling', () => testFile('throttling'));
   it('assert :: route authorizers', () => testFile('authorizer'));
   it('assert :: route listener', () => testFile('listener'));
   it('assert :: route provider', () => testFile('provider'));

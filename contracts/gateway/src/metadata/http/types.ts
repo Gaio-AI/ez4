@@ -28,6 +28,7 @@ export type HttpService = Omit<ServiceMetadata, 'variables' | 'services'> &
     cache?: HttpCache;
     access?: HttpAccess;
     cors?: HttpCors;
+    throttling?: HttpThrottling;
   };
 
 export type HttpImport = ServiceMetadata & {
@@ -109,6 +110,11 @@ export type HttpCache = {
 
 export type HttpAccess = {
   logRetention: number;
+};
+
+export type HttpThrottling = {
+  rateLimit: number;
+  burstLimit: number;
 };
 
 export type HttpCors = {
