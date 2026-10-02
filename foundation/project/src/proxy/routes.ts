@@ -80,6 +80,7 @@ export const findRoute = (host: string, home = getProxyHome()) => {
 
   return route;
 };
+
 export const listRoutes = (home = getProxyHome()) => {
   let hosts: string[];
 

@@ -143,14 +143,14 @@ The project is then reached at `<project>.<branch>.<domain>.localhost`, where th
 
 `ez4 serve` with `proxy` registers itself on the proxy and starts it when needed. Other local servers (e.g. a Vite app) can be put behind it with `ez4 proxy`:
 
-| Command | Effect |
-| --- | --- |
-| `ez4 proxy run <name> -- <command>` | Runs `<command>` with `PORT` (a free port) and `HOST=127.0.0.1` and serves it at `http://<name>.localhost`. The route is removed when the command exits. |
-| `ez4 proxy run -d <name> -- <command>` | Same, in the background; its output goes to `~/.ez4/logs/<name>.localhost.log`. |
-| `ez4 proxy ls` | Lists the running routes. |
-| `ez4 proxy stop <name>` | Stops the process behind a route. |
-| `ez4 proxy setup` | Linux only: lets unprivileged processes bind port 80 (see below). |
-| `ez4 proxy` | Starts the proxy in the foreground. |
+| Command                                | Effect                                                                                                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ez4 proxy run <name> -- <command>`    | Runs `<command>` with `PORT` (a free port) and `HOST=127.0.0.1` and serves it at `http://<name>.localhost`. The route is removed when the command exits. |
+| `ez4 proxy run -d <name> -- <command>` | Same, in the background; its output goes to `~/.ez4/logs/<name>.localhost.log`.                                                                          |
+| `ez4 proxy ls`                         | Lists the running routes.                                                                                                                                |
+| `ez4 proxy stop <name>`                | Stops the process behind a route.                                                                                                                        |
+| `ez4 proxy setup`                      | Linux only: lets unprivileged processes bind port 80 (see below).                                                                                        |
+| `ez4 proxy`                            | Starts the proxy in the foreground.                                                                                                                      |
 
 The proxy and every process behind it listen on `127.0.0.1` and `::1` only. Routes are files under `~/.ez4/proxy/routes`.
 
