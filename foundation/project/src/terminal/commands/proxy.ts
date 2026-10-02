@@ -11,7 +11,7 @@ import { createProxyServer } from '../../proxy/server';
 import { getProxyPort } from '../../utils/project';
 
 export const toRouteHost = (name: string) => {
-  const hostname = name.split(':')[0];
+  const hostname = name.split(':')[0].toLowerCase();
   return hostname.endsWith('.localhost') ? hostname : `${hostname}.localhost`;
 };
 
@@ -82,13 +82,13 @@ const runAttached = async (name: string, command: string[]) => {
   process.on('SIGTERM', forward);
 
   child.on('error', (error) => {
-    removeRoute(host);
+    removeRoute(host, process.pid);
     Logger.error(error.message);
     process.exit(1);
   });
 
   child.on('exit', (code) => {
-    removeRoute(host);
+    removeRoute(host, process.pid);
     process.exit(code ?? 1);
   });
 };
@@ -121,5 +121,5 @@ const stopProxyRoute = (name: string) => {
   }
 
   process.kill(route.pid, 'SIGTERM');
-  removeRoute(host);
+  removeRoute(host, route.pid);
 };

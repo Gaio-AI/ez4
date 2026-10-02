@@ -14,6 +14,9 @@ export const getProxyHome = () => {
 
 const getRoutesPath = (home: string) => join(home, 'routes');
 
+// Hosts come from the untrusted Host header and name files, so only plain hostnames may touch the disk.
+export const isRouteHost = (host: string) => /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(host);
+
 const isAlive = (pid: number) => {
   try {
     process.kill(pid, 0);
@@ -25,19 +28,23 @@ const isAlive = (pid: number) => {
 };
 
 export const addRoute = (route: ProxyRoute, home = getProxyHome()) => {
+  if (!isRouteHost(route.host)) {
+    throw new Error(`Invalid route host: ${route.host}`);
+  }
+
   const routesPath = getRoutesPath(home);
   const temporaryFile = join(routesPath, `.${route.host}.${process.pid}`);
 
-  mkdirSync(routesPath, { recursive: true });
+  mkdirSync(routesPath, { recursive: true, mode: 0o700 });
   writeFileSync(temporaryFile, `${route.port} ${route.pid}`);
   renameSync(temporaryFile, join(routesPath, route.host));
 };
 
-export const removeRoute = (host: string, home = getProxyHome()) => {
-  rmSync(join(getRoutesPath(home), host), { force: true });
-};
+const readRoute = (host: string, home: string): ProxyRoute | undefined => {
+  if (!isRouteHost(host)) {
+    return undefined;
+  }
 
-export const findRoute = (host: string, home = getProxyHome()): ProxyRoute | undefined => {
   let content;
 
   try {
@@ -48,14 +55,31 @@ export const findRoute = (host: string, home = getProxyHome()): ProxyRoute | und
 
   const [port, pid] = content.split(' ').map(Number);
 
-  if (!isAlive(pid)) {
-    removeRoute(host, home);
+  if (!Number.isInteger(port) || !Number.isInteger(pid)) {
     return undefined;
   }
 
   return { host, port, pid };
 };
 
+export const removeRoute = (host: string, ownerPid?: number, home = getProxyHome()) => {
+  const route = readRoute(host, home);
+
+  if (route && (ownerPid === undefined || route.pid === ownerPid)) {
+    rmSync(join(getRoutesPath(home), host), { force: true });
+  }
+};
+
+export const findRoute = (host: string, home = getProxyHome()) => {
+  const route = readRoute(host, home);
+
+  if (route && !isAlive(route.pid)) {
+    removeRoute(host, route.pid, home);
+    return undefined;
+  }
+
+  return route;
+};
 export const listRoutes = (home = getProxyHome()) => {
   let hosts: string[];
 
