@@ -40,6 +40,16 @@ export const getOperandValue = (schema: AnySchema | undefined, operand: unknown,
   return field;
 };
 
+export const getOperandPattern = (schema: AnySchema | undefined, operand: unknown, context: SqlOperationContext) => {
+  // Text matches literally, so its pattern characters are escaped with the backslash the LIKE operations declare in ESCAPE.
+  // Raw values and column references are SQL written by the caller and go into the pattern as they are.
+  if (typeof operand === 'string') {
+    return getOperandValue(schema, operand.replaceAll(/[\\%_]/g, '\\$&'), context);
+  }
+
+  return getOperandValue(schema, operand, context);
+};
+
 export const getOperandColumn = (schema: AnySchema | undefined, column: string, context: SqlOperationContext) => {
   const isJsonColumn = !!context.path;
 

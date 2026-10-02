@@ -40,4 +40,18 @@ describe('sql table check constraint tests', () => {
 
     equal(statement, `ALTER TABLE "table" ADD CONSTRAINT "foo" CHECK (("column" > 0 AND "column" < 100)) NOT VALID`);
   });
+
+  it('assert :: add check constraint (with pattern characters)', () => {
+    const query = sql.table('table').alter();
+
+    query.constraint('foo').check({
+      column: {
+        startsWith: `5'0%_\\`
+      }
+    });
+
+    const statement = query.build();
+
+    equal(statement, `ALTER TABLE "table" ADD CONSTRAINT "foo" CHECK ("column" LIKE '5''0\\%\\_\\\\' || '%' ESCAPE '\\')`);
+  });
 });

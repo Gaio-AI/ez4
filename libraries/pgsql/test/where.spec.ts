@@ -204,7 +204,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%' ESCAPE '\\'`);
   });
 
   it('assert :: where starts with (with insensitive)', ({ assert }) => {
@@ -222,7 +222,24 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE :0 || '%'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE :0 || '%' ESCAPE '\\'`);
+  });
+
+  it('assert :: where starts with (with pattern characters)', ({ assert }) => {
+    const query = sql
+      .select()
+      .from('test')
+      .where({
+        foo: {
+          startsWith: '50%_\\'
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    assert.deepEqual(variables, ['50\\%\\_\\\\']);
+
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%' ESCAPE '\\'`);
   });
 
   it('assert :: where contains', ({ assert }) => {
@@ -239,7 +256,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%' ESCAPE '\\'`);
   });
 
   it('assert :: where contains (with insensitive)', ({ assert }) => {
@@ -257,7 +274,41 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE '%' || :0 || '%'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE '%' || :0 || '%' ESCAPE '\\'`);
+  });
+
+  it('assert :: where contains (with pattern characters)', ({ assert }) => {
+    const query = sql
+      .select()
+      .from('test')
+      .where({
+        foo: {
+          contains: '50%_\\'
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    assert.deepEqual(variables, ['50\\%\\_\\\\']);
+
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%' ESCAPE '\\'`);
+  });
+
+  it('assert :: where contains (with raw value)', ({ assert }) => {
+    const query = sql
+      .select()
+      .from('test')
+      .where({
+        foo: {
+          contains: sql.rawString('50%_\\')
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    assert.deepEqual(variables, []);
+
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || '50%_\\' || '%' ESCAPE '\\'`);
   });
 
   it('assert :: where multiple operators', ({ assert }) => {
