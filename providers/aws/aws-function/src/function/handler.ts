@@ -22,6 +22,7 @@ import {
   tagFunction
 } from './client';
 
+import { getInstalledPackagesHash, getPackagesResult } from './helpers/packages';
 import { protectVariables } from './helpers/variables';
 import { FunctionServiceName } from './types';
 
@@ -55,6 +56,7 @@ const previewResource = async (candidate: FunctionState, current: FunctionState)
       variables: protectVariables(await target.getFunctionVariables()),
       filesHash: target.files && (await getBundleHash(target.functionName, target.files)),
       sourceHash: await getBundleHash(...target.getFunctionFiles()),
+      packagesHash: await getInstalledPackagesHash(current.result?.bundledPackages),
       valuesHash: await target.getFunctionHash()
     },
     {
@@ -64,6 +66,7 @@ const previewResource = async (candidate: FunctionState, current: FunctionState)
       dependencies: current.dependencies,
       variables: current.result?.variables,
       sourceHash: current.result?.sourceHash,
+      packagesHash: current.result?.packagesHash,
       valuesHash: current.result?.valuesHash,
       filesHash: current.result?.filesHash
     },
@@ -110,6 +113,8 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
     const importedFunction = await importFunction(logger, functionName);
     const bundleHash = await hashFile(sourceFile);
 
+    const { bundledPackages, packagesHash } = getPackagesResult(sourceFile);
+
     if (importedFunction) {
       await updateSourceCode(logger, functionName, {
         architecture: parameters.architecture,
@@ -152,6 +157,8 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
         valuesHash,
         bundleHash,
         filesHash,
+        bundledPackages,
+        packagesHash,
         logGroup,
         roleArn
       };
@@ -191,6 +198,8 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
       valuesHash,
       bundleHash,
       filesHash,
+      bundledPackages,
+      packagesHash,
       logGroup,
       roleArn
     };
@@ -362,28 +371,42 @@ const checkSourceCodeUpdates = async (
   current: FunctionResult | undefined,
   context: StepContext
 ) => {
-  const [newSourceHash, newFilesHash, newValuesHash] = await Promise.all([
+  const [newSourceHash, newFilesHash, newValuesHash, newPackagesHash] = await Promise.all([
     getBundleHash(...candidate.getFunctionFiles()),
     candidate.files && getBundleHash(functionName, candidate.files),
-    candidate.getFunctionHash()
+    candidate.getFunctionHash(),
+    getInstalledPackagesHash(current?.bundledPackages)
   ]);
 
   const oldSourceHash = current?.sourceHash;
   const oldValuesHash = current?.valuesHash;
   const oldFilesHash = current?.filesHash;
+  const oldPackagesHash = current?.packagesHash;
 
-  if (newSourceHash !== oldSourceHash || newValuesHash !== oldValuesHash || newFilesHash !== oldFilesHash || context.force) {
+  if (
+    newSourceHash !== oldSourceHash ||
+    newValuesHash !== oldValuesHash ||
+    newFilesHash !== oldFilesHash ||
+    newPackagesHash !== oldPackagesHash ||
+    context.force
+  ) {
     const newSourceFile = await candidate.getFunctionBundle(context);
 
     const newBundleHash = await hashFile(newSourceFile);
     const oldBundleHash = current?.bundleHash;
+
+    // Recorded from the bundle just built even when it isn't uploaded: identical bytes are the
+    // same code, whatever versions it came from.
+    const { bundledPackages, packagesHash } = getPackagesResult(newSourceFile);
 
     if (newBundleHash === oldBundleHash && newFilesHash === oldFilesHash && newValuesHash === oldValuesHash) {
       logger.update(`Skipping source code update`);
 
       return {
         hasSourceUpdated: false,
-        sourceHash: newSourceHash
+        sourceHash: newSourceHash,
+        bundledPackages,
+        packagesHash
       };
     }
 
@@ -398,7 +421,9 @@ const checkSourceCodeUpdates = async (
       valuesHash: newValuesHash,
       sourceHash: newSourceHash,
       bundleHash: newBundleHash,
-      filesHash: newFilesHash
+      filesHash: newFilesHash,
+      bundledPackages,
+      packagesHash
     };
   }
 

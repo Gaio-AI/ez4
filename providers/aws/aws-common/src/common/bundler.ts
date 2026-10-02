@@ -1,5 +1,6 @@
 import type { LinkedContext } from '@ez4/project/library';
 import type { AnyObject } from '@ez4/utils';
+import type { BundledPackage } from './packages';
 
 import { build, formatMessages } from 'esbuild';
 import { readFile } from 'node:fs/promises';
@@ -13,10 +14,13 @@ import { getTemporaryPath } from '@ez4/project/library';
 import { Logger } from '@ez4/logger';
 
 import { SourceFileError } from '../errors/bundler';
+import { collectBundledPackages } from './packages';
 
 const fileCache = new Map<string, string>();
 const hashCache = new Map<string, string>();
 const pathCache = new Map<string, string>();
+
+const packagesCache = new Map<string, BundledPackage[]>();
 
 export type BundlerEntrypoint = {
   functionName: string;
@@ -140,6 +144,15 @@ export const getFunctionBundle = async (provider: string, options: BundlerOption
   });
 };
 
+/**
+ * The installed packages a bundle built in this process carries, from `node_modules`. The source
+ * hash follows only their declarations, so the deploy records them with the function to notice
+ * when an installed version changes under it. Undefined for a file the bundler didn't build.
+ */
+export const getBundledPackages = (bundleFile: string) => {
+  return packagesCache.get(bundleFile);
+};
+
 export const buildFunctionBundle = async (provider: string, options: BundlerOptions) => {
   const { sourceFile, functionName } = options.handler;
 
@@ -159,7 +172,11 @@ export const buildFunctionBundle = async (provider: string, options: BundlerOpti
   const outputFile = getTemporaryPath(targetFile);
 
   const result = await build({
+    // esbuild otherwise works from the folder the process was in when esbuild loaded, and reports
+    // its inputs relative to it; the project is the current folder, as for every hashed path.
+    absWorkingDir: process.cwd(),
     outfile: outputFile,
+    metafile: true,
     treeShaking: !debug,
     minifyWhitespace: true,
     minifySyntax: true,
@@ -209,6 +226,8 @@ export const buildFunctionBundle = async (provider: string, options: BundlerOpti
   if (errors.length) {
     throw new SourceFileError(sourceFile);
   }
+
+  packagesCache.set(outputFile, await collectBundledPackages(Object.keys(result.metafile.inputs)));
 
   fileCache.set(cacheKey, outputFile);
 
