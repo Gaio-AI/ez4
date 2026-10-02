@@ -144,7 +144,8 @@ const runAttached = async (host: string, command: string[]) => {
 
   const forward = process.env.EZ4_PROXY_GROUP_LEADER ? forwardToGroup : (signal: NodeJS.Signals) => child.kill(signal);
 
-  process.on('SIGINT', forward);
+  // A terminal already delivers Ctrl+C to the whole foreground group, child included.
+  process.on('SIGINT', process.stdin.isTTY ? () => {} : forward);
   process.on('SIGTERM', forward);
 
   child.on('error', (error) => {
