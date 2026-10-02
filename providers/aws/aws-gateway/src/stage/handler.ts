@@ -2,6 +2,7 @@ import type { OperationLogLine } from '@ez4/aws-common';
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { AccessLogSettings } from './helpers/access-log';
 import type { StageState, StageResult, StageParameters } from './types';
+import type { StageThrottling } from './client';
 
 import { deepCompare, deepEqual } from '@ez4/utils';
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
@@ -9,9 +10,20 @@ import { tryGetLogGroupArn } from '@ez4/aws-logs';
 
 import { getGatewayId } from '../gateway/utils';
 import { getAccessLogChange } from './helpers/access-log';
+import { getThrottlingChange } from './helpers/throttling';
 import { getStageName } from './helpers/stage';
-import { createStage, deleteStage, disableAccessLogs, enableAccessLogs, importStage, updateStage } from './client';
 import { StageServiceName } from './types';
+
+import {
+  createStage,
+  deleteStage,
+  disableAccessLogs,
+  enableAccessLogs,
+  importStage,
+  resetThrottling,
+  updateStage,
+  updateThrottling
+} from './client';
 
 export const getStageHandler = (): StepHandler<StageState> => ({
   equals: equalsResource,
@@ -58,6 +70,9 @@ const createResource = (candidate: StageState, context: StepContext): Promise<St
     }
 
     if (importedStage) {
+      // An existing stage may carry limits from before: it ends up with the declared ones, or with none of its own.
+      await checkThrottlingUpdates(logger, apiId, stageName, parameters.throttling, importedStage.throttling);
+
       return {
         stageName: importedStage.stageName,
         logGroupArn,
@@ -100,6 +115,7 @@ const updateResource = (candidate: StageState, current: StageState, context: Ste
     );
 
     await checkGeneralUpdates(logger, result.apiId, result.stageName, newParameters, oldParameters);
+    await checkThrottlingUpdates(logger, result.apiId, result.stageName, newParameters.throttling, oldParameters.throttling);
 
     return {
       ...result,
@@ -128,12 +144,31 @@ const checkGeneralUpdates = async (
   const hasChanges = !deepEqual(candidate, current, {
     exclude: {
       stageName: true,
-      accessLogFormat: true
+      accessLogFormat: true,
+      throttling: true
     }
   });
 
   if (hasChanges) {
     await updateStage(logger, apiId, stageName, candidate);
+  }
+};
+
+const checkThrottlingUpdates = async (
+  logger: OperationLogLine,
+  apiId: string,
+  stageName: string,
+  candidate: StageThrottling | undefined,
+  current: StageThrottling | undefined
+) => {
+  const change = getThrottlingChange(candidate, current);
+
+  if (change?.action === 'apply') {
+    return updateThrottling(logger, apiId, stageName, change.throttling);
+  }
+
+  if (change?.action === 'reset') {
+    return resetThrottling(logger, apiId, stageName);
   }
 };
 

@@ -19,6 +19,7 @@ export * from './errors/http/route';
 export * from './errors/http/cache';
 export * from './errors/http/access';
 export * from './errors/http/cors';
+export * from './errors/http/throttling';
 export * from './errors/ws/event';
 export * from './errors/ws/target';
 export * from './errors/service';

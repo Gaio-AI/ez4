@@ -24,6 +24,7 @@ import { attachProviderLinkedServices } from '../utils/provider';
 import { getFullTypeName } from '../utils/name';
 import { createHttpService, HttpNamespaceType } from './types';
 import { getHttpDefaultsMetadata } from './defaults';
+import { getHttpThrottlingMetadata } from './throttling';
 import { getHttpAccessMetadata } from './access';
 import { getHttpCacheMetadata } from './cache';
 import { getHttpLocalRoutes } from './routes';
@@ -89,6 +90,11 @@ export const getHttpServicesMetadata = (reflection: ReflectionTypes) => {
 
         case 'cors': {
           service.cors = getHttpCorsMetadata(member.value, declaration, reflection, errorList);
+          break;
+        }
+
+        case 'throttling': {
+          service.throttling = getHttpThrottlingMetadata(member.value, declaration, reflection, errorList);
           break;
         }
 

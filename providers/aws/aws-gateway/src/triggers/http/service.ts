@@ -34,7 +34,7 @@ export const prepareHttpServices = (event: PrepareResourceEvent) => {
   const { state, service, options, context } = event;
 
   if (isHttpService(service)) {
-    const { name, displayName, description, routes, cors, defaults } = service;
+    const { name, displayName, description, routes, cors, defaults, throttling } = service;
     const { branchName, tags } = options;
 
     const gatewayState = createGateway(state, {
@@ -49,7 +49,8 @@ export const prepareHttpServices = (event: PrepareResourceEvent) => {
     const logGroupState = createAccessLog(state, service, gatewayState, options);
 
     createStage(state, gatewayState, logGroupState, {
-      autoDeploy: true
+      autoDeploy: true,
+      ...(throttling && { throttling })
     });
 
     createRoutes(state, service, gatewayState, options, context);

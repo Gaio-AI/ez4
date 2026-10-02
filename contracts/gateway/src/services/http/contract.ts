@@ -21,6 +21,7 @@ import type { HttpResponse } from './response';
 import type { HttpRequest } from './request';
 import type { HttpHandler } from './handler';
 import type { HttpClient } from './client';
+import type { HttpThrottling } from './throttling';
 import type { HttpAccess } from './access';
 import type { HttpErrors } from './errors';
 import type { HttpRoute } from './route';
@@ -54,6 +55,8 @@ export namespace Http {
 
   export type Errors = HttpErrors;
   export type Cors = HttpCors;
+
+  export type Throttling = HttpThrottling;
 
   export type AuthIncoming<T extends AuthRequest> = HttpAuthIncoming<T>;
   export type Incoming<T extends Request> = HttpIncoming<T>;
@@ -107,6 +110,11 @@ export namespace Http {
   export type UseCors<T extends Cors> = T;
 
   /**
+   * HTTP Throttling definition.
+   */
+  export type UseThrottling<T extends Throttling> = T;
+
+  /**
    * HTTP service.
    */
   export declare abstract class Service implements CommonService.Provider {
@@ -139,6 +147,11 @@ export namespace Http {
      * Access configuration for logs.
      */
     readonly access?: Access;
+
+    /**
+     * Throttling configuration for all routes.
+     */
+    readonly throttling?: Throttling;
 
     /**
      * Variables associated to all routes.
