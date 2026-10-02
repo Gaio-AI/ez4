@@ -81,3 +81,9 @@ export class SkipFailedEntryDependencyError extends Error {
     super(`Skipping entry (${entryId}) due to dependency failures.`);
   }
 }
+
+export class SkipFailedEntryDependentError extends Error {
+  constructor(public entryId: string) {
+    super(`Skipping entry (${entryId}) due to dependent failures.`);
+  }
+}

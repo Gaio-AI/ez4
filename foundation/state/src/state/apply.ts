@@ -1,11 +1,17 @@
-import type { StepHandlers, StepPostAction, StepState } from '../types/step';
+import type { StepHandlers, StepPostAction, StepPostActionOptions, StepState } from '../types/step';
 import type { EntryState, EntryStates, EntryTypes } from '../types/entry';
 import type { Warning } from '../types/warning';
 
 import { Tasks } from '@ez4/utils';
 
 import { getEntry, getEntryDependencies, getEntryConnections, getEntryDependents } from './entry';
-import { HandlerNotFoundError, EntriesNotFoundError, SkipFailedEntryError, SkipFailedEntryDependencyError } from './errors';
+import {
+  HandlerNotFoundError,
+  EntriesNotFoundError,
+  SkipFailedEntryError,
+  SkipFailedEntryDependencyError,
+  SkipFailedEntryDependentError
+} from './errors';
 import { StepAction } from './step';
 
 export type ApplyOptions<E extends EntryState> = {
@@ -38,6 +44,7 @@ export type ApplyResult<E extends EntryState = EntryState> = {
 };
 
 type PostActionEntry<E extends EntryState> = {
+  options?: StepPostActionOptions;
   callback: StepPostAction;
   action: StepAction;
   entry: E;
@@ -173,8 +180,8 @@ const applyPendingStep = async <E extends EntryState<T>, T extends string>(
       getDependents: <T extends EntryState>(type?: EntryTypes<T>) => {
         return getEntryDependents<T>(completedEntryMap, entry, type);
       },
-      postAction: (callback: StepPostAction) => {
-        postActions.push({ callback, action, entry });
+      postAction: (callback: StepPostAction, options?: StepPostActionOptions) => {
+        postActions.push({ callback, options, action, entry });
       },
       addWarning: (message: string) => {
         warnings.push({ message });
@@ -279,7 +286,7 @@ const applyPostAction = async <E extends EntryState<T>, T extends string>(
   failedEntries: EntryStates<E>,
   errorList: Error[]
 ) => {
-  const { callback, action, entry } = postAction;
+  const { callback, options, action, entry } = postAction;
   const { entryId, dependencies } = entry;
 
   try {
@@ -289,6 +296,10 @@ const applyPostAction = async <E extends EntryState<T>, T extends string>(
 
     if (succeededEntries[entryId] && !checkAllSucceeded(dependencies, succeededEntries)) {
       throw new SkipFailedEntryDependencyError(entryId);
+    }
+
+    if (options?.requireDependents && !checkAllDependentsSucceeded(entry, { ...succeededEntries, ...failedEntries }, failedEntries)) {
+      throw new SkipFailedEntryDependentError(entryId);
     }
 
     await callback();
@@ -311,6 +322,23 @@ const checkAllSucceeded = <E extends EntryState<T>, T extends string>(dependenci
     }
 
     return false;
+  });
+};
+
+const checkAllDependentsSucceeded = <E extends EntryState<T>, T extends string>(
+  entry: E,
+  allEntries: EntryStates<E>,
+  failedEntries: EntryStates<E>,
+  visitedIds = new Set<string>()
+): boolean => {
+  return getEntryDependents<E>(allEntries, entry).every((dependent) => {
+    if (visitedIds.has(dependent.entryId)) {
+      return true;
+    }
+
+    visitedIds.add(dependent.entryId);
+
+    return !failedEntries[dependent.entryId] && checkAllDependentsSucceeded(dependent, allEntries, failedEntries, visitedIds);
   });
 };
 

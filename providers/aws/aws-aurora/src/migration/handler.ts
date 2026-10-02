@@ -135,16 +135,21 @@ const updateResource = async (candidate: MigrationState, current: MigrationState
             database
           });
 
-          context.postAction(() =>
-            OperationLogger.logExecution(MigrationServiceName, database, 'cleanup', async (logger) => {
-              await modifyDatabase(logger, {
-                ...connectionData,
-                queries: steps.cleanup,
-                database
-              });
+          // Registered from the rollout, the cleanup runs after the code switch of the functions using the database. While
+          // an entry depending on the migration failed, old code may still need what it drops: the entry stays partial,
+          // keeping the old repository, and the next deploy runs it again.
+          context.postAction(
+            () =>
+              OperationLogger.logExecution(MigrationServiceName, database, 'cleanup', async (logger) => {
+                await modifyDatabase(logger, {
+                  ...connectionData,
+                  queries: steps.cleanup,
+                  database
+                });
 
-              delete newResult.oldRepository;
-            })
+                delete newResult.oldRepository;
+              }),
+            { requireDependents: true }
           );
         })
       );
