@@ -6,7 +6,7 @@ import { Logger, DynamicLogger, LogLevel } from '@ez4/logger';
 import { applyDeploy } from '../../deploy/apply';
 import { performDeploy } from '../../deploy/perform';
 import { warnUnsupportedFlags } from '../../utils/flags';
-import { loadState, saveState } from '../../utils/state';
+import { loadState, saveState, assertStateUnchanged } from '../../utils/state';
 import { reportResourceChanges } from '../../deploy/changes';
 import { getDeployOptions } from '../../deploy/options';
 import { loadEnvironment } from '../../config/environment';
@@ -48,7 +48,7 @@ export const destroyCommand = async (input: InputOptions) => {
     plan: true
   });
 
-  const oldState = await DynamicLogger.logExecution('🔄️ Loading state', () => loadState(project.stateFile, options));
+  const { state: oldState, checksum } = await DynamicLogger.logExecution('🔄️ Loading state', () => loadState(project.stateFile, options));
   const newState: EntryStates = {};
 
   const hasChanges = await reportResourceChanges(newState, oldState, options);
@@ -71,6 +71,10 @@ export const destroyCommand = async (input: InputOptions) => {
   }
 
   const deployState = await performDeploy(options, async () => {
+    await DynamicLogger.logExecution('🔄️ Checking state', () => {
+      return assertStateUnchanged(project.stateFile, options, checksum);
+    });
+
     const { result, errors, warnings } = await applyDeploy(newState, oldState, options);
 
     await DynamicLogger.logExecution('✅ Saving state', () => {

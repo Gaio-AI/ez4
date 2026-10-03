@@ -30,7 +30,7 @@ export const outputCommand = async (input: InputOptions) => {
     environment: true
   });
 
-  const currentState = await DynamicLogger.logExecution('🔄️ Loading state', () => {
+  const { state: currentState } = await DynamicLogger.logExecution('🔄️ Loading state', () => {
     return loadState(project.stateFile, options);
   });
 

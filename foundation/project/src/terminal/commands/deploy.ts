@@ -8,7 +8,7 @@ import { performDeploy } from '../../deploy/perform';
 import { getEventContext } from '../../deploy/context';
 import { prepareExecutionRole } from '../../deploy/identity';
 import { prepareLinkedServices } from '../../deploy/services';
-import { mergeState, loadState, saveState } from '../../utils/state';
+import { mergeState, loadState, saveState, assertStateUnchanged } from '../../utils/state';
 import { connectDeployResources, prepareDeployResources } from '../../deploy/resources';
 import { reportResourceChanges } from '../../deploy/changes';
 import { reportResourcesOutput } from '../../deploy/output';
@@ -58,7 +58,7 @@ export const deployCommand = async (input: InputOptions) => {
 
   options.imports = references.imports;
 
-  const [oldState, { metadata, dependencies }] = await DynamicLogger.logExecution('🔄️ Loading metadata and state', () => {
+  const [loadedState, { metadata, dependencies }] = await DynamicLogger.logExecution('🔄️ Loading metadata and state', () => {
     return Promise.all([
       loadState(project.stateFile, options),
       buildMetadata(project.sourceFiles, {
@@ -69,6 +69,8 @@ export const deployCommand = async (input: InputOptions) => {
       })
     ]);
   });
+
+  const { state: oldState, checksum } = loadedState;
 
   const newState: EntryStates = {};
 
@@ -105,6 +107,10 @@ export const deployCommand = async (input: InputOptions) => {
   }
 
   const deployState = await performDeploy(options, async () => {
+    await DynamicLogger.logExecution('🔄️ Checking state', () => {
+      return assertStateUnchanged(project.stateFile, options, checksum);
+    });
+
     const { result, errors, warnings } = await applyDeploy(newState, oldState, options);
 
     await DynamicLogger.logExecution('✅ Saving state', () => {
