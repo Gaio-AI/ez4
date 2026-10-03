@@ -2,7 +2,10 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 
+import { Logger } from '@ez4/logger';
+
 import { CommandType, getInputOptions } from './terminal/options';
+import { proxyCommand } from './terminal/commands/proxy';
 import { checkMinNodeVersion } from './terminal/version';
 
 checkMinNodeVersion();
@@ -12,58 +15,71 @@ const extensionsPath = join(import.meta.dirname, './extensions.mjs');
 
 const input = getInputOptions();
 
-if (input.project) {
-  process.env.EZ4_PROJECT_FILE = input.project;
-}
-
-const extraArguments = [];
-
-if (input.command === CommandType.Test) {
-  extraArguments.push('--experimental-test-module-mocks');
-
-  if (input.coverage) {
-    extraArguments.push('--experimental-test-coverage');
+const runApplication = () => {
+  if (input.project) {
+    process.env.EZ4_PROJECT_FILE = input.project;
   }
-}
 
-if (input.command === CommandType.Serve || input.command === CommandType.Test || input.command === CommandType.Run) {
-  extraArguments.push('--enable-source-maps');
+  const extraArguments = [];
 
-  if (input.inspect) {
-    extraArguments.push('--inspect');
+  if (input.command === CommandType.Test) {
+    extraArguments.push('--experimental-test-module-mocks');
+
+    if (input.coverage) {
+      extraArguments.push('--experimental-test-coverage');
+    }
   }
-}
 
-const childProcess = spawn(
-  'node',
-  [
-    // Invocation options
-    '--no-warnings',
-    '--experimental-strip-types',
-    '--experimental-transform-types',
+  if (input.command === CommandType.Serve || input.command === CommandType.Test || input.command === CommandType.Run) {
+    extraArguments.push('--enable-source-maps');
 
-    // Extra arguments
-    ...extraArguments,
-
-    // Custom loader options
-    '--loader',
-    extensionsPath,
-
-    // Forward invocation
-    applicationPath,
-    ...process.argv.slice(2)
-  ],
-  {
-    stdio: 'inherit'
+    if (input.inspect) {
+      extraArguments.push('--inspect');
+    }
   }
-);
 
-const setupShutdown = () => {
-  childProcess.removeAllListeners('exit');
-  childProcess.once('exit', () => process.exit(childProcess.exitCode));
+  const childProcess = spawn(
+    'node',
+    [
+      // Invocation options
+      '--no-warnings',
+      '--experimental-strip-types',
+      '--experimental-transform-types',
+
+      // Extra arguments
+      ...extraArguments,
+
+      // Custom loader options
+      '--loader',
+      extensionsPath,
+
+      // Forward invocation
+      applicationPath,
+      ...process.argv.slice(2)
+    ],
+    {
+      stdio: 'inherit'
+    }
+  );
+
+  const setupShutdown = () => {
+    childProcess.removeAllListeners('exit');
+    childProcess.once('exit', () => process.exit(childProcess.exitCode));
+  };
+
+  process.on('SIGTERM', setupShutdown);
+  process.on('SIGINT', setupShutdown);
+
+  setupShutdown();
 };
 
-process.on('SIGTERM', setupShutdown);
-process.on('SIGINT', setupShutdown);
-
-setupShutdown();
+if (input.command === CommandType.Proxy) {
+  try {
+    await proxyCommand(input);
+  } catch (error) {
+    Logger.error((error as Error).message);
+    process.exit(1);
+  }
+} else {
+  runApplication();
+}
