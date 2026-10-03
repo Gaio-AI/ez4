@@ -193,6 +193,13 @@ describe('migration :: create constraint tests', () => {
             query: `ALTER TABLE IF EXISTS "table" ALTER COLUMN "column" TYPE text USING "column"::text`
           }
         ],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
@@ -203,6 +210,18 @@ describe('migration :: create constraint tests', () => {
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -212,17 +231,6 @@ describe('migration :: create constraint tests', () => {
             name: 'table_column_ck'
           }
         ],
-        relations: [],
-        indexes: []
-      },
-      cleanup: {
-        tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
-          }
-        ],
-        validations: [],
         relations: [],
         indexes: []
       }
@@ -262,6 +270,13 @@ describe('migration :: create constraint tests', () => {
             query: `ALTER TABLE IF EXISTS "table" ALTER COLUMN "column" TYPE boolean USING "column"::boolean`
           }
         ],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
@@ -272,6 +287,18 @@ describe('migration :: create constraint tests', () => {
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -281,17 +308,6 @@ describe('migration :: create constraint tests', () => {
             name: 'table_column_ck'
           }
         ],
-        relations: [],
-        indexes: []
-      },
-      cleanup: {
-        tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
-          }
-        ],
-        validations: [],
         relations: [],
         indexes: []
       }
@@ -331,6 +347,13 @@ describe('migration :: create constraint tests', () => {
             query: `ALTER TABLE IF EXISTS "table" ALTER COLUMN "column" TYPE decimal USING "column"::decimal`
           }
         ],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
@@ -341,6 +364,18 @@ describe('migration :: create constraint tests', () => {
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -350,17 +385,6 @@ describe('migration :: create constraint tests', () => {
             name: 'table_column_ck'
           }
         ],
-        relations: [],
-        indexes: []
-      },
-      cleanup: {
-        tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
-          }
-        ],
-        validations: [],
         relations: [],
         indexes: []
       }
@@ -400,6 +424,13 @@ describe('migration :: create constraint tests', () => {
             query: `ALTER TABLE IF EXISTS "table" ALTER COLUMN "column" TYPE text USING "column"::text`
           }
         ],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
@@ -410,6 +441,18 @@ describe('migration :: create constraint tests', () => {
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -419,17 +462,6 @@ describe('migration :: create constraint tests', () => {
             name: 'table_column_ck'
           }
         ],
-        relations: [],
-        indexes: []
-      },
-      cleanup: {
-        tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
-          }
-        ],
-        validations: [],
         relations: [],
         indexes: []
       }

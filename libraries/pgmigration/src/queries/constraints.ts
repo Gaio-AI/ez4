@@ -1,15 +1,17 @@
 import type { AnySchema, EnumSchema, ObjectSchema, ScalarSchema } from '@ez4/schema';
-import type { AnyObject, ObjectComparison } from '@ez4/utils';
-import type { SqlBuilder } from '@ez4/pgsql';
+import type { SqlBuilder, SqlFilters } from '@ez4/pgsql';
+import type { ObjectComparison } from '@ez4/utils';
 import type { PgMigrationQueries } from '../types/query';
 
 import { isEnumSchema, isScalarSchema, SchemaType } from '@ez4/schema';
+import { escapeSqlText } from '@ez4/pgsql';
 import { isNotNullish } from '@ez4/utils';
 
 import { getConstraintName } from '../utils/naming';
 
 import {
   getCheckConstraintExistsQuery,
+  getCheckConstraintMissingQuery,
   getCheckConstraintRecordsQuery,
   getCheckConstraintInvalidQuery,
   getCheckRunningValidationQuery,
@@ -29,13 +31,14 @@ export namespace ConstraintQuery {
       const columnSchema = columns[columnName];
 
       if (isEnumSchema(columnSchema) || (isScalarSchema(columnSchema) && isNotNullish(columnSchema.definitions?.value))) {
+        const filters = getConstraintFilters(builder, columnName, columnSchema);
         const name = getConstraintName(table, columnName);
 
         statements.constraints.push(
           {
             check: getCheckConstraintExistsQuery(builder, name),
-            assert: getCheckConstraintRecordsQuery(builder, table, getConstraintFilters(builder, columnName, columnSchema)),
-            query: getCreateQuery(builder, table, name, columnName, columnSchema).build(),
+            assert: getCheckConstraintRecordsQuery(builder, table, filters),
+            query: getCreateQuery(builder, table, name, filters).build(),
             name
           },
           {
@@ -68,52 +71,29 @@ export namespace ConstraintQuery {
     };
 
     for (const columnName in changes) {
-      const { update, create, remove, nested } = changes[columnName];
+      const sourceColumn = sourceSchema.properties[columnName];
+      const targetColumn = targetSchema.properties[columnName];
 
-      if (remove || update || nested) {
-        const columnSchema = sourceSchema.properties[columnName];
-        const change = { ...remove, ...update, ...nested };
+      const sourceValues = getConstraintValues(sourceColumn);
+      const targetValues = getConstraintValues(targetColumn);
 
-        if (isConstrainedChange(columnSchema, change)) {
-          const name = getConstraintName(table, columnName);
+      const switchValues = getSwitchValues(sourceColumn, targetColumn);
 
-          steps.cleanup.constraints.push({
-            query: getDeleteQuery(builder, table, name).build()
+      // Rollout runs before the new code goes live, so it widens the check to the values both
+      // versions of the code write.
+      if (!isSameValues(switchValues, sourceValues)) {
+        if (switchValues) {
+          prepareSwap(builder, steps.rollout, table, columnName, getValueListFilters(builder, columnName, switchValues));
+        } else {
+          steps.rollout.constraints.push({
+            query: getDeleteQuery(builder, table, getConstraintName(table, columnName)).build()
           });
         }
       }
 
-      if (create || update || nested) {
-        const columnSchema = targetSchema.properties[columnName];
-        const change = { ...create, ...update, ...nested };
-
-        if (isConstrainedChange(columnSchema, change)) {
-          const tmpName = getConstraintName(table, `${columnName}_tmp`);
-          const newName = getConstraintName(table, columnName);
-
-          steps.rollout.constraints.push(
-            {
-              check: getCheckConstraintExistsQuery(builder, tmpName),
-              assert: getCheckConstraintRecordsQuery(builder, table, getConstraintFilters(builder, columnName, columnSchema)),
-              query: getCreateQuery(builder, table, tmpName, columnName, columnSchema).build(),
-              name: newName
-            },
-            {
-              check: getCheckConstraintValidQuery(builder, tmpName),
-              query: getValidateQuery(builder, table, tmpName).build()
-            }
-          );
-
-          steps.rollout.validations.push({
-            check: getCheckConstraintInvalidQuery(builder, tmpName),
-            retry: getCheckRunningValidationQuery(builder, tmpName),
-            name: newName
-          });
-
-          steps.cleanup.constraints.push({
-            query: builder.table(table).alter().existing().constraint(tmpName).rename(newName).build()
-          });
-        }
+      // Cleanup runs after the old code is gone, so the check narrows to the new values only there.
+      if (isConstrainedSchema(targetColumn) && !isSameValues(targetValues, switchValues)) {
+        prepareSwap(builder, steps.cleanup, table, columnName, getConstraintFilters(builder, columnName, targetColumn));
       }
     }
 
@@ -183,6 +163,45 @@ export namespace ConstraintQuery {
     return statements;
   };
 
+  // The new check is created and validated under a temporary name, and it replaces the current one
+  // only once validated: while a validation is still running (or has failed) the current check
+  // stays and the step fails, and a step run again skips whatever is already done.
+  const prepareSwap = (builder: SqlBuilder, statements: ConstraintQueries, table: string, column: string, filters: SqlFilters) => {
+    const tmpName = getConstraintName(table, `${column}_tmp`);
+    const newName = getConstraintName(table, column);
+
+    statements.constraints.push(
+      {
+        check: getCheckConstraintExistsQuery(builder, tmpName),
+        assert: getCheckConstraintRecordsQuery(builder, table, filters),
+        query: getCreateQuery(builder, table, tmpName, filters).build(),
+        name: newName
+      },
+      {
+        check: getCheckConstraintValidQuery(builder, tmpName),
+        query: getValidateQuery(builder, table, tmpName).build()
+      },
+      {
+        check: getCheckConstraintMissingQuery(builder, tmpName),
+        assert: getCheckConstraintInvalidQuery(builder, tmpName),
+        query: getDeleteQuery(builder, table, newName).build(),
+        name: tmpName
+      },
+      {
+        check: getCheckConstraintMissingQuery(builder, tmpName),
+        assert: getCheckConstraintInvalidQuery(builder, tmpName),
+        query: builder.table(table).alter().existing().constraint(tmpName).rename(newName).build(),
+        name: tmpName
+      }
+    );
+
+    statements.validations.push({
+      check: getCheckConstraintInvalidQuery(builder, tmpName),
+      retry: getCheckRunningValidationQuery(builder, tmpName),
+      name: newName
+    });
+  };
+
   const getDeleteQuery = (builder: SqlBuilder, table: string, name: string) => {
     return builder.table(table).alter().existing().constraint(name).drop().existing();
   };
@@ -191,59 +210,88 @@ export namespace ConstraintQuery {
     return builder.table(table).alter().existing().constraint(name).validate();
   };
 
-  const getCreateQuery = (builder: SqlBuilder, table: string, name: string, column: string, schema: EnumSchema | ScalarSchema) => {
+  const getCreateQuery = (builder: SqlBuilder, table: string, name: string, filters: SqlFilters) => {
     const query = builder.table(table).alter().existing().constraint(name);
 
-    query.check(getConstraintFilters(builder, column, schema)).validate(false);
+    query.check(filters).validate(false);
 
     return query;
   };
 
   const getConstraintFilters = (builder: SqlBuilder, column: string, schema: EnumSchema | ScalarSchema) => {
+    const values = getConstraintValues(schema) ?? [];
+
+    if (isEnumSchema(schema)) {
+      return getValueListFilters(builder, column, values);
+    }
+
+    const [value] = values;
+
+    return {
+      [column]: {
+        equal: builder.rawValue(value)
+      }
+    };
+  };
+
+  const getValueListFilters = (builder: SqlBuilder, column: string, values: string[]) => {
+    return {
+      [column]: {
+        isIn: values.map((value) => builder.rawValue(value))
+      }
+    };
+  };
+
+  // The allowed values as the SQL literals of the check, so they compare the way the check does (an
+  // enum option 1 is the text '1') and build its value list.
+  const getConstraintValues = (schema: AnySchema) => {
     switch (schema.type) {
       case SchemaType.Enum: {
-        return {
-          [column]: {
-            isIn: schema.options.map(({ value }) => builder.rawString(`${value}`))
-          }
-        };
+        return schema.options.map(({ value }) => escapeSqlText(`${value}`));
       }
 
       case SchemaType.Boolean:
-      case SchemaType.Number:
-        return {
-          [column]: {
-            equal: builder.rawValue(schema.definitions?.value)
-          }
-        };
+      case SchemaType.Number: {
+        const value = schema.definitions?.value;
+
+        return isNotNullish(value) ? [`${value}`] : undefined;
+      }
 
       case SchemaType.String: {
-        return {
-          [column]: {
-            equal: builder.rawString(`${schema.definitions?.value}`)
-          }
-        };
+        const value = schema.definitions?.value;
+
+        return isNotNullish(value) ? [escapeSqlText(value)] : undefined;
       }
     }
+
+    return undefined;
+  };
+
+  // While the old and the new code are both live, the column accepts the values of either one, and
+  // values of different types can't share a check, so the column has none then.
+  const getSwitchValues = (sourceSchema: AnySchema, targetSchema: AnySchema) => {
+    const sourceValues = getConstraintValues(sourceSchema);
+    const targetValues = getConstraintValues(targetSchema);
+
+    if (!sourceValues || !targetValues || sourceSchema.type !== targetSchema.type) {
+      return undefined;
+    }
+
+    const removedValues = sourceValues.filter((value) => !targetValues.includes(value));
+
+    return [...targetValues, ...removedValues];
+  };
+
+  // Checks are compared by their values as sets, so reordering the options keeps the check.
+  const isSameValues = (values: string[] | undefined, otherValues: string[] | undefined) => {
+    if (!values || !otherValues) {
+      return values === otherValues;
+    }
+
+    return values.every((value) => otherValues.includes(value)) && otherValues.every((value) => values.includes(value));
   };
 
   const isConstrainedSchema = (schema: AnySchema): schema is EnumSchema | ScalarSchema => {
     return isEnumSchema(schema) || (isScalarSchema(schema) && isNotNullish(schema.definitions?.value));
-  };
-
-  const isConstrainedChange = (schema: AnySchema, changes: AnyObject): schema is EnumSchema | ScalarSchema => {
-    switch (schema.type) {
-      case SchemaType.Boolean:
-      case SchemaType.Number:
-      case SchemaType.String: {
-        return isNotNullish(changes.definitions?.value) || isNotNullish(changes.definitions?.update?.value);
-      }
-
-      case SchemaType.Enum: {
-        return isNotNullish(changes.options);
-      }
-    }
-
-    return false;
   };
 }

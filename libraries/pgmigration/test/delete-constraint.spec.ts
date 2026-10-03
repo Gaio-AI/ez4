@@ -112,18 +112,18 @@ describe('migration :: delete constraint tests', () => {
             query: `ALTER TABLE IF EXISTS "table" ALTER COLUMN "column" TYPE text USING "column"::text`
           }
         ],
-        constraints: [],
+        constraints: [
+          {
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
+          }
+        ],
         validations: [],
         relations: [],
         indexes: []
       },
       cleanup: {
         tables: [],
-        constraints: [
-          {
-            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
-          }
-        ],
+        constraints: [],
         validations: [],
         relations: [],
         indexes: []
@@ -159,18 +159,18 @@ describe('migration :: delete constraint tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [],
+        constraints: [
+          {
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
+          }
+        ],
         validations: [],
         relations: [],
         indexes: []
       },
       cleanup: {
         tables: [],
-        constraints: [
-          {
-            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
-          }
-        ],
+        constraints: [],
         validations: [],
         relations: [],
         indexes: []

@@ -22,7 +22,7 @@ describe('migration :: update constraint tests', () => {
     ]);
   };
 
-  it('assert :: update (with enum column type)', async () => {
+  it('assert :: update (with enum values added)', async () => {
     const sourceTable = getDatabaseTables({
       column: {
         type: SchemaType.Enum,
@@ -79,6 +79,191 @@ describe('migration :: update constraint tests', () => {
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
+          }
+        ],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
+  it('assert :: update (with enum values removed)', async () => {
+    const sourceTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 123
+          },
+          {
+            value: 'bar'
+          }
+        ]
+      }
+    });
+
+    const targetTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 123
+          }
+        ]
+      }
+    });
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('foo', '123') LIMIT 1`,
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo', '123')) NOT VALID`,
+            name: 'table_column_ck'
+          },
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
+          }
+        ],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
+  it('assert :: update (with enum values added and removed)', async () => {
+    const sourceTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 123
+          }
+        ]
+      }
+    });
+
+    const targetTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 'bar'
+          }
+        ]
+      }
+    });
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [],
+        constraints: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('foo', 'bar', '123') LIMIT 1`,
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo', 'bar', '123')) NOT VALID`,
+            name: 'table_column_ck'
+          },
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -95,12 +280,90 @@ describe('migration :: update constraint tests', () => {
         tables: [],
         constraints: [
           {
-            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('foo', 'bar') LIMIT 1`,
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo', 'bar')) NOT VALID`,
+            name: 'table_column_ck'
           },
           {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
+  it('assert :: update (with enum values reordered)', async () => {
+    const sourceTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 123
+          }
+        ]
+      }
+    });
+
+    const targetTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 123
+          },
+          {
+            value: 'foo'
+          }
+        ]
+      }
+    });
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [],
         validations: [],
         relations: [],
         indexes: []
@@ -142,13 +405,25 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: 'SELECT 1 FROM "table" WHERE NOT "column" = false LIMIT 1',
-            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = false) NOT VALID`,
+            assert: 'SELECT 1 FROM "table" WHERE NOT "column" IN (false, true) LIMIT 1',
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN (false, true)) NOT VALID`,
             name: 'table_column_ck'
           },
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -165,13 +440,35 @@ describe('migration :: update constraint tests', () => {
         tables: [],
         constraints: [
           {
-            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: 'SELECT 1 FROM "table" WHERE NOT "column" = false LIMIT 1',
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = false) NOT VALID`,
+            name: 'table_column_ck'
           },
           {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
-        validations: [],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
         relations: [],
         indexes: []
       }
@@ -212,13 +509,25 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: 'SELECT 1 FROM "table" WHERE NOT "column" = 456 LIMIT 1',
-            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = 456) NOT VALID`,
+            assert: 'SELECT 1 FROM "table" WHERE NOT "column" IN (456, 123) LIMIT 1',
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN (456, 123)) NOT VALID`,
             name: 'table_column_ck'
           },
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -235,13 +544,35 @@ describe('migration :: update constraint tests', () => {
         tables: [],
         constraints: [
           {
-            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: 'SELECT 1 FROM "table" WHERE NOT "column" = 456 LIMIT 1',
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = 456) NOT VALID`,
+            name: 'table_column_ck'
           },
           {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
-        validations: [],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
         relations: [],
         indexes: []
       }
@@ -282,13 +613,25 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: `SELECT 1 FROM "table" WHERE NOT "column" = 'bar' LIMIT 1`,
-            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = 'bar') NOT VALID`,
+            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('bar', 'foo') LIMIT 1`,
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('bar', 'foo')) NOT VALID`,
             name: 'table_column_ck'
           },
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
             query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
           }
         ],
         validations: [
@@ -305,13 +648,124 @@ describe('migration :: update constraint tests', () => {
         tables: [],
         constraints: [
           {
-            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: `SELECT 1 FROM "table" WHERE NOT "column" = 'bar' LIMIT 1`,
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = 'bar') NOT VALID`,
+            name: 'table_column_ck'
           },
           {
-            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"'
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
+          }
+        ],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
+  it('assert :: update (with enum to literal column type)', async () => {
+    const sourceTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 'bar'
+          }
+        ]
+      }
+    });
+
+    const targetTable = getDatabaseTables({
+      column: {
+        type: SchemaType.String,
+        definitions: {
+          value: 'foo'
+        }
+      }
+    });
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE "column_name" = 'column' AND "table_name" = 'table')`,
+            query: `ALTER TABLE IF EXISTS "table" ALTER COLUMN "column" TYPE text USING "column"::text`
+          }
+        ],
+        constraints: [
+          {
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`
           }
         ],
         validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+            assert: `SELECT 1 FROM "table" WHERE NOT "column" = 'foo' LIMIT 1`,
+            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" = 'foo') NOT VALID`,
+            name: 'table_column_ck'
+          },
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" VALIDATE CONSTRAINT "table_column_tmp_ck"`
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: `ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_column_ck"`,
+            name: 'table_column_tmp_ck'
+          },
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck')`,
+            assert: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_column_tmp_ck" TO "table_column_ck"',
+            name: 'table_column_tmp_ck'
+          }
+        ],
+        validations: [
+          {
+            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_column_tmp_ck'`,
+            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_column_tmp_ck"' || '%' LIMIT 1`,
+            name: 'table_column_ck'
+          }
+        ],
         relations: [],
         indexes: []
       }
