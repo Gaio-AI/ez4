@@ -83,7 +83,7 @@
     "local:registry": "rm -rf .registry/* && node tools/verdaccio.mjs",
     "live:publish": "npm run build && npm run live:publish --workspaces --if-present",
     "changeset": "changeset",
-    "changeset:check": "node tools/changeset-patch-only.mjs",
+    "changeset:check": "node tools/changeset-check.mjs",
     "version-packages": "npm run changeset:check && changeset version && npm install --package-lock-only --no-audit --no-fund",
     "release": "tools/release.sh"
   },

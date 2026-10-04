@@ -1,7 +1,7 @@
 {
   "name": "@ez4/local-storage",
   "description": "EZ4: Local storage emulator",
-  "version": "0.53.918",
+  "version": "1.0.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -53,12 +53,12 @@
     "@types/mime": "^3.0.0"
   },
   "dependencies": {
-    "@ez4/common": "^0.53.0",
-    "@ez4/local-common": "^0.53.0",
-    "@ez4/logger": "^0.53.0",
-    "@ez4/project": "^0.53.0",
-    "@ez4/storage": "^0.53.0",
-    "@ez4/utils": "^0.53.0",
+    "@ez4/common": "^1.0.0",
+    "@ez4/local-common": "^1.0.0",
+    "@ez4/logger": "^1.0.0",
+    "@ez4/project": "^1.0.0",
+    "@ez4/storage": "^1.0.0",
+    "@ez4/utils": "^1.0.0",
     "mime": "^3.0.0"
   }
 }
