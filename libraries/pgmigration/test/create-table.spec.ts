@@ -540,22 +540,22 @@ describe('migration :: create table tests', () => {
       validations: [
         {
           check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_id_ck'`,
-          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_id_ck"' || '%' ESCAPE '\\' LIMIT 1`,
+          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_id_ck"' || '%' LIMIT 1`,
           name: 'table_id_ck'
         },
         {
           check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_default_a_ck'`,
-          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_default_a_ck"' || '%' ESCAPE '\\' LIMIT 1`,
+          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_default_a_ck"' || '%' LIMIT 1`,
           name: 'table_default_a_ck'
         },
         {
           check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_default_b_ck'`,
-          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_default_b_ck"' || '%' ESCAPE '\\' LIMIT 1`,
+          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_default_b_ck"' || '%' LIMIT 1`,
           name: 'table_default_b_ck'
         },
         {
           check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = false AND "conname" = 'table_nullable_ck'`,
-          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_nullable_ck"' || '%' ESCAPE '\\' LIMIT 1`,
+          retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_nullable_ck"' || '%' LIMIT 1`,
           name: 'table_nullable_ck'
         }
       ],
