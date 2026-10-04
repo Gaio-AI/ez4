@@ -1,7 +1,7 @@
 {
   "name": "@ez4/local-distribution",
   "description": "EZ4: Local distribution emulator",
-  "version": "0.53.918",
+  "version": "1.0.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -41,14 +41,14 @@
     "live:publish": "npm run build && npm publish --access public"
   },
   "devDependencies": {
-    "@ez4/common": "^0.53.0",
-    "@ez4/local-storage": "^0.53.0"
+    "@ez4/common": "^1.0.0",
+    "@ez4/local-storage": "^1.0.0"
   },
   "dependencies": {
-    "@ez4/distribution": "^0.53.0",
-    "@ez4/logger": "^0.53.0",
-    "@ez4/project": "^0.53.0",
-    "@ez4/storage": "^0.53.0",
-    "@ez4/utils": "^0.53.0"
+    "@ez4/distribution": "^1.0.0",
+    "@ez4/logger": "^1.0.0",
+    "@ez4/project": "^1.0.0",
+    "@ez4/storage": "^1.0.0",
+    "@ez4/utils": "^1.0.0"
   }
 }

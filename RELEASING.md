@@ -37,28 +37,34 @@ So: **a version is published only from a commit that carries its tag.** If there
 tag, that version does not exist. The Release workflow uses the same rule the other way around: a
 version on `main` without its tag is a version still to publish.
 
-## Only patches
+## Semantic versions
 
-Every release is a patch of the current minor: a caret range on a `0.x` version stops at the minor,
-so the backend and the frontend take any of them by changing their lockfile alone, and go back by
-reverting it. A consumer change that works with both versions can land first to make that true:
-`0.53.904` typed Postgres reads as `T | null`, and the backend was fixed to compile against both sets
-of types before a lockfile-only pull request took the version.
+From `1.0.0` on the version says what kind of change a release carries, and the backend and the
+frontend depend on `^1.0.0`:
 
-A `minor` or `major` changeset fails the pull request (`npm run changeset:check`), and the release
-workflow refuses to version it too. A change that would need consumers to change code or
-configuration in the same step waits until it can be made compatible, or goes out with a
-[new minor](#moving-to-a-new-minor).
+- **patch** — a fix.
+- **minor** — a feature, a new opt-in option, or a behaviour change every consumer keeps working with.
+- **major** — a consumer has to change code or configuration to take it.
 
-Patch numbers start at `900` on each minor, clear of the patches upstream published under the same
-names (`0.53.1`, `0.53.2`).
+A caret range takes every patch and minor, so a consumer adopts one by changing its lockfile alone and
+goes back by reverting it. A major is the one release a consumer takes by editing its ranges on
+purpose, every `@ez4/*` range in the same pull request: mixed ranges trip
+`ProviderVersionMismatchError`.
+
+A `major` changeset fails the pull request (`npm run changeset:check`) unless its summary has a line
+starting with `Breaking:` that says what a consumer must change, and the release workflow runs the same
+check before versioning. The line goes into the release pull request with the rest of the summary, so
+whoever takes the major reads there what to change.
+
+Whatever the bump, a release is still validated as one batch with one recipe (step 3 of
+[Releasing](#releasing)).
 
 ## Releasing
 
 1. Add a changeset to the pull request that changes a package:
 
    ```bash
-   npx changeset   # pick any package, always `patch`
+   npx changeset   # pick any package, and the bump the change needs
    ```
 
    Every published package and `extensions/vscode` move in lockstep (`fixed` in
@@ -67,8 +73,9 @@ names (`0.53.1`, `0.53.2`).
    the same string (`ProviderVersionMismatchError`).
 
 2. Once the pull request merges and the suite passes on `main`, the Release workflow opens or updates
-   the release pull request from `changeset-release/main`, with every package bumped to the next
-   patch and the lockfile relinked.
+   the release pull request from `changeset-release/main`, with every package bumped by the largest
+   bump among the changesets waiting and the lockfile relinked. A minor or a major also moves every
+   internal `@ez4/*` range to the new version (`updateInternalDependencies`).
 
 3. Validate the batch before merging the release pull request. A release carries a small batch, and
    what goes together is decided by **what the change can break**, because that decides how it is
@@ -109,25 +116,6 @@ names (`0.53.1`, `0.53.2`).
    re-run: packages already in the registry at that version are skipped.
 
 A published version is immutable. A mistake means publishing the next one.
-
-### Moving to a new minor
-
-The one version change that is not a changeset, taken on purpose for a change that cannot be made
-compatible with the consumers. Bump everything by hand to the first patch of the new minor, in a pull
-request against `main`:
-
-```bash
-npm version <minor>.900 --workspaces --no-workspaces-update --no-git-tag-version --allow-same-version
-git checkout -- examples/ tests/
-npm install   # relinks the workspaces at the new version
-```
-
-Without `--no-workspaces-update`, `npm version` reinstalls right after the bump, before the
-`checkout`, and fails with a 404 on `hello-aws-gateway`. The `checkout` is not optional: packages
-under `examples/` reference each other with `^0.0.0`, and the bump breaks their resolution. Move every
-`@ez4/*` range to the new minor, here — including the exact pins in `extensions/vscode` — and in the
-consumers, in the same step: nobody takes a minor by accident. Merging it publishes the version, since
-it has no tag yet.
 
 ## What CI covers
 

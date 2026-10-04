@@ -42,7 +42,7 @@ jobs:
       - name: Require a changeset
         run: npx --yes @changesets/cli@3.0.3 status --since=origin/main
 
-      - name: Allow only patches
+      - name: Allow a major only with a breaking note
         run: npm run changeset:check
 
   lint:
