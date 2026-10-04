@@ -52,6 +52,6 @@ describe('sql table check constraint tests', () => {
 
     const statement = query.build();
 
-    equal(statement, `ALTER TABLE "table" ADD CONSTRAINT "foo" CHECK ("column" LIKE '5''0\\%\\_\\\\' || '%' ESCAPE '\\')`);
+    equal(statement, `ALTER TABLE "table" ADD CONSTRAINT "foo" CHECK ("column" LIKE '5''0\\%\\_\\\\' || '%')`);
   });
 });

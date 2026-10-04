@@ -203,7 +203,7 @@ describe('where', () => {
       }
     });
 
-    equal(whereClause, `WHERE "bar"->>'barFoo' LIKE '%' || :0 || '%' ESCAPE '\\' AND "baz" LIKE '%' || :1 || '%' ESCAPE '\\'`);
+    equal(whereClause, `WHERE "bar"->>'barFoo' LIKE '%' || :0 || '%' AND "baz" LIKE '%' || :1 || '%'`);
 
     deepEqual(variables, ['abc', 'def']);
   });
@@ -214,7 +214,7 @@ describe('where', () => {
       baz: { startsWith: 'def' }
     });
 
-    equal(whereClause, `WHERE "bar"->>'barFoo' LIKE :0 || '%' ESCAPE '\\' AND "baz" LIKE :1 || '%' ESCAPE '\\'`);
+    equal(whereClause, `WHERE "bar"->>'barFoo' LIKE :0 || '%' AND "baz" LIKE :1 || '%'`);
 
     deepEqual(variables, ['abc', 'def']);
   });

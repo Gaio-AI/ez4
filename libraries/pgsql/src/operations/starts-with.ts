@@ -7,9 +7,10 @@ export const getStartsWithOperation = (column: string, schema: AnySchema | undef
   const rhsOperand = getOperandPattern(schema, operand, context);
   const lhsOperand = getOperandColumn(schema, column, context);
 
+  // No ESCAPE clause, for the same reason as in `getContainsOperation`: the backslash is LIKE's default escape.
   if (context.flags?.insensitive) {
-    return `${lhsOperand} ILIKE ${rhsOperand} || '%' ESCAPE '\\'`;
+    return `${lhsOperand} ILIKE ${rhsOperand} || '%'`;
   }
 
-  return `${lhsOperand} LIKE ${rhsOperand} || '%' ESCAPE '\\'`;
+  return `${lhsOperand} LIKE ${rhsOperand} || '%'`;
 };
