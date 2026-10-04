@@ -11,6 +11,13 @@ import { SqlColumnReference } from '../common/reference';
 import { mergeSqlAlias, mergeSqlJsonPath, mergeSqlPath } from '../utils/merge';
 import { InvalidAtomicOperation } from '../errors/operations';
 import { SqlSelectStatement } from '../statements/select';
+import { escapeSqlText } from '../utils/escape';
+
+// A key is always plain text: left to the driver's detection, a key shaped like a date or a UUID would be bound
+// as one and come back rewritten.
+const jsonKeySchema: AnySchema = {
+  type: SchemaType.String
+};
 
 export type SqlUpdateContext = {
   options: SqlBuilderOptions;
@@ -31,15 +38,21 @@ export const getUpdateColumns = (
 
   const columns = [];
 
-  const pushUpdate = (fieldName: string, fieldValue: string) => {
-    if (depth <= 1 && !coalesce) {
-      columns.push(`${mergeSqlPath(fieldName, parent)} = ${fieldValue}`);
-    } else {
-      columns.push(`'${fieldName}', ${fieldValue}`);
-    }
-  };
-
   const json = !!parent;
+
+  // Inside a JSON column the field name is a key that can come straight from data, so it's bound as a variable
+  // and never written into the statement.
+  const bindJsonKey = (fieldName: string) => {
+    const keyIndex = references.counter++;
+
+    if (options.onPrepareVariable) {
+      variables.push(options.onPrepareVariable(fieldName, { schema: jsonKeySchema, index: keyIndex }));
+    } else {
+      variables.push(fieldName);
+    }
+
+    return `:${keyIndex}`;
+  };
 
   for (const fieldName in record) {
     const value = record[fieldName];
@@ -48,20 +61,35 @@ export const getUpdateColumns = (
       continue;
     }
 
+    if (value instanceof SqlRawOperation && isJsonRemoveOperator(value.operator)) {
+      columns.push(`${value.operator} ${escapeSqlText(`${value.build()}`)}`);
+      continue;
+    }
+
+    const fieldKey = json ? bindJsonKey(fieldName) : undefined;
+
+    const pushUpdate = (fieldValue: string) => {
+      if (depth <= 1 && !coalesce) {
+        columns.push(`${mergeSqlPath(fieldName, parent, fieldKey)} = ${fieldValue}`);
+      } else {
+        columns.push(`${fieldKey}, ${fieldValue}`);
+      }
+    };
+
     if (value === null && !json) {
-      pushUpdate(fieldName, 'null');
+      pushUpdate('null');
       continue;
     }
 
     if (value instanceof SqlColumnReference) {
-      pushUpdate(fieldName, value.build());
+      pushUpdate(value.build());
       continue;
     }
 
     if (value instanceof SqlSelectStatement) {
       const [selectStatement, selectVariables] = value.build();
 
-      pushUpdate(fieldName, `(${selectStatement})`);
+      pushUpdate(`(${selectStatement})`);
       variables.push(...selectVariables);
 
       continue;
@@ -73,7 +101,7 @@ export const getUpdateColumns = (
       const innerSchema = fieldSchema && (isObjectSchema(fieldSchema) || isUnionSchema(fieldSchema)) ? fieldSchema : undefined;
       const mustCombine = coalesce || !fieldSchema || (innerSchema && isDynamicObjectColumn(innerSchema));
 
-      const columnName = mergeSqlPath(fieldName, parent);
+      const columnName = mergeSqlPath(fieldName, parent, fieldKey);
       const columnPath = mergeSqlAlias(columnName, source.alias);
 
       const jsonValue = getUpdateColumns(source, value, innerSchema, {
@@ -101,7 +129,7 @@ export const getUpdateColumns = (
       }
 
       if (expression.length) {
-        pushUpdate(fieldName, expression.join(' '));
+        pushUpdate(expression.join(' '));
       }
 
       if (!mustCombine && depth === 0) {
@@ -114,21 +142,18 @@ export const getUpdateColumns = (
     const fieldIndex = references.counter++;
 
     if (!(value instanceof SqlRawOperation)) {
-      pushUpdate(fieldName, `:${fieldIndex}`);
-    } else if (isJsonRemoveOperator(value.operator)) {
-      columns.push(`${value.operator} '${value.build()}'`);
-      continue;
+      pushUpdate(`:${fieldIndex}`);
     } else {
-      const columnName = mergeSqlJsonPath(fieldName, parent, true);
+      const columnName = mergeSqlJsonPath(fieldName, parent, true, fieldKey);
       const columnPath = mergeSqlAlias(columnName, source.alias);
 
       if (!json) {
-        pushUpdate(fieldName, `(${columnPath} ${value.operator} :${fieldIndex})`);
+        pushUpdate(`(${columnPath} ${value.operator} :${fieldIndex})`);
       } else {
         const lhsOperand = getOperandColumn(fieldSchema, fieldName, coalesce ? getOperandCoalesce(fieldSchema, columnPath) : columnPath);
         const rhsOperand = getOperandColumn(fieldSchema, fieldName, `:${fieldIndex}`);
 
-        pushUpdate(fieldName, `(${lhsOperand} ${value.operator} ${rhsOperand})::text::jsonb`);
+        pushUpdate(`(${lhsOperand} ${value.operator} ${rhsOperand})::text::jsonb`);
       }
     }
 

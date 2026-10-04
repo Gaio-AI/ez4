@@ -5,7 +5,7 @@ import type { SqlOrder } from './types';
 import { isAnyObject } from '@ez4/utils';
 
 import { mergeSqlAlias, mergeSqlJsonPath, mergeSqlPath } from '../utils/merge';
-import { escapeSqlName, escapeSqlText } from '../utils/escape';
+import { escapeSqlKey, escapeSqlName } from '../utils/escape';
 import { SqlSelectStatement } from '../statements/select';
 import { SqlOrderClause } from '../clauses/query/order';
 import { getUniqueAlias } from '../helpers/alias';
@@ -98,7 +98,7 @@ const getJsonObject = (record: SqlJsonColumnRecord, context: SqlJsonColumnContex
     const columnName = raw ? mergeSqlJsonPath(field, parent) : mergeSqlPath(field, parent);
 
     if (value instanceof SqlRawValue || value instanceof SqlColumnReference) {
-      fields.push(`${escapeSqlText(field)}, ${value.build()}`);
+      fields.push(`${escapeSqlKey(field)}, ${value.build()}`);
       continue;
     }
 
@@ -108,14 +108,14 @@ const getJsonObject = (record: SqlJsonColumnRecord, context: SqlJsonColumnContex
 
       const [selectStatement, selectVariables] = value.as(temporaryAlias).build();
 
-      fields.push(`${escapeSqlText(field)}, (${selectStatement})`);
+      fields.push(`${escapeSqlKey(field)}, (${selectStatement})`);
       variables.push(...selectVariables);
 
       continue;
     }
 
     if (!isAnyObject(value)) {
-      fields.push(`${escapeSqlText(field)}, ${mergeSqlAlias(columnName, alias)}`);
+      fields.push(`${escapeSqlKey(field)}, ${mergeSqlAlias(columnName, alias)}`);
       continue;
     }
 
@@ -124,7 +124,7 @@ const getJsonObject = (record: SqlJsonColumnRecord, context: SqlJsonColumnContex
       parent: columnName
     });
 
-    fields.push(`${escapeSqlText(field)}, ${nestedObject}`);
+    fields.push(`${escapeSqlKey(field)}, ${nestedObject}`);
   }
 
   return `${raw ? 'json' : 'jsonb'}_build_object(${fields.join(', ')})`;

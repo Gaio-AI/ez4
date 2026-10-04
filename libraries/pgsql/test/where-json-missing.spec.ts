@@ -84,4 +84,36 @@ describe('sql where json missing tests', () => {
 
     assert.equal(statement, `SELECT FROM "test" WHERE (NOT ("json" ? 'foo') OR "json"->>'foo' IS null)`);
   });
+
+  it('assert :: where json is missing (with key that reads as sql)', ({ assert }) => {
+    const query = sql
+      .select({
+        type: SchemaType.Object,
+        properties: {
+          json: {
+            type: SchemaType.Object,
+            properties: {
+              "it's\\": {
+                type: SchemaType.String,
+                optional: true
+              }
+            }
+          }
+        }
+      })
+      .from('test')
+      .where({
+        json: {
+          "it's\\": {
+            isMissing: true
+          }
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    assert.deepEqual(variables, []);
+
+    assert.equal(statement, `SELECT FROM "test" WHERE NOT ("json" ? ('it''s' || chr(92)))`);
+  });
 });
