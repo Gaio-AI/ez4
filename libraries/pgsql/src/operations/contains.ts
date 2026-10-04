@@ -17,11 +17,14 @@ export const getContainsOperation = (column: string, schema: AnySchema | undefin
       const rhsOperand = getOperandPattern(schema, operand, context);
       const lhsOperand = getOperandColumn(schema, column, context);
 
+      // The backslash the pattern is escaped with is the default LIKE escape, so no ESCAPE clause is written:
+      // the RDS Data API reads the `\'` in `ESCAPE '\'` as an escaped quote and leaves every later parameter
+      // of the statement unbound.
       if (context.flags?.insensitive) {
-        return `${lhsOperand} ILIKE '%' || ${rhsOperand} || '%' ESCAPE '\\'`;
+        return `${lhsOperand} ILIKE '%' || ${rhsOperand} || '%'`;
       }
 
-      return `${lhsOperand} LIKE '%' || ${rhsOperand} || '%' ESCAPE '\\'`;
+      return `${lhsOperand} LIKE '%' || ${rhsOperand} || '%'`;
     }
   }
 };

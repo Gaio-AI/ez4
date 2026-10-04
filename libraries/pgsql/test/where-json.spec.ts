@@ -296,7 +296,7 @@ describe('sql where json tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo"->>'bar' LIKE :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo"->>'bar' LIKE :0 || '%'`);
   });
 
   it('assert :: where contains (with json value)', ({ assert }) => {
@@ -319,7 +319,7 @@ describe('sql where json tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo"->>'bar' LIKE '%' || :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo"->>'bar' LIKE '%' || :0 || '%'`);
   });
 
   it('assert :: where contains (with json object)', ({ assert }) => {

@@ -204,7 +204,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%'`);
   });
 
   it('assert :: where starts with (with insensitive)', ({ assert }) => {
@@ -222,7 +222,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE :0 || '%'`);
   });
 
   it('assert :: where starts with (with pattern characters)', ({ assert }) => {
@@ -239,7 +239,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['50\\%\\_\\\\']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE :0 || '%'`);
   });
 
   it('assert :: where contains', ({ assert }) => {
@@ -256,7 +256,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%'`);
   });
 
   it('assert :: where contains (with insensitive)', ({ assert }) => {
@@ -274,7 +274,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['abc']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE '%' || :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" ILIKE '%' || :0 || '%'`);
   });
 
   it('assert :: where contains (with pattern characters)', ({ assert }) => {
@@ -291,7 +291,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, ['50\\%\\_\\\\']);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || :0 || '%'`);
   });
 
   it('assert :: where contains (with raw value)', ({ assert }) => {
@@ -308,7 +308,7 @@ describe('sql where tests', () => {
 
     assert.deepEqual(variables, []);
 
-    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || '50%_\\' || '%' ESCAPE '\\'`);
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo" LIKE '%' || '50%_\\' || '%'`);
   });
 
   it('assert :: where multiple operators', ({ assert }) => {
