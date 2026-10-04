@@ -1,7 +1,7 @@
 {
   "name": "@ez4/docs-gateway-ui",
   "description": "EZ4: Gateway documentation UI",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Wellington Martins",
   "license": "MIT",
   "type": "module",
