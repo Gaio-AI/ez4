@@ -65,10 +65,9 @@ const createResource = (candidate: QueueState, context: StepContext): Promise<Qu
       })
     };
 
+    // The owner project keeps the queue attributes: an import only resolves the queue.
     if (parameters.import) {
       const { queueUrl } = await fetchQueue(logger, parameters.queueName);
-
-      await updateQueue(logger, queueUrl, request);
 
       return {
         deadLetterArn,
