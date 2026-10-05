@@ -72,7 +72,7 @@ const forwardRemote = (req: IncomingMessage, res: ServerResponse, hostname: stri
     return;
   }
 
-  const { origin, referer, host, ...headers } = req.headers;
+  const { origin: _origin, referer: _referer, host: _host, ...headers } = req.headers;
   const send = target.protocol === 'https:' ? httpsRequest : request;
   const path = `${target.pathname.replace(/\/$/, '')}${req.url}`;
 
