@@ -24,6 +24,17 @@ export type StepResult = Record<string, any> | undefined;
 export type StepPostAction = () => void | Promise<void>;
 
 /**
+ * Options for a step post-action.
+ */
+export type StepPostActionOptions = {
+  /**
+   * Determines whether the post action is skipped (leaving the entry as partial) when any entry that depends on
+   * the current one, directly or not, failed its step or a post action that ran before this one.
+   */
+  requireDependents?: boolean;
+};
+
+/**
  * Options containing flags for the step.
  */
 export type StepOptions = {
@@ -73,9 +84,10 @@ export type StepContext = {
    * Register a post action callback to be invoked after finishing all steps.
    *
    * @param callback Post action callback.
+   * @param options Post action options.
    * @returns Must return the resulting state of the post action.
    */
-  postAction: (callback: StepPostAction) => void;
+  postAction: (callback: StepPostAction, options?: StepPostActionOptions) => void;
 
   /**
    * Add a warning message to the current step.
