@@ -1,7 +1,7 @@
 {
   "name": "@ez4/local-database",
   "description": "EZ4: Local database emulator",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -52,14 +52,14 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1127.0",
     "@aws-sdk/client-dynamodb-streams": "^3.1127.0",
-    "@ez4/aws-dynamodb": "^1.0.0",
-    "@ez4/common": "^1.0.0"
+    "@ez4/aws-dynamodb": "^1.1.0",
+    "@ez4/common": "^1.1.0"
   },
   "dependencies": {
-    "@ez4/logger": "^1.0.0",
-    "@ez4/local-common": "^1.0.0",
-    "@ez4/project": "^1.0.0",
-    "@ez4/database": "^1.0.0",
-    "@ez4/utils": "^1.0.0"
+    "@ez4/logger": "^1.1.0",
+    "@ez4/local-common": "^1.1.0",
+    "@ez4/project": "^1.1.0",
+    "@ez4/database": "^1.1.0",
+    "@ez4/utils": "^1.1.0"
   }
 }
