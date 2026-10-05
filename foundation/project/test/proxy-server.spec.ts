@@ -2,7 +2,7 @@ import type { AddressInfo } from 'node:net';
 
 import { after, describe, it } from 'node:test';
 import { equal, rejects } from 'node:assert/strict';
-import type { ServerResponse } from 'node:http';
+import type { Server, ServerResponse } from 'node:http';
 
 import { createServer, request } from 'node:http';
 import { mkdtempSync } from 'node:fs';
@@ -36,7 +36,7 @@ const target = createServer((req, res) => {
 });
 const proxy = createProxyServer(home);
 
-const listen = async (server: ReturnType<typeof createServer>) => {
+const listen = async (server: Server) => {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return (server.address() as AddressInfo).port;
@@ -123,5 +123,14 @@ describe('proxy server', () => {
 
     equal(response.statusCode, 502);
     equal(body, 'ez4 proxy: no route for nothing.wt.gaio.localhost\n');
+  });
+
+  it('assert :: the probe host answers 200 without any route', async () => {
+    const proxyPort = (proxy.address() as AddressInfo).port;
+
+    const { status, body } = await get(proxyPort, 'ez4-proxy-probe.localhost');
+
+    equal(status, 200);
+    equal(body, 'ez4 proxy: ok\n');
   });
 });

@@ -2,8 +2,12 @@ import { spawnSync } from 'node:child_process';
 import { request } from 'node:http';
 import { createServer } from 'node:net';
 
+import { PROBE_HOST } from './server';
+
 export const PROXY_INTERNAL_PORT = 1355;
 export const FORWARDER_NAME = 'ez4-proxy-80';
+
+const INTERNAL_PORT_COUNT = 5;
 
 export type ProxyListenPlan = {
   listenPort: number;
@@ -25,6 +29,30 @@ const PORT_80_HELP = 'Port 80 needs permission. Run `ez4 proxy setup` once (sudo
 const PORT_80_ROOT_ONLY = 'Port 80 needs root on this OS for a loopback-only proxy. Set EZ4_PROXY_PORT=1355 (URLs will carry :1355).';
 
 const PORT_80_TAKEN = 'Port 80 is used by another server. Stop it or set EZ4_PROXY_PORT=1355.';
+
+export const getInternalPorts = (env = process.env) => {
+  const base = Number(env.EZ4_PROXY_INTERNAL_PORT) || 1355;
+
+  return Array.from({ length: INTERNAL_PORT_COUNT }, (_, offset) => base + offset);
+};
+
+export const findInternalPort = async (probe: Pick<ProxyPortProbe, 'canBind' | 'isOwnProxy'>, ports = getInternalPorts()) => {
+  for (const port of ports) {
+    if (await probe.isOwnProxy(port)) {
+      return port;
+    }
+  }
+
+  for (const port of ports) {
+    if ((await probe.canBind(port)) === 'ok') {
+      return port;
+    }
+  }
+
+  throw new Error(
+    `ez4 proxy: ports ${ports[0]}-${ports[ports.length - 1]} are all used by other servers. Free one or set EZ4_PROXY_INTERNAL_PORT.`
+  );
+};
 
 // Binding 80 is tried before Docker: Linux with the sysctl or capability needs no container.
 // Elsewhere the loopback bind needs root (macOS only frees 80 on the wildcard address) and Docker Desktop's
@@ -92,7 +120,7 @@ export const canBindPort = (port: number) => {
 
 export const isOwnProxy = (port: number) => {
   return new Promise<boolean>((resolve) => {
-    const probe = request({ host: '127.0.0.1', port, headers: { host: 'ez4-proxy-probe.localhost' }, timeout: 1000 }, (response) => {
+    const probe = request({ host: '127.0.0.1', port, headers: { host: PROBE_HOST }, timeout: 1000 }, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => (body += chunk));

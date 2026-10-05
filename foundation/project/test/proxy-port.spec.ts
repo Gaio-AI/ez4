@@ -3,13 +3,15 @@ import type { BindResult } from '../src/proxy/port';
 
 import { describe, it } from 'node:test';
 import { deepEqual, equal, rejects } from 'node:assert/strict';
+import type { Server } from 'node:http';
+
 import { createServer } from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 
-import { canBindPort, getForwarderArgs, isOwnProxy, planProxyListen } from '../src/proxy/port';
+import { canBindPort, findInternalPort, getForwarderArgs, getInternalPorts, isOwnProxy, planProxyListen } from '../src/proxy/port';
 import { createProxyServer } from '../src/proxy/server';
 
 const probe = (
@@ -23,11 +25,16 @@ const probe = (
   isOwnProxy: async () => !!options.ownProxy
 });
 
-const listen = async (server: ReturnType<typeof createServer>) => {
+const listen = async (server: Server) => {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   return (server.address() as AddressInfo).port;
 };
+
+const rangeProbe = (state: Record<number, 'own' | 'other'>) => ({
+  canBind: async (port: number): Promise<BindResult> => (state[port] ? 'EADDRINUSE' : 'ok'),
+  isOwnProxy: async (port: number) => state[port] === 'own'
+});
 
 describe('proxy port', () => {
   it('assert :: a port other than 80 is used as is', async () => {
@@ -110,5 +117,37 @@ describe('proxy port', () => {
       'socat TCP4-LISTEN:80,bind=127.0.0.1,fork,reuseaddr TCP4:127.0.0.1:1355 & ' +
         'socat TCP6-LISTEN:80,bind=[::1],ipv6only=1,fork,reuseaddr TCP4:127.0.0.1:1355 & wait'
     ]);
+  });
+});
+
+describe('proxy internal port', () => {
+  it('assert :: the range starts at 1355 unless EZ4_PROXY_INTERNAL_PORT moves it', () => {
+    deepEqual(getInternalPorts({}), [1355, 1356, 1357, 1358, 1359]);
+    deepEqual(getInternalPorts({ EZ4_PROXY_INTERNAL_PORT: '2400' }), [2400, 2401, 2402, 2403, 2404]);
+  });
+
+  it('assert :: a running ez4 proxy in the range is reused before a free port', async () => {
+    equal(await findInternalPort(rangeProbe({ 1357: 'own' })), 1357);
+  });
+
+  it('assert :: a port held by another server is skipped', async () => {
+    equal(await findInternalPort(rangeProbe({ 1355: 'other' })), 1356);
+  });
+
+  it('assert :: a range held by other servers fails naming it', async () => {
+    const state = { 1355: 'other', 1356: 'other', 1357: 'other', 1358: 'other', 1359: 'other' } as const;
+
+    await rejects(findInternalPort(rangeProbe(state)), /ports 1355-1359 are all used by other servers/);
+  });
+
+  it('assert :: a server answering 200 to everything is not an ez4 proxy', async () => {
+    const other = createServer((_req, res) => res.end('ok'));
+    const otherPort = await listen(other);
+
+    try {
+      equal(await isOwnProxy(otherPort), false);
+    } finally {
+      other.close();
+    }
   });
 });

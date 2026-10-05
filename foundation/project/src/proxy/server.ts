@@ -6,6 +6,8 @@ import { pipeline } from 'node:stream';
 
 import { findRoute } from './routes';
 
+export const PROBE_HOST = 'ez4-proxy-probe.localhost';
+
 const getHostname = (req: IncomingMessage) => (req.headers.host ?? '').split(':')[0].toLowerCase();
 
 const getNoRouteMessage = (hostname: string) => `ez4 proxy: no route for ${hostname}\n`;
@@ -13,6 +15,12 @@ const getNoRouteMessage = (hostname: string) => `ez4 proxy: no route for ${hostn
 export const createProxyServer = (home?: string) => {
   const server = createServer((req, res) => {
     const hostname = getHostname(req);
+
+    if (hostname === PROBE_HOST) {
+      res.writeHead(200, { 'content-type': 'text/plain' }).end('ez4 proxy: ok\n');
+      return;
+    }
+
     const route = findRoute(hostname, home);
 
     if (!route) {
