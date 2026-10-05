@@ -21,6 +21,28 @@ describe('proxy routes', () => {
     deepEqual(listRoutes(home), [{ host: 'console.wt.gaio.localhost', port: 4100, pid: process.pid }]);
   });
 
+  it('assert :: a remote route keeps its target and owner', () => {
+    const home = mkdtempSync(join(tmpdir(), 'ez4-proxy-'));
+
+    addRoute({ host: 'api.app.wt.localhost', port: 0, pid: process.pid, target: 'https://abc.execute-api.us-east-1.amazonaws.com' }, home);
+
+    deepEqual(findRoute('api.app.wt.localhost', home), {
+      host: 'api.app.wt.localhost',
+      port: 0,
+      pid: process.pid,
+      target: 'https://abc.execute-api.us-east-1.amazonaws.com'
+    });
+  });
+
+  it('assert :: a remote route to another scheme is ignored', () => {
+    const home = mkdtempSync(join(tmpdir(), 'ez4-proxy-'));
+
+    mkdirSync(join(home, 'routes'));
+    writeFileSync(join(home, 'routes', 'bad.wt.localhost'), `remote ${process.pid} file:///etc/passwd`);
+
+    equal(findRoute('bad.wt.localhost', home), undefined);
+  });
+
   it('assert :: a route of a dead process is dropped', () => {
     const home = createHome();
 

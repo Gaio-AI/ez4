@@ -1,8 +1,8 @@
 import type { AddressInfo } from 'node:net';
 
 import { after, describe, it } from 'node:test';
-import { equal, rejects } from 'node:assert/strict';
-import type { Server, ServerResponse } from 'node:http';
+import { deepEqual, equal, rejects } from 'node:assert/strict';
+import type { IncomingHttpHeaders, Server, ServerResponse } from 'node:http';
 
 import { createServer, request } from 'node:http';
 import { mkdtempSync } from 'node:fs';
@@ -34,6 +34,12 @@ const target = createServer((req, res) => {
 
   res.end(`${req.method} ${req.url} ${req.headers.host}`);
 });
+
+const remote = createServer((req, res) => {
+  res.writeHead(200, { 'access-control-allow-origin': 'https://deployed.example.com', 'content-type': 'application/json' });
+  res.end(JSON.stringify({ method: req.method, url: req.url, host: req.headers.host, origin: req.headers.origin ?? null }));
+});
+
 const proxy = createProxyServer(home);
 
 const listen = async (server: Server) => {
@@ -55,8 +61,21 @@ const get = (port: number, host: string, path = '/hello?x=1') => {
   });
 };
 
+const call = (port: number, host: string, method: string, headers: Record<string, string> = {}) => {
+  return new Promise<{ status: number; headers: IncomingHttpHeaders; body: string }>((resolve, reject) => {
+    const req = request({ port, host: '127.0.0.1', method, path: '/users/me', headers: { host, ...headers } }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode!, headers: res.headers, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+};
+
 after(() => {
   target.close();
+  remote.close();
   proxy.close();
 });
 
@@ -125,6 +144,28 @@ describe('proxy server', () => {
     equal(body, 'ez4 proxy: no route for nothing.wt.gaio.localhost\n');
   });
 
+  it('assert :: a websocket upgrade to a remote route answers 502 Bad Gateway', async () => {
+    const proxyPort = (proxy.address() as AddressInfo).port;
+
+    addRoute({ host: 'ws-remote.wt.localhost', port: 0, pid: process.pid, target: 'https://example.com' }, home);
+
+    const req = request({
+      port: proxyPort,
+      host: '127.0.0.1',
+      headers: { host: 'ws-remote.wt.localhost', connection: 'Upgrade', upgrade: 'websocket' }
+    });
+
+    req.end();
+
+    const [response] = await once(req, 'response');
+
+    let body = '';
+    for await (const chunk of response) body += chunk;
+
+    equal(response.statusCode, 502);
+    equal(body, 'ez4 proxy: remote routes do not carry websockets\n');
+  });
+
   it('assert :: the probe host answers 200 without any route', async () => {
     const proxyPort = (proxy.address() as AddressInfo).port;
 
@@ -132,5 +173,51 @@ describe('proxy server', () => {
 
     equal(status, 200);
     equal(body, 'ez4 proxy: ok\n');
+  });
+});
+
+describe('proxy remote route', () => {
+  it('assert :: a remote route forwards under the target path with its host and no origin', async () => {
+    const remotePort = await listen(remote);
+    const proxyPort = (proxy.address() as AddressInfo).port;
+
+    addRoute({ host: 'api.app.wt.localhost', port: 0, pid: process.pid, target: `http://127.0.0.1:${remotePort}/base` }, home);
+
+    const { status, body } = await call(proxyPort, 'api.app.wt.localhost', 'GET', { origin: 'http://app.wt.localhost' });
+
+    equal(status, 200);
+    deepEqual(JSON.parse(body), { method: 'GET', url: '/base/users/me', host: `127.0.0.1:${remotePort}`, origin: null });
+  });
+
+  it('assert :: a localhost origin gets credentialed cors instead of the target one', async () => {
+    const proxyPort = (proxy.address() as AddressInfo).port;
+
+    const { headers } = await call(proxyPort, 'api.app.wt.localhost', 'GET', { origin: 'http://app.wt.localhost' });
+
+    equal(headers['access-control-allow-origin'], 'http://app.wt.localhost');
+    equal(headers['access-control-allow-credentials'], 'true');
+  });
+
+  it('assert :: another origin gets no cors at all', async () => {
+    const proxyPort = (proxy.address() as AddressInfo).port;
+
+    const { headers } = await call(proxyPort, 'api.app.wt.localhost', 'GET', { origin: 'https://evil.example.com' });
+
+    equal(headers['access-control-allow-origin'], undefined);
+  });
+
+  it('assert :: a preflight is answered without reaching the target', async () => {
+    const proxyPort = (proxy.address() as AddressInfo).port;
+
+    const { status, headers, body } = await call(proxyPort, 'api.app.wt.localhost', 'OPTIONS', {
+      origin: 'http://app.wt.localhost',
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'authorization,content-type'
+    });
+
+    equal(status, 204);
+    equal(body, '');
+    equal(headers['access-control-allow-methods'], 'POST');
+    equal(headers['access-control-allow-headers'], 'authorization,content-type');
   });
 });

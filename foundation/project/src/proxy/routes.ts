@@ -6,6 +6,17 @@ export type ProxyRoute = {
   host: string;
   port: number;
   pid: number;
+  target?: string;
+};
+
+const REMOTE_PREFIX = 'remote ';
+
+const isRemoteTarget = (target: string) => {
+  try {
+    return ['http:', 'https:'].includes(new URL(target).protocol);
+  } catch {
+    return false;
+  }
 };
 
 export const getProxyHome = () => {
@@ -36,7 +47,7 @@ export const addRoute = (route: ProxyRoute, home = getProxyHome()) => {
   const temporaryFile = join(routesPath, `.${route.host}.${process.pid}`);
 
   mkdirSync(routesPath, { recursive: true, mode: 0o700 });
-  writeFileSync(temporaryFile, `${route.port} ${route.pid}`);
+  writeFileSync(temporaryFile, route.target ? `${REMOTE_PREFIX}${route.pid} ${route.target}` : `${route.port} ${route.pid}`);
   renameSync(temporaryFile, join(routesPath, route.host));
 };
 
@@ -51,6 +62,12 @@ const readRoute = (host: string, home: string): ProxyRoute | undefined => {
     content = readFileSync(join(getRoutesPath(home), host), 'utf8');
   } catch {
     return undefined;
+  }
+
+  if (content.startsWith(REMOTE_PREFIX)) {
+    const [pid, target] = content.slice(REMOTE_PREFIX.length).split(' ');
+
+    return Number.isInteger(Number(pid)) && target && isRemoteTarget(target) ? { host, port: 0, pid: Number(pid), target } : undefined;
   }
 
   const [port, pid] = content.split(' ').map(Number);
