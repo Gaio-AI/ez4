@@ -7,6 +7,18 @@ import { triggerAllAsync } from '@ez4/project/library';
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
+import { hash } from 'node:crypto';
+
+import { StaleStateError } from '../errors/state';
+
+export type LoadedState = {
+  state: EntryStates;
+
+  /**
+   * Digest of the stored state, absent while there is none.
+   */
+  checksum?: string;
+};
 
 export const mergeState = (newState: EntryStates, oldState: EntryStates) => {
   for (const entityId in newState) {
@@ -16,7 +28,7 @@ export const mergeState = (newState: EntryStates, oldState: EntryStates) => {
   }
 };
 
-export const loadState = async (stateOptions: ProjectStateOptions, deployOptions: DeployOptions) => {
+export const loadState = async (stateOptions: ProjectStateOptions, deployOptions: DeployOptions): Promise<LoadedState> => {
   const { projectName, branchName } = deployOptions;
 
   if (!stateOptions.remote) {
@@ -26,7 +38,7 @@ export const loadState = async (stateOptions: ProjectStateOptions, deployOptions
       return unpackState(await readFile(path));
     }
 
-    return {};
+    return { state: {} };
   }
 
   const path = getPath(projectName, stateOptions.path, branchName);
@@ -39,7 +51,19 @@ export const loadState = async (stateOptions: ProjectStateOptions, deployOptions
     return unpackState(data);
   }
 
-  return {};
+  return { state: {} };
+};
+
+/**
+ * A plan only holds for the state it was made from, and another deploy can save the state while this one waits for
+ * the confirmation or the lock. Checked under the lock, the state can't change again until the lock is released.
+ */
+export const assertStateUnchanged = async (stateOptions: ProjectStateOptions, deployOptions: DeployOptions, checksum?: string) => {
+  const currentState = await loadState(stateOptions, deployOptions);
+
+  if (currentState.checksum !== checksum) {
+    throw new StaleStateError();
+  }
 };
 
 export const saveState = async (stateOptions: ProjectStateOptions, deployOptions: DeployOptions, state: EntryStates) => {
@@ -78,8 +102,11 @@ const packState = (state: EntryStates) => {
   return JSON.stringify(data, undefined, 2);
 };
 
-const unpackState = (buffer: Buffer) => {
+const unpackState = (buffer: Buffer): LoadedState => {
   const data = JSON.parse(buffer.toString());
 
-  return data.state ?? {};
+  return {
+    state: data.state ?? {},
+    checksum: hash('sha256', buffer)
+  };
 };
