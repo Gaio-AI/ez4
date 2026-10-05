@@ -68,6 +68,11 @@ export type HttpResponse = {
   body?: HttpDataSchema;
 };
 
+export type HttpHandlerError = {
+  status: number;
+  description?: string;
+};
+
 export type HttpHandler = FunctionSignature & {
   provider?: WebProvider;
   response: HttpResponse;
@@ -75,6 +80,11 @@ export type HttpHandler = FunctionSignature & {
   isolated?: boolean;
   deprecated?: boolean;
   tags?: string[];
+
+  /**
+   * Errors the handler documents raising with `@throws`, for the API documentation only.
+   */
+  errors?: HttpHandlerError[];
 };
 
 export type HttpErrors = {

@@ -5,7 +5,7 @@ import { isAnyArray, isEmptyObject } from '@ez4/utils';
 
 import { getIndentedOutput, getMultilineOutput, getNameOutput } from '../utils/format';
 import { getSchemaReference } from '../utils/reference';
-import { getErrorDescription, getRouteErrors } from './errors';
+import { getRouteErrors } from './errors';
 import { getResponseSchemaName } from './response';
 import { getRequestSchemaName } from './request';
 import { getSecuritySchemes } from './security';
@@ -110,13 +110,35 @@ const getParametersOutput = (target: string, schema: ObjectSchema, namingStyle?:
     const propertySchema = schema.properties[propertyKey];
     const propertyName = getNameOutput(getPropertyName(propertyKey, namingStyle));
 
-    const isRequired = !(propertySchema.nullable || propertySchema.optional);
-    const schemaOutput = getSchemaOutput(propertySchema, namingStyle);
+    // A header, path or query value arrives as a string and is never null, so a nullable parameter is
+    // documented by its type alone, and the gateway refuses it missing unless it's optional.
+    const isRequired = !propertySchema.optional;
+    const schemaOutput = getSchemaOutput({ ...propertySchema, nullable: false }, namingStyle);
 
     output.push(`- name: ${propertyName}`, ...getIndentedOutput([`in: ${target}`, `required: ${isRequired}`, ...schemaOutput]));
   }
 
   return output;
+};
+
+const getHeadersOutput = (schema: ObjectSchema) => {
+  const output = [];
+
+  for (const headerName in schema.properties) {
+    const headerSchema = schema.properties[headerName];
+
+    // A header has no null value, so a nullable header is one that may be missing, like an optional one.
+    const isRequired = !(headerSchema.nullable || headerSchema.optional);
+    const schemaOutput = getSchemaOutput({ ...headerSchema, nullable: false });
+
+    output.push(`${getNameOutput(headerName)}:`, ...getIndentedOutput([`required: ${isRequired}`, ...schemaOutput]));
+  }
+
+  if (!output.length) {
+    return [];
+  }
+
+  return ['headers:', ...getIndentedOutput(output)];
 };
 
 const getContentOutput = (schemaNames: string[]) => {
@@ -139,6 +161,10 @@ const getResponsesOutput = (service: HttpService, route: HttpRoute) => {
   for (const status of statuses) {
     const content = [`description: "Successful response."`];
 
+    if (response.headers) {
+      content.push(...getHeadersOutput(response.headers));
+    }
+
     if (response.body) {
       content.push(...getContentOutput([getResponseSchemaName(handler)]));
     }
@@ -146,12 +172,12 @@ const getResponsesOutput = (service: HttpService, route: HttpRoute) => {
     output.push(`'${status}':`, ...getIndentedOutput(content));
   }
 
-  for (const [status, schemaNames] of getRouteErrors(service, route)) {
+  for (const { status, description, schemaNames } of getRouteErrors(service, route)) {
     if (statuses.includes(status)) {
       continue;
     }
 
-    const content = [`description: "${getMultilineOutput(getErrorDescription(status))}"`, ...getContentOutput(schemaNames)];
+    const content = [`description: "${getMultilineOutput(description)}"`, ...getContentOutput(schemaNames)];
 
     output.push(`'${status}':`, ...getIndentedOutput(content));
   }

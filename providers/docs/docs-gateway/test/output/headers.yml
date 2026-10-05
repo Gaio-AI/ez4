@@ -1,0 +1,61 @@
+# Auto-generated Open API specification, any manual modifications will be lost during regeneration.
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+
+paths:
+  /items:
+    get:
+      operationId: listItemsHandler
+      responses:
+        '200':
+          description: "Successful response."
+          headers:
+            ratelimit-remaining:
+              required: true
+              schema:
+                type: string
+                description: "Requests left in the current window."
+            x-cache:
+              required: false
+              schema:
+                type: string
+            x-next-cursor:
+              required: false
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listItemsHandler'
+    delete:
+      operationId: deleteItemsHandler
+      responses:
+        '202':
+          description: "Successful response."
+          headers:
+            location:
+              required: true
+              schema:
+                type: string
+        '204':
+          description: "Successful response."
+          headers:
+            location:
+              required: true
+              schema:
+                type: string
+
+components:
+  schemas:
+    listItemsHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+      required:
+        - items

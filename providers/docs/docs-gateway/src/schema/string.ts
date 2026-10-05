@@ -2,11 +2,11 @@ import type { StringSchema } from '@ez4/schema';
 
 import { isAnyNumber } from '@ez4/utils';
 
-import { getCommonSchemaOutput } from '../utils/schema';
+import { getCommonSchemaOutput, getConstantOutput, getTypeOutput } from '../utils/schema';
 import { getMultilineOutput } from '../utils/format';
 
 export const getStringSchemaOutput = (schema: StringSchema) => {
-  const output = ['type: string', ...getCommonSchemaOutput(schema)];
+  const output = [getTypeOutput('string', schema), ...getCommonSchemaOutput(schema)];
 
   if (schema.format) {
     output.push(`format: ${schema.format}`);
@@ -16,7 +16,7 @@ export const getStringSchemaOutput = (schema: StringSchema) => {
     const { default: defaultValue, minLength, maxLength, pattern, value } = schema.definitions;
 
     if (value) {
-      output.push(`enum: ["${getMultilineOutput(value)}"]`);
+      output.push(getConstantOutput(`"${getMultilineOutput(value)}"`, schema));
     }
 
     if (defaultValue) {

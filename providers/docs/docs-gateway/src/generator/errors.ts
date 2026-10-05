@@ -51,12 +51,18 @@ const GatewayErrorSchema: ObjectSchema = {
   }
 };
 
+export type RouteError = {
+  status: number;
+  description: string;
+  schemaNames: string[];
+};
+
 export const getErrorSchemas = (service: HttpService) => {
   const schemaNames = new Set<string>();
 
   for (const route of service.routes) {
-    for (const [, errorSchemaNames] of getRouteErrors(service, route)) {
-      errorSchemaNames.forEach((schemaName) => schemaNames.add(schemaName));
+    for (const error of getRouteErrors(service, route)) {
+      error.schemaNames.forEach((schemaName) => schemaNames.add(schemaName));
     }
   }
 
@@ -74,15 +80,21 @@ export const getErrorSchemas = (service: HttpService) => {
 };
 
 /**
- * Get the error statuses the route can respond, sorted, with the schema names of their bodies.
+ * Get the error statuses the route can respond, sorted, with their description and the schema names of their bodies.
  */
-export const getRouteErrors = (service: HttpService, route: HttpRoute) => {
-  const errors = new Map<number, Set<string>>();
+export const getRouteErrors = (service: HttpService, route: HttpRoute): RouteError[] => {
+  const errors = new Map<number, { schemaNames: Set<string>; descriptions: Set<string> }>();
 
-  const addError = (status: number, schemaName: string) => {
-    const schemaNames = errors.get(status) ?? new Set();
+  const addError = (status: number, schemaName: string, description?: string) => {
+    const error = errors.get(status) ?? { schemaNames: new Set(), descriptions: new Set() };
 
-    errors.set(status, schemaNames.add(schemaName));
+    error.schemaNames.add(schemaName);
+
+    if (description) {
+      error.descriptions.add(description);
+    }
+
+    errors.set(status, error);
   };
 
   const { request } = route.handler;
@@ -102,6 +114,11 @@ export const getRouteErrors = (service: HttpService, route: HttpRoute) => {
     addError(httpErrors[errorName], HttpErrorSchemaName);
   }
 
+  // Errors the handler raises by itself, documented with `@throws` in its JSDoc.
+  for (const { status, description } of route.handler.errors ?? []) {
+    addError(status, HttpErrorSchemaName, description);
+  }
+
   // The gateway responds by itself with 401 when the credential is missing or the authorizer finds it
   // unauthorized, and with 403 when the authorizer denies the request.
   if (route.authorizer) {
@@ -111,9 +128,13 @@ export const getRouteErrors = (service: HttpService, route: HttpRoute) => {
 
   return [...errors.entries()]
     .sort(([statusA], [statusB]) => statusA - statusB)
-    .map(([status, schemaNames]): [number, string[]] => [status, [...schemaNames]]);
+    .map(([status, { schemaNames, descriptions }]) => ({
+      status,
+      description: [...descriptions].join('\n\n') || getErrorDescription(status),
+      schemaNames: [...schemaNames]
+    }));
 };
 
-export const getErrorDescription = (status: number) => {
+const getErrorDescription = (status: number) => {
   return STATUS_CODES[status] ?? 'Error';
 };

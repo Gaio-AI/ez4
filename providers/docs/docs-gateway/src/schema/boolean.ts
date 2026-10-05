@@ -2,10 +2,10 @@ import type { BooleanSchema } from '@ez4/schema';
 
 import { isAnyBoolean } from '@ez4/utils';
 
-import { getCommonSchemaOutput } from '../utils/schema';
+import { getCommonSchemaOutput, getConstantOutput, getTypeOutput } from '../utils/schema';
 
 export const getBooleanSchemaOutput = (schema: BooleanSchema) => {
-  const output = ['type: boolean', ...getCommonSchemaOutput(schema)];
+  const output = [getTypeOutput('boolean', schema), ...getCommonSchemaOutput(schema)];
 
   if (schema.definitions) {
     const { default: defaultValue, value } = schema.definitions;
@@ -15,7 +15,7 @@ export const getBooleanSchemaOutput = (schema: BooleanSchema) => {
     }
 
     if (isAnyBoolean(value)) {
-      output.push(`enum: [${value}]`);
+      output.push(getConstantOutput(`${value}`, schema));
     }
   }
 

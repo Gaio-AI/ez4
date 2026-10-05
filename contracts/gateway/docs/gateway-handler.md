@@ -65,11 +65,13 @@ The handler JSDoc documents the route operation in the generated OpenAPI specifi
 - `@summary` and `@description` - Operation summary and description.
 - `@deprecated` - Marks the operation as deprecated.
 - `@tag <name>` - Groups the operation under the tag, one `@tag` per tag.
+- `@throws <status> [description]` - Documents an `HttpError` status the handler raises, one `@throws` per error. It changes nothing at runtime.
 
 ```ts
 /**
  * @summary Read a user.
  * @tag Users
+ * @throws 404 The user doesn't exist.
  */
 export function readUserHandler(request: Http.Incoming<ReadUserRequest>): ReadUserResponse {
   // ...
