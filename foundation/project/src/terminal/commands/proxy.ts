@@ -5,7 +5,7 @@ import { Logger } from '@ez4/logger';
 import { spawn } from 'node:child_process';
 import { closeSync } from 'node:fs';
 
-import { ensureForwarder, planProxyListen, setupUnprivilegedPort, systemPortProbe } from '../../proxy/port';
+import { ensureForwarder, getDockerGateway, planProxyListen, setupUnprivilegedPort, systemPortProbe } from '../../proxy/port';
 import { ensureProxy, getCliPath, getFreePort, openLogFile } from '../../proxy/daemon';
 import { addRoute, findRoute, isRouteHost, listRoutes, removeRoute } from '../../proxy/routes';
 import { createProxyServer } from '../../proxy/server';
@@ -81,28 +81,35 @@ const setupProxyPort = () => {
   process.exit(setupUnprivilegedPort());
 };
 
-const getListenPort = async () => {
+const getListenPlan = async () => {
   const daemonPort = Number(process.env.EZ4_PROXY_LISTEN);
 
   if (daemonPort) {
-    return daemonPort;
+    return { listenPort: daemonPort, behind: process.env.EZ4_PROXY_BEHIND === '1' };
   }
 
   const plan = await planProxyListen(getProxyPort(), systemPortProbe);
 
-  if (plan.forwarder) {
+  if (plan.mode === 'forwarder') {
     ensureForwarder(plan.listenPort);
   }
 
-  return plan.listenPort;
+  return { listenPort: plan.listenPort, behind: plan.mode === 'behind' };
 };
 
 const serveProxy = async () => {
-  const port = await getListenPort();
+  const { listenPort: port, behind } = await getListenPlan();
 
   // IPv6 is bound only after IPv4 is won, so two racing daemons never end up holding half each.
   listenLoopback(port, '127.0.0.1', () => {
     listenLoopback(port, '::1', () => Logger.log(`🔀 ez4 proxy listening on 127.0.0.1 and ::1 port ${port}`));
+
+    // A proxy in a container reaches the host through the Docker bridge gateway, not its loopback.
+    const gateway = behind ? getDockerGateway() : undefined;
+
+    if (gateway) {
+      listenLoopback(port, gateway, () => Logger.log(`🔀 ez4 proxy also listening on ${gateway} port ${port} for the proxy in front`));
+    }
   });
 };
 
@@ -110,8 +117,8 @@ const listenLoopback = (port: number, host: string, onListening: () => void) => 
   const server = createProxyServer();
 
   server.on('error', (error: NodeJS.ErrnoException) => {
-    if (host === '::1') {
-      Logger.warn(`ez4 proxy listening on 127.0.0.1 only (${error.message})`);
+    if (host !== '127.0.0.1') {
+      Logger.warn(`ez4 proxy not listening on ${host} (${error.message})`);
       return;
     }
 

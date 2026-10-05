@@ -1,17 +1,19 @@
 import { spawnSync } from 'node:child_process';
 import { request } from 'node:http';
-import { createServer } from 'node:net';
+import { createServer, isIP } from 'node:net';
 
 import { PROBE_HOST } from './server';
 
-export const PROXY_INTERNAL_PORT = 1355;
 export const FORWARDER_NAME = 'ez4-proxy-80';
 
 const INTERNAL_PORT_COUNT = 5;
+const FORWARDER_PORT_LABEL = 'ez4.port';
+
+export type ProxyListenMode = 'direct' | 'reuse' | 'forwarder' | 'behind';
 
 export type ProxyListenPlan = {
   listenPort: number;
-  forwarder: boolean;
+  mode: ProxyListenMode;
 };
 
 export type BindResult = 'ok' | 'EACCES' | 'EADDRINUSE';
@@ -27,8 +29,6 @@ export type ProxyPortProbe = {
 const PORT_80_HELP = 'Port 80 needs permission. Run `ez4 proxy setup` once (sudo), install Docker, or set EZ4_PROXY_PORT=1355.';
 
 const PORT_80_ROOT_ONLY = 'Port 80 needs root on this OS for a loopback-only proxy. Set EZ4_PROXY_PORT=1355 (URLs will carry :1355).';
-
-const PORT_80_TAKEN = 'Port 80 is used by another server. Stop it or set EZ4_PROXY_PORT=1355.';
 
 export const getInternalPorts = (env = process.env) => {
   const base = Number(env.EZ4_PROXY_INTERNAL_PORT) || 1355;
@@ -54,30 +54,29 @@ export const findInternalPort = async (probe: Pick<ProxyPortProbe, 'canBind' | '
   );
 };
 
-// Binding 80 is tried before Docker: Linux with the sysctl or capability needs no container.
-// Elsewhere the loopback bind needs root (macOS only frees 80 on the wildcard address) and Docker Desktop's
-// host network does not reach host loopback, so no forwarder can help.
-export const planProxyListen = async (port: number, probe: ProxyPortProbe): Promise<ProxyListenPlan> => {
-  if (port !== 80) {
-    return { listenPort: port, forwarder: false };
-  }
+const getPrivilegedPortHelp = (port: number) => `Port ${port} needs root. Set EZ4_PROXY_PORT to a port above 1023.`;
 
-  const bind = await probe.canBind(80);
+// Binding is tried before anything else: Linux with the sysctl or capability needs no container.
+// A port held by another server leaves the URLs on it and puts ez4 behind it (see ensureProxy).
+export const planProxyListen = async (port: number, probe: ProxyPortProbe): Promise<ProxyListenPlan> => {
+  const bind = await probe.canBind(port);
 
   if (bind === 'ok') {
-    return { listenPort: 80, forwarder: false };
+    return { listenPort: port, mode: 'direct' };
   }
 
   if (bind === 'EADDRINUSE') {
-    if (probe.isForwarderRunning()) {
-      return { listenPort: PROXY_INTERNAL_PORT, forwarder: true };
+    if (await probe.isOwnProxy(port)) {
+      return { listenPort: port, mode: 'reuse' };
     }
 
-    if (await probe.isOwnProxy(80)) {
-      return { listenPort: 80, forwarder: false };
-    }
+    const listenPort = await findInternalPort(probe);
 
-    throw new Error(PORT_80_TAKEN);
+    return { listenPort, mode: port === 80 && probe.isForwarderRunning() ? 'forwarder' : 'behind' };
+  }
+
+  if (port !== 80) {
+    throw new Error(getPrivilegedPortHelp(port));
   }
 
   if (probe.platform !== 'linux') {
@@ -85,7 +84,7 @@ export const planProxyListen = async (port: number, probe: ProxyPortProbe): Prom
   }
 
   if (probe.hasDocker()) {
-    return { listenPort: PROXY_INTERNAL_PORT, forwarder: true };
+    return { listenPort: await findInternalPort(probe), mode: 'forwarder' };
   }
 
   throw new Error(PORT_80_HELP);
@@ -100,6 +99,8 @@ export const getForwarderArgs = (internalPort: number) => [
   'unless-stopped',
   '--name',
   FORWARDER_NAME,
+  '--label',
+  `${FORWARDER_PORT_LABEL}=${internalPort}`,
   '--network',
   'host',
   '--entrypoint',
@@ -139,10 +140,19 @@ export const hasDocker = () => {
 };
 
 const getForwarderState = () => {
-  return spawnSync('docker', ['inspect', '-f', '{{.State.Running}}', FORWARDER_NAME], { encoding: 'utf8' });
+  const result = spawnSync(
+    'docker',
+    ['inspect', '-f', `{{.State.Running}} {{index .Config.Labels "${FORWARDER_PORT_LABEL}"}}`, FORWARDER_NAME],
+    {
+      encoding: 'utf8'
+    }
+  );
+  const [running, port] = result.status === 0 ? result.stdout.trim().split(' ') : [];
+
+  return { exists: result.status === 0, running: running === 'true', port: Number(port) };
 };
 
-export const isForwarderRunning = () => getForwarderState().stdout?.trim() === 'true';
+export const isForwarderRunning = () => getForwarderState().running;
 
 export const systemPortProbe: ProxyPortProbe = {
   platform: process.platform,
@@ -155,17 +165,29 @@ export const systemPortProbe: ProxyPortProbe = {
 export const ensureForwarder = (internalPort: number) => {
   const state = getForwarderState();
 
-  if (state.stdout?.trim() === 'true') {
+  if (state.running && state.port === internalPort) {
     return;
   }
 
-  const args = state.status === 0 ? ['start', FORWARDER_NAME] : getForwarderArgs(internalPort);
+  // A forwarder created for another internal port (or before the label) is replaced, not reused.
+  if (state.exists && state.port !== internalPort) {
+    spawnSync('docker', ['rm', '-f', FORWARDER_NAME], { stdio: 'ignore' });
+  }
+
+  const args = state.exists && state.port === internalPort ? ['start', FORWARDER_NAME] : getForwarderArgs(internalPort);
   const result = spawnSync('docker', args, { stdio: 'inherit' });
 
   // Another ez4 process may have created the container between the inspect and the run.
   if (result.status !== 0 && !isForwarderRunning()) {
     throw new Error(`Unable to start ${FORWARDER_NAME}. ${PORT_80_HELP}`);
   }
+};
+
+export const getDockerGateway = () => {
+  const result = spawnSync('docker', ['network', 'inspect', 'bridge', '-f', '{{(index .IPAM.Config 0).Gateway}}'], { encoding: 'utf8' });
+  const gateway = result.status === 0 ? result.stdout.trim() : '';
+
+  return isIP(gateway) === 4 ? gateway : undefined;
 };
 
 export const setupUnprivilegedPort = () => {

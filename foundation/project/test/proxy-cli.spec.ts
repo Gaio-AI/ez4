@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { describe, it } from 'node:test';
 import { deepEqual, equal, match } from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
@@ -59,19 +59,23 @@ describe('proxy cli', () => {
     const routeFile = join(home, 'routes', 'demo.wt.localhost');
     const script = `const fs = require('fs'); console.log(JSON.stringify({ port: process.env.PORT, host: process.env.HOST, owner: process.env.EZ4_PROXY_ROUTE, route: fs.readFileSync(${JSON.stringify(routeFile)}, 'utf8') }))`;
 
-    const result = spawnSync(process.execPath, ['bin/cli.mjs', 'proxy', 'run', 'demo.wt', '--', process.execPath, '-e', script], {
-      env: { ...process.env, EZ4_PROXY_HOME: home, EZ4_PROXY_PORT: `${(proxy.address() as AddressInfo).port}` },
-      encoding: 'utf8'
+    const child = spawn(process.execPath, ['bin/cli.mjs', 'proxy', 'run', 'demo.wt', '--', process.execPath, '-e', script], {
+      env: { ...process.env, EZ4_PROXY_HOME: home, EZ4_PROXY_PORT: `${(proxy.address() as AddressInfo).port}` }
     });
+
+    let stdout = '';
+    child.stdout.on('data', (chunk) => (stdout += chunk));
+
+    const [status] = await once(child, 'exit');
 
     proxy.close();
 
-    const output = JSON.parse(result.stdout.trim().split('\n').pop()!);
+    const output = JSON.parse(stdout.trim().split('\n').pop()!);
 
-    equal(result.status, 0);
+    equal(status, 0);
     equal(output.host, '127.0.0.1');
     equal(output.owner, 'demo.wt.localhost');
-    equal(output.route, `${output.port} ${result.pid}`);
+    equal(output.route, `${output.port} ${child.pid}`);
     equal(existsSync(routeFile), false);
   });
 

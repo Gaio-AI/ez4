@@ -14,15 +14,18 @@ import { once } from 'node:events';
 import { canBindPort, findInternalPort, getForwarderArgs, getInternalPorts, isOwnProxy, planProxyListen } from '../src/proxy/port';
 import { createProxyServer } from '../src/proxy/server';
 
+// The internal range (1355-1359) is free unless listed in `busy`; any other port answers `bind`.
+const isInternal = (port: number) => port >= 1355 && port <= 1359;
+
 const probe = (
   bind: BindResult,
-  options: { docker?: boolean; forwarder?: boolean; ownProxy?: boolean; platform?: NodeJS.Platform } = {}
+  options: { docker?: boolean; forwarder?: boolean; ownProxy?: boolean; busy?: number[]; platform?: NodeJS.Platform } = {}
 ) => ({
   platform: options.platform ?? 'linux',
-  canBind: async () => bind,
+  canBind: async (port: number): Promise<BindResult> => (!isInternal(port) ? bind : options.busy?.includes(port) ? 'EADDRINUSE' : 'ok'),
   hasDocker: () => !!options.docker,
   isForwarderRunning: () => !!options.forwarder,
-  isOwnProxy: async () => !!options.ownProxy
+  isOwnProxy: async (port: number) => !isInternal(port) && !!options.ownProxy
 });
 
 const listen = async (server: Server) => {
@@ -37,16 +40,26 @@ const rangeProbe = (state: Record<number, 'own' | 'other'>) => ({
 });
 
 describe('proxy port', () => {
-  it('assert :: a port other than 80 is used as is', async () => {
-    deepEqual(await planProxyListen(1355, probe('EACCES')), { listenPort: 1355, forwarder: false });
+  it('assert :: a free port is bound directly', async () => {
+    deepEqual(await planProxyListen(1300, probe('ok')), { listenPort: 1300, mode: 'direct' });
+    deepEqual(await planProxyListen(80, probe('ok', { docker: true })), { listenPort: 80, mode: 'direct' });
   });
 
-  it('assert :: port 80 is bound directly when allowed', async () => {
-    deepEqual(await planProxyListen(80, probe('ok', { docker: true })), { listenPort: 80, forwarder: false });
+  it('assert :: a port held by an ez4 proxy is reused', async () => {
+    deepEqual(await planProxyListen(80, probe('EADDRINUSE', { ownProxy: true })), { listenPort: 80, mode: 'reuse' });
   });
 
-  it('assert :: port 80 falls back to the docker forwarder', async () => {
-    deepEqual(await planProxyListen(80, probe('EACCES', { docker: true })), { listenPort: 1355, forwarder: true });
+  it('assert :: a port held by another server puts ez4 behind it on the first free internal port', async () => {
+    deepEqual(await planProxyListen(80, probe('EADDRINUSE', { docker: true, busy: [1355] })), { listenPort: 1356, mode: 'behind' });
+    deepEqual(await planProxyListen(1300, probe('EADDRINUSE')), { listenPort: 1355, mode: 'behind' });
+  });
+
+  it('assert :: port 80 held by the running forwarder keeps the forwarder', async () => {
+    deepEqual(await planProxyListen(80, probe('EADDRINUSE', { docker: true, forwarder: true })), { listenPort: 1355, mode: 'forwarder' });
+  });
+
+  it('assert :: port 80 without permission falls back to the docker forwarder', async () => {
+    deepEqual(await planProxyListen(80, probe('EACCES', { docker: true, busy: [1355] })), { listenPort: 1356, mode: 'forwarder' });
   });
 
   it('assert :: port 80 without permission outside linux asks for another port instead of docker', async () => {
@@ -60,16 +73,8 @@ describe('proxy port', () => {
     await rejects(planProxyListen(80, probe('EACCES')), /ez4 proxy setup/);
   });
 
-  it('assert :: port 80 held by the running forwarder keeps the forwarder plan', async () => {
-    deepEqual(await planProxyListen(80, probe('EADDRINUSE', { docker: true, forwarder: true })), { listenPort: 1355, forwarder: true });
-  });
-
-  it('assert :: port 80 held by an ez4 proxy is used directly', async () => {
-    deepEqual(await planProxyListen(80, probe('EADDRINUSE', { ownProxy: true })), { listenPort: 80, forwarder: false });
-  });
-
-  it('assert :: port 80 held by another server fails', async () => {
-    await rejects(planProxyListen(80, probe('EADDRINUSE', { docker: true })), /used by another server/);
+  it('assert :: another privileged port without permission asks for a port above 1023', async () => {
+    await rejects(planProxyListen(81, probe('EACCES', { docker: true })), /above 1023/);
   });
 
   it('assert :: an ez4 proxy is told apart from another server', async () => {
@@ -100,22 +105,24 @@ describe('proxy port', () => {
     equal(await canBindPort(port), 'ok');
   });
 
-  it('assert :: the forwarder repeats port 80 on ipv4 and ipv6 loopback only', () => {
-    deepEqual(getForwarderArgs(1355), [
+  it('assert :: the forwarder repeats port 80 on loopback to the labelled internal port', () => {
+    deepEqual(getForwarderArgs(1356), [
       'run',
       '-d',
       '--restart',
       'unless-stopped',
       '--name',
       'ez4-proxy-80',
+      '--label',
+      'ez4.port=1356',
       '--network',
       'host',
       '--entrypoint',
       'sh',
       'alpine/socat',
       '-c',
-      'socat TCP4-LISTEN:80,bind=127.0.0.1,fork,reuseaddr TCP4:127.0.0.1:1355 & ' +
-        'socat TCP6-LISTEN:80,bind=[::1],ipv6only=1,fork,reuseaddr TCP4:127.0.0.1:1355 & wait'
+      'socat TCP4-LISTEN:80,bind=127.0.0.1,fork,reuseaddr TCP4:127.0.0.1:1356 & ' +
+        'socat TCP6-LISTEN:80,bind=[::1],ipv6only=1,fork,reuseaddr TCP4:127.0.0.1:1356 & wait'
     ]);
   });
 });
