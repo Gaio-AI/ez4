@@ -1,0 +1,192 @@
+# Auto-generated Open API specification, any manual modifications will be lost during regeneration.
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+
+paths:
+  /items/{itemId}:
+    patch:
+      operationId: updateItemHandler
+      parameters:
+        - name: x-tenant
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-trace
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: dry
+          in: query
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateItemHandlerRequest'
+      responses:
+        '200':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/updateItemHandler'
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+components:
+  schemas:
+    updateItemHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: [string, 'null']
+        note:
+          type: [string, 'null']
+        count:
+          type: [number, 'null']
+        active:
+          type: [boolean, 'null']
+        owner:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+            name:
+              type: [string, 'null']
+          required:
+            - id
+            - name
+        node:
+          type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+            parent:
+              anyOf:
+                - $ref: '#/components/schemas/updateItemHandler/properties/node'
+                - type: 'null'
+          required:
+            - name
+            - parent
+        position:
+          type: [array, 'null']
+          items: false
+          prefixItems:
+            - type: number
+            - type: number
+        priority:
+          type: [number, 'null']
+          enum:
+            - 1
+            - 2
+            - null
+        level:
+          type: [string, number, 'null']
+          enum:
+            - "none"
+            - 1
+            - null
+      required:
+        - id
+        - name
+        - count
+        - active
+        - owner
+        - node
+        - position
+        - priority
+        - level
+    updateItemHandlerRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: [string, 'null']
+        note:
+          type: [string, 'null']
+        label:
+          type: string
+        kind:
+          type: [string, 'null']
+          enum: ["item", null]
+        color:
+          type: [string, 'null']
+          enum:
+            - "red"
+            - "blue"
+            - null
+        size:
+          type: [string, 'null']
+          enum:
+            - "small"
+            - "large"
+            - null
+        owner:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+            name:
+              type: [string, 'null']
+          required:
+            - id
+            - name
+        tags:
+          type: [array, 'null']
+          items:
+            type: [string, 'null']
+        value:
+          anyOf:
+          - type: string
+          - type: number
+          - type: 'null'
+      required:
+        - name
+        - kind
+        - color
+        - size
+        - owner
+        - tags
+        - value
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message

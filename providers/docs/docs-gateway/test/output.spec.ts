@@ -39,4 +39,7 @@ describe('gateway documentation (open api output)', () => {
   it('assert :: auth query', () => testFile('auth-query'));
   it('assert :: auth jwt', () => testFile('auth-jwt'));
   it('assert :: complete api', () => testFile('complete'));
+  it('assert :: nullable fields', () => testFile('nullable'));
+  it('assert :: response headers', () => testFile('headers'));
+  it('assert :: handler errors', () => testFile('throws'));
 });

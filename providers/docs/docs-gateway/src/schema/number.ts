@@ -2,10 +2,10 @@ import type { NumberSchema } from '@ez4/schema';
 
 import { isAnyNumber } from '@ez4/utils';
 
-import { getCommonSchemaOutput } from '../utils/schema';
+import { getCommonSchemaOutput, getConstantOutput, getTypeOutput } from '../utils/schema';
 
 export const getNumberSchemaOutput = (schema: NumberSchema) => {
-  const output = [`type: ${schema.format === 'integer' ? 'integer' : 'number'}`];
+  const output = [getTypeOutput(schema.format === 'integer' ? 'integer' : 'number', schema)];
 
   output.push(...getCommonSchemaOutput(schema));
 
@@ -25,7 +25,7 @@ export const getNumberSchemaOutput = (schema: NumberSchema) => {
     }
 
     if (isAnyNumber(value)) {
-      output.push(`enum: [${value}]`);
+      output.push(getConstantOutput(`${value}`, schema));
     }
   }
 

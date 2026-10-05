@@ -3,21 +3,25 @@ import type { SchemaOutputContext } from '../utils/reference';
 
 import { getPropertyName } from '@ez4/schema';
 
-import { getCommonSchemaOutput } from '../utils/schema';
+import { getCommonSchemaOutput, getTypeOutput } from '../utils/schema';
 import { getChildSchemaOutputContext } from '../utils/reference';
 import { getIndentedOutput, getNameOutput } from '../utils/format';
 import { getAnySchemaOutput } from '../schema/any';
 
 export const getObjectSchemaOutput = (schema: ObjectSchema, namingStyle?: NamingStyle, context?: SchemaOutputContext) => {
   if (schema.definitions?.encoded) {
-    return ['type: string', ...getCommonSchemaOutput(schema), 'format: byte'];
+    return [getTypeOutput('string', schema), ...getCommonSchemaOutput(schema), 'format: byte'];
   }
 
   if (context && schema.identity) {
     context.identities.set(schema.identity, context.pointer);
   }
 
-  const output = ['type: object', ...getCommonSchemaOutput(schema), `additionalProperties: ${!!schema.definitions?.extensible}`];
+  const output = [
+    getTypeOutput('object', schema),
+    ...getCommonSchemaOutput(schema),
+    `additionalProperties: ${!!schema.definitions?.extensible}`
+  ];
 
   const requiredProperties = [];
   const propertiesOutput = [];
@@ -27,7 +31,8 @@ export const getObjectSchemaOutput = (schema: ObjectSchema, namingStyle?: Naming
     const propertyName = getPropertyName(propertyKey, namingStyle);
     const propertyOutput = getNameOutput(propertyName);
 
-    if (!propertySchema.nullable && !propertySchema.optional) {
+    // A nullable property is still sent, with null: only an optional one can be left out.
+    if (!propertySchema.optional) {
       requiredProperties.push(`- ${propertyOutput}`);
     }
 

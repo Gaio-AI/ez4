@@ -50,6 +50,9 @@ describe('gateway documentation (open api validation)', () => {
   it('assert :: auth jwt', () => testFile('auth-jwt'));
   it('assert :: complete api', () => testFile('complete'));
   it('assert :: naming style in arrays', () => testFile('naming-array'));
+  it('assert :: nullable fields', () => testFile('nullable'));
+  it('assert :: response headers', () => testFile('headers'));
+  it('assert :: handler errors', () => testFile('throws'));
 
   // Both routes share the handler and have no name, so their operation id is the same.
   it('assert :: naming style', () => testFile('naming-style', { 'duplicate-operation-id': 'warning' }));

@@ -1,6 +1,6 @@
 import type { AllType, ReflectionTypes, TypeCallback, TypeFunction, TypeModel } from '@ez4/reflection';
 import type { Incomplete } from '@ez4/utils';
-import type { HttpHandler } from './types';
+import type { HttpHandler, HttpHandlerError } from './types';
 
 import { getFunctionReferences, getFunctionSignature, isFunctionSignature } from '@ez4/common/library';
 import { isTypeCallback, isTypeFunction } from '@ez4/reflection';
@@ -69,19 +69,48 @@ export const getHttpHandlerMetadata = (
 
 const getHandlerDocumentation = (type: TypeCallback | TypeFunction) => {
   const deprecated = type.tags?.some(({ name }) => name === 'deprecated');
+  const errors = [];
   const tags = [];
 
   for (const { name, text } of type.tags ?? []) {
-    const tag = text?.trim();
+    const value = text?.trim();
 
-    if (name === 'tag' && tag) {
-      tags.push(tag);
+    if (name === 'tag' && value) {
+      tags.push(value);
+    }
+
+    if (name === 'throws' && value) {
+      const error = getHandlerError(value);
+
+      if (error) {
+        errors.push(error);
+      }
     }
   }
 
   return {
     ...(deprecated && { deprecated }),
-    ...(tags.length && { tags })
+    ...(tags.length && { tags }),
+    ...(errors.length && { errors })
+  };
+};
+
+/**
+ * Read a `@throws <status> [description]` tag. Any other `@throws`, such as one naming an error class,
+ * documents the function and not the route.
+ */
+const getHandlerError = (text: string): HttpHandlerError | undefined => {
+  const match = text.match(/^([45]\d{2})(?:\s+(.+))?$/s);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const [, status, description] = match;
+
+  return {
+    status: Number(status),
+    ...(description && { description })
   };
 };
 

@@ -1,0 +1,113 @@
+# Auto-generated Open API specification, any manual modifications will be lost during regeneration.
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+
+paths:
+  /items:
+    get:
+      operationId: listItemsHandler
+      security:
+        - keyAuthorizer: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listItemsHandler'
+        '400':
+          description: "The cursor is not valid."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '401':
+          description: "Unauthorized"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayError'
+        '403':
+          description: "The key lacks the items scope."
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/HttpError'
+                  - $ref: '#/components/schemas/GatewayError'
+        '404':
+          description: "Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '429':
+          description: "Rate limit exceeded.\n\nThe account is paused."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+  /status:
+    get:
+      operationId: readStatusHandler
+      responses:
+        '204':
+          description: "Successful response."
+        '503':
+          description: "The upstream service is unavailable."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+components:
+  securitySchemes:
+    keyAuthorizer:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  schemas:
+    listItemsHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+      required:
+        - items
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message
+    GatewayError:
+      type: object
+      description: "Error returned by the gateway when it denies the request authorization."
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+      required:
+        - message

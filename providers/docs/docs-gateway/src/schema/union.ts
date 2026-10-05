@@ -20,5 +20,9 @@ export const getUnionSchemaOutput = (schema: UnionSchema, namingStyle?: NamingSt
     }
   }
 
+  if (schema.nullable) {
+    elementsOutput.push(`- type: 'null'`);
+  }
+
   return ['anyOf:', ...elementsOutput];
 };

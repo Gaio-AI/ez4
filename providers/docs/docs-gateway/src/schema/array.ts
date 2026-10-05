@@ -4,16 +4,16 @@ import type { SchemaOutputContext } from '../utils/reference';
 import { isAnyNumber } from '@ez4/utils';
 
 import { getIndentedOutput } from '../utils/format';
-import { getCommonSchemaOutput } from '../utils/schema';
+import { getCommonSchemaOutput, getTypeOutput } from '../utils/schema';
 import { getChildSchemaOutputContext } from '../utils/reference';
 import { getAnySchemaOutput } from './any';
 
 export const getArraySchemaOutput = (schema: ArraySchema, namingStyle?: NamingStyle, context?: SchemaOutputContext) => {
   if (schema.definitions?.encoded) {
-    return ['type: string', ...getCommonSchemaOutput(schema), 'format: byte'];
+    return [getTypeOutput('string', schema), ...getCommonSchemaOutput(schema), 'format: byte'];
   }
 
-  const output = ['type: array', ...getCommonSchemaOutput(schema)];
+  const output = [getTypeOutput('array', schema), ...getCommonSchemaOutput(schema)];
 
   if (schema.definitions) {
     const { minLength, maxLength } = schema.definitions;

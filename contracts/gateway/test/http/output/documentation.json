@@ -23,7 +23,7 @@
           "name": "testRoute1",
           "file": "test/http/input/output-documentation.ts",
           "position": [
-            23,
+            28,
             1
           ],
           "description": "Route with every documentation tag.",
@@ -32,6 +32,15 @@
           "tags": [
             "Test Tag A",
             "Test Tag B"
+          ],
+          "errors": [
+            {
+              "status": 404,
+              "description": "Test item not found."
+            },
+            {
+              "status": 429
+            }
           ],
           "response": {
             "status": 204
@@ -44,7 +53,7 @@
           "name": "testRoute2",
           "file": "test/http/input/output-documentation.ts",
           "position": [
-            29,
+            34,
             1
           ],
           "response": {
