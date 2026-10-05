@@ -79,7 +79,7 @@ export const applySteps = async <E extends EntryState>(
     const postActions: PostActionEntry<E>[] = [];
 
     const stepTasks = nextSteps.map((entry) => () => {
-      return applyPendingStep(entry, allNewEntries, allOldEntries, succeededEntries, postActions, handlers, force);
+      return applyPendingStep(entry, allNewEntries, allOldEntries, succeededEntries, failedEntries, postActions, handlers, force);
     });
 
     const stepResults = await Tasks.run(stepTasks, {
@@ -150,6 +150,7 @@ const applyPendingStep = async <E extends EntryState<T>, T extends string>(
   newEntries: EntryStates<E>,
   oldEntries: EntryStates<E>,
   succeededEntries: EntryStates<E>,
+  failedEntries: EntryStates<E>,
   postActions: PostActionEntry<E>[],
   handlers: StepHandlers<E>,
   force: boolean
@@ -203,14 +204,17 @@ const applyPendingStep = async <E extends EntryState<T>, T extends string>(
       }
 
       case StepAction.Update: {
-        if (!force && (!step.preview || step.preview.counts <= 0)) {
-          return [getEntry(oldEntries, entryId)];
-        }
-
         const entry = { ...candidate };
 
         if (!checkAllSucceeded(entry.dependencies, succeededEntries)) {
           throw new SkipFailedEntryDependencyError(entryId);
+        }
+
+        if (!force && (!step.preview || step.preview.counts <= 0)) {
+          const { dependencies, connections } = entry;
+
+          // Nothing changed, but the entry is saved with its current dependencies: the old ones may be deleted by this apply.
+          return [{ ...getEntry(oldEntries, entryId), dependencies, connections }];
         }
 
         const context = buildContext(succeededEntries, newEntries, entry);
@@ -250,6 +254,11 @@ const applyPendingStep = async <E extends EntryState<T>, T extends string>(
 
       case StepAction.Delete: {
         const entry = { ...candidate };
+
+        // An entry kept in the state by a failure still depends on this one, so it stays as well or the state can't be loaded.
+        if (getEntryDependents(failedEntries, entry).length) {
+          throw new SkipFailedEntryDependencyError(entryId);
+        }
 
         const context = buildContext(oldEntries, oldEntries, entry);
 
