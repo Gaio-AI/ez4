@@ -69,6 +69,7 @@ export type CreateRequest = {
   origins?: AdditionalOrigin[];
   rewriteFunctionArn?: Arn;
   certificateArn?: Arn;
+  minimumProtocolVersion?: MinimumProtocolVersion;
   firewallArn?: Arn;
   originAccessId?: string;
   description?: string;
@@ -245,6 +246,7 @@ const upsertDistributionRequest = (request: CreateRequest | UpdateRequest, defau
     distributionName,
     description,
     certificateArn,
+    minimumProtocolVersion,
     firewallArn,
     defaultIndex,
     defaultOrigin,
@@ -289,7 +291,7 @@ const upsertDistributionRequest = (request: CreateRequest | UpdateRequest, defau
     },
     ViewerCertificate: {
       SSLSupportMethod: SSLSupportMethod.sni_only,
-      MinimumProtocolVersion: MinimumProtocolVersion.TLSv1,
+      MinimumProtocolVersion: minimumProtocolVersion ?? MinimumProtocolVersion.TLSv1,
       ...(certificateArn
         ? {
             CloudFrontDefaultCertificate: false,
@@ -411,7 +413,7 @@ const prepareAllOrigins = (request: CreateRequest | UpdateRequest): Origin[] => 
               OriginReadTimeout: 30,
               OriginSslProtocols: {
                 Quantity: 1,
-                Items: [SslProtocol.SSLv3]
+                Items: [SslProtocol.TLSv1_2]
               }
             }
           }),

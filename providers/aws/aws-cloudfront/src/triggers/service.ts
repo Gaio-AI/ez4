@@ -1,6 +1,7 @@
 import type { PrepareResourceEvent, ConnectResourceEvent } from '@ez4/project/library';
 import type { Arn } from '@ez4/aws-common';
 
+import { MinimumProtocolVersion } from '@aws-sdk/client-cloudfront';
 import { isCdnBucketOrigin, isCdnService } from '@ez4/distribution/library';
 import { getServiceName } from '@ez4/project/library';
 import { getBucketState } from '@ez4/aws-bucket';
@@ -43,6 +44,10 @@ export const prepareCdnServices = (event: PrepareResourceEvent) => {
     defaultIndex,
     ...(firewall && {
       firewallArn: firewall as Arn
+    }),
+    // CloudFront holds the default certificate to TLSv1, so only a custom certificate takes a stricter policy.
+    ...(certificate && {
+      minimumProtocolVersion: MinimumProtocolVersion.TLSv1_2_2021
     }),
     originAccessState: createOriginAccess(state, {
       accessName: getOriginAccessName(service, options),
