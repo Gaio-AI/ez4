@@ -16,6 +16,7 @@ export type InputOptions = {
   project?: string;
   environment?: string;
   arguments?: string[];
+  remote?: string[];
   suppress?: boolean;
   force?: boolean;
   plan?: boolean;
@@ -103,6 +104,10 @@ export const getInputOptions = () => {
       case '-d':
       case '--detach':
         options.detach = true;
+        break;
+
+      case '--remote':
+        options.remote = [...(options.remote ?? []), input[++index] ?? ''];
         break;
 
       case '--':

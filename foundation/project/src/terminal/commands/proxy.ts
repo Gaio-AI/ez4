@@ -21,16 +21,56 @@ const getRouteUrl = (host: string) => {
   return port === 80 ? `http://${host}` : `http://${host}:${port}`;
 };
 
+export const toRemoteRoute = (variable: string, value: string, host: string) => {
+  const label = variable
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const remoteHost = `${label}.${host}`;
+  const url = new URL(getRouteUrl(remoteHost));
+  const hasScheme = /^https?:\/\//.test(value);
+
+  return { host: remoteHost, target: hasScheme ? value : `https://${value}`, value: hasScheme ? url.origin : url.host };
+};
+
+const getRemoteRoutes = (host: string, input: InputOptions) => {
+  const variables = input.remote ?? [];
+
+  if (variables.some((variable) => !variable || variable.startsWith('-'))) {
+    throw new Error('Missing variable after --remote, e.g. `ez4 proxy run app.wt --remote API_DOMAIN -- npm run dev`.');
+  }
+
+  return variables.flatMap((variable) => {
+    const value = process.env[variable];
+
+    if (!value) {
+      Logger.warn(`${variable} is not set, no remote route for it.`);
+      return [];
+    }
+
+    const route = toRemoteRoute(variable, value, host);
+
+    if (!isRouteHost(route.host)) {
+      throw new Error(`Invalid remote route ${route.host} for ${variable}.`);
+    }
+
+    return [{ variable, ...route }];
+  });
+};
+
 export const proxyCommand = async (input: InputOptions) => {
   const [action, name] = input.positionals ?? [];
 
   switch (action) {
     case undefined:
       return serveProxy();
-    case 'run':
+    case 'run': {
+      const host = getRouteHost(name);
+      const remote = getRemoteRoutes(host, input);
       return input.detach
-        ? runDetached(getRouteHost(name), getRunCommand(name, input))
-        : runAttached(getRouteHost(name), getRunCommand(name, input));
+        ? runDetached(host, getRunCommand(name, input), input.remote ?? [])
+        : runAttached(host, getRunCommand(name, input), remote);
+    }
     case 'ls':
       return listProxyRoutes();
     case 'stop':
@@ -134,19 +174,34 @@ const listenLoopback = (port: number, host: string, onListening: () => void) => 
   server.listen(port, host, onListening);
 };
 
-const runAttached = async (host: string, command: string[]) => {
+type RemoteRouteEntry = {
+  variable: string;
+  host: string;
+  target: string;
+  value: string;
+};
+
+const runAttached = async (host: string, command: string[], remote: RemoteRouteEntry[] = []) => {
   assertRouteFree(host);
+  for (const route of remote) {
+    assertRouteFree(route.host);
+  }
 
   await ensureProxy(getProxyPort());
 
   const port = await getFreePort();
 
   addRoute({ host, port, pid: process.pid });
+  for (const route of remote) {
+    addRoute({ host: route.host, port: 0, pid: process.pid, target: route.target });
+  }
+
+  const remoteEnv = Object.fromEntries(remote.map(({ variable, value }) => [variable, value]));
 
   // The child stays in the foreground process group so it keeps the terminal (no SIGTTIN on stdin reads).
   const child = spawn(command[0], command.slice(1), {
     stdio: 'inherit',
-    env: { ...process.env, PORT: `${port}`, HOST: '127.0.0.1', EZ4_PROXY_ROUTE: host, EZ4_PROXY_GROUP_LEADER: undefined }
+    env: { ...process.env, ...remoteEnv, PORT: `${port}`, HOST: '127.0.0.1', EZ4_PROXY_ROUTE: host, EZ4_PROXY_GROUP_LEADER: undefined }
   });
 
   const forward = process.env.EZ4_PROXY_GROUP_LEADER ? forwardToGroup : (signal: NodeJS.Signals) => child.kill(signal);
@@ -157,12 +212,18 @@ const runAttached = async (host: string, command: string[]) => {
 
   child.on('error', (error) => {
     removeRoute(host, process.pid);
+    for (const route of remote) {
+      removeRoute(route.host, process.pid);
+    }
     Logger.error(error.message);
     process.exit(1);
   });
 
   child.on('exit', (code) => {
     removeRoute(host, process.pid);
+    for (const route of remote) {
+      removeRoute(route.host, process.pid);
+    }
     process.exit(code ?? 1);
   });
 };
@@ -178,14 +239,16 @@ const forwardToGroup = (signal: NodeJS.Signals) => {
   }
 };
 
-const runDetached = async (host: string, command: string[]) => {
+const runDetached = async (host: string, command: string[], remoteVariables: string[] = []) => {
   assertRouteFree(host);
 
   await ensureProxy(getProxyPort());
 
   const { logFile, fd } = openLogFile(host);
 
-  spawn(process.execPath, [getCliPath(), 'proxy', 'run', host, '--', ...command], {
+  const remoteArgs = remoteVariables.flatMap((variable) => ['--remote', variable]);
+
+  spawn(process.execPath, [getCliPath(), 'proxy', 'run', host, ...remoteArgs, '--', ...command], {
     detached: true,
     stdio: ['ignore', fd, fd],
     env: { ...process.env, EZ4_PROXY_GROUP_LEADER: '1' }
@@ -198,8 +261,9 @@ const runDetached = async (host: string, command: string[]) => {
 };
 
 const listProxyRoutes = () => {
-  for (const { host, port, pid } of listRoutes()) {
-    Logger.log(`${host}  ${getRouteUrl(host)}  port ${port}  pid ${pid}`);
+  for (const { host, port, pid, target } of listRoutes()) {
+    const destination = target ? `→ ${target}` : `port ${port}`;
+    Logger.log(`${host}  ${getRouteUrl(host)}  ${destination}  pid ${pid}`);
   }
 };
 
