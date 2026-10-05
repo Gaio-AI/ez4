@@ -23,6 +23,17 @@ export type RepositoryTable = {
 };
 
 /**
+ * DynamoDB service options.
+ */
+export type DynamoDbOptions = {
+  /**
+   * Keep continuous backups of every table in the service, restorable to any second of the last 35 days.
+   * Taking the option out turns them off, and the restore window goes with them.
+   */
+  pointInTimeRecovery?: boolean;
+};
+
+/**
  * Default DynamoDB engine settings.
  */
 export type DynamoDbEngine = {
@@ -35,7 +46,7 @@ export type DynamoDbEngine = {
   orderMode: OrderMode.IndexColumns;
   streamMode: StreamMode.Supported;
   lockMode: LockMode.Unsupported;
-  options: never;
+  options: DynamoDbOptions;
   name: 'dynamodb';
 };
 

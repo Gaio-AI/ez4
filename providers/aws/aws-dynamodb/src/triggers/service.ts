@@ -82,6 +82,9 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
       tags: options.tags,
       attributeSchema,
       ttlAttribute,
+      ...(service.options?.pointInTimeRecovery === true && {
+        pointInTimeRecovery: true
+      }),
       ...(scalability && {
         capacityUnits: {
           maxReadUnits: scalability.maxCapacity,

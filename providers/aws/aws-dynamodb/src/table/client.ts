@@ -1,13 +1,14 @@
 import type { Arn, OperationLogLine, ResourceTags } from '@ez4/aws-common';
 import type { AttributeSchemaGroup } from '../types/schema';
 
-import { getTagList, waitDeletion } from '@ez4/aws-common';
+import { getTagList, waitDeletion, waitUpdates } from '@ez4/aws-common';
 
 import {
   DescribeTableCommand,
   CreateTableCommand,
   UpdateTableCommand,
   DeleteTableCommand,
+  UpdateContinuousBackupsCommand,
   UpdateTimeToLiveCommand,
   TagResourceCommand,
   UntagResourceCommand,
@@ -156,6 +157,22 @@ export const updateDeletion = async (logger: OperationLogLine, tableName: string
       TableName: tableName
     })
   );
+};
+
+export const updateRecovery = async (logger: OperationLogLine, tableName: string, enabled: boolean) => {
+  logger.update(`Updating point-in-time recovery`);
+
+  // A table takes continuous backups only some time after it becomes active.
+  await waitUpdates(() => {
+    return getDynamoDBClient().send(
+      new UpdateContinuousBackupsCommand({
+        TableName: tableName,
+        PointInTimeRecoverySpecification: {
+          PointInTimeRecoveryEnabled: enabled
+        }
+      })
+    );
+  }, ['ContinuousBackupsUnavailableException']);
 };
 
 export const updateTimeToLive = async (logger: OperationLogLine, tableName: string, request: UpdateTimeToLiveRequest) => {

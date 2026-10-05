@@ -11,6 +11,7 @@ import {
   updateStreams,
   updateCapacity,
   updateDeletion,
+  updateRecovery,
   updateTimeToLive,
   deleteTable,
   importIndex,
@@ -63,7 +64,7 @@ const replaceResource = async (candidate: TableState, current: TableState) => {
 const createResource = (candidate: TableState): Promise<TableResult> => {
   const parameters = candidate.parameters;
 
-  const { tableName, ttlAttribute } = parameters;
+  const { tableName, ttlAttribute, pointInTimeRecovery } = parameters;
 
   return OperationLogger.logExecution(TableServiceName, tableName, 'creation', async (logger) => {
     const response = await createTable(logger, parameters);
@@ -73,6 +74,10 @@ const createResource = (candidate: TableState): Promise<TableResult> => {
         attributeName: ttlAttribute,
         enabled: true
       });
+    }
+
+    if (pointInTimeRecovery) {
+      await updateRecovery(logger, response.tableName, true);
     }
 
     return {
@@ -98,6 +103,7 @@ const updateResource = (candidate: TableState, current: TableState): Promise<Tab
     await checkTimeToLiveUpdates(logger, tableName, parameters, current.parameters);
     await checkCapacityUpdates(logger, tableName, parameters, current.parameters);
     await checkDeletionUpdates(logger, tableName, parameters, current.parameters);
+    await checkRecoveryUpdates(logger, tableName, parameters, current.parameters);
     await checkIndexUpdates(logger, tableName, parameters, current.parameters);
 
     return {
@@ -153,6 +159,15 @@ const checkDeletionUpdates = async (logger: OperationLogLine, tableName: string,
 
   if (allowDeletion !== !!current.allowDeletion) {
     await updateDeletion(logger, tableName, allowDeletion);
+  }
+};
+
+const checkRecoveryUpdates = async (logger: OperationLogLine, tableName: string, candidate: TableParameters, current: TableParameters) => {
+  const pointInTimeRecovery = !!candidate.pointInTimeRecovery;
+
+  // Never declared on either side means hands off, so recovery turned on outside the code stays on.
+  if (pointInTimeRecovery !== !!current.pointInTimeRecovery) {
+    await updateRecovery(logger, tableName, pointInTimeRecovery);
   }
 };
 
