@@ -19,10 +19,10 @@
     "test": "ez4 test -e local.env"
   },
   "dependencies": {
-    "@ez4/aws-scheduler": "^1.0.0",
-    "@ez4/common": "^1.0.0",
-    "@ez4/local-scheduler": "^1.0.0",
-    "@ez4/scheduler": "^1.0.0",
-    "@ez4/project": "^1.0.0"
+    "@ez4/aws-scheduler": "^1.1.0",
+    "@ez4/common": "^1.1.0",
+    "@ez4/local-scheduler": "^1.1.0",
+    "@ez4/scheduler": "^1.1.0",
+    "@ez4/project": "^1.1.0"
   }
 }

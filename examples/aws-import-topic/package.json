@@ -19,13 +19,13 @@
   },
   "dependencies": {
     "hello-aws-topic": "^0.0.0",
-    "@ez4/aws-topic": "^1.0.0",
-    "@ez4/aws-queue": "^1.0.0",
-    "@ez4/common": "^1.0.0",
-    "@ez4/local-topic": "^1.0.0",
-    "@ez4/local-queue": "^1.0.0",
-    "@ez4/topic": "^1.0.0",
-    "@ez4/queue": "^1.0.0",
-    "@ez4/project": "^1.0.0"
+    "@ez4/aws-topic": "^1.1.0",
+    "@ez4/aws-queue": "^1.1.0",
+    "@ez4/common": "^1.1.0",
+    "@ez4/local-topic": "^1.1.0",
+    "@ez4/local-queue": "^1.1.0",
+    "@ez4/topic": "^1.1.0",
+    "@ez4/queue": "^1.1.0",
+    "@ez4/project": "^1.1.0"
   }
 }
