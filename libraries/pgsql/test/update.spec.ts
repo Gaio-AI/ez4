@@ -55,14 +55,39 @@ describe('sql update tests', () => {
 
     const [statement, variables] = query.build();
 
-    deepEqual(variables, [true]);
+    deepEqual(variables, ['bar', 'baz', true]);
 
     equal(
       statement,
       `UPDATE ONLY "table" ` +
         `SET "foo" = COALESCE("foo", '{}'::jsonb) ` +
-        `|| jsonb_build_object('bar', COALESCE("foo"['bar'], '{}'::jsonb) || jsonb_build_object('baz', :0))`
+        `|| jsonb_build_object(:0, COALESCE("foo"[:0], '{}'::jsonb) || jsonb_build_object(:1, :2))`
     );
+  });
+
+  it('assert :: update with json record keys that read as sql', () => {
+    const query = sql
+      .update()
+      .only('table')
+      .record({
+        foo: {
+          "x', to_jsonb(current_database()), 'y": 1,
+          'bar\\': {
+            'baz\\': true
+          }
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    equal(
+      statement,
+      `UPDATE ONLY "table" ` +
+        `SET "foo" = COALESCE("foo", '{}'::jsonb) ` +
+        `|| jsonb_build_object(:0, :1, :2, COALESCE("foo"[:2], '{}'::jsonb) || jsonb_build_object(:3, :4))`
+    );
+
+    deepEqual(variables, ["x', to_jsonb(current_database()), 'y", 1, 'bar\\', 'baz\\', true]);
   });
 
   it('assert :: update with json record (with schema)', () => {
@@ -108,9 +133,9 @@ describe('sql update tests', () => {
 
     const [statement, variables] = query.build();
 
-    deepEqual(variables, [true]);
+    deepEqual(variables, ['bar', 'baz', true]);
 
-    equal(statement, `UPDATE ONLY "table" SET "foo"['bar'] = "foo"['bar'] || jsonb_build_object('baz', :0)`);
+    equal(statement, `UPDATE ONLY "table" SET "foo"[:0] = "foo"[:0] || jsonb_build_object(:1, :2)`);
   });
 
   it('assert :: update with json record (nullable in schema)', () => {
@@ -190,16 +215,16 @@ describe('sql update tests', () => {
 
     const [statement, variables] = query.build();
 
-    deepEqual(variables, ['bar', 123, false]);
+    deepEqual(variables, ['bar', 'bar', 'baz', 'baz_foo', 123, 'qux', 'qux_foo', false]);
 
     equal(
       statement,
       `UPDATE ONLY "table" ` +
         `SET "foo" = COALESCE("foo", '{}'::jsonb) ` +
         `|| jsonb_build_object(` +
-        `'bar', :0, ` +
-        `'baz', COALESCE("foo"['baz'], '{}'::jsonb) || jsonb_build_object('baz_foo', :1), ` +
-        `'qux', COALESCE("foo"['qux'], '{}'::jsonb) || jsonb_build_object('qux_foo', :2)` +
+        `:0, :1, ` +
+        `:2, COALESCE("foo"[:2], '{}'::jsonb) || jsonb_build_object(:3, :4), ` +
+        `:5, COALESCE("foo"[:5], '{}'::jsonb) || jsonb_build_object(:6, :7)` +
         `)`
     );
   });
@@ -289,9 +314,40 @@ describe('sql update tests', () => {
 
     const [statement, variables] = query.build();
 
-    deepEqual(variables, [123]);
+    deepEqual(variables, ['bar', 123]);
 
-    equal(statement, `UPDATE ONLY "table" SET "foo"['bar'] = (("foo"->>'bar')::int - (:0)::int)::text::jsonb`);
+    equal(statement, `UPDATE ONLY "table" SET "foo"[:0] = (("foo"->>:0)::int - (:1)::int)::text::jsonb`);
+  });
+
+  it('assert :: update with json remove operation', () => {
+    const schema: ObjectSchema = {
+      type: SchemaType.Object,
+      properties: {
+        foo: {
+          type: SchemaType.Object,
+          properties: {
+            "it's": {
+              type: SchemaType.String
+            }
+          }
+        }
+      }
+    };
+
+    const query = sql
+      .update(schema)
+      .only('table')
+      .record({
+        foo: {
+          "it's": sql.rawOperation('#-', "{it's}")
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    deepEqual(variables, []);
+
+    equal(statement, `UPDATE ONLY "table" SET "foo" = "foo" #- '{it''s}'`);
   });
 
   it('assert :: update with raw json record operation (optional in schema)', () => {
@@ -325,12 +381,12 @@ describe('sql update tests', () => {
 
     const [statement, variables] = query.build();
 
-    deepEqual(variables, [123]);
+    deepEqual(variables, ['bar', 123]);
 
     equal(
       statement,
       `UPDATE ONLY "table" ` +
-        `SET "foo" = COALESCE("foo", '{}'::jsonb) || jsonb_build_object('bar', ((COALESCE("foo"->>'bar', '999'))::dec * (:0)::dec)::text::jsonb)`
+        `SET "foo" = COALESCE("foo", '{}'::jsonb) || jsonb_build_object(:0, ((COALESCE("foo"->>:0, '999'))::dec * (:1)::dec)::text::jsonb)`
     );
   });
 
@@ -385,11 +441,11 @@ describe('sql update tests', () => {
       })
       .build();
 
-    deepEqual(variables1, [123]);
-    deepEqual(variables2, [456]);
+    deepEqual(variables1, ['baz', 123]);
+    deepEqual(variables2, ['bar', 456]);
 
-    equal(statement1, `UPDATE ONLY "table" SET "foo"['baz'] = (("foo"->>'baz')::int / (:0)::int)::text::jsonb`);
-    equal(statement2, `UPDATE ONLY "table" SET "foo"['bar'] = (("foo"->>'bar')::dec / (:0)::dec)::text::jsonb`);
+    equal(statement1, `UPDATE ONLY "table" SET "foo"[:0] = (("foo"->>:0)::int / (:1)::int)::text::jsonb`);
+    equal(statement2, `UPDATE ONLY "table" SET "foo"[:0] = (("foo"->>:0)::dec / (:1)::dec)::text::jsonb`);
   });
 
   it('assert :: update with alias', () => {

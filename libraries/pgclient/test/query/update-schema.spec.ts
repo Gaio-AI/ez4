@@ -71,11 +71,11 @@ describe('update schema', () => {
         // Select
         `"Q0" AS (SELECT "scalar", jsonb_build_object('scalar', "json"['scalar']) AS "json" FROM "ez4-test-update-schema"), ` +
         // Update
-        `"Q1" AS (UPDATE ONLY "ez4-test-update-schema" AS "U" SET "scalar" = :0, "json"['scalar'] = :1 FROM "Q0") ` +
+        `"Q1" AS (UPDATE ONLY "ez4-test-update-schema" AS "U" SET "scalar" = :0, "json"[:1] = :2 FROM "Q0") ` +
         // Return
         `SELECT "scalar", "json" FROM "Q0"`
     );
 
-    assert.deepEqual(variables, ['foo', 123]);
+    assert.deepEqual(variables, ['foo', 'scalar', 123]);
   });
 });

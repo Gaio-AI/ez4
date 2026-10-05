@@ -108,9 +108,9 @@ describe('sql builder tests', () => {
       .record({ foo: { bar: 'baz' } })
       .build();
 
-    equal(onPrepareVariable.mock.callCount(), 1);
+    equal(onPrepareVariable.mock.callCount(), 2);
 
-    deepEqual(variables, ['update_0_baz']);
+    deepEqual(variables, ['update_0_bar', 'update_1_baz']);
   });
 
   it('assert :: on prepare where variable', () => {

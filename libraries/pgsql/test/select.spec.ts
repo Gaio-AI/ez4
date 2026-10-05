@@ -109,6 +109,25 @@ describe('sql select tests', () => {
     );
   });
 
+  it('assert :: select with json object keys that read as sql', () => {
+    const query = sql.select().from('table');
+
+    query.objectColumn({ "it's\\": true }, { column: 'jsonb' });
+    query.objectColumn({ "it's\\": true }, { column: 'json', raw: true });
+
+    const [statement, variables] = query.build();
+
+    deepEqual(variables, []);
+
+    equal(
+      statement,
+      `SELECT ` +
+        `jsonb_build_object(('it''s' || chr(92)), "jsonb"[('it''s' || chr(92))]) AS "jsonb", ` +
+        `json_build_object(('it''s' || chr(92)), "json"->('it''s' || chr(92))) AS "json" ` +
+        `FROM "table"`
+    );
+  });
+
   it('assert :: select with json array columns', () => {
     const query = sql.select().columns('foo', 'bar').as('alias').from('table');
 

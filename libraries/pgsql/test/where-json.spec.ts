@@ -47,6 +47,39 @@ describe('sql where json tests', () => {
     assert.equal(statement, `SELECT FROM "test" WHERE "foo"->>'bar' = :0`);
   });
 
+  it('assert :: where equal (with json key that reads as sql)', ({ assert }) => {
+    const key = "\\a\\'b\\\\";
+
+    const schema: ObjectSchema = {
+      type: SchemaType.Object,
+      properties: {
+        foo: {
+          type: SchemaType.Object,
+          properties: {
+            [key]: {
+              type: SchemaType.String
+            }
+          }
+        }
+      }
+    };
+
+    const query = sql
+      .select(schema)
+      .from('test')
+      .where({
+        foo: {
+          [key]: 'abc'
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    assert.deepEqual(variables, ['abc']);
+
+    assert.equal(statement, `SELECT FROM "test" WHERE "foo"->>(chr(92) || 'a' || chr(92) || '''b' || chr(92) || chr(92)) = :0`);
+  });
+
   it('assert :: where equal (explicit with json value)', ({ assert }) => {
     const schema = getJsonObject({
       type: SchemaType.Boolean

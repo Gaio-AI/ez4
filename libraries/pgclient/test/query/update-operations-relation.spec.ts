@@ -221,11 +221,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"['foo'] = (("T"."json"->>'foo')::dec + (:0)::dec)::text::jsonb FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"[:0] = (("T"."json"->>:0)::dec + (:1)::dec)::text::jsonb FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
 
-    assert.deepEqual(variables, [456]);
+    assert.deepEqual(variables, ['foo', 456]);
   });
 
   it('assert :: prepare update operations (json decrement)', async ({ assert }) => {
@@ -242,11 +242,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"['foo'] = (("T"."json"->>'foo')::dec - (:0)::dec)::text::jsonb FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"[:0] = (("T"."json"->>:0)::dec - (:1)::dec)::text::jsonb FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
 
-    assert.deepEqual(variables, [456]);
+    assert.deepEqual(variables, ['foo', 456]);
   });
 
   it('assert :: prepare update operations (json multiply)', async ({ assert }) => {
@@ -263,11 +263,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"['foo'] = (("T"."json"->>'foo')::dec * (:0)::dec)::text::jsonb FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"[:0] = (("T"."json"->>:0)::dec * (:1)::dec)::text::jsonb FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
 
-    assert.deepEqual(variables, [456]);
+    assert.deepEqual(variables, ['foo', 456]);
   });
 
   it('assert :: prepare update operations (json divide)', async ({ assert }) => {
@@ -284,11 +284,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"['foo'] = (("T"."json"->>'foo')::dec / (:0)::dec)::text::jsonb FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json"[:0] = (("T"."json"->>:0)::dec / (:1)::dec)::text::jsonb FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
 
-    assert.deepEqual(variables, [456]);
+    assert.deepEqual(variables, ['foo', 456]);
   });
 
   it('assert :: prepare update operations (json replace with)', async ({ assert }) => {
@@ -350,11 +350,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json" = "T"."json" #- '{bar}', "json"['foo'] = :0 FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json" = "T"."json" #- '{bar}', "json"[:0] = :1 FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
 
-    assert.deepEqual(variables, [123]);
+    assert.deepEqual(variables, ['foo', 123]);
   });
 
   it('assert :: prepare update operations (invalid operator)', async ({ assert }) => {

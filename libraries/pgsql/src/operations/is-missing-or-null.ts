@@ -1,6 +1,6 @@
 import type { SqlOperationContext } from './types';
 
-import { escapeSqlText } from '../utils/escape';
+import { escapeSqlKey } from '../utils/escape';
 import { getIsNullOperation } from './is-null';
 
 export const getIsMissingOrNullOperation = (column: string, operand: unknown, context: SqlOperationContext) => {
@@ -8,7 +8,7 @@ export const getIsMissingOrNullOperation = (column: string, operand: unknown, co
     return getIsNullOperation(column, operand);
   }
 
-  const hasKey = `${context.path} ? ${escapeSqlText(context.field)}`;
+  const hasKey = `${context.path} ? ${escapeSqlKey(context.field)}`;
 
   if (operand) {
     return `(NOT (${hasKey}) OR ${column} IS null)`;
