@@ -7,6 +7,7 @@ export const TableServiceType = 'aws:dynamodb.table';
 
 export type TableParameters = CreateRequest & {
   ttlAttribute?: string;
+  pointInTimeRecovery?: boolean;
 };
 
 export type TableResult = CreateResponse;

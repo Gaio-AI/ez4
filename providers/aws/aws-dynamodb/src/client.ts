@@ -1,4 +1,4 @@
-export { DynamoDbEngine } from './client/types';
+export type { DynamoDbEngine, DynamoDbOptions } from './client/types';
 
 export * from './client/errors';
 export * from './client/service';
