@@ -1,7 +1,7 @@
 {
   "name": "@ez4/docs-gateway",
   "description": "EZ4: Gateway documentation generator",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",

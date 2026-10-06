@@ -1,7 +1,7 @@
 {
   "name": "@ez4/raw-pg",
   "description": "EZ4: External Postgres provider (connect to any Postgres via TCP, e.g. Supabase, Neon, RDS direct)",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
