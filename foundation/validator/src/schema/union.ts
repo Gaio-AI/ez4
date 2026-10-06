@@ -68,7 +68,9 @@ type Discriminator = {
  * property path holding a literal in every branch, with at least two distinct values across them
  * (`type: 'message' | 'media'`, then `data.media_kind` among the remaining `media` branches).
  * Narrowing repeats until no discriminator is left, so the error report comes from the branches
- * the input actually targets. An input whose value matches no branch fails on that property alone.
+ * the input actually targets. A discriminator is required in every branch, so an input whose value
+ * is missing or matches no branch fails on that property alone. Only an input that is not an
+ * object along the path is left to every branch.
  */
 const narrowByDiscriminators = (value: unknown, elements: AnySchema[], context: ValidationContext): AnySchema[] | Error => {
   let current = elements;

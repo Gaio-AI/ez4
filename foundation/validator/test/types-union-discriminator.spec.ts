@@ -76,10 +76,9 @@ describe('union discriminator validation', () => {
     deepEqual(await getErrorPaths({ type: 'media', data: { kind: 'video', mime: 'video/mp4' } }, nodeSchema), ['$.data.kind']);
   });
 
-  it('assert :: missing discriminator falls back to every branch', async () => {
-    const paths = await getErrorPaths({ data: { text: 'hi' } }, nodeSchema);
-
-    deepEqual(paths, ['$.type']);
+  it('assert :: missing discriminator is reported on the discriminator', async () => {
+    deepEqual(await getErrorPaths({ data: { text: 'hi' } }, nodeSchema), ['$.type']);
+    deepEqual(await getErrorPaths({ type: 'media', data: {} }, nodeSchema), ['$.data.kind']);
   });
 
   it('assert :: tied branches report a shared error once', async () => {
