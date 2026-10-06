@@ -21,6 +21,7 @@ const HELP_LINES = [
   '  run       Execute script files for the given project',
   '  serve     Emulate all resources for the given project',
   '  test      Run test suites for the given project',
+  '  proxy     Route <name>.localhost to local processes (run, ls, stop, setup)',
   '  help      Display the command line options',
   '',
   LogFormat.toBold('Options:'),
@@ -28,6 +29,7 @@ const HELP_LINES = [
   '  --branch, -b       Specify the name for resource branch deployment or destruction',
   '  --project, -p      Specify the project configuration file (Default is ez4.project.js)',
   '  --environment, -e  Specify the environment variables file to load',
+  '  --remote <VAR>     With proxy run: route VAR (a domain or URL) through <VAR>.<name>.localhost with localhost CORS',
   '  --suppress         Suppress local resource emulation when serving',
   '  --coverage         Enable code coverage reports when testing',
   '  --inspect          Enable inspect mode when serving, running, or testing',
@@ -36,6 +38,14 @@ const HELP_LINES = [
   '  --force            Force deployment or destruction of resources',
   '  --plan             Show the deployment or destruction plan and exit without applying it (exit code 2 when it has changes)',
   '  --local            Use local options when serving or testing',
+  '  --detach, -d       Run in background when using proxy run',
+  '',
+  LogFormat.toBold('Proxy:'),
+  '  ez4 proxy run [-d] <name> [--remote VAR]... -- <command>  Serve <command> at http://<name>.localhost with PORT and HOST set',
+  '  ez4 proxy ls                                              List the running routes',
+  '  ez4 proxy stop <name>                                     Stop the process behind a route',
+  '  ez4 proxy setup                                           Allow port 80 without root on Linux (system-wide sysctl, sudo)',
+  '  proxy run targets POSIX shells (Linux, macOS); killing its wrapper with SIGKILL orphans the command.',
   ''
 ];
 

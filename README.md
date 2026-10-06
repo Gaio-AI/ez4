@@ -69,6 +69,12 @@ Read the [quick start](./documentation/quick-start.md) guide and explore the exa
 - [Importing topic](./examples/aws-import-topic)
 - [Custom provider](./examples/custom-provider)
 
+## Local proxy for parallel worktrees
+
+With `serveOptions.proxy` set, each `ez4 serve` gets a stable host such as `http://backend.feat-1.acme.localhost`, routed by a shared loopback-only proxy instead of a hand-picked port. `ez4 proxy run <name> -- <command>` puts any other local server (e.g. a Vite app) behind the same proxy, and coexists with another server holding port `80` by running [behind another proxy](./documentation/configuration.md#behind-another-proxy).
+
+See [Proxy host](./documentation/configuration.md#proxy-host) for the options, commands, port `80` setup and troubleshooting.
+
 ## What's next
 
 - [Quick start](./documentation/quick-start.md)

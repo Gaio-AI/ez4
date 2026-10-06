@@ -28,7 +28,7 @@ export const loadReferences = async (projectOptions: ProjectOptions, workspacePa
       prefix: getServicePrefix(projectOptions.prefix),
       projectName: toKebabCase(projectOptions.projectName),
       branchName: getServiceBranch(projectOptions.branchName),
-      serviceHost: getServiceHost(projectOptions.serveOptions),
+      serviceHost: getServiceHost(projectOptions),
       ...(!enabled && {
         disabled: true
       })
