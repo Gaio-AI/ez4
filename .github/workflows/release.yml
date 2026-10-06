@@ -1,22 +1,16 @@
 name: Release
 
-# develop: gate only, nothing publishes. main: a merge from develop or a hotfix/* PR versions,
-# publishes to CodeArtifact, tags v<version> and merges main back into develop. The release
-# commit, the tag and the back-merge merge use the gaio-code-agent App token, so they start
-# workflows: the run the release commit starts stops at 🔎 Tested tree, and the back-merge
-# merge starts develop's run, whose tree gate decides.
+# develop: rebuilds changeset-release/develop (develop + a merge of main + `changeset version`),
+# keeps its PR into main and tests that tree; nothing publishes. main: merging that PR or a
+# hotfix/* PR publishes the version it brings to CodeArtifact and tags v<version>. Every push here
+# uses GITHUB_TOKEN, which starts no workflow, so the run that pushes a tree also tests it.
 on:
   push:
     branches:
       - develop
       - main
-  # A manual run on develop; ez4 deploys nothing.
+  # On develop: rebuilds the release PR, e.g. after a hotfix reached main.
   workflow_dispatch:
-    inputs:
-      deploy:
-        description: Read by repos with stg/demo deploys; ez4 deploys nothing.
-        type: string
-        required: false
 
 permissions: {}
 
@@ -24,10 +18,75 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  release-branch:
+    name: 🌿 Release branch
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A newer push to develop rebuilds the branch from scratch.
+    concurrency:
+      group: release-branch
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      sha: ${{ steps.publish.outputs.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into the release branch
+        uses: ./.github/actions/changeset-release
+        with:
+          command: prepare
+          argument: ${{ github.sha }}
+
+      - id: pending
+        uses: ./.github/actions/changeset-release
+        with:
+          command: pending
+
+      - name: Set up Node.js
+        if: steps.pending.outputs.pending == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.pending.outputs.pending == 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Version
+        id: version
+        if: steps.pending.outputs.pending == 'true'
+        run: |
+          npm run version-packages
+          echo "version=$(node -p "require('./foundation/utils/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Push the release branch and its PR
+        id: publish
+        if: steps.pending.outputs.pending == 'true'
+        uses: ./.github/actions/changeset-release
+        with:
+          command: publish
+          argument: release v${{ steps.version.outputs.version }}
+
+      - name: Close the release PR
+        if: steps.pending.outputs.pending != 'true'
+        uses: ./.github/actions/changeset-release
+        with:
+          command: close
+
   gate:
     name: 🔎 Tested tree
-    # The App's release commit on main starts this workflow again; the run that pushed it ships it.
-    if: github.ref != 'refs/heads/main' || github.actor != 'gaio-code-agent[bot]'
+    needs: [release-branch]
+    # On main release-branch is skipped; on develop a failed or superseded rebuild stops the run.
+    if: >-
+      !cancelled() &&
+      (needs.release-branch.result == 'success' || needs.release-branch.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -35,17 +94,25 @@ jobs:
       pull-requests: read
       statuses: read
     outputs:
+      sha: ${{ steps.sha.outputs.sha }}
       tested: ${{ steps.check.outputs.tested }}
       source: ${{ steps.source.outputs.source }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # develop: the release branch head when something is pending, else the pushed commit.
+      - id: sha
+        env:
+          SHA: ${{ needs.release-branch.outputs.sha || github.sha }}
+        run: |
+          git fetch -q origin "$SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
       - id: check
         uses: ./.github/actions/tree-gate
         with:
           command: check
-          sha: ${{ github.sha }}
+          sha: ${{ steps.sha.outputs.sha }}
       - id: source
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/tree-gate
@@ -66,7 +133,7 @@ jobs:
       contents: read
       statuses: write
     with:
-      record-sha: ${{ github.sha }}
+      sha: ${{ needs.gate.outputs.sha }}
     secrets: inherit
 
   record:
@@ -80,16 +147,19 @@ jobs:
       statuses: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
       - uses: ./.github/actions/tree-gate
         with:
           command: record
-          sha: ${{ github.sha }}
+          sha: ${{ needs.gate.outputs.sha }}
 
   release:
     name: 🦋 Release
     needs: [gate, suite]
     if: >-
       !cancelled() &&
+      github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.gate.outputs.source != 'other' &&
       (needs.suite.result == 'success' ||
@@ -102,30 +172,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      # GitHub Actions cannot bypass a ruleset; the gaio-code-agent App can, and its pushes start
-      # workflows (the back-merge merge starts develop's run).
-      - name: App token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.GAIO_CODE_AGENT_APP_ID }}
-          private-key: ${{ secrets.GAIO_CODE_AGENT_APP_PRIVATE_KEY }}
-
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
-
-      # A re-run after this job already pushed its release commit continues from that commit:
-      # versioning `github.sha` again would be rejected as non-fast-forward.
-      - name: Resume a pushed release
-        run: |
-          main=$(git rev-parse origin/main)
-          if [ "$main" != "$GITHUB_SHA" ] && [ "$(git rev-parse "$main^")" = "$GITHUB_SHA" ] &&
-             [ "$(git log -1 --format=%ae "$main")" = '41898282+github-actions[bot]@users.noreply.github.com' ]; then
-            git checkout -q "$main"
-          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -136,31 +186,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
-      - name: Pending changesets
-        id: changesets
-        run: |
-          releasing=$(node -e '
-            require("@changesets/read").default(process.cwd()).then((changesets) => {
-              console.log(changesets.some((changeset) => changeset.releases.length > 0));
-            });
-          ')
-          echo "has-changesets=$releasing" >> "$GITHUB_OUTPUT"
-
-      # Pushed with the App token through its bypass; the run it starts stops at 🔎 Tested tree. A
-      # main that moved since this run started rejects the push (non-fast-forward): the queued run
-      # ships both.
-      - name: Version
-        if: steps.changesets.outputs['has-changesets'] == 'true'
-        run: |
-          npm run version-packages
-          version=$(node -p "require('./foundation/utils/package.json').version")
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit --no-verify -m "chore: version $version"
-          git push origin "HEAD:refs/heads/main"
-
-      # A version is published only from a commit that carries its tag (RELEASING.md).
+      # The merged PR already carries the version: the release branch or the hotfix ran
+      # `changeset version`. A version is published only from a commit that carries its tag.
       - name: Unreleased version
         id: unreleased
         run: |
@@ -198,14 +225,3 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: v${{ steps.unreleased.outputs.version }}
         run: gh release view "$VERSION" >/dev/null 2>&1 || gh release create "$VERSION" --generate-notes --verify-tag
-
-      # The release commit when one was made, else the pushed merge.
-      - name: Released head
-        id: head
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Back-merge into develop
-        uses: ./.github/actions/back-merge
-        with:
-          sha: ${{ steps.head.outputs.sha }}
-          token: ${{ steps.app-token.outputs.token }}

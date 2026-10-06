@@ -2,20 +2,17 @@ name: Tree gate
 description: Skip a suite for a tree that already passed it. See tree-gate.mjs.
 inputs:
   command:
-    description: record | check | verify | source
+    description: record | check | source
     required: true
   sha:
     description: Commit to record the status on, or to look up.
     required: true
 outputs:
   tested:
-    description: "'true' when check/verify found the tree already tested."
+    description: "'true' when check found the tree already tested."
     value: ${{ steps.gate.outputs.tested }}
-  deploy:
-    description: "'all' when check found a back-merge that brought code (a hotfix) into develop."
-    value: ${{ steps.gate.outputs.deploy }}
   source:
-    description: develop | hotfix | other (command source).
+    description: release | hotfix | other (command source).
     value: ${{ steps.gate.outputs.source }}
   tree:
     description: The tree recorded (command record).
