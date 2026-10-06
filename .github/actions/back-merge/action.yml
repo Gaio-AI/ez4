@@ -1,0 +1,17 @@
+name: Back-merge
+description: Merge a released main commit back into develop. See back-merge.mjs.
+inputs:
+  sha:
+    description: The main commit to bring into develop (the release commit).
+    required: true
+  develop-workflow:
+    description: Workflow file run on develop, dispatched when the merge brings code.
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        DEVELOP_WORKFLOW: ${{ inputs.develop-workflow }}
+      run: node "$GITHUB_ACTION_PATH/back-merge.mjs" "${{ inputs.sha }}"
