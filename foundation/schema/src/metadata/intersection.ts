@@ -98,10 +98,30 @@ const intersectObjects = (target: ObjectSchema, source: ObjectSchema): ObjectSch
     const targetProperty = target.properties[name];
     const sourceProperty = source.properties[name];
 
-    properties[name] = targetProperty ? intersectSchemas(targetProperty, sourceProperty, true) : sourceProperty;
+    properties[name] = targetProperty
+      ? keepRequired(intersectSchemas(targetProperty, sourceProperty, true), targetProperty, sourceProperty)
+      : sourceProperty;
   }
 
   return { ...merged, properties };
+};
+
+/**
+ * A property stays optional or nullable only when both sides allow it: `{ x?: T } & { x: T }` and
+ * `{ x: T | null } & { x: T }` both require a non-null `x`.
+ */
+const keepRequired = (schema: AnySchema, target: AnySchema, source: AnySchema): AnySchema => {
+  const result = { ...schema };
+
+  if (!target.optional || !source.optional) {
+    delete result.optional;
+  }
+
+  if (!target.nullable || !source.nullable) {
+    delete result.nullable;
+  }
+
+  return result;
 };
 
 const intersectEnums = (target: EnumSchema, source: EnumSchema): EnumSchema => {

@@ -30,4 +30,10 @@ export interface NarrowingTestSchema {
   distributed: { next: (string | null)[] } & (Facts<'audio', 'audio/aac'> | Facts<'image', 'image/png'>);
 
   nested: { data: { kind: Kind; size: number } } & { data: { kind: 'audio' } };
+
+  required: { optional?: string; nullable: string | null; both?: string | null } & {
+    optional: string;
+    nullable: string;
+    both?: string | null;
+  };
 }

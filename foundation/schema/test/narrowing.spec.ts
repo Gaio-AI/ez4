@@ -87,4 +87,23 @@ describe('schema narrowing', () => {
       }
     });
   });
+
+  it('assert :: intersection keeps a property optional or nullable only when both sides do', () => {
+    deepEqual(withoutIdentity(getProperties().required), {
+      type: SchemaType.Object,
+      properties: {
+        optional: {
+          type: SchemaType.String
+        },
+        nullable: {
+          type: SchemaType.String
+        },
+        both: {
+          type: SchemaType.String,
+          optional: true,
+          nullable: true
+        }
+      }
+    });
+  });
 });
