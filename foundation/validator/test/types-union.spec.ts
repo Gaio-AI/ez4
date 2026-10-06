@@ -66,9 +66,9 @@ describe('union type validation', () => {
       ]
     };
 
-    // No matching objects
-    await assertError(null, schema, [ExpectedObjectTypeError, ExpectedObjectTypeError]);
-    await assertError(undefined, schema, [ExpectedObjectTypeError, ExpectedObjectTypeError]);
+    // No matching objects, every branch fails the same way and it's reported once.
+    await assertError(null, schema, [ExpectedObjectTypeError]);
+    await assertError(undefined, schema, [ExpectedObjectTypeError]);
 
     // First matching object properties only.
     await assertError({ foo: 123 }, schema, [ExpectedStringTypeError, ExpectedStringTypeError]);

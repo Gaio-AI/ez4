@@ -40,7 +40,8 @@ export const validateUnion = async (value: unknown, schema: UnionSchema, context
     }
 
     if (errorSize === lastErrorSize) {
-      lastErrorList.push(...errorList);
+      // Tied branches often fail the same way (e.g. a string where every branch is an object).
+      lastErrorList.push(...errorList.filter((error) => !lastErrorList.some((last) => isSameError(last, error))));
       continue;
     }
 
@@ -51,6 +52,10 @@ export const validateUnion = async (value: unknown, schema: UnionSchema, context
   }
 
   return lastErrorList;
+};
+
+const isSameError = (target: Error, source: Error) => {
+  return target.constructor === source.constructor && target.message === source.message;
 };
 
 type Discriminator = {

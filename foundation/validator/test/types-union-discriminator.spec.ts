@@ -82,6 +82,10 @@ describe('union discriminator validation', () => {
     deepEqual(paths, ['$.type']);
   });
 
+  it('assert :: tied branches report a shared error once', async () => {
+    deepEqual(await getErrorPaths('message', nodeSchema), ['$']);
+  });
+
   it('assert :: custom validation runs once a branch matches', async () => {
     const handler = mock.fn((_value: unknown, _context: ValidationCustomContext) => {});
 
