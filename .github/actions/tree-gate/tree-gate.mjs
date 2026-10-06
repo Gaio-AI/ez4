@@ -3,7 +3,9 @@
 // `Tested tree` commit status (description = tree sha); later stages look it up instead of rerunning.
 //
 //   record <sha>  post `Tested tree` = HEAD^{tree} on <sha> (a PR run posts its merge tree on the PR head)
-//   check <sha>   tested=true when the PR head or a merged parent of <sha> carries <sha>'s tree
+//   check <sha>   tested=true when the PR head or a merged parent of <sha> carries <sha>'s tree, or when
+//                 <sha> merged a back-merge PR that brought only the bot's release commit into a tested
+//                 develop; deploy=all when that back-merge brought code (a hotfix)
 //   verify <sha>  tested=true when <sha> itself carries its own tree
 //   source <sha>  source=develop|hotfix|other: the pull request whose merge into main produced <sha>
 //
@@ -13,6 +15,34 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const CONTEXT = 'Tested tree';
+
+const BOT = '41898282+github-actions[bot]@users.noreply.github.com';
+const RELEASE_SUBJECT = /^(release[: ]|chore: version )/;
+
+/** True when every line of `git log --no-merges --format=%ae%x09%s` is the bot's release commit. */
+export function releaseOnly(log) {
+  return log
+    .split('\n')
+    .filter(Boolean)
+    .every((line) => {
+      const [email, subject] = line.split('\t');
+      return email === BOT && RELEASE_SUBJECT.test(subject);
+    });
+}
+
+/** The pull request the back-merge action opens from a released main commit into develop. */
+export function isBackMerge(pull) {
+  return pull?.base.ref === 'develop' && pull.head.ref.startsWith('back-merge/');
+}
+
+/**
+ * A back-merge commit is tested when main brought only the release commit into a develop head that
+ * had passed; code from main (a hotfix) is untested and deploys every stg/demo target.
+ */
+export function backMergeVerdict({ log, firstParentTested }) {
+  if (!releaseOnly(log)) return { tested: false, deploy: 'all' };
+  return { tested: firstParentTested, deploy: '' };
+}
 
 /** Statuses come newest first, so only the latest `Tested tree` status counts. */
 export function carriesTree(statuses, tree) {
@@ -82,8 +112,18 @@ function main([command, sha]) {
     case 'check': {
       const tree = run('git', ['rev-parse', `${sha}^{tree}`]);
       const parents = run('git', ['rev-list', '--parents', '-n', '1', sha]).split(' ').slice(1);
-      const covering = candidates(parents, pullFor(pullsOf(sha), sha));
-      return output('tested', covering.some((commit) => carriesTree(statusesOf(commit), tree)));
+      const pull = pullFor(pullsOf(sha), sha);
+      let tested = candidates(parents, pull).some((commit) => carriesTree(statusesOf(commit), tree));
+      let deploy = '';
+      if (!tested && isBackMerge(pull) && parents.length === 2) {
+        const [first, second] = parents;
+        ({ tested, deploy } = backMergeVerdict({
+          log: run('git', ['log', '--no-merges', '--format=%ae%x09%s', `${first}..${second}`]),
+          firstParentTested: carriesTree(statusesOf(first), run('git', ['rev-parse', `${first}^{tree}`]))
+        }));
+      }
+      output('deploy', deploy);
+      return output('tested', tested);
     }
     case 'verify': {
       const tree = run('git', ['rev-parse', `${sha}^{tree}`]);

@@ -3,48 +3,22 @@
 //
 //   back-merge.mjs <sha>
 //
-// Env: GITHUB_REPOSITORY, GH_TOKEN, DEVELOP_WORKFLOW (the workflow file that runs on develop).
-// When main brings only the bot's release commit and the develop head it merged into had passed
-// the suite, the merge commit gets the `Tested tree` status. Otherwise DEVELOP_WORKFLOW is
-// dispatched on develop so the suite runs; when main brings code (a hotfix) the dispatch carries
-// `deploy=all` and every refs/deploy/* ref is deleted, so stg/demo get the hotfix even if that run
-// is superseded. Merges made with GITHUB_TOKEN fire no workflow, which is why this script does
-// either. Safe to re-run: an existing branch, open or merged pull request is reused.
+// Env: GITHUB_REPOSITORY, GH_TOKEN (a gaio-code-agent App token: GITHUB_TOKEN cannot bypass the
+// develop ruleset, and a merge made with it would start no workflow). The App's merge starts
+// develop's release.yml, whose tree gate decides whether the suite runs (tree-gate.mjs `check`).
+// When main brings code (a hotfix), every refs/deploy/* ref is deleted first, so stg/demo get the
+// hotfix even if that develop run is superseded. Safe to re-run: an existing branch, open or merged
+// pull request is reused.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-import { CONTEXT, carriesTree } from '../tree-gate/tree-gate.mjs';
-
-const BOT = '41898282+github-actions[bot]@users.noreply.github.com';
-const RELEASE_SUBJECT = /^(release[: ]|chore: version )/;
-
-/** True when every line of `git log --no-merges --format=%ae%x09%s` is the bot's release commit. */
-export function releaseOnly(log) {
-  return log
-    .split('\n')
-    .filter(Boolean)
-    .every((line) => {
-      const [email, subject] = line.split('\t');
-      return email === BOT && RELEASE_SUBJECT.test(subject);
-    });
-}
+import { releaseOnly } from '../tree-gate/tree-gate.mjs';
 
 export const branchFor = (sha) => `back-merge/${sha.slice(0, 12)}`;
 
 const run = (command, args) => execFileSync(command, args, { encoding: 'utf8' }).trim();
 
 const succeeds = (command, args) => spawnSync(command, args, { encoding: 'utf8' }).status === 0;
-
-/** Whether `sha` carries a passing `Tested tree` for its own tree; any API failure answers false. */
-function tested(repo, sha) {
-  try {
-    const statuses = JSON.parse(run('gh', ['api', `repos/${repo}/commits/${sha}/statuses?per_page=100`]));
-    return carriesTree(statuses, run('git', ['rev-parse', `${sha}^{tree}`]));
-  } catch (error) {
-    console.error(`::warning::${error.message.split('\n')[0]}`);
-    return false;
-  }
-}
 
 function merge(url) {
   let error = '';
@@ -104,32 +78,20 @@ function resetDeployRefs() {
 
 function main([sha]) {
   if (!sha) throw new Error('usage: back-merge.mjs <sha>');
-  const { GITHUB_REPOSITORY: repo, DEVELOP_WORKFLOW: workflow } = process.env;
-  if (!workflow) throw new Error('DEVELOP_WORKFLOW is required');
 
   const branch = branchFor(sha);
   run('git', ['fetch', '--quiet', 'origin', 'develop']);
-  // A re-run, or a merge a person finished after a conflict, continues from the merged PR.
-  let mergeCommit = run('gh', ['pr', 'list', '--head', branch, '--base', 'develop', '--state', 'merged', '--json', 'mergeCommit', '--jq', '.[0].mergeCommit.oid // empty']);
-  if (!mergeCommit) {
-    if (succeeds('git', ['merge-base', '--is-ancestor', sha, 'origin/develop'])) {
-      return console.log(`develop already contains ${sha}`);
-    }
-    mergeCommit = openAndMerge(sha, branch);
-    run('git', ['fetch', '--quiet', 'origin', 'develop']);
+  // A re-run, or a merge a person finished after a conflict, finds the merged PR: its merge already
+  // started develop's run.
+  const merged = run('gh', ['pr', 'list', '--head', branch, '--base', 'develop', '--state', 'merged', '--json', 'url', '--jq', '.[0].url // empty']);
+  if (merged) return console.log(`${merged} is already merged`);
+  if (succeeds('git', ['merge-base', '--is-ancestor', sha, 'origin/develop'])) {
+    return console.log(`develop already contains ${sha}`);
   }
 
-  // The merge commit's first parent is exactly the develop head it merged into, whatever landed since.
-  const before = run('git', ['rev-parse', `${mergeCommit}^1`]);
-  const code = !releaseOnly(run('git', ['log', '--no-merges', '--format=%ae%x09%s', `${before}..${sha}`]));
-  if (!code && tested(repo, before)) {
-    const tree = run('git', ['rev-parse', `${mergeCommit}^{tree}`]);
-    run('gh', ['api', '--method', 'POST', `repos/${repo}/statuses/${mergeCommit}`, '-f', 'state=success', '-f', `context=${CONTEXT}`, '-f', `description=${tree}`]);
-    return console.log(`${mergeCommit} brings only the release commit into a tested develop: recorded as tested`);
-  }
-  if (code) resetDeployRefs();
-  run('gh', ['workflow', 'run', workflow, '--ref', 'develop', ...(code ? ['-f', 'deploy=all'] : [])]);
-  console.log(`${mergeCommit} ${code ? 'brings code' : 'merged into an untested develop'}: ${workflow} dispatched on develop`);
+  if (!releaseOnly(run('git', ['log', '--no-merges', '--format=%ae%x09%s', `origin/develop..${sha}`]))) resetDeployRefs();
+  const mergeCommit = openAndMerge(sha, branch);
+  console.log(`${mergeCommit} merged ${sha} into develop; develop's release.yml decides the suite`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

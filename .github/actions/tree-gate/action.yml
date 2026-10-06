@@ -11,6 +11,9 @@ outputs:
   tested:
     description: "'true' when check/verify found the tree already tested."
     value: ${{ steps.gate.outputs.tested }}
+  deploy:
+    description: "'all' when check found a back-merge that brought code (a hotfix) into develop."
+    value: ${{ steps.gate.outputs.deploy }}
   source:
     description: develop | hotfix | other (command source).
     value: ${{ steps.gate.outputs.source }}
