@@ -136,13 +136,13 @@ change touches before merging the release pull request, against the lab account 
 
 ## Switching to git flow (once)
 
-1. After the cutover PR is merged into `main` (so `develop` starts with the new workflows), push `develop`:
-   ```bash
-   git push origin origin/main:refs/heads/develop
-   ```
-2. Settings → General → Default branch: set to `develop` (new PRs and `gh pr create` target it; `main` stays the release branch).
-3. Any ruleset written against `~DEFAULT_BRANCH` must name `refs/heads/main` explicitly before the switch.
-4. Settings → Actions → General → Workflow permissions: enable "Allow GitHub Actions to create and approve pull requests".
+1. Before merging the cutover PR, set up the App the release workflow pushes with:
+   - **`gaio-code-agent` App** (Organization settings → GitHub Apps → gaio-code-agent): Permissions → Repository → **Workflows: Read and write**, then accept the new permission under Organization settings → Installed GitHub Apps → gaio-code-agent, whose repository access must include `ez4`. Its token pushes the release commit and tags and merges the back-merge PR: GitHub Actions cannot bypass a ruleset, the App can, and its pushes start workflows.
+   - **Organization secrets** `GAIO_CODE_AGENT_APP_ID` and `GAIO_CODE_AGENT_APP_PRIVATE_KEY`, with access to `ez4`: the values of `GAIO_CODE_AGENT_GITHUB_APP_ID` and `GAIO_CODE_AGENT_GITHUB_APP_PRIVATE_KEY` in Doppler `gaio-computron` `prd`.
+   - **Rulesets:** add the `gaio-code-agent` App as an `always` bypass actor on `main` (create a `main` ruleset if none exists: PR required, merge + squash, no force push) and on `develop`.
+2. After the cutover PR is merged into `main`: `develop` already exists at the pre-cutover `main` and is not the default branch. Bring it up to `main` before anything merges into it, so it carries the new workflows: `git push origin origin/main:refs/heads/develop` by a repository admin (fast-forward), or a PR `main → develop` merged with a merge commit when the `develop` ruleset blocks the push.
+3. Settings → General → Default branch: set to `develop` (new PRs and `gh pr create` target it; `main` stays the release branch).
+4. Any ruleset written against `~DEFAULT_BRANCH` must name `refs/heads/main` explicitly before the switch.
 5. Retarget open PRs:
    ```bash
    gh pr list --base main --state open --json number --jq '.[].number' | xargs -I{} gh pr edit {} --base develop

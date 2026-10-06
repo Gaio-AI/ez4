@@ -2,17 +2,19 @@ name: Release
 
 # develop: gate only, nothing publishes. main: a merge from develop or a hotfix/* PR versions,
 # publishes to CodeArtifact, tags v<version> and merges main back into develop. The release
-# commit, the tag and the back-merge are pushed with GITHUB_TOKEN, so they start no workflow.
+# commit, the tag and the back-merge merge use the gaio-code-agent App token, so they start
+# workflows: the run the release commit starts stops at 🔎 Tested tree, and the back-merge
+# merge starts develop's run, whose tree gate decides.
 on:
   push:
     branches:
       - develop
       - main
-  # back-merge.mjs dispatches this on develop when a hotfix brought code into it.
+  # A manual run on develop; ez4 deploys nothing.
   workflow_dispatch:
     inputs:
       deploy:
-        description: Sent by the back-merge to every repo; ez4 deploys nothing.
+        description: Read by repos with stg/demo deploys; ez4 deploys nothing.
         type: string
         required: false
 
@@ -24,6 +26,8 @@ env:
 jobs:
   gate:
     name: 🔎 Tested tree
+    # The App's release commit on main starts this workflow again; the run that pushed it ships it.
+    if: github.ref != 'refs/heads/main' || github.actor != 'gaio-code-agent[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -53,8 +57,7 @@ jobs:
     name: 🧪 Suite
     needs: [gate]
     if: needs.gate.outputs.tested != 'true'
-    # A newer push to develop supersedes this suite; main's never is, nor a run the back-merge
-    # dispatched (it carries `deploy=all` after a hotfix).
+    # A newer push to develop supersedes this suite; main's never is, nor a manual run.
     concurrency:
       group: suite-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'push' }}
@@ -97,15 +100,22 @@ jobs:
       group: release-main
       cancel-in-progress: false
     permissions:
-      actions: write
       contents: write
-      pull-requests: write
-      statuses: write
     steps:
+      # GitHub Actions cannot bypass a ruleset; the gaio-code-agent App can, and its pushes start
+      # workflows (the back-merge merge starts develop's run).
+      - name: App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.GAIO_CODE_AGENT_APP_ID }}
+          private-key: ${{ secrets.GAIO_CODE_AGENT_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       # A re-run after this job already pushed its release commit continues from that commit:
       # versioning `github.sha` again would be rejected as non-fast-forward.
@@ -136,8 +146,9 @@ jobs:
           ')
           echo "has-changesets=$releasing" >> "$GITHUB_OUTPUT"
 
-      # Pushed with GITHUB_TOKEN through the bypass; it starts no workflow. A main that moved
-      # since this run started rejects the push (non-fast-forward): the queued run ships both.
+      # Pushed with the App token through its bypass; the run it starts stops at 🔎 Tested tree. A
+      # main that moved since this run started rejects the push (non-fast-forward): the queued run
+      # ships both.
       - name: Version
         if: steps.changesets.outputs['has-changesets'] == 'true'
         run: |
@@ -197,4 +208,4 @@ jobs:
         uses: ./.github/actions/back-merge
         with:
           sha: ${{ steps.head.outputs.sha }}
-          develop-workflow: release.yml
+          token: ${{ steps.app-token.outputs.token }}
