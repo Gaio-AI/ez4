@@ -5,7 +5,7 @@
   "fixed": [["@ez4/*", "vscode-ez4"]],
   "linked": [],
   "access": "public",
-  "baseBranch": "main",
+  "baseBranch": "develop",
   "updateInternalDependencies": "minor",
   "privatePackages": { "version": true, "tag": false },
   "ignore": ["@ez4/tests-*", "aws-*", "hello-*", "custom-provider"]

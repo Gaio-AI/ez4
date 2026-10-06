@@ -1,14 +1,20 @@
 name: Release
 
-# Runs after the full suite passes on main, so nothing is versioned or published from a red commit.
+# develop: gate only, nothing publishes. main: a merge from develop or a hotfix/* PR versions,
+# publishes to CodeArtifact, tags v<version> and merges main back into develop. The release
+# commit, the tag and the back-merge are pushed with GITHUB_TOKEN, so they start no workflow.
 on:
-  workflow_run:
-    workflows:
-      - Pull requests
-    types:
-      - completed
+  push:
     branches:
+      - develop
       - main
+  # back-merge.mjs dispatches this on develop when a hotfix brought code into it.
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Sent by the back-merge to every repo; ez4 deploys nothing.
+        type: string
+        required: false
 
 permissions: {}
 
@@ -16,24 +22,100 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  gate:
+    name: 🔎 Tested tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      tested: ${{ steps.check.outputs.tested }}
+      source: ${{ steps.source.outputs.source }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: check
+        uses: ./.github/actions/tree-gate
+        with:
+          command: check
+          sha: ${{ github.sha }}
+      - id: source
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/tree-gate
+        with:
+          command: source
+          sha: ${{ github.sha }}
+
+  suite:
+    name: 🧪 Suite
+    needs: [gate]
+    if: needs.gate.outputs.tested != 'true'
+    # A newer push to develop supersedes this suite; main's never is, nor a run the back-merge
+    # dispatched (it carries `deploy=all` after a hotfix).
+    concurrency:
+      group: suite-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'push' }}
+    uses: ./.github/workflows/pull-requests.yml
+    permissions:
+      contents: read
+      statuses: write
+    with:
+      record-sha: ${{ github.sha }}
+    secrets: inherit
+
+  record:
+    name: 📌 Record tree
+    needs: [gate]
+    if: needs.gate.outputs.tested == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/tree-gate
+        with:
+          command: record
+          sha: ${{ github.sha }}
+
   release:
     name: 🦋 Release
+    needs: [gate, suite]
+    if: >-
+      !cancelled() &&
+      github.ref == 'refs/heads/main' &&
+      needs.gate.outputs.source != 'other' &&
+      (needs.suite.result == 'success' ||
+       (needs.suite.result == 'skipped' && needs.gate.outputs.tested == 'true'))
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     # Never cancel: an interrupted publish leaves a version half out.
     concurrency:
       group: release-main
       cancel-in-progress: false
     permissions:
+      actions: write
       contents: write
       pull-requests: write
-
+      statuses: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+
+      # A re-run after this job already pushed its release commit continues from that commit:
+      # versioning `github.sha` again would be rejected as non-fast-forward.
+      - name: Resume a pushed release
+        run: |
+          main=$(git rev-parse origin/main)
+          if [ "$main" != "$GITHUB_SHA" ] && [ "$(git rev-parse "$main^")" = "$GITHUB_SHA" ] &&
+             [ "$(git log -1 --format=%ae "$main")" = '41898282+github-actions[bot]@users.noreply.github.com' ]; then
+            git checkout -q "$main"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -44,8 +126,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
 
-      # A changeset added with `--empty` releases nothing, so it opens no release pull request: it stays
-      # on `main` until the next release consumes it.
       - name: Pending changesets
         id: changesets
         run: |
@@ -56,39 +136,22 @@ jobs:
           ')
           echo "has-changesets=$releasing" >> "$GITHUB_OUTPUT"
 
-      # Not changesets/action: it builds the pull request body from each package's CHANGELOG.md,
-      # and this repository writes none (`changelog: false`).
-      - name: Release pull request
+      # Pushed with GITHUB_TOKEN through the bypass; it starts no workflow. A main that moved
+      # since this run started rejects the push (non-fast-forward): the queued run ships both.
+      - name: Version
         if: steps.changesets.outputs['has-changesets'] == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: changeset-release/main
         run: |
-          summaries=$(awk 'FNR == 1 { fences = 0 } /^---$/ { fences++; next } fences >= 2' $(find .changeset -name '*.md' ! -name README.md))
-
           npm run version-packages
           version=$(node -p "require('./foundation/utils/package.json').version")
-          title="chore: version $version"
-
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -C "$BRANCH"
           git add -A
-          git commit -m "$title"
-          git push --force origin "$BRANCH"
+          git commit --no-verify -m "chore: version $version"
+          git push origin "HEAD:refs/heads/main"
 
-          body=$(printf 'Publishes `%s` to CodeArtifact when merged.\n\n%s\n' "$version" "$summaries")
-          if gh pr view "$BRANCH" --json state --jq .state | grep -q OPEN; then
-            gh pr edit "$BRANCH" --title "$title" --body "$body"
-          else
-            gh pr create --base main --head "$BRANCH" --title "$title" --body "$body"
-          fi
-
-      # A version is published only from a commit that carries its tag (RELEASING.md), so the tag
-      # is what tells a released version from one still to publish.
+      # A version is published only from a commit that carries its tag (RELEASING.md).
       - name: Unreleased version
         id: unreleased
-        if: steps.changesets.outputs['has-changesets'] == 'false'
         run: |
           version=$(node -p "require('./foundation/utils/package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -110,12 +173,28 @@ jobs:
         if: steps.unreleased.outputs.publish == 'true'
         run: npm run release
 
-      - name: Tag and release notes
+      - name: Tag
         if: steps.unreleased.outputs.publish == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: v${{ steps.unreleased.outputs.version }}
         run: |
           git tag "$VERSION"
           git push origin "$VERSION"
-          gh release create "$VERSION" --generate-notes --verify-tag
+
+      # Separate from the tag so a re-run creates a Release a failed run left out.
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v${{ steps.unreleased.outputs.version }}
+        run: gh release view "$VERSION" >/dev/null 2>&1 || gh release create "$VERSION" --generate-notes --verify-tag
+
+      # The release commit when one was made, else the pushed merge.
+      - name: Released head
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Back-merge into develop
+        uses: ./.github/actions/back-merge
+        with:
+          sha: ${{ steps.head.outputs.sha }}
+          develop-workflow: release.yml
