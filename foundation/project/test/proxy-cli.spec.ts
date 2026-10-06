@@ -151,6 +151,23 @@ describe('proxy cli', () => {
     equal(existsSync(routeFile), false);
   });
 
+  it('assert :: two remote variables on one host are a usage error and register no route', () => {
+    const home = mkdtempSync(join(tmpdir(), 'ez4-proxy-'));
+
+    const result = spawnSync(
+      process.execPath,
+      ['bin/cli.mjs', 'proxy', 'run', 'demo.wt', '--remote', 'API_URL', '--remote', 'api-url', '--', process.execPath, '-e', ''],
+      {
+        env: { ...process.env, EZ4_PROXY_HOME: home, EZ4_PROXY_PORT: '1', API_URL: 'a.example.com', 'api-url': 'b.example.com' },
+        encoding: 'utf8'
+      }
+    );
+
+    equal(result.status, 1);
+    match(result.stderr + result.stdout, /API_URL and api-url both route to api-url\.demo\.wt\.localhost/);
+    equal(existsSync(join(home, 'routes', 'api-url.demo.wt.localhost')), false);
+  });
+
   it('assert :: --remote without a variable is a usage error', () => {
     const result = runCli(mkdtempSync(join(tmpdir(), 'ez4-proxy-')), 'proxy', 'run', 'demo.wt', '--remote');
 

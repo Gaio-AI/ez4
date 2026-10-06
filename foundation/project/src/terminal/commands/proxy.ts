@@ -40,7 +40,7 @@ const getRemoteRoutes = (host: string, input: InputOptions) => {
     throw new Error('Missing variable after --remote, e.g. `ez4 proxy run app.wt --remote API_DOMAIN -- npm run dev`.');
   }
 
-  return variables.flatMap((variable) => {
+  const routes = variables.flatMap((variable) => {
     const value = process.env[variable];
 
     if (!value) {
@@ -56,6 +56,17 @@ const getRemoteRoutes = (host: string, input: InputOptions) => {
 
     return [{ variable, ...route }];
   });
+
+  // Variable names differing only in case or separators share a host; the last one would silently replace the others.
+  routes.forEach((route, index) => {
+    const previous = routes.slice(0, index).find(({ host }) => host === route.host);
+
+    if (previous) {
+      throw new Error(`${previous.variable} and ${route.variable} both route to ${route.host}. Rename one of them.`);
+    }
+  });
+
+  return routes;
 };
 
 export const proxyCommand = async (input: InputOptions) => {
