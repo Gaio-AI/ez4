@@ -20,6 +20,7 @@ const assertDeploy = async <E extends EntryState>(newState: EntryStates<E>, oldS
 
 describe('gateway stage access log', { timeout: 120000 }, () => {
   let lastState: EntryStates | undefined;
+  let stageId: string | undefined;
 
   registerTriggers();
 
@@ -41,9 +42,10 @@ describe('gateway stage access log', { timeout: 120000 }, () => {
       autoDeploy: true
     });
 
+    stageId = stageResource.entryId;
     lastState = await assertDeploy(localState, undefined);
 
-    const stageState = lastState[stageResource.entryId];
+    const stageState = lastState[stageId];
     const logGroupState = lastState[logGroupResource.entryId];
 
     ok(stageState && isStageState(stageState) && stageState.result);
@@ -62,10 +64,11 @@ describe('gateway stage access log', { timeout: 120000 }, () => {
   });
 
   it('assert :: destroy', async () => {
-    ok(lastState);
+    ok(stageId && lastState);
 
     const { result } = await deploy(undefined, lastState);
 
-    equal(Object.keys(result).length, 0);
+    // The log group may stay: AWS writes a validation event into it when access logs are turned on.
+    equal(result[stageId], undefined);
   });
 });
