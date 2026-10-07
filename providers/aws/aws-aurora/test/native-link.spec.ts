@@ -157,7 +157,14 @@ describe('aurora native link', () => {
     equal(source.from, '@ez4/aws-aurora/client/native');
     equal(source.requireVpc, true);
 
-    ok(source.constructor.includes('endpoint: "first-link-db.proxy-abc.us-east-1.rds.amazonaws.com", user: "app"'));
+    // The proxy is a function variable, so the link code is the same with or without it.
+    ok(
+      source.constructor.includes('endpoint: process.env["EZ4_AURORA_PROXY_FIRST_LINK_DB"] ?? __EZ4_CLUSTER_WRITER_ENDPOINT, user: "app"')
+    );
+
+    deepEqual(source.variables, {
+      EZ4_AURORA_PROXY_FIRST_LINK_DB: 'first-link-db.proxy-abc.us-east-1.rds.amazonaws.com'
+    });
   });
 
   it('assert :: native connection to the writer when the stage has no proxy', async () => {
@@ -165,7 +172,11 @@ describe('aurora native link', () => {
 
     const source = await prepareLinkedClient(getContext('db'), service, getOptions('second'));
 
-    ok(source.constructor.includes('endpoint: __EZ4_CLUSTER_WRITER_ENDPOINT, user: "app"'));
+    ok(
+      source.constructor.includes('endpoint: process.env["EZ4_AURORA_PROXY_SECOND_LINK_DB"] ?? __EZ4_CLUSTER_WRITER_ENDPOINT, user: "app"')
+    );
+
+    equal(source.variables, undefined);
   });
 
   it('assert :: native connection to the writer while the proxy is not available', async () => {
@@ -179,7 +190,9 @@ describe('aurora native link', () => {
 
     const source = await prepareLinkedClient(getContext('db'), service, getOptions('third'));
 
-    ok(source.constructor.includes('endpoint: __EZ4_CLUSTER_WRITER_ENDPOINT }'));
+    ok(source.constructor.includes('endpoint: process.env["EZ4_AURORA_PROXY_THIRD_LINK_DB"] ?? __EZ4_CLUSTER_WRITER_ENDPOINT }'));
+
+    equal(source.variables, undefined);
   });
 
   it('assert :: data api connection looks no proxy up', async () => {

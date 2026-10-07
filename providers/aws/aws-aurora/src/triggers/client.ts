@@ -8,6 +8,7 @@ import { getDatabaseName } from '@ez4/pgclient/utils';
 import { getTableRepository } from '@ez4/pgclient/library';
 import { Client as LocalClient } from '@ez4/pgclient/driver';
 import { getDefinitionName } from '@ez4/project/library';
+import { toSnakeCase } from '@ez4/utils';
 
 import { importCluster } from '../cluster/client';
 import { getClusterState } from '../cluster/utils';
@@ -40,7 +41,9 @@ export const prepareLinkedClient = async (
 
   const isApiMode = connectionMode === ConnectionMode.Api;
 
-  const connection = isApiMode ? `resourceArn: ${resourceArn}` : await getNativeConnection(service, options, clusterId, user);
+  const { connection, variables } = isApiMode
+    ? { connection: `resourceArn: ${resourceArn}`, variables: undefined }
+    : await getNativeConnection(service, options, clusterId, user);
 
   return {
     from: `@ez4/aws-aurora/client/${connectionMode}`,
@@ -53,22 +56,30 @@ export const prepareLinkedClient = async (
       `})`,
     connectionIds: [clusterId],
     dependencyIds: [clusterId, integrityId],
-    requireVpc: !isApiMode
+    requireVpc: !isApiMode,
+    variables
   };
 };
 
-// The endpoint is the cluster's proxy when the stage has one, written into the link: creating or removing the
-// proxy changes the functions' bundles, so the switch shows in the plan.
+// The cluster's proxy reaches the function as an environment variable, not in its code: the function hash
+// doesn't cover the link, while a variable is part of the plan and of the configuration update. Creating or
+// removing the proxy then switches the endpoint on the next deploy, and the plan shows it.
 const getNativeConnection = async (service: DatabaseService, options: DeployOptions, clusterId: string, user: unknown) => {
-  const proxy = await getClusterProxy(getClusterName(service, options));
+  const clusterName = getClusterName(service, options);
 
-  const endpoint = proxy ? JSON.stringify(proxy.endpoint) : getDefinitionName<ClusterState>(clusterId, 'writerEndpoint');
+  const proxy = await getClusterProxy(clusterName);
 
-  if (typeof user === 'string') {
-    return `endpoint: ${endpoint}, user: ${JSON.stringify(user)}`;
-  }
+  const proxyVariable = `EZ4_AURORA_PROXY_${toSnakeCase(clusterName).toUpperCase()}`;
+  const writerEndpoint = getDefinitionName<ClusterState>(clusterId, 'writerEndpoint');
 
-  return `endpoint: ${endpoint}`;
+  const endpoint = `endpoint: process.env[${JSON.stringify(proxyVariable)}] ?? ${writerEndpoint}`;
+
+  return {
+    connection: typeof user === 'string' ? `${endpoint}, user: ${JSON.stringify(user)}` : endpoint,
+    variables: proxy && {
+      [proxyVariable]: proxy.endpoint
+    }
+  };
 };
 
 export const prepareEmulatorClient = async (event: EmulateClientEvent) => {
