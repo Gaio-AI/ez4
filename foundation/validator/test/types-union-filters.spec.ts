@@ -75,7 +75,11 @@ describe('union filters inside encoded array validation', () => {
   });
 
   it('assert :: wrong discriminant', async () => {
-    await assertFilterError({ field: 'unknown', operator: 'contains', value: ['foo'] }, UnexpectedStringError);
+    // The discriminator is matched first: one error listing every accepted `field`.
+    const errors = await validate(encode([{ field: 'unknown', operator: 'contains', value: ['foo'] }]), filtersSchema);
+
+    equal(errors.length, 1);
+    ok(errors[0] instanceof UnexpectedEnumValueError, errors[0].constructor.name);
   });
 
   it('assert :: operator from another branch', async () => {

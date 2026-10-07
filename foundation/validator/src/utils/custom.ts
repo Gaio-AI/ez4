@@ -18,14 +18,23 @@ export const useCustomValidation = async (value: unknown, schema: AnySchema, typ
     return [];
     //
   } catch (error) {
-    if (!(error instanceof Error)) {
-      return [new ValidationError(`${error}`, property, value)];
+    // A handler reporting several problems at once throws them as one `AggregateError`.
+    if (error instanceof AggregateError) {
+      return error.errors.map((inner) => toValidationError(inner, property, value));
     }
 
-    if (!(error instanceof ValidationError)) {
-      return [new ValidationError(error.message, property, value, error)];
-    }
-
-    return [error];
+    return [toValidationError(error, property, value)];
   }
+};
+
+const toValidationError = (error: unknown, property: string | undefined, value: unknown) => {
+  if (!(error instanceof Error)) {
+    return new ValidationError(`${error}`, property, value);
+  }
+
+  if (!(error instanceof ValidationError)) {
+    return new ValidationError(error.message, property, value, error);
+  }
+
+  return error;
 };

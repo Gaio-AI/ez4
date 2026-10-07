@@ -140,10 +140,11 @@ A published version is immutable. A mistake means publishing the next one.
 
 ## What CI covers
 
-Pull requests into `develop` and `hotfix/*` pull requests run changeset (or versioned)
-validation, linting, and every test leg (foundation, contracts, libraries, local and docs
-providers) and record the `Tested tree` status. `sync/*` pull requests skip the changeset job.
-Pushes to `develop` test the release branch head (or `develop` when no release is pending).
+Pull requests into `develop` run changeset validation and linting only. `hotfix/*` pull
+requests into `main` run the versioned check, linting, and every test leg (foundation,
+contracts, libraries, local and docs providers) and record the `Tested tree` status.
+`sync/*` pull requests skip the changeset job. Pushes to `develop` run the full suite on the
+release branch head (or on `develop` when no release is pending) and record its tree.
 The release pull request runs no CI of its own; pushes to `main` reuse the recorded
 `Tested tree` status via the tree gate so a tested tree is never tested again. CI does
 **not** run the specs under `providers/aws/*`: run the ones for the packages a change
@@ -155,6 +156,7 @@ real AWS.
 1. Before merging the cutover PR, configure repository settings:
    - **Actions permissions:** Settings → Actions → General → Workflow permissions → select **Allow GitHub Actions to create and approve pull requests**.
    - **Rulesets:** a `main` ruleset (PR required, merge + squash, no force push) and a `develop` ruleset (PR required, squash + merge, no force push), with no bypass actors.
+   - **Required check on `main`:** `Tested tree`, not `🧪 Tests`. The release pull request gets no pull request run, so only the `Tested tree` status that the `develop` run records on its head can satisfy it; a `hotfix/*` pull request records its own.
 2. After the cutover PR is merged into `main`: `develop` already exists at the pre-cutover `main` and is not the default branch. Bring it up to `main` before anything merges into it, so it carries the new workflows: `git push origin origin/main:refs/heads/develop` by a repository admin (fast-forward), or a `sync/*` PR merged with a merge commit when the `develop` ruleset blocks the push.
 3. Settings → General → Default branch: set to `develop` (new PRs and `gh pr create` target it; `main` stays the release branch).
 4. Any ruleset written against `~DEFAULT_BRANCH` must name `refs/heads/main` explicitly before the switch.

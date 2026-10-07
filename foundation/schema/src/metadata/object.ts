@@ -92,7 +92,7 @@ export const getObjectSchema = (
     references.set(type, identity);
 
     const modelSchema = createObjectSchema({
-      properties: getAnySchemaFromMembers(reflection, context, getModelProperties(type)),
+      properties: getAnySchemaFromMembers(reflection, context, getModelProperties(type, reflection)),
       description: description ?? getDeclarationDescription(type),
       definitions: type.definitions,
       identity

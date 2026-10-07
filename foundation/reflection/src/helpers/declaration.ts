@@ -6,7 +6,7 @@ import type { PropertyNodes } from '../resolver/model-property';
 import type { MethodNodes } from '../resolver/model-method';
 import type { FunctionNodes } from '../resolver/type-function';
 
-import { isImportSpecifier } from 'typescript';
+import { isImportSpecifier, isVariableDeclaration } from 'typescript';
 
 import { isTypeEnum } from '../resolver/type-enum';
 import { isTypeClass } from '../resolver/type-class';
@@ -32,7 +32,10 @@ export const isTypeDeclaration = (node: Node): node is DeclarationNodes => {
 
 export const getNodeTypeDeclaration = (node: Node, checker: TypeChecker) => {
   const symbol = checker.getSymbolAtLocation(node);
-  const declaration = symbol?.declarations?.at(0);
+
+  // A `const X` merged with a `type X` resolves to the type in a type position.
+  const declarations = symbol?.declarations;
+  const declaration = declarations?.find((current) => !isVariableDeclaration(current)) ?? declarations?.at(0);
 
   if (declaration && isImportSpecifier(declaration)) {
     const type = checker.getTypeAtLocation(node);

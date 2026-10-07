@@ -1,10 +1,10 @@
 {
   "2026ad6af87b566974d78e7cc3b12371:Typeof": {
-    "file": "test/types/typeof.ts",
     "type": "interface",
     "name": "Typeof",
+    "file": "test/types/typeof.ts",
     "position": {
-      "line": 7,
+      "line": 17,
       "character": 1
     },
     "modifiers": {
@@ -31,13 +31,13 @@
         "type": "property",
         "name": "regular3",
         "value": {
-          "file": "test/types/typeof.ts",
           "type": "callback",
+          "name": "Function",
+          "file": "test/types/typeof.ts",
           "position": {
             "line": 5,
             "character": 1
           },
-          "name": "Function",
           "return": {
             "type": "void"
           }
@@ -63,33 +63,79 @@
         "type": "property",
         "name": "template3",
         "value": {
-          "file": "test/types/typeof.ts",
           "type": "callback",
+          "name": "Function",
+          "file": "test/types/typeof.ts",
           "position": {
             "line": 5,
             "character": 1
           },
-          "name": "Function",
           "return": {
             "type": "void"
           }
+        }
+      },
+      {
+        "type": "property",
+        "name": "constant1",
+        "value": {
+          "type": "number",
+          "literal": 1000
+        }
+      },
+      {
+        "type": "property",
+        "name": "constant2",
+        "value": {
+          "type": "number",
+          "literal": 1000
+        }
+      },
+      {
+        "type": "property",
+        "name": "constant3",
+        "value": {
+          "type": "string",
+          "literal": "max"
+        }
+      },
+      {
+        "type": "property",
+        "name": "constant4",
+        "value": {
+          "type": "object",
+          "file": "test/types/typeof.ts",
+          "position": {
+            "line": 15,
+            "character": 19
+          },
+          "members": [
+            {
+              "type": "property",
+              "name": "value",
+              "value": {
+                "type": "number",
+                "literal": 1000
+              }
+            }
+          ]
         }
       }
     ]
   },
   "2026ad6af87b566974d78e7cc3b12371:Enum": {
-    "file": "test/types/typeof.ts",
     "type": "enum",
     "name": "Enum",
+    "file": "test/types/typeof.ts",
     "position": {
       "line": 3,
       "character": 1
     }
   },
   "2026ad6af87b566974d78e7cc3b12371:Class": {
-    "file": "test/types/typeof.ts",
     "type": "class",
     "name": "Class",
+    "file": "test/types/typeof.ts",
     "position": {
       "line": 4,
       "character": 1
