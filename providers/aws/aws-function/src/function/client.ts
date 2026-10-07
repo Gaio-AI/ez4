@@ -1,6 +1,7 @@
 import type { Arn, OperationLogLine, ResourceTags } from '@ez4/aws-common';
 import type { ArchitectureType, LogLevel, RuntimeType } from '@ez4/project';
 import type { LinkedVariables } from '@ez4/project/library';
+import type { FunctionVpcConfig } from './types';
 
 import {
   GetFunctionCommand,
@@ -33,7 +34,6 @@ import { FunctionDefaults } from '../utils/defaults';
 import { assertVariables } from './helpers/variables';
 import { getLogLevel } from './helpers/logging';
 import { getZipBuffer } from './helpers/zip';
-import { getDefaultVpcConfig } from './utils';
 import { getSafeDescription } from '../utils/description';
 import { Tasks } from '@ez4/utils';
 
@@ -53,6 +53,7 @@ export type CreateRequest = {
   memory: number;
   retryAttempts?: number;
   vpc?: boolean;
+  vpcConfig?: FunctionVpcConfig;
   tags?: ResourceTags;
 };
 
@@ -75,7 +76,7 @@ export type UpdateConfigurationRequest = {
   runtime?: RuntimeType;
   timeout?: number;
   memory?: number;
-  vpc?: boolean;
+  vpcConfig?: FunctionVpcConfig;
 };
 
 export type UpdateSourceCodeRequest = {
@@ -117,12 +118,10 @@ export const createFunction = async (logger: OperationLogLine, request: CreateRe
     assertVariables(variables);
   }
 
-  const vpcConfig = request.vpc ? await getDefaultVpcConfig() : undefined;
-
   const sourceFile = await getSourceZipFile(request.sourceFile, request.files);
   const handlerName = getSourceHandlerName(request.handlerName);
 
-  const { description, memory, timeout, architecture, runtime, roleArn, logGroup, logLevel } = request;
+  const { description, memory, timeout, architecture, runtime, roleArn, logGroup, logLevel, vpcConfig } = request;
 
   const client = getLambdaClient();
 
@@ -142,8 +141,8 @@ export const createFunction = async (logger: OperationLogLine, request: CreateRe
         Runtime: getFunctionRuntime(runtime),
         PackageType: 'Zip',
         VpcConfig: {
-          SecurityGroupIds: vpcConfig ? [vpcConfig.securityGroupId] : [],
-          SubnetIds: vpcConfig ? vpcConfig.subnetIds : []
+          SecurityGroupIds: vpcConfig?.securityGroupIds ?? [],
+          SubnetIds: vpcConfig?.subnetIds ?? []
         },
         LoggingConfig: {
           LogGroup: logGroup,
@@ -280,9 +279,7 @@ export const updateConfiguration = async (logger: OperationLogLine, functionName
     assertVariables(variables);
   }
 
-  const vpcConfig = request.vpc ? await getDefaultVpcConfig() : undefined;
-
-  const { description, memory, timeout, runtime, roleArn, logGroup, logLevel } = request;
+  const { description, memory, timeout, runtime, roleArn, logGroup, logLevel, vpcConfig } = request;
 
   const client = getLambdaClient();
 
@@ -298,8 +295,8 @@ export const updateConfiguration = async (logger: OperationLogLine, functionName
         Handler: getSourceHandlerName(handlerName)
       }),
       VpcConfig: {
-        SecurityGroupIds: vpcConfig ? [vpcConfig.securityGroupId] : [],
-        SubnetIds: vpcConfig ? vpcConfig.subnetIds : []
+        SecurityGroupIds: vpcConfig?.securityGroupIds ?? [],
+        SubnetIds: vpcConfig?.subnetIds ?? []
       },
       LoggingConfig: {
         LogGroup: logGroup,

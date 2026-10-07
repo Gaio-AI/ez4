@@ -1,7 +1,7 @@
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { LinkedVariables } from '@ez4/project/library';
-import type { FunctionState, FunctionResult, FunctionParameters } from './types';
+import type { FunctionState, FunctionResult, FunctionParameters, FunctionVpcConfig } from './types';
 
 import { applyTagUpdates, CorruptedResourceError, getBundleHash, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare, deepEqual, hashFile } from '@ez4/utils';
@@ -24,10 +24,18 @@ import {
 
 import { getInstalledPackagesHash, getPackagesResult } from './helpers/packages';
 import { protectVariables } from './helpers/variables';
+import { getFunctionVpcConfig } from './utils';
 import { FunctionServiceName } from './types';
 
 type FunctionConfigurationWithVariables = FunctionParameters & {
   variables: LinkedVariables;
+  vpcConfig?: FunctionVpcConfig;
+};
+
+// The subnets and security groups are resolved from the network on each deploy, so the state keeps the ones
+// in use: a change in the network then shows in the plan and reaches the function.
+const getVpcConfig = (parameters: FunctionParameters) => {
+  return parameters.vpc ? getFunctionVpcConfig() : undefined;
 };
 
 export const getFunctionHandler = (): StepHandler<FunctionState> => ({
@@ -57,7 +65,8 @@ const previewResource = async (candidate: FunctionState, current: FunctionState)
       filesHash: target.files && (await getBundleHash(target.functionName, target.files)),
       sourceHash: await getBundleHash(...target.getFunctionFiles()),
       packagesHash: await getInstalledPackagesHash(current.result?.bundledPackages),
-      valuesHash: await target.getFunctionHash()
+      valuesHash: await target.getFunctionHash(),
+      vpcConfig: await getVpcConfig(target)
     },
     {
       ...source,
@@ -68,7 +77,8 @@ const previewResource = async (candidate: FunctionState, current: FunctionState)
       sourceHash: current.result?.sourceHash,
       packagesHash: current.result?.packagesHash,
       valuesHash: current.result?.valuesHash,
-      filesHash: current.result?.filesHash
+      filesHash: current.result?.filesHash,
+      vpcConfig: current.result?.vpcConfig
     },
     {
       exclude: {
@@ -102,12 +112,13 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
     const logGroup = getLogGroupName(FunctionServiceName, functionName, context);
     const roleArn = getRoleArn(FunctionServiceName, functionName, context);
 
-    const [sourceHash, filesHash, sourceFile, valuesHash, variables] = await Promise.all([
+    const [sourceHash, filesHash, sourceFile, valuesHash, variables, vpcConfig] = await Promise.all([
       getBundleHash(...parameters.getFunctionFiles()),
       parameters.files && getBundleHash(functionName, parameters.files),
       parameters.getFunctionBundle(context),
       parameters.getFunctionHash(),
-      parameters.getFunctionVariables()
+      parameters.getFunctionVariables(),
+      getVpcConfig(candidate.parameters)
     ]);
 
     const importedFunction = await importFunction(logger, functionName);
@@ -126,6 +137,7 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
         ...parameters,
         logGroup,
         roleArn,
+        vpcConfig,
         variables: {
           ...variables,
           ...(release?.variableName && {
@@ -160,7 +172,8 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
         bundledPackages,
         packagesHash,
         logGroup,
-        roleArn
+        roleArn,
+        vpcConfig
       };
     }
 
@@ -170,6 +183,7 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
       sourceFile,
       logGroup,
       roleArn,
+      vpcConfig,
       variables: {
         ...variables,
         ...(release?.variableName && {
@@ -201,7 +215,8 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
       bundledPackages,
       packagesHash,
       logGroup,
-      roleArn
+      roleArn,
+      vpcConfig
     };
   });
 };
@@ -224,10 +239,19 @@ const updateResource = (candidate: FunctionState, current: FunctionState, contex
     const newLogGroup = getLogGroupName(FunctionServiceName, functionName, context);
     const oldLogGroup = current.result?.logGroup ?? newLogGroup;
 
+    const newVpcConfig = await getVpcConfig(parameters);
+    const oldVpcConfig = current.result?.vpcConfig;
+
     const { hasSourceUpdated, ...newResult } = await checkSourceCodeUpdates(logger, functionName, parameters, current.result, context);
 
-    const newConfig = { ...parameters, variables: newVariables, roleArn: newRoleArn, logGroup: newLogGroup };
-    const oldConfig = { ...current.parameters, variables: oldVariables, roleArn: oldRoleArn, logGroup: oldLogGroup };
+    const newConfig = { ...parameters, variables: newVariables, roleArn: newRoleArn, logGroup: newLogGroup, vpcConfig: newVpcConfig };
+    const oldConfig = {
+      ...current.parameters,
+      variables: oldVariables,
+      roleArn: oldRoleArn,
+      logGroup: oldLogGroup,
+      vpcConfig: oldVpcConfig
+    };
 
     const hasConfigurationUpdated = await checkConfigurationUpdates(logger, functionName, newConfig, oldConfig, hasSourceUpdated, context);
 
@@ -258,6 +282,7 @@ const updateResource = (candidate: FunctionState, current: FunctionState, contex
       variables: protectVariables(newVariables),
       logGroup: newLogGroup,
       roleArn: newRoleArn,
+      vpcConfig: newVpcConfig,
       functionVersion
     };
   });

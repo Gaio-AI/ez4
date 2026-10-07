@@ -54,6 +54,15 @@ Ensure the user performing deployments has the permissions below:
 }
 ```
 
+#### Functions in a VPC
+
+A function that needs a VPC (e.g. linked to a database through a native connection) runs in the default VPC:
+
+- in the subnets tagged `ez4:functions` = `true`, or its first two subnets when none is tagged;
+- with the security groups tagged `ez4:functions` = `true`, or its default security group when none is tagged.
+
+Tag private subnets routed through a NAT to give those functions outbound access. The configuration in use is kept in the state, so a deploy after the tags change shows the move in the plan and reconfigures the functions.
+
 ## License
 
 MIT License

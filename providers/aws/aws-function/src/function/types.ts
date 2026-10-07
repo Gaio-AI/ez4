@@ -18,7 +18,12 @@ export type FunctionRelease = {
   version: string;
 };
 
-export type FunctionParameters = Omit<CreateRequest, 'logGroup' | 'roleArn' | 'publish' | 'variables'> & {
+export type FunctionVpcConfig = {
+  subnetIds: string[];
+  securityGroupIds: string[];
+};
+
+export type FunctionParameters = Omit<CreateRequest, 'logGroup' | 'roleArn' | 'publish' | 'variables' | 'vpcConfig'> & {
   getFunctionFiles: GetFunctionFiles;
   getFunctionVariables: GetFunctionVariables;
   getFunctionBundle: GetFunctionBundle;
@@ -37,6 +42,7 @@ export type FunctionResult = CreateResponse & {
   packagesHash?: string;
   logGroup?: string;
   roleArn: Arn;
+  vpcConfig?: FunctionVpcConfig;
 };
 
 export type FunctionState = EntryState & {

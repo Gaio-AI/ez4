@@ -55,5 +55,8 @@
     "@ez4/utils": "^1.1.0",
     "@types/adm-zip": "^0.5.5",
     "adm-zip": "^0.5.14"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-ec2": "^3.1127.0"
   }
 }
