@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-aurora",
   "description": "EZ4: Self-managed AWS Aurora serverless v2 provider",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -68,16 +68,16 @@
     "@aws-sdk/credential-provider-node": "^3.972.82",
     "@smithy/core": "^3.35.1",
     "@smithy/signature-v4": "^5.7.3",
-    "@ez4/aws-common": "^1.1.0",
-    "@ez4/aws-identity": "^1.1.0",
-    "@ez4/common": "^1.1.0",
-    "@ez4/database": "^1.1.0",
-    "@ez4/pgclient": "^1.1.0",
-    "@ez4/pgmigration": "^1.1.0",
-    "@ez4/pgsql": "^1.1.0",
-    "@ez4/project": "^1.1.0",
-    "@ez4/schema": "^1.1.0",
-    "@ez4/state": "^1.1.0",
-    "@ez4/utils": "^1.1.0"
+    "@ez4/aws-common": "^1.2.0",
+    "@ez4/aws-identity": "^1.2.0",
+    "@ez4/common": "^1.2.0",
+    "@ez4/database": "^1.2.0",
+    "@ez4/pgclient": "^1.2.0",
+    "@ez4/pgmigration": "^1.2.0",
+    "@ez4/pgsql": "^1.2.0",
+    "@ez4/project": "^1.2.0",
+    "@ez4/schema": "^1.2.0",
+    "@ez4/state": "^1.2.0",
+    "@ez4/utils": "^1.2.0"
   }
 }
