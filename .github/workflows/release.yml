@@ -123,7 +123,9 @@ jobs:
   suite:
     name: 🧪 Suite
     needs: [gate]
-    if: needs.gate.outputs.tested != 'true'
+    # On main release-branch is skipped, and a skip propagates to every later job unless its `if`
+    # starts with a status check, so each job below names the result it depends on.
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.gate.outputs.tested != 'true' }}
     # A newer push to develop supersedes this suite; main's never is, nor a manual run.
     concurrency:
       group: suite-${{ github.event_name }}-${{ github.ref }}
@@ -139,7 +141,7 @@ jobs:
   record:
     name: 📌 Record tree
     needs: [gate]
-    if: needs.gate.outputs.tested == 'true'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.gate.outputs.tested == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
