@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-queue",
   "description": "EZ4: Self-managed AWS Simple Queue provider",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",

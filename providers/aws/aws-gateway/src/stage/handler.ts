@@ -65,11 +65,11 @@ const createResource = (candidate: StageState, context: StepContext): Promise<St
 
     const importedStage = await importStage(logger, apiId, stageName);
 
-    if (logGroupArn) {
-      await enableAccessLogs(logger, apiId, stageName, logGroupArn);
-    }
-
     if (importedStage) {
+      if (logGroupArn) {
+        await enableAccessLogs(logger, apiId, stageName, logGroupArn);
+      }
+
       // An existing stage may carry limits from before: it ends up with the declared ones, or with none of its own.
       await checkThrottlingUpdates(logger, apiId, stageName, parameters.throttling, importedStage.throttling);
 
@@ -84,6 +84,11 @@ const createResource = (candidate: StageState, context: StepContext): Promise<St
       ...parameters,
       stageName
     });
+
+    // Access logs are a setting of the stage, so a new one gets them only once it exists.
+    if (logGroupArn) {
+      await enableAccessLogs(logger, apiId, createdStage.stageName, logGroupArn);
+    }
 
     return {
       stageName: createdStage.stageName,
