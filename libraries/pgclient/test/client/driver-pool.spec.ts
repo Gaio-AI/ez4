@@ -29,4 +29,32 @@ describe('client driver pool', () => {
 
     await pool.end();
   });
+
+  it('assert :: idle connection closed by the server', async (context) => {
+    const warn = context.mock.method(console, 'warn', () => {});
+
+    const pool = createPool(TestConnection);
+
+    const client = await pool.connect();
+    const { rows } = await client.query('SELECT pg_backend_pid() AS pid');
+
+    client.release();
+
+    // The server ends the idle connection, as an idle session timeout, a restart or a proxy would.
+    const admin = createPool(TestConnection);
+
+    await admin.query('SELECT pg_terminate_backend($1)', [rows[0].pid]);
+    await admin.end();
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const result = await pool.query('SELECT 1 AS one');
+
+    equal(result.rows[0].one, 1);
+
+    equal(warn.mock.callCount(), 1);
+    equal(warn.mock.calls[0].arguments[0].idleConnectionEnded.code, '57P01');
+
+    await pool.end();
+  });
 });
