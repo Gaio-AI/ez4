@@ -17,9 +17,14 @@ import { Client as NativeClient } from '../client/providers/native';
 import { Client as ApiClient } from '../client/providers/api';
 import { ConnectionMode } from '../client/types';
 import { getConnectionOptions } from '../local/options';
+import { getClusterProxy } from '../utils/proxy';
 import { getClusterName, isAuroraService } from './utils';
 
-export const prepareLinkedClient = (context: EventContext, service: DatabaseService, options: DeployOptions): ContextSource => {
+export const prepareLinkedClient = async (
+  context: EventContext,
+  service: DatabaseService,
+  options: DeployOptions
+): Promise<ContextSource> => {
   const integrityName = getDatabaseName(service, options);
   const integrityState = getIntegrityState(context, integrityName, options);
   const integrityId = integrityState.entryId;
@@ -29,14 +34,13 @@ export const prepareLinkedClient = (context: EventContext, service: DatabaseServ
 
   const secretArn = getDefinitionName<ClusterState>(clusterId, 'secretArn');
   const resourceArn = getDefinitionName<ClusterState>(clusterId, 'clusterArn');
-  const endpoint = getDefinitionName<ClusterState>(clusterId, 'writerEndpoint');
   const database = getDatabaseName(service, options);
 
-  const { connectionMode = ConnectionMode.Api } = service.options ?? {};
+  const { connectionMode = ConnectionMode.Api, user } = service.options ?? {};
 
   const isApiMode = connectionMode === ConnectionMode.Api;
 
-  const connection = isApiMode ? `resourceArn: ${resourceArn}` : `endpoint: ${endpoint}`;
+  const connection = isApiMode ? `resourceArn: ${resourceArn}` : await getNativeConnection(service, options, clusterId, user);
 
   return {
     from: `@ez4/aws-aurora/client/${connectionMode}`,
@@ -51,6 +55,20 @@ export const prepareLinkedClient = (context: EventContext, service: DatabaseServ
     dependencyIds: [clusterId, integrityId],
     requireVpc: !isApiMode
   };
+};
+
+// The endpoint is the cluster's proxy when the stage has one, written into the link: creating or removing the
+// proxy changes the functions' bundles, so the switch shows in the plan.
+const getNativeConnection = async (service: DatabaseService, options: DeployOptions, clusterId: string, user: unknown) => {
+  const proxy = await getClusterProxy(getClusterName(service, options));
+
+  const endpoint = proxy ? JSON.stringify(proxy.endpoint) : getDefinitionName<ClusterState>(clusterId, 'writerEndpoint');
+
+  if (typeof user === 'string') {
+    return `endpoint: ${endpoint}, user: ${JSON.stringify(user)}`;
+  }
+
+  return `endpoint: ${endpoint}`;
 };
 
 export const prepareEmulatorClient = async (event: EmulateClientEvent) => {
@@ -92,7 +110,7 @@ export const prepareEmulatorClient = async (event: EmulateClientEvent) => {
         ...serviceOptions
       };
 
-      const { connectionMode } = clientOptions;
+      const { connectionMode, user } = clientOptions;
 
       if (connectionMode === ConnectionMode.Native) {
         return NativeClient.make({
@@ -100,7 +118,8 @@ export const prepareEmulatorClient = async (event: EmulateClientEvent) => {
           repository: getTableRepository(service.tables),
           connection: {
             ...connection,
-            endpoint: cluster.writerEndpoint
+            endpoint: cluster.writerEndpoint,
+            user
           }
         });
       }

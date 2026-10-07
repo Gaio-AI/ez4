@@ -7,7 +7,7 @@ import type { GeneratorUsageHelp } from '../generator/help';
 import type { IdentityAccount, IdentityGrant } from './identity';
 import type { DeployOptions, DestroyOptions, ServeOptions } from './options';
 import type { ServiceMetadata, ContextSource } from './service';
-import type { MetadataServiceResult } from './metadata';
+import type { MetadataReflection, MetadataServiceResult } from './metadata';
 
 export type Trigger = SyncEvent | AsyncEvent;
 
@@ -84,6 +84,10 @@ export type IdentityEvent = {
 export type PolicyResourceEvent = {
   state: EntryStates;
   serviceType: string;
+  /**
+   * All services of the project, for a policy scoped to the resources of its service type.
+   */
+  metadata: MetadataReflection;
   options: DeployOptions;
 };
 

@@ -41,6 +41,12 @@ Ensure the user performing deployments has the permissions below:
       ]
     },
     {
+      "Sid": "AuroraProxyDiscovery",
+      "Effect": "Allow",
+      "Action": ["rds:DescribeDBProxies"],
+      "Resource": ["arn:aws:rds:*:{account-id}:db-proxy:*"]
+    },
+    {
       "Sid": "AuroraDatabaseManagement",
       "Effect": "Allow",
       "Action": [
@@ -82,6 +88,26 @@ Ensure the user performing deployments has the permissions below:
   ]
 }
 ```
+
+## Native connections
+
+By default a function reaches the database through the Data API. A link can connect natively instead, with the Postgres protocol, which needs the function in a VPC (see `@ez4/aws-function`):
+
+```ts
+declare class Handler extends Queue.Service<Message> {
+  services: {
+    db: Environment.Service<Db, { connectionMode: 'native'; user: 'app' }>;
+  };
+}
+```
+
+- **Authentication:** with `user`, the connection signs in with IAM: a token per connection, no secret. The database role needs `GRANT rds_iam TO <user>`, and the cluster needs IAM database authentication enabled. Without `user`, it signs in with the cluster's master secret.
+- **Proxy:** when an RDS Proxy named after the cluster exists and is available, the connection goes through it; otherwise it goes to the writer. Creating the proxy is how a stage opts in. The endpoint is written into the link, so a deploy after the proxy appears shows the switch in the plan.
+- **IAM grant:** the execution policy grants `rds-db:connect` on the clusters the project links natively and on their proxies, by resource id. A cluster created in the same deploy has no id yet, so its grant comes with the next deploy. Looking proxies up needs the `AuroraProxyDiscovery` permission above, only for projects with native links.
+- **TLS:** always on, trusting the public roots (an RDS Proxy) and the RDS certificate bundle (the cluster itself).
+- **Pool:** one connection per function instance, closed after 5 minutes idle; keep the role's `idle_session_timeout` and the proxy's idle client timeout above that.
+- **Retries:** opening a connection is retried while the database restarts or resumes. A statement whose session the server ended (`57P01`, `57P05`) runs again on a new connection, outside transactions only.
+- **Timeouts:** the Data API cuts statements at 45 seconds; for native connections, set `statement_timeout` on the role.
 
 ## License
 
