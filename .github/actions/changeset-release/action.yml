@@ -1,0 +1,28 @@
+name: Changeset release
+description: Keep the changeset-release/develop branch and its PR into main. See changeset-release.mjs.
+inputs:
+  command:
+    description: prepare | pending | publish | close | hotfix
+    required: true
+  argument:
+    description: prepare <sha>, publish <title>, hotfix <base ref>.
+    required: false
+    default: ''
+outputs:
+  pending:
+    description: "'true' when a changeset releases a package (command pending)."
+    value: ${{ steps.release.outputs.pending }}
+  sha:
+    description: The release branch head (command publish).
+    value: ${{ steps.release.outputs.sha }}
+runs:
+  using: composite
+  steps:
+    - id: release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        # ez4 is a fork: without it `gh pr` would target the parent repository.
+        GH_REPO: ${{ github.repository }}
+        ARGUMENT: ${{ inputs.argument }}
+      run: node "$GITHUB_ACTION_PATH/changeset-release.mjs" "${{ inputs.command }}" "$ARGUMENT"
