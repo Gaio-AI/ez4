@@ -19,14 +19,14 @@
     "output": "ez4 output -e local.env"
   },
   "dependencies": {
-    "@ez4/aws-queue": "^1.1.0",
-    "@ez4/aws-gateway": "^1.1.0",
-    "@ez4/common": "^1.1.0",
-    "@ez4/gateway": "^1.1.0",
-    "@ez4/queue": "^1.1.0",
-    "@ez4/local-gateway": "^1.1.0",
-    "@ez4/local-queue": "^1.1.0",
-    "@ez4/project": "^1.1.0",
-    "@ez4/schema": "^1.1.0"
+    "@ez4/aws-queue": "^1.2.0",
+    "@ez4/aws-gateway": "^1.2.0",
+    "@ez4/common": "^1.2.0",
+    "@ez4/gateway": "^1.2.0",
+    "@ez4/queue": "^1.2.0",
+    "@ez4/local-gateway": "^1.2.0",
+    "@ez4/local-queue": "^1.2.0",
+    "@ez4/project": "^1.2.0",
+    "@ez4/schema": "^1.2.0"
   }
 }
