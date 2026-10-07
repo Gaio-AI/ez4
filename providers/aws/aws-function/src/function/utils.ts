@@ -1,9 +1,16 @@
 import type { Arn } from '@ez4/aws-common';
+import type { VpcTag } from '@ez4/aws-vpc';
 import type { DeployOptions, EventContext } from '@ez4/project/library';
 import type { EntryState, StepContext } from '@ez4/state';
-import type { FunctionState } from './types';
+import type { FunctionState, FunctionVpcConfig } from './types';
 
-import { getDefaultSecurityGroupId, getDefaultSubnetIds, getDefaultVpcId } from '@ez4/aws-vpc';
+import {
+  getDefaultSecurityGroupId,
+  getDefaultSubnetIds,
+  getDefaultVpcId,
+  getTaggedSecurityGroupIds,
+  getTaggedSubnetIds
+} from '@ez4/aws-vpc';
 import { IncompleteResourceError } from '@ez4/aws-common';
 
 import { FunctionDefaults } from '../utils/defaults';
@@ -122,4 +129,60 @@ export const getDefaultVpcConfig = async () => {
     subnetIds: subnetIds.slice(0, 2),
     securityGroupId
   };
+};
+
+/**
+ * Tag that places functions in the default VPC: the subnets and security groups carrying it are the ones
+ * every function that needs a VPC runs in (e.g. private subnets routed through a NAT).
+ */
+export const FunctionVpcTag: VpcTag = {
+  key: 'ez4:functions',
+  value: 'true'
+};
+
+/**
+ * Network for the functions that need a VPC: the subnets and security groups of the default VPC tagged with
+ * `FunctionVpcTag`, in a stable order. Without tagged subnets, the first two subnets of the default VPC;
+ * without tagged security groups, its default security group.
+ */
+export const resolveFunctionVpcConfig = async (): Promise<FunctionVpcConfig> => {
+  const vpcId = await getDefaultVpcId();
+
+  if (!vpcId) {
+    throw new DefaultVpcDetailsError();
+  }
+
+  const [taggedSubnetIds, taggedSecurityGroupIds] = await Promise.all([
+    getTaggedSubnetIds(vpcId, FunctionVpcTag),
+    getTaggedSecurityGroupIds(vpcId, FunctionVpcTag)
+  ]);
+
+  const subnetIds = taggedSubnetIds.length ? taggedSubnetIds : (await getDefaultSubnetIds(vpcId))?.slice(0, 2);
+
+  const defaultSecurityGroupId = taggedSecurityGroupIds.length ? undefined : await getDefaultSecurityGroupId(vpcId);
+  const securityGroupIds = defaultSecurityGroupId ? [defaultSecurityGroupId] : taggedSecurityGroupIds;
+
+  if (!subnetIds?.length || !securityGroupIds.length) {
+    throw new DefaultVpcDetailsError();
+  }
+
+  return {
+    subnetIds,
+    securityGroupIds
+  };
+};
+
+let functionVpcConfig: Promise<FunctionVpcConfig> | undefined;
+
+/**
+ * Same as `resolveFunctionVpcConfig`, looked up once per process: the network does not change during a
+ * deploy, and the plan of every function in a VPC asks for it.
+ */
+export const getFunctionVpcConfig = () => {
+  functionVpcConfig ??= resolveFunctionVpcConfig().catch((error) => {
+    functionVpcConfig = undefined;
+    throw error;
+  });
+
+  return functionVpcConfig;
 };

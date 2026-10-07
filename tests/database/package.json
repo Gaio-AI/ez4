@@ -29,7 +29,7 @@
     "clean:registry": "rm -rf ../../.registry/@ez4/tests-database"
   },
   "dependencies": {
-    "@ez4/database": "^1.2.0",
-    "@ez4/schema": "^1.2.0"
+    "@ez4/database": "^1.3.0",
+    "@ez4/schema": "^1.3.0"
   }
 }

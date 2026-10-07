@@ -5,6 +5,7 @@ import type { ClientConnection } from '../types/connection';
 import { Pool } from 'pg';
 
 import { PgClient } from '@ez4/pgclient';
+import { Runtime } from '@ez4/common';
 
 import { ClientDriver } from './client';
 
@@ -39,7 +40,7 @@ export const createPool = (connection: ClientConnection) => {
   const baseOptions = {
     allowExitOnIdle: true,
     connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 15000,
+    idleTimeoutMillis: connection.idleTimeout ?? 15000,
     maxUses: 500,
     min: 0,
     max: connection.poolSize ?? 2,
@@ -47,18 +48,38 @@ export const createPool = (connection: ClientConnection) => {
   };
 
   if ('connectionString' in connection && connection.connectionString) {
-    return new Pool({ ...baseOptions, connectionString: connection.connectionString });
+    return listenIdleErrors(new Pool({ ...baseOptions, connectionString: connection.connectionString }));
   }
 
   const { database, password, user, host, port } = connection as Extract<ClientConnection, { host: string }>;
 
-  return new Pool({
-    ...baseOptions,
-    ssl: connection.ssl ?? false,
-    database,
-    password,
-    user,
-    host,
-    port
+  return listenIdleErrors(
+    new Pool({
+      ...baseOptions,
+      ssl: connection.ssl ?? false,
+      database,
+      password,
+      user,
+      host,
+      port
+    })
+  );
+};
+
+// The server or a proxy may end an idle pooled connection (idle session timeout, restart, failover), and in a
+// Lambda that surfaces when the frozen container resumes. The pool emits it as an 'error' event, which crashes
+// the process when nothing listens. The pool already discards that client, so the next query connects again.
+const listenIdleErrors = (pool: Pool) => {
+  pool.on('error', (error) => {
+    console.warn({
+      type: 'PgSQL',
+      ...Runtime.getScope(),
+      idleConnectionEnded: {
+        code: Reflect.get(error, 'code'),
+        message: error.message
+      }
+    });
   });
+
+  return pool;
 };

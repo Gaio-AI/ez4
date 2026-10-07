@@ -8,6 +8,7 @@ import { getDatabaseName } from '@ez4/pgclient/utils';
 import { getTableRepository } from '@ez4/pgclient/library';
 import { Client as LocalClient } from '@ez4/pgclient/driver';
 import { getDefinitionName } from '@ez4/project/library';
+import { toSnakeCase } from '@ez4/utils';
 
 import { importCluster } from '../cluster/client';
 import { getClusterState } from '../cluster/utils';
@@ -17,9 +18,14 @@ import { Client as NativeClient } from '../client/providers/native';
 import { Client as ApiClient } from '../client/providers/api';
 import { ConnectionMode } from '../client/types';
 import { getConnectionOptions } from '../local/options';
+import { getClusterProxy } from '../utils/proxy';
 import { getClusterName, isAuroraService } from './utils';
 
-export const prepareLinkedClient = (context: EventContext, service: DatabaseService, options: DeployOptions): ContextSource => {
+export const prepareLinkedClient = async (
+  context: EventContext,
+  service: DatabaseService,
+  options: DeployOptions
+): Promise<ContextSource> => {
   const integrityName = getDatabaseName(service, options);
   const integrityState = getIntegrityState(context, integrityName, options);
   const integrityId = integrityState.entryId;
@@ -29,14 +35,15 @@ export const prepareLinkedClient = (context: EventContext, service: DatabaseServ
 
   const secretArn = getDefinitionName<ClusterState>(clusterId, 'secretArn');
   const resourceArn = getDefinitionName<ClusterState>(clusterId, 'clusterArn');
-  const endpoint = getDefinitionName<ClusterState>(clusterId, 'writerEndpoint');
   const database = getDatabaseName(service, options);
 
-  const { connectionMode = ConnectionMode.Api } = service.options ?? {};
+  const { connectionMode = ConnectionMode.Api, user } = service.options ?? {};
 
   const isApiMode = connectionMode === ConnectionMode.Api;
 
-  const connection = isApiMode ? `resourceArn: ${resourceArn}` : `endpoint: ${endpoint}`;
+  const { connection, variables } = isApiMode
+    ? { connection: `resourceArn: ${resourceArn}`, variables: undefined }
+    : await getNativeConnection(service, options, clusterId, user);
 
   return {
     from: `@ez4/aws-aurora/client/${connectionMode}`,
@@ -49,7 +56,29 @@ export const prepareLinkedClient = (context: EventContext, service: DatabaseServ
       `})`,
     connectionIds: [clusterId],
     dependencyIds: [clusterId, integrityId],
-    requireVpc: !isApiMode
+    requireVpc: !isApiMode,
+    variables
+  };
+};
+
+// The cluster's proxy reaches the function as an environment variable, not in its code: the function hash
+// doesn't cover the link, while a variable is part of the plan and of the configuration update. Creating or
+// removing the proxy then switches the endpoint on the next deploy, and the plan shows it.
+const getNativeConnection = async (service: DatabaseService, options: DeployOptions, clusterId: string, user: unknown) => {
+  const clusterName = getClusterName(service, options);
+
+  const proxy = await getClusterProxy(clusterName);
+
+  const proxyVariable = `EZ4_AURORA_PROXY_${toSnakeCase(clusterName).toUpperCase()}`;
+  const writerEndpoint = getDefinitionName<ClusterState>(clusterId, 'writerEndpoint');
+
+  const endpoint = `endpoint: process.env[${JSON.stringify(proxyVariable)}] ?? ${writerEndpoint}`;
+
+  return {
+    connection: typeof user === 'string' ? `${endpoint}, user: ${JSON.stringify(user)}` : endpoint,
+    variables: proxy && {
+      [proxyVariable]: proxy.endpoint
+    }
   };
 };
 
@@ -92,7 +121,7 @@ export const prepareEmulatorClient = async (event: EmulateClientEvent) => {
         ...serviceOptions
       };
 
-      const { connectionMode } = clientOptions;
+      const { connectionMode, user } = clientOptions;
 
       if (connectionMode === ConnectionMode.Native) {
         return NativeClient.make({
@@ -100,7 +129,8 @@ export const prepareEmulatorClient = async (event: EmulateClientEvent) => {
           repository: getTableRepository(service.tables),
           connection: {
             ...connection,
-            endpoint: cluster.writerEndpoint
+            endpoint: cluster.writerEndpoint,
+            user
           }
         });
       }
