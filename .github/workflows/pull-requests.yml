@@ -1,58 +1,86 @@
 name: Pull requests
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     types:
       - ready_for_review
       - synchronize
       - opened
+  # release.yml calls this when a pushed tree was never tested; the caller's event is `push`.
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit to test; it gets the Tested tree status once lint and every test leg pass.
+        type: string
+        required: true
 
+# A reusable workflow shares the caller's `github.workflow`, so the event is part of the group,
+# and only pull request runs are cancelled by a newer push.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: pull-requests-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   NODE_VERSION: '24'
 
 jobs:
+  # main receives only the release PR (changeset-release/develop) and hotfix/* PRs.
+  branch-policy:
+    name: 🚦 Branch policy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - name: Only the release branch or hotfix/* into main
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            changeset-release/develop|hotfix/*) exit 0 ;;
+            *) echo "::error::PRs into main come from changeset-release/develop (release) or hotfix/*; target develop instead"; exit 1 ;;
+          esac
+
   changeset:
     name: 🦋 Changeset
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
-      github.base_ref == 'main' &&
-      github.head_ref != 'changeset-release/main'
-
+      !startsWith(github.head_ref, 'sync/')
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-
       # A pull request that needs no release adds one with `npx changeset add --empty`.
       - name: Require a changeset
-        run: npx --yes @changesets/cli@3.0.3 status --since=origin/main
-
+        if: github.base_ref != 'main'
+        run: npx --yes @changesets/cli@3.0.3 status --since=origin/${{ github.base_ref }}
+      # main gets versions, not changesets: the hotfix branch ran `changeset version`.
+      - name: Require a versioned hotfix
+        if: github.base_ref == 'main'
+        uses: ./.github/actions/changeset-release
+        with:
+          command: hotfix
+          argument: origin/main
       - name: Allow a major only with a breaking note
         run: npm run changeset:check
 
   lint:
     name: 🧹 Lint
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -72,7 +100,9 @@ jobs:
   test:
     name: 🧪 Test ${{ matrix.group }}
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
 
     strategy:
       fail-fast: false
@@ -123,6 +153,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -147,10 +179,31 @@ jobs:
     name: 🧪 Tests
     runs-on: ubuntu-latest
     needs: [lint, test]
-    if: ${{ !cancelled() && (github.event_name == 'push' || (github.event.pull_request.draft == false && github.event.pull_request.fork == false)) }}
+    if: >-
+      !cancelled() && (github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false && github.event.pull_request.fork == false))
 
     steps:
       - name: Require every lint and test job
         run: |
           test "${{ needs.lint.result }}" = success
           test "${{ needs.test.result }}" = success
+
+  # A PR run checks out refs/pull/N/merge, so it records the merged tree on the PR head:
+  # the squash of an up-to-date PR into develop then needs no rerun.
+  record:
+    name: 📌 Record tree
+    runs-on: ubuntu-latest
+    needs: [tests]
+    if: needs.tests.result == 'success'
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+      - uses: ./.github/actions/tree-gate
+        with:
+          command: record
+          sha: ${{ inputs.sha || github.event.pull_request.head.sha }}
