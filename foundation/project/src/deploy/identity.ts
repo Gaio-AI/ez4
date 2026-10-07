@@ -12,7 +12,7 @@ export const prepareExecutionRole = async (state: EntryStates, metadata: Metadat
 
   const grantsList = await prepareIdentityGrantList(serviceTypes, options);
   const accountList = await prepareIdentityAccountList(serviceTypes, options);
-  const policyList = await prepareExecutionPolicyList(state, serviceTypes, options);
+  const policyList = await prepareExecutionPolicyList(state, metadata, serviceTypes, options);
 
   const role = await triggerAllAsync('deploy:prepareExecutionRole', (handler) =>
     handler({
@@ -79,12 +79,17 @@ const prepareIdentityAccountList = async (serviceTypes: string[], options: Deplo
   return accountList;
 };
 
-const prepareExecutionPolicyList = async (state: EntryStates, serviceTypes: string[], options: DeployOptions) => {
+const prepareExecutionPolicyList = async (
+  state: EntryStates,
+  metadata: MetadataReflection,
+  serviceTypes: string[],
+  options: DeployOptions
+) => {
   const policyList: EntryState[] = [];
 
   for (const serviceType of serviceTypes) {
     await triggerAllAsync('deploy:prepareExecutionPolicy', async (handler) => {
-      const policy = await handler({ state, serviceType, options });
+      const policy = await handler({ state, metadata, serviceType, options });
 
       if (policy) {
         policyList.push(policy);

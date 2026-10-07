@@ -40,7 +40,7 @@ export const createPool = (connection: ClientConnection) => {
   const baseOptions = {
     allowExitOnIdle: true,
     connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 15000,
+    idleTimeoutMillis: connection.idleTimeout ?? 15000,
     maxUses: 500,
     min: 0,
     max: connection.poolSize ?? 2,

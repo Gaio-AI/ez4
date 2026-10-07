@@ -57,4 +57,45 @@ describe('client driver pool', () => {
 
     await pool.end();
   });
+
+  it('assert :: default idle timeout', async () => {
+    const pool = createPool(TestConnection);
+
+    equal(pool.options.idleTimeoutMillis, 15000);
+
+    await pool.end();
+  });
+
+  it('assert :: custom idle timeout', async () => {
+    const pool = createPool({ ...TestConnection, idleTimeout: 300000 });
+
+    equal(pool.options.idleTimeoutMillis, 300000);
+
+    await pool.end();
+  });
+
+  it('assert :: password function for each new connection', async () => {
+    let calls = 0;
+
+    const pool = createPool({
+      ...TestConnection,
+      poolSize: 2,
+      password: async () => {
+        calls++;
+        return TestConnection.password;
+      }
+    });
+
+    const [first, second] = await Promise.all([pool.connect(), pool.connect()]);
+
+    first.release();
+    second.release();
+
+    const result = await pool.query('SELECT 1 AS one');
+
+    equal(result.rows[0].one, 1);
+    equal(calls, 2);
+
+    await pool.end();
+  });
 });
