@@ -97,12 +97,15 @@ jobs:
       - name: Lint codebase
         run: npm run lint
 
+  # Pull requests into develop run changeset and lint only: the push to develop tests the release
+  # branch head. A pull request into main (hotfix/*) ships on merge, so it runs every test leg.
   test:
     name: 🧪 Test ${{ matrix.group }}
     runs-on: ubuntu-latest
     if: >-
       github.event_name != 'pull_request' ||
-      (github.event.pull_request.draft == false && github.event.pull_request.fork == false)
+      (github.event.pull_request.draft == false && github.event.pull_request.fork == false &&
+       github.base_ref == 'main')
 
     strategy:
       fail-fast: false
@@ -174,14 +177,15 @@ jobs:
       - name: Test ${{ matrix.group }}
         run: npm test ${{ matrix.workspaces }}
 
-  # Branch protection requires a check with this name, so it stands for every lint and test job.
+  # Stands for every lint and test job of a full suite.
   tests:
     name: 🧪 Tests
     runs-on: ubuntu-latest
     needs: [lint, test]
     if: >-
       !cancelled() && (github.event_name != 'pull_request' ||
-      (github.event.pull_request.draft == false && github.event.pull_request.fork == false))
+      (github.event.pull_request.draft == false && github.event.pull_request.fork == false &&
+       github.base_ref == 'main'))
 
     steps:
       - name: Require every lint and test job
@@ -189,8 +193,8 @@ jobs:
           test "${{ needs.lint.result }}" = success
           test "${{ needs.test.result }}" = success
 
-  # A PR run checks out refs/pull/N/merge, so it records the merged tree on the PR head:
-  # the squash of an up-to-date PR into develop then needs no rerun.
+  # A PR run checks out refs/pull/N/merge, so it records the merged tree on the hotfix PR head:
+  # merging an up-to-date hotfix then needs no rerun on main.
   record:
     name: 📌 Record tree
     runs-on: ubuntu-latest
