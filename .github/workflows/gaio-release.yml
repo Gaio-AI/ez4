@@ -1,0 +1,185 @@
+name: Release
+on:
+  workflow_call:
+    inputs:
+      config: { type: string, default: .github/gaio-ci.json }
+      force: { type: boolean, default: false }
+      pr-workflow: { type: string, default: pr.yml }
+    secrets:
+      aws-access-key-id:
+        required: false
+      aws-secret-access-key:
+        required: false
+      aws-region:
+        required: false
+      doppler-token:
+        required: false
+      doppler-stg-token:
+        required: false
+      doppler-prd-token:
+        required: false
+permissions: {}
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: read
+      pull-requests: read
+    outputs:
+      tested: ${{ steps.check.outputs.tested }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: check
+        uses: ./.github/gaio-actions/tree-gate
+        with:
+          command: check
+          sha: ${{ github.sha }}
+      - if: steps.check.outputs.tested == 'true'
+        uses: ./.github/gaio-actions/validated
+        with:
+          command: all
+          config: ${{ inputs.config }}
+      - if: steps.check.outputs.tested == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .validated
+          key: validated-${{ github.run_id }}-${{ github.run_attempt }}
+  suite:
+    needs: gate
+    if: needs.gate.outputs.tested != 'true'
+    permissions:
+      contents: read
+      statuses: write
+    uses: ./.github/workflows/gaio-pr.yml
+    with:
+      config: ${{ inputs.config }}
+      sha: ${{ github.sha }}
+      force: ${{ inputs.force }}
+    secrets:
+      aws-access-key-id: ${{ secrets.aws-access-key-id }}
+      aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+      aws-region: ${{ secrets.aws-region }}
+      doppler-token: ${{ secrets.doppler-token }}
+  version:
+    needs: [gate, suite]
+    if: always() && needs.gate.result == 'success' && (needs.suite.result == 'success' || needs.suite.result == 'skipped')
+    runs-on: ubuntu-latest
+    # Queues instead of racing, so the release branch is always built from the newest main.
+    concurrency:
+      group: release-pr
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # Install scripts and the caller's version command must not read the push token from .git/config.
+          persist-credentials: false
+      - id: pending
+        uses: ./.github/gaio-actions/version
+        with:
+          command: pending
+      - id: config
+        if: steps.pending.outputs.pending == 'true'
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: echo "codeartifact=$(jq -r '.codeartifact // false' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      - if: steps.pending.outputs.pending == 'true'
+        uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ steps.config.outputs.codeartifact }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - uses: ./.github/gaio-actions/version
+        with:
+          command: prepare
+          config: ${{ inputs.config }}
+          pr-workflow: ${{ inputs.pr-workflow }}
+  untagged:
+    needs: [gate, suite]
+    if: always() && needs.gate.result == 'success' && (needs.suite.result == 'success' || needs.suite.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      apps: ${{ steps.untagged.outputs.apps || '[]' }}
+      max-parallel: ${{ steps.untagged.outputs.max-parallel || '20' }}
+      serial: ${{ steps.untagged.outputs.serial || 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: untagged
+        uses: ./.github/gaio-actions/version
+        with:
+          command: untagged
+          config: ${{ inputs.config }}
+  deploy:
+    needs: untagged
+    if: needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial != 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.untagged.outputs.max-parallel) }}
+      matrix:
+        app: ${{ fromJSON(needs.untagged.outputs.apps) }}
+    uses: ./.github/workflows/gaio-deploy-app.yml
+    permissions:
+      contents: write
+    with:
+      config: ${{ inputs.config }}
+      app: ${{ matrix.app.name }}
+      dir: ${{ matrix.app.dir }}
+      sha: ${{ github.sha }}
+      demo: ${{ matrix.app.demo }}
+    secrets:
+      aws-access-key-id: ${{ secrets.aws-access-key-id }}
+      aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+      aws-region: ${{ secrets.aws-region }}
+      doppler-stg-token: ${{ secrets.doppler-stg-token }}
+      doppler-prd-token: ${{ secrets.doppler-prd-token }}
+  ship-serial:
+    needs: untagged
+    if: needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    # No timeout and no cancel: an interrupted ez4 deploy corrupts its state.
+    concurrency:
+      group: ship-serial-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          # Deploy commands and install scripts must not read the push token; only the tag step gets it.
+          persist-credentials: false
+      - id: tools
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: |
+          echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+          echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ steps.tools.outputs.codeartifact }}
+          doppler: ${{ steps.tools.outputs.doppler }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - uses: ./.github/gaio-actions/ship
+        with:
+          config: ${{ inputs.config }}
+          units: ${{ needs.untagged.outputs.apps }}
+          sha: ${{ github.sha }}
+          doppler-stg-token: ${{ secrets.doppler-stg-token }}
+          doppler-prd-token: ${{ secrets.doppler-prd-token }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}

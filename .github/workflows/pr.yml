@@ -15,7 +15,7 @@ concurrency:
 jobs:
   ci:
     if: github.event.pull_request.draft != true
-    uses: Gaio-AI/gaio-actions/.github/workflows/pr.yml@v1
+    uses: ./.github/workflows/gaio-pr.yml
     permissions:
       contents: read
       statuses: write

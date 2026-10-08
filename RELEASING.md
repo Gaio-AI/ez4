@@ -4,9 +4,15 @@ This fork publishes `@ez4/*` to Gaio's private CodeArtifact repository. The back
 install from there. Releases are driven by [changesets](https://github.com/changesets/changesets):
 merging the release pull request publishes to CodeArtifact on its own.
 
-CI and release logic lives in [`Gaio-AI/gaio-actions`](https://github.com/Gaio-AI/gaio-actions),
-referenced at `@v1`. This repo keeps two thin callers (`.github/workflows/pr.yml`,
-`.github/workflows/release.yml`) and its commands in `.github/gaio-ci.json`.
+CI and release logic is a copy of [`Gaio-AI/gaio-actions`](https://github.com/Gaio-AI/gaio-actions)
+at `f71aa6c`: `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
+gaio-actions is private, and GitHub does not let a public repo call a private repo's workflows.
+To update the copy, take the workflows and the actions' `action.yml` and `.mjs` files (no tests)
+from a gaio-actions commit, rewrite `Gaio-AI/gaio-actions/<action>@v1` to
+`./.github/gaio-actions/<action>` and `Gaio-AI/gaio-actions/.github/workflows/<name>.yml@v1` to
+`./.github/workflows/gaio-<name>.yml`, and update the commit above. This repo keeps two thin
+callers (`.github/workflows/pr.yml`, `.github/workflows/release.yml`) and its commands in
+`.github/gaio-ci.json`.
 
 ## Flow
 
@@ -128,7 +134,7 @@ A published version is immutable. A mistake means publishing the next one.
 
 ## What CI covers
 
-`.github/workflows/pr.yml` calls `gaio-actions/.github/workflows/pr.yml@v1` on `pull_request` (drafts
+`.github/workflows/pr.yml` calls `.github/workflows/gaio-pr.yml` on `pull_request` (drafts
 skipped) and on `workflow_dispatch` (`force` ignores the validated manifest). The release workflow
 dispatches it on `release/main`, since a pull request opened with `GITHUB_TOKEN` starts no
 `pull_request` run.

@@ -1,0 +1,248 @@
+name: PR checks
+on:
+  workflow_call:
+    inputs:
+      config: { type: string, default: .github/gaio-ci.json }
+      sha: { type: string, default: '' }
+      force: { type: boolean, default: false }
+    secrets:
+      aws-access-key-id:
+        required: false
+      aws-secret-access-key:
+        required: false
+      aws-region:
+        required: false
+      doppler-token:
+        required: false
+permissions: {}
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      skip: ${{ steps.validated.outputs.skip }}
+      legs: ${{ steps.validated.outputs.legs }}
+      lint-hash: ${{ steps.validated.outputs.lint-hash }}
+      lint-needed: ${{ steps.validated.outputs.lint-needed }}
+      checks: ${{ steps.validated.outputs.checks }}
+      check-hashes: ${{ steps.validated.outputs.check-hashes }}
+      codeartifact: ${{ steps.config.outputs.codeartifact }}
+      timeout: ${{ steps.config.outputs.timeout }}
+      doppler: ${{ steps.config.outputs.doppler }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/gaio-actions/setup
+        with:
+          install: 'false'
+      - id: config
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: |
+          {
+            echo "codeartifact=$(jq -r '.codeartifact // false' "$CONFIG")"
+            echo "timeout=$(jq -r '.["timeout-minutes"] // 15' "$CONFIG")"
+            echo "doppler=$(jq -r '.doppler // false' "$CONFIG")"
+          } >> "$GITHUB_OUTPUT"
+      - id: validated
+        uses: ./.github/gaio-actions/validated
+        with:
+          command: plan
+          config: ${{ inputs.config }}
+          base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || '' }}
+          force: ${{ inputs.force }}
+  changeset:
+    needs: plan
+    if: github.event_name == 'pull_request' && needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ needs.plan.outputs.codeartifact }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - env:
+          CONFIG: ${{ inputs.config }}
+        run: |
+          CMD=$(jq -r .changeset "$CONFIG")
+          bash -c "${CMD//\{base\}/$GITHUB_BASE_REF}"
+  lint:
+    needs: plan
+    if: needs.plan.outputs.skip != 'true' && needs.plan.outputs.lint-needed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ needs.plan.outputs.codeartifact }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - env:
+          CONFIG: ${{ inputs.config }}
+        run: bash -c "$(jq -r .lint "$CONFIG")"
+      - env:
+          LINT_HASH: ${{ needs.plan.outputs.lint-hash }}
+        run: mkdir -p passed && touch "passed/${LINT_HASH}__0"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: passed-lint
+          path: passed/
+          retention-days: 1
+  tasks:
+    needs: plan
+    if: needs.plan.outputs.skip != 'true' && needs.plan.outputs.legs != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.legs) }}
+    name: ${{ matrix.task }} ${{ matrix.package }} ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ needs.plan.outputs.codeartifact }}
+          doppler: ${{ needs.plan.outputs.doppler }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - uses: ./.github/gaio-actions/services
+        with:
+          config: ${{ inputs.config }}
+      - env:
+          CONFIG: ${{ inputs.config }}
+        run: jq -r '.env // {} | to_entries[] | "\(.key)=\(.value)"' "$CONFIG" >> "$GITHUB_ENV"
+      - if: matrix.prepare != ''
+        env:
+          CMD: ${{ matrix.prepare }}
+          DOPPLER_TOKEN: ${{ secrets.doppler-token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_REGION: ${{ secrets.aws-region }}
+        run: bash -c "$CMD"
+      - env:
+          CMD: ${{ matrix.run }}
+          DOPPLER_TOKEN: ${{ secrets.doppler-token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_REGION: ${{ secrets.aws-region }}
+        run: bash -c "$CMD"
+      - env:
+          HASH: ${{ matrix.hash }}
+          INDEX: ${{ matrix.index }}
+        run: mkdir -p passed && touch "passed/${HASH}__${INDEX}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: passed-${{ strategy.job-index }}
+          path: passed/
+          retention-days: 1
+  extra:
+    needs: plan
+    if: needs.plan.outputs.skip != 'true' && needs.plan.outputs.checks != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.checks) }}
+    continue-on-error: ${{ matrix.advisory }}
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ needs.plan.outputs.codeartifact }}
+          doppler: ${{ needs.plan.outputs.doppler }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - uses: ./.github/gaio-actions/services
+        with:
+          config: ${{ inputs.config }}
+      - env:
+          CONFIG: ${{ inputs.config }}
+        run: jq -r '.env // {} | to_entries[] | "\(.key)=\(.value)"' "$CONFIG" >> "$GITHUB_ENV"
+      - env:
+          CMD: ${{ matrix.run }}
+          BASE_REF: ${{ github.base_ref }}
+          DOPPLER_TOKEN: ${{ secrets.doppler-token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_REGION: ${{ secrets.aws-region }}
+        run: bash -c "$CMD"
+      - env:
+          HASH: ${{ matrix.hash }}
+        run: mkdir -p passed && touch "passed/${HASH}__0"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: passed-check-${{ strategy.job-index }}
+          path: passed/
+          retention-days: 1
+  record:
+    needs: [plan, changeset, lint, tasks, extra]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: passed-*
+          merge-multiple: true
+          path: passed/
+      - uses: ./.github/gaio-actions/validated
+        with:
+          command: merge
+          config: ${{ inputs.config }}
+          legs: ${{ needs.plan.outputs.legs }}
+          lint-hash: ${{ needs.lint.result == 'success' && needs.plan.outputs.lint-hash || '' }}
+          check-hashes: ${{ needs.plan.outputs.check-hashes }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .validated
+          key: validated-${{ github.run_id }}-${{ github.run_attempt }}
+      - if: >-
+          contains(fromJSON('["success","skipped"]'), needs.changeset.result) &&
+          contains(fromJSON('["success","skipped"]'), needs.lint.result) &&
+          contains(fromJSON('["success","skipped"]'), needs.tasks.result) &&
+          contains(fromJSON('["success","skipped"]'), needs.extra.result)
+        uses: ./.github/gaio-actions/tree-gate
+        with:
+          command: record
+          sha: ${{ inputs.sha || github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+  checks:
+    needs: [plan, changeset, lint, tasks, extra]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - if: needs.plan.result != 'success' || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    uses: Gaio-AI/gaio-actions/.github/workflows/release.yml@v1
+    uses: ./.github/workflows/gaio-release.yml
     permissions:
       contents: write
       pull-requests: write

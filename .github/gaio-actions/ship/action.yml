@@ -1,0 +1,36 @@
+name: Ship
+description: Ship release units one at a time, each demo → prd → tag, stopping at the first failure. See ship.mjs.
+inputs:
+  config:
+    default: .github/gaio-ci.json
+  units:
+    description: The `apps` JSON output of `version untagged`.
+    required: true
+  sha:
+    description: The release commit; HEAD must be it.
+    required: true
+  doppler-stg-token:
+    default: ''
+  doppler-prd-token:
+    default: ''
+  aws-access-key-id:
+    default: ''
+  aws-secret-access-key:
+    default: ''
+  aws-region:
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+        UNITS: ${{ inputs.units }}
+        SHA: ${{ inputs.sha }}
+        GH_TOKEN: ${{ github.token }}
+        DOPPLER_STG_TOKEN: ${{ inputs.doppler-stg-token }}
+        DOPPLER_PRD_TOKEN: ${{ inputs.doppler-prd-token }}
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        AWS_REGION: ${{ inputs.aws-region }}
+      run: node "$GITHUB_ACTION_PATH/ship.mjs"

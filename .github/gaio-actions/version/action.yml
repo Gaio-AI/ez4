@@ -1,0 +1,33 @@
+name: Version
+description: Open the release PR from pending changesets, or list the untagged apps. See version.mjs.
+inputs:
+  command:
+    description: pending | prepare | untagged
+    required: true
+  config:
+    default: .github/gaio-ci.json
+  pr-workflow:
+    description: The caller's PR workflow file, dispatched on the release branch.
+    default: pr.yml
+outputs:
+  pending: { value: '${{ steps.run.outputs.pending }}' }
+  opened: { value: '${{ steps.run.outputs.opened }}' }
+  pr: { value: '${{ steps.run.outputs.pr }}' }
+  apps: { value: '${{ steps.run.outputs.apps }}' }
+  max-parallel: { value: '${{ steps.run.outputs.max-parallel }}' }
+  serial: { value: '${{ steps.run.outputs.serial }}' }
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        CONFIG: ${{ inputs.config }}
+        PR_WORKFLOW: ${{ inputs.pr-workflow }}
+        GITHUB_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        export APPS="$(jq -c '[.apps[] | if type == "string" then . else .dir end]' "$CONFIG")"
+        export VERSION_COMMAND="$(jq -r .version "$CONFIG")"
+        node "$GITHUB_ACTION_PATH/version.mjs" "$COMMAND"
