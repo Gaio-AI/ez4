@@ -157,7 +157,7 @@ need real AWS.
 | `changeset` | Pull request changeset check, `Breaking:` rule included; `{base}` is the base branch. |
 | `lint` | One root-level task. |
 | `shared-inputs` | Files whose change invalidates every task hash. |
-| `ignore` | Paths that alone run no lint or task. `.changeset/` is not one of them, so a changeset-only PR still runs the changeset check (lint and tasks stay hash-skipped). |
+| `ignore` | Paths that alone run no lint or task. A PR that changes anything under `.changeset/` always runs the changeset check; a changeset-only PR keeps lint and tasks hash-skipped. |
 | `tasks` | The `test` leg per workspace described above. |
 | `services` | Containers started for every task leg. |
 | `apps` | One release unit, `ez4`: `foundation/utils` carries the version, tagged `v{version}`, no demo, published by `npm run release`. |

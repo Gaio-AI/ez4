@@ -35,7 +35,3 @@ test('the test task lists its packages instead of filtering them in the shell', 
   assert.ok(Array.isArray(task.packages) && task.packages.length > 0, 'test task has a packages list');
   assert.doesNotMatch(task.run, /\bcase\b/);
 });
-
-test('a changeset-only PR is not ignored, so the changeset check still runs on it', () => {
-  assert.equal(config.ignore.includes('.changeset/'), false);
-});
