@@ -106,6 +106,7 @@ jobs:
           bash -c "${cmd//\{env\}/prd}"
   tag:
     needs: prd
+    if: ${{ !cancelled() && needs.prd.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

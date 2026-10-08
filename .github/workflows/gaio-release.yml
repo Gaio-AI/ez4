@@ -48,7 +48,7 @@ jobs:
           key: validated-${{ github.run_id }}-${{ github.run_attempt }}
   suite:
     needs: gate
-    if: needs.gate.outputs.tested != 'true'
+    if: ${{ !cancelled() && needs.gate.outputs.tested != 'true' }}
     permissions:
       contents: read
       statuses: write
@@ -121,7 +121,7 @@ jobs:
           config: ${{ inputs.config }}
   deploy:
     needs: untagged
-    if: needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial != 'true'
+    if: ${{ !cancelled() && needs.untagged.result == 'success' && needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial != 'true' }}
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.untagged.outputs.max-parallel) }}
@@ -144,7 +144,7 @@ jobs:
       doppler-prd-token: ${{ secrets.doppler-prd-token }}
   ship-serial:
     needs: untagged
-    if: needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial == 'true'
+    if: ${{ !cancelled() && needs.untagged.result == 'success' && needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     # No timeout and no cancel: an interrupted ez4 deploy corrupts its state.
