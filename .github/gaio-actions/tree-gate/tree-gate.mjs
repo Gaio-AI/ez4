@@ -4,7 +4,6 @@
 //
 //   record <sha>  post `Tested tree` = HEAD^{tree} on <sha> (a PR run posts its merge tree on the PR head)
 //   check <sha>   tested=true when <sha>, the PR head it merged or a merged parent carries <sha>'s tree
-//   source <sha>  source=release|hotfix|other: the pull request whose merge into main produced <sha>
 //
 // Any API failure answers "not tested": the caller then runs the full suite.
 import { execFileSync } from 'node:child_process';
@@ -32,16 +31,6 @@ export function candidates(sha, parents, pull) {
   return [sha, ...(pull ? [pull.head.sha] : []), ...parents.slice(1)];
 }
 
-/** The branch release.yml keeps as develop + main + `changeset version`, with its PR into main. */
-export const RELEASE_BRANCH = 'changeset-release/develop';
-
-export function releaseSource(pull) {
-  if (!pull || pull.base.ref !== 'main') return 'other';
-  if (pull.head.ref === RELEASE_BRANCH) return 'release';
-  if (pull.head.ref.startsWith('hotfix/')) return 'hotfix';
-  return 'other';
-}
-
 const run = (command, args) => execFileSync(command, args, { encoding: 'utf8' }).trim();
 
 const api = (path) => JSON.parse(run('gh', ['api', `repos/${process.env.GITHUB_REPOSITORY}/${path}`]));
@@ -65,7 +54,7 @@ const output = (key, value) => {
 };
 
 function main([command, sha]) {
-  if (!sha) throw new Error('usage: tree-gate.mjs record|check|source <sha>');
+  if (!sha) throw new Error('usage: tree-gate.mjs record|check <sha>');
 
   switch (command) {
     case 'record': {
@@ -90,8 +79,6 @@ function main([command, sha]) {
       const pull = pullFor(pullsOf(sha), sha);
       return output('tested', candidates(sha, parents, pull).some((commit) => carriesTree(statusesOf(commit), tree)));
     }
-    case 'source':
-      return output('source', releaseSource(pullFor(pullsOf(sha), sha)));
     default:
       throw new Error(`unknown command: ${command}`);
   }

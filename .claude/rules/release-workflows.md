@@ -1,16 +1,16 @@
 ---
 paths:
   - '.github/workflows/**'
-  - '.github/actions/**'
+  - '.github/gaio-ci.json'
   - '.changeset/**'
 description: |
-  Release workflow rules: tree gate, release branch, deploy/publish safety, local checks.
+  Release workflow rules: gaio-actions callers, CI config, publish safety, local checks.
 ---
 
 # Release Workflow Rules
 
-- A stage after the PR never reruns a suite for a tree with a passing `Tested tree` status: keep the `gate` → `suite`/`record` jobs and record the tree after every full suite
-- `.github/actions/tree-gate` and `.github/actions/changeset-release` are byte-identical in ez4, computron, gaio-backend and gaio-frontend: change all four together
-- Release, deploy and publish jobs use `cancel-in-progress: false` and no `timeout-minutes`
-- Every bot push uses `GITHUB_TOKEN` and starts no workflow: the `develop` run that pushes `changeset-release/develop` also tests it, records its tree and deploys it. Versions are made on the release branch or a hotfix branch; no job commits to `main` or `develop`
-- Validate every workflow change with `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest` and an `act -n` dry run per event (commands in `RELEASING.md`); never run release jobs for real with `act`
+- CI and release logic is a copy of `Gaio-AI/gaio-actions` (`.github/workflows/gaio-*.yml`, `.github/gaio-actions/`), since a public repo cannot call a private repo's workflows. Change shared behaviour in gaio-actions first and re-copy it as `RELEASING.md` describes; `.github/workflows/pr.yml` and `release.yml` stay thin callers, and this repo's commands live in `.github/gaio-ci.json`
+- Callers map the secrets explicitly (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`); the release caller keeps `concurrency: release-main` with `cancel-in-progress: false`
+- `apps` has one unit, `foundation/utils`, tagged `v{version}`, `demo: null`, published by `npm run release`; the tag is created only after the publish succeeds
+- Every bot push uses `GITHUB_TOKEN`; only the release PR's squash merge publishes, and no job commits to `main`
+- Validate every workflow or config change with `node --test scripts/ci-config.test.mjs` and `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest`; never run release jobs for real with `act`

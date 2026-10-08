@@ -2,7 +2,7 @@ name: Tree gate
 description: Skip a suite for a tree that already passed it. See tree-gate.mjs.
 inputs:
   command:
-    description: record | check | source
+    description: record | check
     required: true
   sha:
     description: Commit to record the status on, or to look up.
@@ -11,9 +11,6 @@ outputs:
   tested:
     description: "'true' when check found the tree already tested."
     value: ${{ steps.gate.outputs.tested }}
-  source:
-    description: release | hotfix | other (command source).
-    value: ${{ steps.gate.outputs.source }}
   tree:
     description: The tree recorded (command record).
     value: ${{ steps.gate.outputs.tree }}
@@ -24,4 +21,6 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
-      run: node "$GITHUB_ACTION_PATH/tree-gate.mjs" "${{ inputs.command }}" "${{ inputs.sha }}"
+        COMMAND: ${{ inputs.command }}
+        SHA: ${{ inputs.sha }}
+      run: node "$GITHUB_ACTION_PATH/tree-gate.mjs" "$COMMAND" "$SHA"

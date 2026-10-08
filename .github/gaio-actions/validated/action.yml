@@ -1,0 +1,56 @@
+name: Validated
+description: Skip package tasks whose content hash already passed. See validated.mjs.
+inputs:
+  command:
+    description: plan | merge | all
+    required: true
+  config:
+    default: .github/gaio-ci.json
+  base:
+    default: ''
+  force:
+    default: 'false'
+  passed-dir:
+    default: passed
+  legs:
+    default: '[]'
+  lint-hash:
+    default: ''
+  check-hashes:
+    default: '[]'
+outputs:
+  skip:
+    value: ${{ steps.run.outputs.skip }}
+  legs:
+    value: ${{ steps.run.outputs.legs }}
+  lint-hash:
+    value: ${{ steps.run.outputs.lint-hash }}
+  lint-needed:
+    value: ${{ steps.run.outputs.lint-needed }}
+  checks:
+    value: ${{ steps.run.outputs.checks }}
+  check-hashes:
+    value: ${{ steps.run.outputs.check-hashes }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .validated
+        key: validated-${{ github.run_id }}-restore
+        restore-keys: validated-
+    - if: inputs.force == 'true'
+      shell: bash
+      run: rm -f .validated
+    - id: run
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        CONFIG: ${{ inputs.config }}
+        BASE: ${{ inputs.base }}
+        MANIFEST: .validated
+        PASSED_DIR: ${{ inputs.passed-dir }}
+        LEGS: ${{ inputs.legs }}
+        LINT_HASH: ${{ inputs.lint-hash }}
+        CHECK_HASHES: ${{ inputs.check-hashes }}
+      run: node "$GITHUB_ACTION_PATH/validated.mjs" "$COMMAND"

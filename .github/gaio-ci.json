@@ -1,0 +1,59 @@
+{
+  "codeartifact": true,
+  "deploy-doppler": false,
+  "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
+  "lint": "npm run build && npm run lint && node --test scripts/ci-config.test.mjs",
+  "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js"],
+  "ignore": [".github/", "*.md"],
+  "tasks": [
+    {
+      "name": "test",
+      "script": "test",
+      "packages": [
+        "@ez4/utils",
+        "@ez4/state",
+        "@ez4/reflection",
+        "@ez4/logger",
+        "@ez4/project",
+        "@ez4/schema",
+        "@ez4/validator",
+        "@ez4/transform",
+        "@ez4/gateway",
+        "@ez4/database",
+        "@ez4/cache",
+        "@ez4/scheduler",
+        "@ez4/storage",
+        "@ez4/distribution",
+        "@ez4/queue",
+        "@ez4/topic",
+        "@ez4/factory",
+        "@ez4/validation",
+        "@ez4/email",
+        "@ez4/pgsql",
+        "@ez4/pgclient",
+        "@ez4/pgmigration",
+        "@ez4/local-common",
+        "@ez4/local-gateway",
+        "@ez4/local-database",
+        "@ez4/local-cache",
+        "@ez4/local-scheduler",
+        "@ez4/local-storage",
+        "@ez4/local-queue",
+        "@ez4/local-topic",
+        "@ez4/local-distribution",
+        "@ez4/docs-gateway",
+        "@ez4/docs-database",
+        "@ez4/docs-topology"
+      ],
+      "run": "npm test -w {package}",
+      "prepare": { "*": "npm run build && npm link -w @ez4/project --prefer-offline --no-audit" }
+    }
+  ],
+  "services": {
+    "postgres": { "image": "postgres:16", "ports": ["5432:5432"], "env": { "POSTGRES_USER": "postgres", "POSTGRES_PASSWORD": "postgres" } },
+    "dynamodb": { "image": "amazon/dynamodb-local:3.3.0", "ports": ["8000:8000"] },
+    "valkey": { "image": "valkey/valkey:8", "ports": ["6379:6379"] }
+  },
+  "apps": [{ "dir": "foundation/utils", "name": "ez4", "tag": "v{version}", "demo": null, "prd": "npm run release" }],
+  "version": "npm run version-packages"
+}

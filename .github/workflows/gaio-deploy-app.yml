@@ -1,0 +1,125 @@
+name: Deploy app
+on:
+  workflow_call:
+    inputs:
+      config: { type: string, default: .github/gaio-ci.json }
+      app: { type: string, required: true }
+      dir: { type: string, required: true }
+      sha: { type: string, required: true }
+      demo: { type: boolean, default: true }
+    secrets:
+      aws-access-key-id:
+        required: false
+      aws-secret-access-key:
+        required: false
+      aws-region:
+        required: false
+      doppler-stg-token:
+        required: false
+      doppler-prd-token:
+        required: false
+permissions: {}
+jobs:
+  demo:
+    if: inputs.demo
+    runs-on: ubuntu-latest
+    environment: demo
+    concurrency:
+      group: deploy-${{ inputs.app }}-stg
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha }}
+      - id: tools
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: |
+          echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+          echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ steps.tools.outputs.codeartifact }}
+          doppler: ${{ steps.tools.outputs.doppler }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - name: Deploy
+        env:
+          APP: ${{ inputs.app }}
+          DIR: ${{ inputs.dir }}
+          CONFIG: ${{ inputs.config }}
+          STAGE: demo
+          DOPPLER_TOKEN: ${{ secrets.doppler-stg-token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_REGION: ${{ secrets.aws-region }}
+        run: |
+          cmd=$(jq -r --arg d "$DIR" --arg s "$STAGE" '([.apps[] | objects | select(.dir == $d)] | first) as $u | if $u and ($u | has($s)) then $u[$s] // "" else .deploy end' "$CONFIG")
+          if [ -z "$cmd" ]; then echo "$STAGE is skipped for $DIR"; exit 0; fi
+          cmd=${cmd//\{app\}/$APP}
+          bash -c "${cmd//\{env\}/stg}"
+  prd:
+    needs: demo
+    if: ${{ !cancelled() && (needs.demo.result == 'success' || needs.demo.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: production
+    # deploy-site-prd is shared with gaio-frontend's deploy-site.yml: one writer of the site's prd ez4 state at a time.
+    concurrency:
+      group: deploy-${{ inputs.app }}-prd
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha }}
+      - id: tools
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: |
+          echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+          echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/gaio-actions/setup
+        with:
+          codeartifact: ${{ steps.tools.outputs.codeartifact }}
+          doppler: ${{ steps.tools.outputs.doppler }}
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      - name: Deploy
+        env:
+          APP: ${{ inputs.app }}
+          DIR: ${{ inputs.dir }}
+          CONFIG: ${{ inputs.config }}
+          STAGE: prd
+          DOPPLER_TOKEN: ${{ secrets.doppler-prd-token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_REGION: ${{ secrets.aws-region }}
+        run: |
+          cmd=$(jq -r --arg d "$DIR" --arg s "$STAGE" '([.apps[] | objects | select(.dir == $d)] | first) as $u | if $u and ($u | has($s)) then $u[$s] // "" else .deploy end' "$CONFIG")
+          if [ -z "$cmd" ]; then echo "$STAGE is skipped for $DIR"; exit 0; fi
+          cmd=${cmd//\{app\}/$APP}
+          bash -c "${cmd//\{env\}/prd}"
+  tag:
+    needs: prd
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+      - id: template
+        env:
+          DIR: ${{ inputs.dir }}
+          CONFIG: ${{ inputs.config }}
+        run: echo "tag-template=$(jq -r --arg d "$DIR" '([.apps[] | objects | select(.dir == $d) | .tag] | first) // "{package}@{version}"' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/gaio-actions/release-tag
+        with:
+          app-dir: ${{ inputs.dir }}
+          tag-template: ${{ steps.template.outputs.tag-template }}

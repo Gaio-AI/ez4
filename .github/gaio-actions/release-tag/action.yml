@@ -1,0 +1,23 @@
+name: Release tag
+description: Tag one app at HEAD and publish its GitHub Release. See release-tag.mjs.
+inputs:
+  app-dir:
+    description: App directory holding package.json and CHANGELOG.md.
+    required: true
+  tag-template:
+    description: Tag template; {package}, {name} (package without scope) and {version} are replaced.
+    default: '{package}@{version}'
+outputs:
+  tag:
+    description: The rendered tag.
+    value: ${{ steps.release.outputs.tag }}
+runs:
+  using: composite
+  steps:
+    - id: release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        APP_DIR: ${{ inputs.app-dir }}
+        TAG_TEMPLATE: ${{ inputs.tag-template }}
+      run: node "$GITHUB_ACTION_PATH/release-tag.mjs" "$APP_DIR" "$TAG_TEMPLATE"

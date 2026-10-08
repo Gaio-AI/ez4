@@ -1,0 +1,12 @@
+name: Services
+description: Start the config's service containers and wait until they are ready. See services.mjs.
+inputs:
+  config:
+    default: .github/gaio-ci.json
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+      run: node "$GITHUB_ACTION_PATH/services.mjs"
