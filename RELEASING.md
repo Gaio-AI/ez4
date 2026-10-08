@@ -13,7 +13,7 @@ referenced at `@v1`. This repo keeps two thin callers (`.github/workflows/pr.yml
 1. `main` is the only long-lived branch. Work branches start from `main` and open their pull request
    against `main`. Protected: no direct pushes, no force pushes.
 2. Every pull request that changes a published package carries a changeset.
-3. Pull requests merge by squash. The required check is `ci / checks`. The branch must be up to date
+3. Pull requests merge by squash. The required check is the `Tested tree` status, posted once every PR check passes. The branch must be up to date
    with `main` before merge (**Update branch**), so the tested tree is the tree that lands.
 4. A push to `main` with pending changesets rebuilds `release/main` (`main` plus
    `npm run version-packages`) and opens or updates the release pull request `release/main` → `main`
@@ -197,7 +197,7 @@ pull request.
 
 1. Settings → Actions → General: "Allow GitHub Actions to create and approve pull requests" stays
    enabled, so the release workflow can open the release pull request.
-2. The `main` ruleset requires the check `ci / checks` instead of `Tested tree`, squash merges only,
+2. The `main` ruleset requires the `Tested tree` status, never `ci / checks` (the release pull request's dispatched run is not attached to it), squash merges only,
    and branches up to date before merge, with no bypass actor. Any ruleset written against
    `~DEFAULT_BRANCH` names `refs/heads/main` explicitly.
 3. Merge the pull request that adds the gaio-actions callers to `main`. `main` has no pending changeset
