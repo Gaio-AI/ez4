@@ -2,12 +2,14 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 permissions: {}
 concurrency:
   group: release-main
   cancel-in-progress: false
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/gaio-release.yml
     permissions:
       contents: write

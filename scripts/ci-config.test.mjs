@@ -41,3 +41,9 @@ test('no workflow calls the private gaio-actions repo, which a public repo canno
     assert.doesNotMatch(read(`.github/workflows/${file}`), /Gaio-AI\/gaio-actions/, file);
   }
 });
+
+test('a manual release runs only on main, so a dispatch from another branch never deploys it', () => {
+  const release = readFileSync('.github/workflows/release.yml', 'utf8');
+  assert.match(release, /^  workflow_dispatch:/m);
+  assert.match(release, /^    if: github\.ref == 'refs\/heads\/main'$/m);
+});
