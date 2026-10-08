@@ -134,13 +134,13 @@ dispatches it on `release/main`, since a pull request opened with `GITHUB_TOKEN`
 `pull_request` run.
 
 - `changeset` (pull requests only): `changeset status --since=origin/<base>`.
-- `lint`: `npm run build && npm run lint`.
+- `lint`: `npm run build && npm run lint && node --test scripts/ci-config.test.mjs`.
 - `checks`: `npm run changeset:check` (the `Breaking:` rule).
-- `tasks`: one `test` leg per workspace with a `test` script, with Postgres 16 on `:5432`, DynamoDB
-  local 3.3.0 on `:8000` and Valkey 8 on `:6379`, and the AWS secrets in the environment. Only the
-  foundation, contracts, `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/
-  `docs-database`/`docs-topology` workspaces run their tests (`npm run build`, `npm link -w
-  @ez4/project`, `npm test -w <package>`); every other leg prints that it is outside the CI test set.
+- `tasks`: one `test` leg per workspace listed in the task's `packages` (foundation, contracts,
+  `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`),
+  with Postgres 16 on `:5432`, DynamoDB local 3.3.0 on `:8000` and Valkey 8 on `:6379`, and the AWS
+  secrets in the environment. Each leg runs `npm run build` and `npm link -w @ez4/project`, then
+  `npm test -w <package>`.
 - A task whose content hash already passed is skipped, and a passing run posts `Tested tree` on the
   head commit, so `release.yml` on `main` does not test the same tree again.
 

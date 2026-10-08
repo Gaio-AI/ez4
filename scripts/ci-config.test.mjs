@@ -24,3 +24,9 @@ test('tests run with the services the emulators expect', () => {
   assert.match(config.services.dynamodb.image, /^amazon\/dynamodb-local/);
   assert.match(config.services.valkey.image, /^valkey\/valkey:8/);
 });
+
+test('the test task lists its packages instead of filtering them in the shell', () => {
+  const task = config.tasks.find((t) => t.name === 'test');
+  assert.ok(Array.isArray(task.packages) && task.packages.length > 0, 'test task has a packages list');
+  assert.doesNotMatch(task.run, /\bcase\b/);
+});
