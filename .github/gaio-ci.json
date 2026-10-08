@@ -4,7 +4,7 @@
   "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
   "lint": "npm run build && npm run lint && node --test scripts/ci-config.test.mjs",
   "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js"],
-  "ignore": [".changeset/", ".github/", "*.md"],
+  "ignore": [".github/", "*.md"],
   "tasks": [
     {
       "name": "test",
