@@ -133,9 +133,9 @@ skipped) and on `workflow_dispatch` (`force` ignores the validated manifest). Th
 dispatches it on `release/main`, since a pull request opened with `GITHUB_TOKEN` starts no
 `pull_request` run.
 
-- `changeset` (pull requests only): `changeset status --since=origin/<base>`.
+- `changeset` (pull requests only): `npm run changeset:check` (the `Breaking:` rule), then
+  `changeset status --since=origin/<base>`.
 - `lint`: `npm run build && npm run lint && node --test scripts/ci-config.test.mjs`.
-- `checks`: `npm run changeset:check` (the `Breaking:` rule).
 - `tasks`: one `test` leg per workspace listed in the task's `packages` (foundation, contracts,
   `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`),
   with Postgres 16 on `:5432`, DynamoDB local 3.3.0 on `:8000` and Valkey 8 on `:6379`, and the AWS
@@ -154,14 +154,13 @@ need real AWS.
 |---|---|
 | `codeartifact` | Log in to CodeArtifact (`@ez4` namespace) before installing. |
 | `deploy-doppler` | `false`: publishing needs no Doppler. |
-| `changeset` | Pull request changeset check; `{base}` is the base branch. |
+| `changeset` | Pull request changeset check, `Breaking:` rule included; `{base}` is the base branch. |
 | `lint` | One root-level task. |
 | `shared-inputs` | Files whose change invalidates every task hash. |
 | `ignore` | Paths that alone run no lint or task. |
 | `tasks` | The `test` leg per workspace described above. |
 | `services` | Containers started for every task leg. |
-| `checks` | Extra root-level commands, hashed like `lint`. |
-| `apps` | One release unit: `foundation/utils` carries the version, tagged `v{version}`, no demo, published by `npm run release`. |
+| `apps` | One release unit, `ez4`: `foundation/utils` carries the version, tagged `v{version}`, no demo, published by `npm run release`. |
 | `version` | Command that consumes the changesets. |
 
 `scripts/ci-config.test.mjs` checks this file and the callers (`node --test scripts/ci-config.test.mjs`).

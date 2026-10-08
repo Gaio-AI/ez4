@@ -15,8 +15,13 @@ test('the develop flow is gone and the callers use gaio-actions', () => {
 });
 
 test('ez4 publishes once as v<version>, with no demo stage', () => {
-  assert.deepEqual(config.apps, [{ dir: 'foundation/utils', tag: 'v{version}', demo: null, prd: 'npm run release' }]);
+  assert.deepEqual(config.apps, [{ dir: 'foundation/utils', name: 'ez4', tag: 'v{version}', demo: null, prd: 'npm run release' }]);
   assert.ok(JSON.parse(read('package.json')).scripts.release, 'root release script exists');
+});
+
+test('the changeset job enforces the Breaking: rule, since a changeset-only PR skips every other leg', () => {
+  assert.match(config.changeset, /npm run changeset:check/);
+  assert.equal((config.checks ?? []).some((check) => check.name === 'changeset-check'), false);
 });
 
 test('tests run with the services the emulators expect', () => {

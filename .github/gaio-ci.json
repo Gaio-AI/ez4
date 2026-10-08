@@ -1,7 +1,7 @@
 {
   "codeartifact": true,
   "deploy-doppler": false,
-  "changeset": "npx --yes @changesets/cli status --since=origin/{base}",
+  "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
   "lint": "npm run build && npm run lint && node --test scripts/ci-config.test.mjs",
   "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js"],
   "ignore": [".changeset/", ".github/", "*.md"],
@@ -54,7 +54,6 @@
     "dynamodb": { "image": "amazon/dynamodb-local:3.3.0", "ports": ["8000:8000"] },
     "valkey": { "image": "valkey/valkey:8", "ports": ["6379:6379"] }
   },
-  "checks": [{ "name": "changeset-check", "run": "npm run changeset:check" }],
-  "apps": [{ "dir": "foundation/utils", "tag": "v{version}", "demo": null, "prd": "npm run release" }],
+  "apps": [{ "dir": "foundation/utils", "name": "ez4", "tag": "v{version}", "demo": null, "prd": "npm run release" }],
   "version": "npm run version-packages"
 }
