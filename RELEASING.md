@@ -4,27 +4,29 @@ This fork publishes `@ez4/*` to Gaio's private CodeArtifact repository. The back
 install from there. Releases are driven by [changesets](https://github.com/changesets/changesets):
 merging the release pull request publishes to CodeArtifact on its own.
 
-## Branches
+CI and release logic lives in [`Gaio-AI/gaio-actions`](https://github.com/Gaio-AI/gaio-actions),
+referenced at `@v1`. This repo keeps two thin callers (`.github/workflows/pr.yml`,
+`.github/workflows/release.yml`) and its commands in `.github/gaio-ci.json`.
 
-- **`develop`** — every change lands here through a pull request, merged with a squash: one commit per
-  change. Nothing publishes from `develop`.
-- **`main`** — published versions only. Receives the release pull request
-  `changeset-release/develop → main` merged with a merge commit, and `hotfix/*` pull requests. A
-  commit on `main` is published only when it carries a `v<version>` tag. Protected: no direct pushes,
-  no force pushes.
-- **`changeset-release/develop`** — rebuilt by every push to `develop`: `develop` merged with `main`
-  plus `changeset version`, force-pushed by CI (`GITHUB_TOKEN`) and opened or updated as the release
-  pull request into `main`. Nobody pushes to it: the next push to `develop` replaces it.
-- **`hotfix/<name>`** — branched from `main` for an urgent fix to a published version: add a changeset,
-  run `npm run version-packages`, commit, then open against `main` and merge with a merge commit or
-  squash.
-- **`sync/<name>`** — branched from `develop` to merge `main` into `develop` by hand: resolve
-  conflicts, open against `develop`, merge with a merge commit (never squash).
+## Flow
 
-Changes that touch no published package — this file, CI, repository tooling — need no changeset,
-since there is nothing to release. The `🦋 Changeset` job fails any other pull request into `develop`
-without one; a package change that must not release adds `npx changeset add --empty`. An empty
-changeset releases nothing: it waits and goes out with the next release.
+1. `main` is the only long-lived branch. Work branches start from `main` and open their pull request
+   against `main`. Protected: no direct pushes, no force pushes.
+2. Every pull request that changes a published package carries a changeset.
+3. Pull requests merge by squash. The required check is `ci / checks`. The branch must be up to date
+   with `main` before merge (**Update branch**), so the tested tree is the tree that lands.
+4. A push to `main` with pending changesets rebuilds `release/main` (`main` plus
+   `npm run version-packages`) and opens or updates the release pull request `release/main` → `main`
+   (title `chore(release): ...`). Nothing publishes at this step.
+5. A person reviews the release pull request and squash-merges it. That is the only way to release.
+6. The push of that merge sees that `v<version>` (the version of `foundation/utils/package.json`) has
+   no tag, runs `npm run release` in the `production` environment, then tags `v<version>` and creates
+   its GitHub Release. There is no demo stage.
+
+Changes that touch no published package (this file, CI, repository tooling) need no changeset, since
+there is nothing to release. The `changeset` job fails any other pull request without one; a package
+change that must not release adds `npx changeset add --empty`. An empty changeset releases nothing: it
+waits and goes out with the next release.
 
 Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. The fork follows its own line and
 does not track or rebase onto upstream: `upstream` is there to read, and a change worth having is
@@ -39,9 +41,10 @@ This is the one rule that matters. Upstream publishes per-package patches with n
 without a single commit saying so. Anyone basing work on the release commit alone silently regresses
 those packages, which is exactly what happened to this fork on its first day.
 
-So: **a version is published only from a commit that carries its tag.** If there is no `v<version>`
-tag, that version does not exist. The Release workflow uses the same rule the other way around: a
-version on `main` without its tag is a version still to publish.
+So: **a version is published only from the commit that gets its tag.** If there is no `v<version>`
+tag, that version is not done. The Release workflow uses the same rule the other way around: a
+version on `main` without its tag is a version still to publish, and the tag is created only after
+`npm run release` succeeds at that commit.
 
 ## Semantic versions
 
@@ -59,7 +62,7 @@ purpose, every `@ez4/*` range in the same pull request: mixed ranges trip
 
 A `major` changeset fails the pull request (`npm run changeset:check`) unless its summary has a line
 starting with `Breaking:` that says what a consumer must change, and `npm run version-packages` runs the
-same check when the release branch is built. The line goes into the release pull request with the rest of
+same check when the release PR is built. The line goes into the release pull request with the rest of
 the summary, so whoever takes the major reads there what to change.
 
 Whatever the bump, a release is still validated as one batch with one recipe (step 3 of
@@ -78,25 +81,23 @@ Whatever the bump, a release is still validated as one batch with one recipe (st
    Lockstep is not tidiness: ez4 refuses to load providers whose declared `@ez4/*` versions are not
    the same string (`ProviderVersionMismatchError`).
 
-2. Changesets wait on `develop`. Every push to `develop` runs `release.yml`: `🌿 Release branch`
-   rebuilds `changeset-release/develop` (`develop` + a merge of `main` + `changeset version`),
-   force-pushes it with `GITHUB_TOKEN` and opens or updates its pull request into `main` (title
-   `release v<version>`). A minor or a major also moves every internal `@ez4/*` range to the new version
-   (`updateInternalDependencies`).
+2. Changesets wait on `main`. Every push to `main` runs `release.yml`, which rebuilds `release/main`
+   and its pull request with the next version. A minor or a major also moves every internal `@ez4/*`
+   range to the new version (`updateInternalDependencies`).
 
-3. Validate the batch on `develop` before merging the release pull request. A release carries a small
+3. Validate the batch on `main` before merging the release pull request. A release carries a small
    batch, and what goes together is decided by **what the change can break**, because that decides how
    it is validated:
 
    - **Deploy-time behaviour only** — plan output, guards, what the deploy sends to AWS: plan every
-     consumer package with `develop` and compare against the current version.
+     consumer package with `main` and compare against the current version.
    - **The runtime client** — ORM, drivers, queue and topic clients: the consumer's full test suite
-     and type check on `develop`, then a deploy to `dev`.
+     and type check on `main`, then a deploy to `dev`.
    - **The migration engine**: the lab account, against a table large enough to hit the Data API
      limits.
    - **Something new and opt-in**: the lab account.
 
-   One recipe per batch. A batch that needs two recipes is two batches. To install `develop` in a
+   One recipe per batch. A batch that needs two recipes is two batches. To install `main` in a
    consumer, publish it to the local registry (`npm run local:registry`, then `npm run local:publish`)
    and take **every** `@ez4/*` dependency at that version: mixing versions trips
    `ProviderVersionMismatchError`.
@@ -113,67 +114,106 @@ Whatever the bump, a release is still validated as one batch with one recipe (st
    The consumer's lockfile then resolves from the local registry: it serves the validation, and the
    consumer takes the version for real only once it is published.
 
-4. The release pull request `changeset-release/develop → main` is opened and updated by CI on every push
-   to `develop` with pending changesets. With no pending releasing changeset there is no release pull
-   request (CI closes an open one), the suite runs on `develop` itself. A passing `Tested tree` status
-   on its head means the full suite ran and passed during that `develop` run. Merge the release pull
-   request with **Create a merge commit** (never squash), so each change keeps its own commit on `main`.
+4. Merge the release pull request with squash. The push of the merge publishes every public workspace
+   to CodeArtifact under `latest` (`npm run release`, which skips what is already in the registry),
+   then tags `v<version>` and creates the GitHub Release. No job commits to `main`.
 
-5. On push to `main`, `release.yml` gates the tree (reusing the `Tested tree` status from the release
-   branch or running the suite if untested), publishes every public workspace to CodeArtifact under
-   `latest` (`npm run release`) when its `v<version>` tag is missing, tags `v<version>`, and creates
-   the GitHub Release with generated notes. No job commits to `main` or `develop`. A failed run can be
-   re-run: it publishes or tags only what is missing.
+5. Consumers take the version through their own pull requests: a lockfile update for a patch or a
+   minor, every `@ez4/*` range together for a major.
 
-Hotfix: branched from `main` (`hotfix/<name>`), add a changeset, run `npm run version-packages`, and
-commit. Open a pull request into `main` (CI checks branch policy, versioned check, lint, and full suite).
-Merge with a merge commit or squash; merging releases to CodeArtifact and tags the commit. Afterwards
-run `release.yml` on `develop` (Actions → Release → Run workflow) so the release pull request includes
-the hotfix; otherwise the next push to `develop` does it.
-
-Syncing `main` into `develop`: nothing merges `main` into `develop` automatically; the release branch
-merges `main` on every rebuild. When that merge conflicts (or developers want `main`'s changes on
-`develop`), create `sync/<name>` from `develop`, run `git merge origin/main`, resolve conflicts, open a
-pull request into `develop`, and merge with **Create a merge commit** (never squash).
+An urgent fix is an ordinary pull request into `main` with a changeset, followed by merging the release
+pull request it produces.
 
 A published version is immutable. A mistake means publishing the next one.
 
 ## What CI covers
 
-Pull requests into `develop` run changeset validation and linting only. `hotfix/*` pull
-requests into `main` run the versioned check, linting, and every test leg (foundation,
-contracts, libraries, local and docs providers) and record the `Tested tree` status.
-`sync/*` pull requests skip the changeset job. Pushes to `develop` run the full suite on the
-release branch head (or on `develop` when no release is pending) and record its tree.
-The release pull request runs no CI of its own; pushes to `main` reuse the recorded
-`Tested tree` status via the tree gate so a tested tree is never tested again. CI does
-**not** run the specs under `providers/aws/*`: run the ones for the packages a change
-touches before merging the release pull request, against the lab account where they need
-real AWS.
+`.github/workflows/pr.yml` calls `gaio-actions/.github/workflows/pr.yml@v1` on `pull_request` (drafts
+skipped) and on `workflow_dispatch` (`force` ignores the validated manifest). The release workflow
+dispatches it on `release/main`, since a pull request opened with `GITHUB_TOKEN` starts no
+`pull_request` run.
 
-## Switching to git flow (once)
+- `changeset` (pull requests only): `changeset status --since=origin/<base>`.
+- `lint`: `npm run build && npm run lint`.
+- `checks`: `npm run changeset:check` (the `Breaking:` rule).
+- `tasks`: one `test` leg per workspace with a `test` script, with Postgres 16 on `:5432`, DynamoDB
+  local 3.3.0 on `:8000` and Valkey 8 on `:6379`, and the AWS secrets in the environment. Only the
+  foundation, contracts, `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/
+  `docs-database`/`docs-topology` workspaces run their tests (`npm run build`, `npm link -w
+  @ez4/project`, `npm test -w <package>`); every other leg prints that it is outside the CI test set.
+- A task whose content hash already passed is skipped, and a passing run posts `Tested tree` on the
+  head commit, so `release.yml` on `main` does not test the same tree again.
 
-1. Before merging the cutover PR, configure repository settings:
-   - **Actions permissions:** Settings → Actions → General → Workflow permissions → select **Allow GitHub Actions to create and approve pull requests**.
-   - **Rulesets:** a `main` ruleset (PR required, merge + squash, no force push) and a `develop` ruleset (PR required, squash + merge, no force push), with no bypass actors.
-   - **Required check on `main`:** `Tested tree`, not `🧪 Tests`. The release pull request gets no pull request run, so only the `Tested tree` status that the `develop` run records on its head can satisfy it; a `hotfix/*` pull request records its own.
-2. After the cutover PR is merged into `main`: `develop` already exists at the pre-cutover `main` and is not the default branch. Bring it up to `main` before anything merges into it, so it carries the new workflows: `git push origin origin/main:refs/heads/develop` by a repository admin (fast-forward), or a `sync/*` PR merged with a merge commit when the `develop` ruleset blocks the push.
-3. Settings → General → Default branch: set to `develop` (new PRs and `gh pr create` target it; `main` stays the release branch).
-4. Any ruleset written against `~DEFAULT_BRANCH` must name `refs/heads/main` explicitly before the switch.
-5. Retarget open PRs:
+CI does **not** run the specs under `providers/aws/*`, `tests/*` or `examples/*`: run the ones for the
+packages a change touches before merging the release pull request, against the lab account where they
+need real AWS.
+
+## `.github/gaio-ci.json`
+
+| Field | Meaning |
+|---|---|
+| `codeartifact` | Log in to CodeArtifact (`@ez4` namespace) before installing. |
+| `deploy-doppler` | `false`: publishing needs no Doppler. |
+| `changeset` | Pull request changeset check; `{base}` is the base branch. |
+| `lint` | One root-level task. |
+| `shared-inputs` | Files whose change invalidates every task hash. |
+| `ignore` | Paths that alone run no lint or task. |
+| `tasks` | The `test` leg per workspace described above. |
+| `services` | Containers started for every task leg. |
+| `checks` | Extra root-level commands, hashed like `lint`. |
+| `apps` | One release unit: `foundation/utils` carries the version, tagged `v{version}`, no demo, published by `npm run release`. |
+| `version` | Command that consumes the changesets. |
+
+`scripts/ci-config.test.mjs` checks this file and the callers (`node --test scripts/ci-config.test.mjs`).
+
+## Secrets
+
+| Repo secret | Workflow secret | Used by |
+|---|---|---|
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | `aws-access-key-id`, `aws-secret-access-key`, `aws-region` | CodeArtifact login, the test legs and `npm run release` |
+
+## Recovery
+
+When the publish fails after the release pull request merged, the version is on `main` without its tag.
+
+- Re-run with **Re-run failed jobs** on the same run: `npm run release` skips the packages already
+  published, and the tag job skips a tag that exists.
+- The next push to `main` retries while `v<version>` is missing.
+
+## Validating workflow changes
+
+```bash
+docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest
+node --test scripts/ci-config.test.mjs
+```
+
+Never run `release.yml` for real with `act`: it pushes `release/main`, opens the release pull request,
+publishes to CodeArtifact and creates tags.
+
+## Cut-over
+
+Steps for a repository admin, in order. `main` receives the gaio-actions callers first; `develop` is
+drained later through a normal pull request, so nothing publishes until someone merges the release
+pull request.
+
+1. Settings → Actions → General: "Allow GitHub Actions to create and approve pull requests" stays
+   enabled, so the release workflow can open the release pull request.
+2. The `main` ruleset requires the check `ci / checks` instead of `Tested tree`, squash merges only,
+   and branches up to date before merge, with no bypass actor. Any ruleset written against
+   `~DEFAULT_BRANCH` names `refs/heads/main` explicitly.
+3. Merge the pull request that adds the gaio-actions callers to `main`. `main` has no pending changeset
+   and `v<version>` is already tagged, so the merge publishes nothing. The first `release.yml` run
+   creates the `production` environment.
+4. Freeze `develop`: new pull requests target `main` from here on. Close the open
+   `changeset-release/develop` pull request and delete its branch.
+5. Settings → General → Default branch = `main`, then retarget the open pull requests:
    ```bash
-   gh pr list --base main --state open --json number --jq '.[].number' | xargs -I{} gh pr edit {} --base develop
+   gh pr list --base develop --state open --json number --jq '.[].number' | xargs -I{} gh pr edit {} --base main
    ```
-6. Close any open release pull request into `main` (if any) and delete its branch.
-7. Verify workflows locally:
-   ```bash
-   docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest
-   act pull_request -W .github/workflows/pull-requests.yml -e /path/to/pr-develop.json -n
-   act pull_request -W .github/workflows/pull-requests.yml -e /path/to/pr-sync.json -n
-   act pull_request -W .github/workflows/pull-requests.yml -e /path/to/pr-hotfix.json -n
-   act push -W .github/workflows/release.yml -e /path/to/push-develop.json -n
-   act push -W .github/workflows/release.yml -e /path/to/push-main.json -n
-   ```
+6. In the hall `ivar.json`, set ez4 `default_branch` to `main`, then run `ivar sync`.
+7. When `develop`'s changesets should ship, open a pull request from `develop` into `main` and merge it.
+   The release workflow opens the release pull request, and merging that publishes.
+8. Delete `develop` and its ruleset.
 
 ## Taking a change from upstream
 
