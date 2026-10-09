@@ -17,7 +17,7 @@ export const prepareDeployResources = async (
     const service = metadata[identity];
 
     const successful = await triggerAllAsync('deploy:prepareResources', (handler) => {
-      return handler({ state, service, options, context });
+      return handler({ state, service, metadata, options, context });
     });
 
     if (!successful) {

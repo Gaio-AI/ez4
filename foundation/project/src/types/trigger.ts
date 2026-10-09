@@ -102,6 +102,7 @@ export type RoleResourceEvent = {
 export type PrepareResourceEvent = {
   state: EntryStates;
   service: ServiceMetadata;
+  metadata: MetadataReflection;
   options: DeployOptions;
   context: EventContext;
 };

@@ -26,8 +26,8 @@ export type ClientOptions = {
 
   /**
    * Database user of a native connection, authenticated with IAM: the role must be granted `rds_iam`, and
-   * the cluster must have IAM database authentication enabled. Without it, a native connection signs in
-   * with the cluster's master secret.
+   * the deploy turns IAM database authentication on in the cluster. Without it, a native connection signs
+   * in with the cluster's master secret.
    */
   user?: string;
 };

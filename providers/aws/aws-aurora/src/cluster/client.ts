@@ -28,6 +28,7 @@ export type CreateRequest = {
   scalability?: Scalability | null;
   enableInsights?: boolean;
   enableHttp?: boolean;
+  enableIamAuth?: boolean;
   tags?: ResourceTags;
 };
 
@@ -87,6 +88,7 @@ export const createCluster = async (logger: OperationLogLine, request: CreateReq
       DeletionProtection: !request.allowDeletion,
       EnablePerformanceInsights: request.enableInsights,
       EnableHttpEndpoint: request.enableHttp,
+      EnableIAMDatabaseAuthentication: request.enableIamAuth,
       MasterUsername: getRandomPassword(),
       ManageMasterUserPassword: true,
       AutoMinorVersionUpgrade: true,
@@ -130,13 +132,18 @@ export const updateCluster = async (logger: OperationLogLine, clusterName: strin
   const canPause = scalability?.minCapacity === 0;
   const client = getRDSClient();
 
+  // The master password isn't rotated: the Data API signs in with it, and its calls fail for minutes after a
+  // rotation. IAM authentication is only ever turned on, since an RDS Proxy or a person may sign in with it
+  // without a link to show it.
   const response = await client.send(
     new ModifyDBClusterCommand({
       DBClusterIdentifier: clusterName,
       DeletionProtection: !request.allowDeletion,
       EnablePerformanceInsights: request.enableInsights,
       EnableHttpEndpoint: request.enableHttp,
-      RotateMasterUserPassword: true,
+      ...(request.enableIamAuth && {
+        EnableIAMDatabaseAuthentication: true
+      }),
       ApplyImmediately: true,
       ServerlessV2ScalingConfiguration: {
         MinCapacity: scalability?.minCapacity ?? 0,
