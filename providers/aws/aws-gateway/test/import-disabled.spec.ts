@@ -81,7 +81,7 @@ describe('aws gateway disabled import', () => {
     const state: EntryStates = {};
     const context = getContext(state);
 
-    equal(prepareHttpImports({ state, service, options: getOptions(), context }), true);
+    equal(prepareHttpImports({ state, service, metadata: {}, options: getOptions(), context }), true);
 
     const [gatewayState] = Object.values(state);
 
@@ -100,7 +100,7 @@ describe('aws gateway disabled import', () => {
     const state: EntryStates = {};
     const context = getContext(state);
 
-    equal(prepareHttpImports({ state, service, options: getOptions(true), context }), true);
+    equal(prepareHttpImports({ state, service, metadata: {}, options: getOptions(true), context }), true);
 
     deepEqual(state, {});
     equal(context.setServiceState.mock.callCount(), 0);

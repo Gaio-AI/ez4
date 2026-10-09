@@ -1,6 +1,6 @@
 import type { DatabaseService } from '@ez4/database/library';
 import type { DeployOptions, EventContext, MetadataReflection } from '@ez4/project/library';
-import type { EntryStates, StepContext } from '@ez4/state';
+import type { EntryStates, StepContext, StepOptions } from '@ez4/state';
 import type { AnyObject } from '@ez4/utils';
 import type { ClusterParameters, ClusterState } from '../src/cluster/types';
 
@@ -19,7 +19,7 @@ type Command = {
   input: AnyObject;
 };
 
-const getDatabase = (name: string) => {
+const getDatabase = (name: string, options?: AnyObject) => {
   return {
     type: '@ez4/database',
     name,
@@ -29,7 +29,8 @@ const getDatabase = (name: string) => {
     tables: [],
     engine: {
       name: 'aurora'
-    }
+    },
+    options
   } as unknown as DatabaseService;
 };
 
@@ -88,6 +89,24 @@ describe('aurora cluster iam authentication', () => {
     } as unknown as MetadataReflection);
 
     equal(parameters.enableIamAuth, true);
+  });
+
+  it('assert :: link options override the database options', async () => {
+    const native = getDatabase('db', { connectionMode: 'native', user: 'app' });
+
+    const inherited = await prepareCluster(native, {
+      db: native,
+      worker: getLinker('db')
+    } as unknown as MetadataReflection);
+
+    equal(inherited.enableIamAuth, true);
+
+    const overridden = await prepareCluster(native, {
+      db: native,
+      worker: getLinker('db', { connectionMode: 'api' })
+    } as unknown as MetadataReflection);
+
+    ok(!('enableIamAuth' in overridden));
   });
 
   it('assert :: native link without a user leaves iam authentication out', async () => {
@@ -151,27 +170,39 @@ const getClusterState = (parameters: Omit<ClusterParameters, 'clusterName'>): Cl
 };
 
 /**
- * What the cluster handler sends to RDS, answered in place. An update turns IAM authentication on when asked and
- * never off, and doesn't rotate the master password, which the Data API signs in with.
+ * What the cluster handler sends to RDS, answered in place by a cluster that turns IAM authentication on only
+ * when asked, and reports it one read late, as RDS does: the cluster reads `available` again before the
+ * setting takes effect. An update turns IAM authentication on when asked and never off, waits until it is in
+ * effect, and doesn't rotate the master password, which the Data API signs in with.
  */
 describe('aurora cluster requests', () => {
   const handler = getClusterHandler();
   const context = {} as StepContext;
 
   let commands: Command[];
-  let clusterExists: boolean;
+  let cluster: { exists: boolean; iamEnabled: boolean; iamReadsUntilEnabled: number; iamReported: boolean };
+
+  const getInputs = (name: string) => {
+    return commands.filter((command) => command.constructor.name === name).map((command) => command.input);
+  };
 
   const getInput = (name: string) => {
-    const command = commands.find((command) => command.constructor.name === name);
+    const [input] = getInputs(name);
 
-    ok(command, `${name} was not sent.`);
+    ok(input, `${name} was not sent.`);
 
-    return command.input;
+    return input;
+  };
+
+  const askIamAuth = (input: AnyObject) => {
+    if (input.EnableIAMDatabaseAuthentication && !cluster.iamEnabled) {
+      cluster.iamReadsUntilEnabled = 2;
+    }
   };
 
   beforeEach(() => {
     commands = [];
-    clusterExists = true;
+    cluster = { exists: true, iamEnabled: false, iamReadsUntilEnabled: 0, iamReported: false };
 
     mock.method(RDSClient.prototype, 'send', async (command: Command) => {
       const name = command.constructor.name;
@@ -180,15 +211,25 @@ describe('aurora cluster requests', () => {
 
       switch (name) {
         case 'DescribeDBClustersCommand':
-          if (!clusterExists) {
-            clusterExists = true;
+          if (!cluster.exists) {
             throw new DBClusterNotFoundFault({ message: 'not found', $metadata: {} });
           }
 
-          return { DBClusters: [{ ...clusterResult, Status: 'available' }] };
+          if (cluster.iamReadsUntilEnabled > 0 && --cluster.iamReadsUntilEnabled === 0) {
+            cluster.iamEnabled = true;
+          }
+
+          cluster.iamReported ||= cluster.iamEnabled;
+
+          return { DBClusters: [{ ...clusterResult, Status: 'available', IAMDatabaseAuthenticationEnabled: cluster.iamEnabled }] };
 
         case 'CreateDBClusterCommand':
+          cluster.exists = true;
+          cluster.iamEnabled = !!command.input.EnableIAMDatabaseAuthentication;
+          return { DBCluster: clusterResult };
+
         case 'ModifyDBClusterCommand':
+          askIamAuth(command.input);
           return { DBCluster: clusterResult };
       }
 
@@ -201,28 +242,62 @@ describe('aurora cluster requests', () => {
   });
 
   it('assert :: create with iam authentication', async () => {
-    clusterExists = false;
+    cluster.exists = false;
 
-    const candidate = getClusterState({ enableIamAuth: true });
-
-    await handler.create(candidate, context);
+    await handler.create(getClusterState({ enableIamAuth: true }), context);
 
     equal(getInput('CreateDBClusterCommand').EnableIAMDatabaseAuthentication, true);
+    ok(cluster.iamReported);
   });
 
-  it('assert :: update turns iam authentication on without rotating the master password', async () => {
-    const current = getClusterState({ enableHttp: true });
-    const candidate = getClusterState({ enableHttp: true, enableIamAuth: true });
+  it('assert :: import of a cluster without iam authentication turns it on and waits for it', async () => {
+    await handler.create(getClusterState({ enableIamAuth: true }), context);
+
+    deepEqual(getInputs('ModifyDBClusterCommand'), [
+      {
+        DBClusterIdentifier: 'test-iam-db',
+        EnableIAMDatabaseAuthentication: true,
+        ApplyImmediately: true
+      }
+    ]);
+
+    equal(getInputs('CreateDBClusterCommand').length, 0);
+    ok(cluster.iamReported);
+  });
+
+  it('assert :: import of a cluster with iam authentication changes nothing', async () => {
+    cluster.iamEnabled = true;
+
+    await handler.create(getClusterState({ enableIamAuth: true }), context);
+
+    equal(getInputs('ModifyDBClusterCommand').length, 0);
+  });
+
+  it('assert :: update turns iam authentication on, waits for it and does not rotate the master password', async () => {
+    const current = getClusterState({ enableHttp: true, enableInsights: true, scalability: { minCapacity: 0.5, maxCapacity: 8 } });
+    const candidate = getClusterState({ enableHttp: true, enableInsights: true, scalability: { minCapacity: 0.5, maxCapacity: 8 }, enableIamAuth: true });
 
     await handler.update(candidate, current, context);
 
-    const input = getInput('ModifyDBClusterCommand');
+    deepEqual(getInput('ModifyDBClusterCommand'), {
+      DBClusterIdentifier: 'test-iam-db',
+      DeletionProtection: true,
+      EnablePerformanceInsights: true,
+      EnableHttpEndpoint: true,
+      EnableIAMDatabaseAuthentication: true,
+      ApplyImmediately: true,
+      ServerlessV2ScalingConfiguration: {
+        MinCapacity: 0.5,
+        MaxCapacity: 8
+      }
+    });
 
-    equal(input.EnableIAMDatabaseAuthentication, true);
-    equal(input.RotateMasterUserPassword, undefined);
+    ok(cluster.iamReported);
   });
 
   it('assert :: update without iam authentication leaves it as it is', async () => {
+    cluster.iamEnabled = true;
+
     const current = getClusterState({ enableIamAuth: true, scalability: { minCapacity: 0.5, maxCapacity: 8 } });
     const candidate = getClusterState({ scalability: { minCapacity: 0.5, maxCapacity: 16 } });
 
@@ -231,7 +306,20 @@ describe('aurora cluster requests', () => {
     const input = getInput('ModifyDBClusterCommand');
 
     ok(!('EnableIAMDatabaseAuthentication' in input));
-    equal(input.RotateMasterUserPassword, undefined);
+    ok(!('RotateMasterUserPassword' in input));
     deepEqual(input.ServerlessV2ScalingConfiguration, { MinCapacity: 0.5, MaxCapacity: 16 });
+  });
+
+  it('assert :: losing the last iam link is no change', async () => {
+    cluster.iamEnabled = true;
+
+    const current = getClusterState({ enableHttp: true, enableIamAuth: true });
+    const candidate = getClusterState({ enableHttp: true });
+
+    equal(await handler.preview(candidate, current, {} as StepOptions), undefined);
+
+    await handler.update(candidate, current, context);
+
+    equal(getInputs('ModifyDBClusterCommand').length, 0);
   });
 });

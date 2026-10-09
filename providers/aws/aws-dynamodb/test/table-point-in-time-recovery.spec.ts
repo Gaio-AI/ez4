@@ -123,7 +123,7 @@ const getTableParameters = (service: DatabaseService) => {
     }
   } as unknown as EventContext;
 
-  prepareDatabaseServices({ state, service, options, context });
+  prepareDatabaseServices({ state, service, metadata: {}, options, context });
 
   const [tableState] = Object.values(state).filter((entry) => entry && isTableState(entry));
 

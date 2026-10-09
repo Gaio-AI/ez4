@@ -115,7 +115,7 @@ const getDistributionParameters = (service: CdnService) => {
     setServiceState: () => {}
   } as unknown as EventContext;
 
-  prepareCdnServices({ state, service, options, context });
+  prepareCdnServices({ state, service, metadata: {}, options, context });
 
   const [distributionState] = Object.values(state).filter((entry) => entry && isDistributionState(entry));
 
