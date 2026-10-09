@@ -23,6 +23,8 @@ outputs:
     value: ${{ steps.run.outputs.skip }}
   names:
     value: ${{ steps.run.outputs.names }}
+  build-cache:
+    value: ${{ steps.run.outputs.build-cache }}
   legs:
     value: ${{ steps.run.outputs.legs }}
   lint-hash:

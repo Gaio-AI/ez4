@@ -47,3 +47,18 @@ test('a manual release runs only on main, so a dispatch from another branch neve
   assert.match(release, /^  workflow_dispatch:/m);
   assert.match(release, /^    if: github\.ref == 'refs\/heads\/main'$/m);
 });
+
+test('the build outputs are cached by relative globs that cover every dist and tsbuildinfo the build writes', () => {
+  const paths = config['build-cache'];
+  assert.ok(Array.isArray(paths) && paths.length > 0, 'build-cache is a non-empty list');
+  for (const path of paths) assert.ok(!path.startsWith('/') && !path.split('/').includes('..'), path);
+  for (const needle of ['foundation/*/dist', 'providers/*/*/dist', 'foundation/project/bin/*.mjs']) assert.ok(paths.includes(needle), needle);
+  assert.ok(paths.some((path) => path.endsWith('tsconfig.pack.tsbuildinfo')));
+});
+
+test('lint builds first, lints every workspace and still runs this config test', () => {
+  const { lint } = config;
+  assert.ok(lint.indexOf('npm run build') < lint.indexOf('npm run lint'), 'build before lint');
+  assert.match(lint, /node --test scripts\/ci-config\.test\.mjs/);
+  assert.match(lint, /-P "\$\(nproc\)"/);
+});

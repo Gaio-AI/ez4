@@ -28,6 +28,7 @@ jobs:
       lint-needed: ${{ steps.validated.outputs.lint-needed }}
       checks: ${{ steps.validated.outputs.checks }}
       check-hashes: ${{ steps.validated.outputs.check-hashes }}
+      build-cache: ${{ steps.validated.outputs.build-cache }}
       names: ${{ steps.validated.outputs.names }}
       codeartifact: ${{ steps.config.outputs.codeartifact }}
       timeout: ${{ steps.config.outputs.timeout }}
@@ -103,6 +104,15 @@ jobs:
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
           aws-region: ${{ secrets.aws-region }}
+      - name: Restore build outputs
+        if: needs.plan.outputs.build-cache != '' && !inputs.force
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ needs.plan.outputs.build-cache }}
+          key: build-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ github.ref_name }}-
+            build-${{ runner.os }}-main-
       - name: ${{ fromJSON(needs.plan.outputs.names).lint }}
         env:
           CONFIG: ${{ inputs.config }}
@@ -148,6 +158,15 @@ jobs:
         env:
           CONFIG: ${{ inputs.config }}
         run: jq -r '.env // {} | to_entries[] | "\(.key)=\(.value)"' "$CONFIG" >> "$GITHUB_ENV"
+      - name: Restore build outputs
+        if: needs.plan.outputs.build-cache != '' && !inputs.force
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ needs.plan.outputs.build-cache }}
+          key: build-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ github.ref_name }}-
+            build-${{ runner.os }}-main-
       - name: ${{ fromJSON(needs.plan.outputs.names).prepare }} ${{ matrix.label }}
         if: matrix.prepare != ''
         env:
@@ -210,6 +229,15 @@ jobs:
         env:
           CONFIG: ${{ inputs.config }}
         run: jq -r '.env // {} | to_entries[] | "\(.key)=\(.value)"' "$CONFIG" >> "$GITHUB_ENV"
+      - name: Restore build outputs
+        if: needs.plan.outputs.build-cache != '' && !inputs.force
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ needs.plan.outputs.build-cache }}
+          key: build-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ runner.os }}-${{ github.ref_name }}-
+            build-${{ runner.os }}-main-
       - name: ${{ fromJSON(needs.plan.outputs.names).check }} ${{ matrix.label }}
         env:
           CMD: ${{ matrix.run }}

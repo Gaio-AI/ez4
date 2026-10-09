@@ -1,8 +1,25 @@
 {
   "codeartifact": true,
   "deploy-doppler": false,
+  "build-cache": [
+    "contracts/*/dist",
+    "contracts/*/tsconfig.pack.tsbuildinfo",
+    "extensions/*/dist",
+    "extensions/*/tsconfig.pack.tsbuildinfo",
+    "foundation/*/dist",
+    "foundation/*/tsconfig.pack.tsbuildinfo",
+    "libraries/*/dist",
+    "libraries/*/tsconfig.pack.tsbuildinfo",
+    "providers/*/*/dist",
+    "providers/*/*/tsconfig.pack.tsbuildinfo",
+    "tests/*/dist",
+    "tests/*/tsconfig.pack.tsbuildinfo",
+    "examples/*/dist",
+    "foundation/project/bin/*.mjs",
+    "foundation/project/bin/*.mjs.map"
+  ],
   "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
-  "lint": "npm run build && npm run lint && node --test scripts/ci-config.test.mjs",
+  "lint": "npm run build && npm query .workspace | jq -r '.[].name' | xargs -P \"$(nproc)\" -I{} npm run lint -w {} --if-present && node --test scripts/ci-config.test.mjs",
   "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js"],
   "ignore": [".github/", "*.md"],
   "tasks": [

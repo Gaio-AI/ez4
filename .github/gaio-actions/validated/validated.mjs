@@ -151,9 +151,29 @@ const revParse = (spec) => {
 
 const readText = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
 
+const OUTPUT_DELIMITER = 'GAIO_OUTPUT_EOF';
+
+export function formatOutput(key, value) {
+  if (!String(value).includes('\n')) return `${key}=${value}\n`;
+  if (String(value).includes(OUTPUT_DELIMITER)) throw new Error(`output ${key} contains ${OUTPUT_DELIMITER}`);
+  return `${key}<<${OUTPUT_DELIMITER}\n${value}\n${OUTPUT_DELIMITER}\n`;
+}
+
+export function resolveBuildCache(config) {
+  const paths = config['build-cache'];
+  if (paths === undefined) return [];
+  if (!Array.isArray(paths) || paths.some((entry) => typeof entry !== 'string' || entry.trim() === '')) {
+    throw new Error('build-cache: must be an array of non-empty strings');
+  }
+  paths.forEach((entry, index) => {
+    if (entry.startsWith('/') || entry.split('/').includes('..')) throw new Error(`build-cache[${index}]: must be a relative path without ..`);
+  });
+  return paths;
+}
+
 const output = (key, value) => {
   console.log(`${key}=${value}`);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, formatOutput(key, value));
 };
 
 // ponytail: negated (`!dir`) workspace globs are ignored; add exclusion when a consumer needs it.
@@ -256,10 +276,12 @@ function main([command]) {
   switch (command) {
     case 'plan': {
       const { names, legName } = resolveNaming(config);
+      const buildCache = resolveBuildCache(config).join('\n');
       const changed = BASE ? git('diff', '--name-only', `${BASE}...HEAD`).split('\n').filter(Boolean) : undefined;
       if (changed && skipsAll(changed, config.ignore ?? [], CONFIG)) {
         output('skip', true);
         output('names', JSON.stringify(names));
+        output('build-cache', '');
         output('legs', '[]');
         output('lint-hash', '');
         output('lint-needed', false);
@@ -270,6 +292,7 @@ function main([command]) {
       const { tasks, packages, hashes, lintHash, checks, checkHashes } = computeHashes(config, CONFIG);
       output('skip', false);
       output('names', JSON.stringify(names));
+      output('build-cache', buildCache);
       output('legs', JSON.stringify(planLegs({ tasks, packages, hashes, validated, legName })));
       output('lint-hash', lintHash);
       output('lint-needed', lintHash !== '' && !validated.has(lintHash));
