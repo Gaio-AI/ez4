@@ -30,23 +30,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.sha }}
-      - id: tools
+      - name: Read deploy tools
+        id: tools
         env:
           CONFIG: ${{ inputs.config }}
         run: |
           echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
           echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/gaio-actions/setup
+      - name: Set up
+        uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.tools.outputs.codeartifact }}
           doppler: ${{ steps.tools.outputs.doppler }}
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
           aws-region: ${{ secrets.aws-region }}
-      - name: Deploy
+      - name: Deploy ${{ inputs.app }} to demo
         env:
           APP: ${{ inputs.app }}
           DIR: ${{ inputs.dir }}
@@ -73,23 +76,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.sha }}
-      - id: tools
+      - name: Read deploy tools
+        id: tools
         env:
           CONFIG: ${{ inputs.config }}
         run: |
           echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
           echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/gaio-actions/setup
+      - name: Set up
+        uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.tools.outputs.codeartifact }}
           doppler: ${{ steps.tools.outputs.doppler }}
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
           aws-region: ${{ secrets.aws-region }}
-      - name: Deploy
+      - name: Deploy ${{ inputs.app }} to prd
         env:
           APP: ${{ inputs.app }}
           DIR: ${{ inputs.dir }}
@@ -111,16 +117,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
-      - id: template
+      - name: Read tag template
+        id: template
         env:
           DIR: ${{ inputs.dir }}
           CONFIG: ${{ inputs.config }}
         run: echo "tag-template=$(jq -r --arg d "$DIR" '([.apps[] | objects | select(.dir == $d) | .tag] | first) // "{package}@{version}"' "$CONFIG")" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/gaio-actions/release-tag
+      - name: Tag ${{ inputs.app }}
+        uses: ./.github/gaio-actions/release-tag
         with:
           app-dir: ${{ inputs.dir }}
           tag-template: ${{ steps.template.outputs.tag-template }}

@@ -18,6 +18,9 @@ export function renderTag(template, pkg) {
 /** The same format `changeset tag` writes. */
 export const tagName = (pkg) => renderTag('{package}@{version}', pkg);
 
+/** The GitHub Release title: the short app name and version, e.g. `console 1.5.0`. */
+export const releaseHeading = (pkg) => `${renderTag('{name}', pkg)} ${pkg.version}`;
+
 /** The body under `## <version>` up to the next `## `. */
 export function notesFor(changelog, version) {
   const lines = changelog.split('\n');
@@ -72,7 +75,7 @@ function main([dir, template]) {
   if (!succeeds('gh', ['release', 'view', tag])) {
     const changelog = join(dir, 'CHANGELOG.md');
     const notes = existsSync(changelog) ? notesFor(readFileSync(changelog, 'utf8'), pkg.version) : '';
-    run('gh', ['release', 'create', tag, '--title', tag, '--notes', notes || 'No changelog entry.', '--verify-tag']);
+    run('gh', ['release', 'create', tag, '--title', releaseHeading(pkg), '--notes', notes || 'No changelog entry.', '--verify-tag']);
   }
 
   output('tag', tag);

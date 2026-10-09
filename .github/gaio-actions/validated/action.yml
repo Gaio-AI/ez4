@@ -21,6 +21,10 @@ inputs:
 outputs:
   skip:
     value: ${{ steps.run.outputs.skip }}
+  names:
+    value: ${{ steps.run.outputs.names }}
+  build-cache:
+    value: ${{ steps.run.outputs.build-cache }}
   legs:
     value: ${{ steps.run.outputs.legs }}
   lint-hash:
@@ -38,7 +42,9 @@ runs:
       with:
         path: .validated
         key: validated-${{ github.run_id }}-restore
-        restore-keys: validated-
+        restore-keys: |
+          validated-main-
+          validated-
     - if: inputs.force == 'true'
       shell: bash
       run: rm -f .validated
