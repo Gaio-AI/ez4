@@ -275,7 +275,12 @@ describe('aurora cluster requests', () => {
 
   it('assert :: update turns iam authentication on, waits for it and does not rotate the master password', async () => {
     const current = getClusterState({ enableHttp: true, enableInsights: true, scalability: { minCapacity: 0.5, maxCapacity: 8 } });
-    const candidate = getClusterState({ enableHttp: true, enableInsights: true, scalability: { minCapacity: 0.5, maxCapacity: 8 }, enableIamAuth: true });
+    const candidate = getClusterState({
+      enableHttp: true,
+      enableInsights: true,
+      scalability: { minCapacity: 0.5, maxCapacity: 8 },
+      enableIamAuth: true
+    });
 
     await handler.update(candidate, current, context);
 
