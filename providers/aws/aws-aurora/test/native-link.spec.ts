@@ -263,7 +263,27 @@ describe('aurora native link', () => {
 
     deepEqual(statement.Condition, {
       StringLike: {
-        'secretsmanager:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${region}:${AccountId}:cluster:seventh-link-*`
+        'aws:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${region}:${AccountId}:cluster:seventh-link-*`
+      }
+    });
+  });
+
+  it('assert :: master secrets of a branch deploy are those of the stage clusters', async () => {
+    const policyDocument = await preparePolicyDocument(
+      {
+        reports: getService('reports'),
+        worker: getLinker({ reports: { reference: 'reports' } })
+      },
+      { ...getOptions('eighth'), branchName: 'feature' }
+    );
+
+    const statement = policyDocument.Statement.find(({ Action }) => Action.includes('secretsmanager:GetSecretValue'));
+
+    ok(statement);
+
+    deepEqual(statement.Condition, {
+      StringLike: {
+        'aws:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${process.env.AWS_REGION}:${AccountId}:cluster:eighth-link-*`
       }
     });
   });

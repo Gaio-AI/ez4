@@ -18,7 +18,7 @@ export const getPolicyDocument = async (prefix: string, clusterNames: string[]) 
       permissions: ['secretsmanager:GetSecretValue'],
       conditions: {
         StringLike: {
-          'secretsmanager:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${region}:${accountId}:cluster:${prefix}-*`
+          'aws:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${region}:${accountId}:cluster:${prefix}-*`
         }
       }
     },
