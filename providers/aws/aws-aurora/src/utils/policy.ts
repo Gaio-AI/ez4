@@ -10,9 +10,17 @@ export const getPolicyDocument = async (prefix: string, clusterNames: string[]) 
   const [region, accountId, databaseUsers] = await Promise.all([getRegion(), getAccountId(), getDatabaseUserResourceIds(clusterNames)]);
 
   const grants: IdentityGrant[] = [
+    // An Aurora-managed master secret is named after nothing that says its cluster, so the grant reaches the
+    // project's own ones by the cluster ARN that RDS tags each with. The Data API reads the secret with the
+    // caller's permission, so it is held to the same clusters.
     {
       resourceIds: [`arn:aws:secretsmanager:${region}:${accountId}:secret:rds!*`],
-      permissions: ['secretsmanager:GetSecretValue']
+      permissions: ['secretsmanager:GetSecretValue'],
+      conditions: {
+        StringLike: {
+          'aws:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${region}:${accountId}:cluster:${prefix}-*`
+        }
+      }
     },
     {
       resourceIds: [`arn:aws:rds:${region}:${accountId}:cluster:${prefix}-*`],

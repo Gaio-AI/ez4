@@ -12,7 +12,10 @@ export const createPolicyDocument = (grants: IdentityGrant[]): PolicyDocument =>
         Sid: `ID${index}`,
         Effect: 'Allow',
         Resource: current.resourceIds,
-        Action: current.permissions
+        Action: current.permissions,
+        ...(current.conditions && {
+          Condition: current.conditions
+        })
       };
     })
   };
