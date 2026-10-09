@@ -12,7 +12,7 @@ import { triggerAllAsync } from '@ez4/project/library';
 import { ClusterServiceType, registerTriggers } from '@ez4/aws-aurora';
 
 type PolicyDocument = {
-  Statement: { Action: string[]; Resource: string[] }[];
+  Statement: { Action: string[]; Resource: string[]; Condition?: AnyObject }[];
 };
 
 type Command = {
@@ -242,6 +242,30 @@ describe('aurora native link', () => {
       `arn:aws:rds-db:${region}:${AccountId}:dbuser:cluster-CONSOLE/*`,
       `arn:aws:rds-db:${region}:${AccountId}:dbuser:prx-0console/*`
     ]);
+  });
+
+  it('assert :: master secrets readable only for the project clusters', async () => {
+    const policyDocument = await preparePolicyDocument(
+      {
+        reports: getService('reports'),
+        worker: getLinker({ reports: { reference: 'reports' } })
+      },
+      getOptions('seventh')
+    );
+
+    const statement = policyDocument.Statement.find(({ Action }) => Action.includes('secretsmanager:GetSecretValue'));
+
+    ok(statement);
+
+    const region = process.env.AWS_REGION;
+
+    deepEqual(statement.Resource, [`arn:aws:secretsmanager:${region}:${AccountId}:secret:rds!*`]);
+
+    deepEqual(statement.Condition, {
+      StringLike: {
+        'secretsmanager:ResourceTag/aws:rds:primaryDBClusterArn': `arn:aws:rds:${region}:${AccountId}:cluster:seventh-link-*`
+      }
+    });
   });
 
   it('assert :: no iam authentication grant before the clusters exist', async () => {
