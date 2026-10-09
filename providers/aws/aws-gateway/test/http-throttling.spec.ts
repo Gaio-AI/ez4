@@ -34,7 +34,7 @@ const getService = (attributes: Partial<HttpService>) => {
 const getStageParameters = (service: HttpService) => {
   const state: EntryStates = {};
 
-  prepareHttpServices({ state, service, options, context });
+  prepareHttpServices({ state, service, metadata: {}, options, context });
 
   const [stageState] = Object.values(state).filter((entry) => entry && isStageState(entry));
 

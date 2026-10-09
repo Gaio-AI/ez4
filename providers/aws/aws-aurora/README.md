@@ -101,7 +101,7 @@ declare class Handler extends Queue.Service<Message> {
 }
 ```
 
-- **Authentication:** with `user`, the connection signs in with IAM: a token per connection, no secret. The database role needs `GRANT rds_iam TO <user>`, and the cluster needs IAM database authentication enabled. Without `user`, it signs in with the cluster's master secret.
+- **Authentication:** with `user`, the connection signs in with IAM: a token per connection, no secret. The database role needs `GRANT rds_iam TO <user>`. The deploy turns IAM database authentication on in the cluster (the cluster stays available and keeps its connections) and never turns it off, since a proxy or a person may sign in with it. Without `user`, it signs in with the cluster's master secret.
 - **Proxy:** when an RDS Proxy named after the cluster exists and is available, the connection goes through it; otherwise it goes to the writer. Creating the proxy is how a stage opts in. Its endpoint reaches the function as the variable `EZ4_AURORA_PROXY_<CLUSTER>` (e.g. `EZ4_AURORA_PROXY_PRD_CONSOLE_DB`), so the deploy after the proxy appears or goes away shows the variable in the plan and switches the functions.
 - **IAM grant:** the execution policy grants `rds-db:connect` on the clusters the project links natively and on their proxies, by resource id. A cluster created in the same deploy has no id yet, so its grant comes with the next deploy. Looking proxies up needs the `AuroraProxyDiscovery` permission above, only for projects with native links.
 - **TLS:** always on, trusting the public roots (an RDS Proxy) and the RDS certificate bundle (the cluster itself).

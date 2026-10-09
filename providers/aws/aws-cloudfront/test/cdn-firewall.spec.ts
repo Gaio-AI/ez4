@@ -42,7 +42,7 @@ const getService = (attributes: Partial<CdnService>) => {
 const getDistributionParameters = (service: CdnService) => {
   const state: EntryStates = {};
 
-  prepareCdnServices({ state, service, options, context });
+  prepareCdnServices({ state, service, metadata: {}, options, context });
 
   const [distributionState] = Object.values(state).filter((entry) => entry && isDistributionState(entry));
 

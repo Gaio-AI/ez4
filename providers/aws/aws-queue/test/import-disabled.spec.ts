@@ -53,7 +53,7 @@ describe('aws queue disabled import', () => {
   it('assert :: a queue import of a disabled project fails the deploy', () => {
     const state: EntryStates = {};
 
-    throws(() => prepareImports({ state, service, options, context }), { message });
+    throws(() => prepareImports({ state, service, metadata: {}, options, context }), { message });
 
     deepEqual(state, {});
   });

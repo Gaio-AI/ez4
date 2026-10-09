@@ -48,7 +48,7 @@ const getService = (attributes: Partial<QueueService>) => {
 const getQueueParameters = (service: QueueService) => {
   const state: EntryStates = {};
 
-  prepareServices({ state, service, options, context: getContext(state) });
+  prepareServices({ state, service, metadata: {}, options, context: getContext(state) });
 
   const [queueState] = Object.values(state).filter((entry) => entry && isQueueState(entry));
 

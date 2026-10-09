@@ -8,7 +8,7 @@ import { createCluster } from '../cluster/service';
 import { createInstance } from '../instance/service';
 import { createMigration } from '../migration/service';
 import { createIntegrity } from '../integrity/service';
-import { getClusterName, getInstanceName, isAuroraService } from './utils';
+import { getClusterName, getInstanceName, isAuroraService, isLinkedWithIam } from './utils';
 import { UnsupportedPaginationModeError } from './errors';
 import { prepareLinkedClient } from './client';
 
@@ -23,7 +23,7 @@ export const prepareLinkedServices = (event: ServiceEvent) => {
 };
 
 export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
-  const { state, service, options, context } = event;
+  const { state, service, metadata, options, context } = event;
 
   if (!isAuroraService(service)) {
     return false;
@@ -41,7 +41,11 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
     tags: options.tags,
     enableInsights: true,
     enableHttp: true,
-    scalability
+    scalability,
+    // Only when needed: a parameter the cluster didn't have would update every existing cluster.
+    ...(isLinkedWithIam(service, metadata) && {
+      enableIamAuth: true
+    })
   });
 
   const instanceState = createInstance(state, clusterState, {

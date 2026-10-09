@@ -5,7 +5,16 @@ import type { ClusterState, ClusterResult, ClusterParameters } from './types';
 import { applyTagUpdates, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare, deepEqual } from '@ez4/utils';
 
-import { importCluster, createCluster, updateCluster, deleteCluster, tagCluster, untagCluster, updateDeletion } from './client';
+import {
+  importCluster,
+  createCluster,
+  updateCluster,
+  deleteCluster,
+  enableClusterIamAuth,
+  tagCluster,
+  untagCluster,
+  updateDeletion
+} from './client';
 import { ClusterServiceName } from './types';
 
 export const getClusterHandler = (): StepHandler<ClusterState> => ({
@@ -21,8 +30,14 @@ const equalsResource = (candidate: ClusterState, current: ClusterState) => {
   return !!candidate.result && candidate.result.clusterArn === current.result?.clusterArn;
 };
 
+// IAM authentication is only ever turned on, so a cluster that had it still has it: losing the last link
+// that needs it changes nothing.
+const withKeptIamAuth = (candidate: ClusterParameters, current: ClusterParameters): ClusterParameters => {
+  return current.enableIamAuth ? { ...candidate, enableIamAuth: true } : candidate;
+};
+
 const previewResource = (candidate: ClusterState, current: ClusterState) => {
-  const target = { ...candidate.parameters, dependencies: candidate.dependencies };
+  const target = { ...withKeptIamAuth(candidate.parameters, current.parameters), dependencies: candidate.dependencies };
   const source = { ...current.parameters, dependencies: current.dependencies };
 
   const changes = deepCompare(target, source);
@@ -49,7 +64,15 @@ const createResource = (candidate: ClusterState): Promise<ClusterResult> => {
   const { clusterName } = candidate.parameters;
 
   return OperationLogger.logExecution(ClusterServiceName, clusterName, 'creation', async (logger) => {
-    const response = (await importCluster(logger, clusterName)) ?? (await createCluster(logger, candidate.parameters));
+    const imported = await importCluster(logger, clusterName);
+
+    // An existing cluster is adopted as it is, and its parameters then match the state, so no later update
+    // would turn IAM authentication on.
+    if (imported && candidate.parameters.enableIamAuth && !imported.iamAuthEnabled) {
+      await enableClusterIamAuth(logger, clusterName);
+    }
+
+    const response = imported ?? (await createCluster(logger, candidate.parameters));
 
     const { clusterArn, writerEndpoint, readerEndpoint, secretArn } = response;
 
@@ -123,7 +146,7 @@ const checkGeneralUpdates = async (
   candidate: ClusterParameters,
   current: ClusterParameters
 ) => {
-  const hasChanges = !deepEqual(candidate, current, {
+  const hasChanges = !deepEqual(withKeptIamAuth(candidate, current), current, {
     exclude: {
       clusterName: true,
       tags: true

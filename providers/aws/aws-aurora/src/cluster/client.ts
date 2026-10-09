@@ -1,6 +1,8 @@
 import type { Arn, OperationLogLine, ResourceTags } from '@ez4/aws-common';
+import type { RDSClient } from '@aws-sdk/client-rds';
 
-import { getTagList } from '@ez4/aws-common';
+import { getAwsClientWaiter, getTagList } from '@ez4/aws-common';
+import { Wait } from '@ez4/utils';
 
 import {
   CreateDBClusterCommand,
@@ -17,6 +19,9 @@ import {
 import { getRDSClient, getRDSWaiter } from '../utils/deploy';
 import { getRandomPassword } from '../utils/credentials';
 
+// Enough for the minutes the setting takes, at the waiter's pace.
+const IAM_AUTH_ATTEMPTS = 120;
+
 export type Scalability = {
   minCapacity: number;
   maxCapacity: number;
@@ -28,6 +33,7 @@ export type CreateRequest = {
   scalability?: Scalability | null;
   enableInsights?: boolean;
   enableHttp?: boolean;
+  enableIamAuth?: boolean;
   tags?: ResourceTags;
 };
 
@@ -38,14 +44,15 @@ export type ImportOrCreateResponse = {
   secretArn: Arn;
 };
 
+export type ImportResponse = ImportOrCreateResponse & {
+  iamAuthEnabled: boolean;
+};
+
 export type UpdateRequest = Partial<Omit<CreateRequest, 'clusterName' | 'database' | 'tags'>>;
 
 export type UpdateResponse = ImportOrCreateResponse;
 
-export const importCluster = async (
-  logger: OperationLogLine | undefined,
-  clusterName: string
-): Promise<ImportOrCreateResponse | undefined> => {
+export const importCluster = async (logger: OperationLogLine | undefined, clusterName: string): Promise<ImportResponse | undefined> => {
   logger?.update(`Importing cluster`);
 
   try {
@@ -56,13 +63,14 @@ export const importCluster = async (
       })
     );
 
-    const [{ DBClusterArn, MasterUserSecret, Endpoint, ReaderEndpoint }] = response.DBClusters!;
+    const [{ DBClusterArn, MasterUserSecret, Endpoint, ReaderEndpoint, IAMDatabaseAuthenticationEnabled }] = response.DBClusters!;
 
     return {
       clusterArn: DBClusterArn as Arn,
       secretArn: MasterUserSecret!.SecretArn as Arn,
       readerEndpoint: ReaderEndpoint!,
-      writerEndpoint: Endpoint!
+      writerEndpoint: Endpoint!,
+      iamAuthEnabled: !!IAMDatabaseAuthenticationEnabled
     };
   } catch (error) {
     if (!(error instanceof DBClusterNotFoundFault)) {
@@ -87,6 +95,7 @@ export const createCluster = async (logger: OperationLogLine, request: CreateReq
       DeletionProtection: !request.allowDeletion,
       EnablePerformanceInsights: request.enableInsights,
       EnableHttpEndpoint: request.enableHttp,
+      EnableIAMDatabaseAuthentication: request.enableIamAuth,
       MasterUsername: getRandomPassword(),
       ManageMasterUserPassword: true,
       AutoMinorVersionUpgrade: true,
@@ -112,6 +121,10 @@ export const createCluster = async (logger: OperationLogLine, request: CreateReq
     DBClusterIdentifier: clusterName
   });
 
+  if (request.enableIamAuth) {
+    await waitForIamAuth(client, clusterName);
+  }
+
   const { DBClusterArn, MasterUserSecret, Endpoint, ReaderEndpoint } = response.DBCluster!;
 
   return {
@@ -130,13 +143,18 @@ export const updateCluster = async (logger: OperationLogLine, clusterName: strin
   const canPause = scalability?.minCapacity === 0;
   const client = getRDSClient();
 
+  // The master password isn't rotated: the Data API signs in with it, and its calls fail for minutes after a
+  // rotation. IAM authentication is only ever turned on, since an RDS Proxy or a person may sign in with it
+  // without a link to show it.
   const response = await client.send(
     new ModifyDBClusterCommand({
       DBClusterIdentifier: clusterName,
       DeletionProtection: !request.allowDeletion,
       EnablePerformanceInsights: request.enableInsights,
       EnableHttpEndpoint: request.enableHttp,
-      RotateMasterUserPassword: true,
+      ...(request.enableIamAuth && {
+        EnableIAMDatabaseAuthentication: true
+      }),
       ApplyImmediately: true,
       ServerlessV2ScalingConfiguration: {
         MinCapacity: scalability?.minCapacity ?? 0,
@@ -152,6 +170,10 @@ export const updateCluster = async (logger: OperationLogLine, clusterName: strin
     DBClusterIdentifier: clusterName
   });
 
+  if (request.enableIamAuth) {
+    await waitForIamAuth(client, clusterName);
+  }
+
   const { DBClusterArn, MasterUserSecret, Endpoint, ReaderEndpoint } = response.DBCluster!;
 
   return {
@@ -160,6 +182,51 @@ export const updateCluster = async (logger: OperationLogLine, clusterName: strin
     readerEndpoint: ReaderEndpoint!,
     writerEndpoint: Endpoint!
   };
+};
+
+export const enableClusterIamAuth = async (logger: OperationLogLine, clusterName: string) => {
+  logger.update(`Enabling IAM authentication`);
+
+  const client = getRDSClient();
+
+  await client.send(
+    new ModifyDBClusterCommand({
+      DBClusterIdentifier: clusterName,
+      EnableIAMDatabaseAuthentication: true,
+      ApplyImmediately: true
+    })
+  );
+
+  await waitForIamAuth(client, clusterName);
+};
+
+// The cluster reads `available` again before IAM authentication takes effect, and functions that sign in
+// with IAM depend on it, so the wait is on the setting itself.
+const waitForIamAuth = async (client: RDSClient, clusterName: string) => {
+  const { minDelay, maxDelay } = getAwsClientWaiter();
+
+  await Wait.until(
+    async () => {
+      const response = await client.send(
+        new DescribeDBClustersCommand({
+          DBClusterIdentifier: clusterName
+        })
+      );
+
+      const [{ Status, IAMDatabaseAuthenticationEnabled }] = response.DBClusters!;
+
+      if (Status !== 'available' || !IAMDatabaseAuthenticationEnabled) {
+        return Wait.RetryAttempt;
+      }
+
+      return true;
+    },
+    {
+      attempts: IAM_AUTH_ATTEMPTS,
+      minDelay,
+      maxDelay
+    }
+  );
 };
 
 export const updateDeletion = async (logger: OperationLogLine, clusterName: string, allowDeletion: boolean) => {
