@@ -86,8 +86,8 @@ jobs:
           CMD=$(jq -r .changeset "$CONFIG")
           bash -c "${CMD//\{base\}/$GITHUB_BASE_REF}"
   lint:
-    needs: plan
-    if: needs.plan.outputs.skip != 'true' && needs.plan.outputs.lint-needed == 'true'
+    needs: [plan, changeset]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.changeset.result != 'failure' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.lint-needed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
     permissions:
@@ -128,8 +128,8 @@ jobs:
           path: passed/
           retention-days: 1
   tasks:
-    needs: plan
-    if: needs.plan.outputs.skip != 'true' && needs.plan.outputs.legs != '[]'
+    needs: [plan, changeset]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.changeset.result != 'failure' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.legs != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
     permissions:
@@ -196,8 +196,8 @@ jobs:
           path: passed/
           retention-days: 1
   extra:
-    needs: plan
-    if: needs.plan.outputs.skip != 'true' && needs.plan.outputs.checks != '[]'
+    needs: [plan, changeset]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.changeset.result != 'failure' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.checks != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout) }}
     permissions:

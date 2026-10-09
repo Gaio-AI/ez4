@@ -5,7 +5,7 @@ install from there. Releases are driven by [changesets](https://github.com/chang
 merging the release pull request publishes to CodeArtifact on its own.
 
 CI and release logic is a copy of [`Gaio-AI/gaio-actions`](https://github.com/Gaio-AI/gaio-actions)
-at its `feat(validated): restore and save configured build outputs across runs (#11)` commit (`6626133`): `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
+at its `feat: gate lint and tests on the changeset check (#12)` commit (`22e51ad`): `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
 gaio-actions is private, and GitHub does not let a public repo call a private repo's workflows.
 To update the copy, take the workflows and the actions' `action.yml` and `.mjs` files (no tests)
 from a gaio-actions commit, rewrite `Gaio-AI/gaio-actions/<action>@v1` to
