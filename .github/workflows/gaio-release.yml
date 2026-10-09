@@ -30,22 +30,26 @@ jobs:
     outputs:
       tested: ${{ steps.check.outputs.tested }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: check
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the tested tree
+        id: check
         uses: ./.github/gaio-actions/tree-gate
         with:
           command: check
           sha: ${{ github.sha }}
-      - if: steps.check.outputs.tested == 'true'
+      - name: Record every hash as validated
+        if: steps.check.outputs.tested == 'true'
         uses: ./.github/gaio-actions/validated
         with:
           command: all
           config: ${{ inputs.config }}
-      - if: steps.check.outputs.tested == 'true'
+      - name: Save validated cache
+        if: steps.check.outputs.tested == 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .validated
-          key: validated-${{ github.run_id }}-${{ github.run_attempt }}
+          key: validated-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
   suite:
     needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.tested != 'true' }}
@@ -75,28 +79,33 @@ jobs:
       pull-requests: write
       actions: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           # Install scripts and the caller's version command must not read the push token from .git/config.
           persist-credentials: false
-      - id: pending
+      - name: Look for pending changesets
+        id: pending
         uses: ./.github/gaio-actions/version
         with:
           command: pending
-      - id: config
+      - name: Read config
+        id: config
         if: steps.pending.outputs.pending == 'true'
         env:
           CONFIG: ${{ inputs.config }}
         run: echo "codeartifact=$(jq -r '.codeartifact // false' "$CONFIG")" >> "$GITHUB_OUTPUT"
-      - if: steps.pending.outputs.pending == 'true'
+      - name: Set up
+        if: steps.pending.outputs.pending == 'true'
         uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.config.outputs.codeartifact }}
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
           aws-region: ${{ secrets.aws-region }}
-      - uses: ./.github/gaio-actions/version
+      - name: Open or update the release PR
+        uses: ./.github/gaio-actions/version
         with:
           command: prepare
           config: ${{ inputs.config }}
@@ -105,7 +114,6 @@ jobs:
     needs: [gate, suite]
     if: always() && needs.gate.result == 'success' && (needs.suite.result == 'success' || needs.suite.result == 'skipped')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     permissions:
       contents: read
     outputs:
@@ -113,8 +121,10 @@ jobs:
       max-parallel: ${{ steps.untagged.outputs.max-parallel || '20' }}
       serial: ${{ steps.untagged.outputs.serial || 'false' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: untagged
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: List untagged apps
+        id: untagged
         uses: ./.github/gaio-actions/version
         with:
           command: untagged
@@ -127,6 +137,7 @@ jobs:
       max-parallel: ${{ fromJSON(needs.untagged.outputs.max-parallel) }}
       matrix:
         app: ${{ fromJSON(needs.untagged.outputs.apps) }}
+    name: Deploy ${{ matrix.app.name }}
     uses: ./.github/workflows/gaio-deploy-app.yml
     permissions:
       contents: write
@@ -154,26 +165,30 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           # Deploy commands and install scripts must not read the push token; only the tag step gets it.
           persist-credentials: false
-      - id: tools
+      - name: Read deploy tools
+        id: tools
         env:
           CONFIG: ${{ inputs.config }}
         run: |
           echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
           echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/gaio-actions/setup
+      - name: Set up
+        uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.tools.outputs.codeartifact }}
           doppler: ${{ steps.tools.outputs.doppler }}
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
           aws-region: ${{ secrets.aws-region }}
-      - uses: ./.github/gaio-actions/ship
+      - name: Ship units in order
+        uses: ./.github/gaio-actions/ship
         with:
           config: ${{ inputs.config }}
           units: ${{ needs.untagged.outputs.apps }}

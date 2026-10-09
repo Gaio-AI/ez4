@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { DEFAULT_LEG_NAME, legLabel, resolveNaming } from './names.mjs';
 
 export function onlyIgnored(paths, ignore) {
   return paths.every((path) =>
@@ -17,10 +18,40 @@ export function skipsAll(changed, ignore, configPath) {
   return !mustRun(changed, configPath) && !changed.some((path) => path.startsWith('.changeset/')) && onlyIgnored(changed, ignore);
 }
 
-export function lintInputs(files, ignore, configPath) {
-  return Object.fromEntries(
-    files.filter(({ path }) => mustRun([path], configPath) || !onlyIgnored([path], ignore)).map(({ path, blob }) => [path, blob])
-  );
+// Version bumps come from the release flow, not from a code change: a manifest whose only difference is
+// `version` (and any CHANGELOG.md) must hash identically so a released tree reuses the validated cache.
+export function normalizePackageJson(text) {
+  try {
+    const manifest = JSON.parse(text);
+    if (manifest && typeof manifest === 'object' && !Array.isArray(manifest) && 'version' in manifest) {
+      const { version: _version, ...rest } = manifest;
+      return JSON.stringify(rest);
+    }
+    return text;
+  } catch {
+    return text;
+  }
+}
+
+const basename = (path) => path.slice(path.lastIndexOf('/') + 1);
+
+const digestLines = (entries, readBlob) => {
+  const lines = [];
+  for (const { path, blob } of entries) {
+    if (basename(path) === 'CHANGELOG.md') continue;
+    const id = basename(path) === 'package.json' ? createHash('sha256').update(normalizePackageJson(readBlob(blob))).digest('hex') : blob;
+    lines.push(`${path}\0${id}`);
+  }
+  return lines.sort();
+};
+
+export function contentDigest(entries, readBlob) {
+  return createHash('sha256').update(digestLines(entries, readBlob).join('\n')).digest('hex');
+}
+
+export function lintInputs(files, ignore, configPath, readBlob = (blob) => blob) {
+  const entries = files.filter(({ path }) => mustRun([path], configPath) || !onlyIgnored([path], ignore));
+  return Object.fromEntries(digestLines(entries, readBlob).map((line) => line.split('\0')));
 }
 
 const globToRegExp = (glob) => new RegExp(`^${glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '[^/]+')}$`);
@@ -60,7 +91,7 @@ export function packageTaskHash({ task, pkg, node, trees, shared }) {
   return taskHash({ task: task.name, command: fill(task.run, pkg, ''), node, trees, shared });
 }
 
-export function planLegs({ tasks, packages, hashes, validated }) {
+export function planLegs({ tasks, packages, hashes, validated, legName = DEFAULT_LEG_NAME }) {
   const legs = [];
   for (const task of tasks) {
     for (const pkg of Object.keys(packages).sort()) {
@@ -70,15 +101,15 @@ export function planLegs({ tasks, packages, hashes, validated }) {
       const count = task.shards?.[pkg] ?? 0;
       const shards = count > 1 ? Array.from({ length: count }, (_, i) => `${i + 1}/${count}`) : [''];
       const prepare = fill(task.prepare?.[pkg] ?? task.prepare?.['*'] ?? '', pkg, '');
-      shards.forEach((shard, index) => legs.push({ task: task.name, package: pkg, shard, index, hash, run: fill(task.run, pkg, shard), prepare }));
+      shards.forEach((shard, index) => legs.push({ task: task.name, package: pkg, shard, index, hash, run: fill(task.run, pkg, shard), prepare, label: legLabel(legName, { task: task.name, package: pkg, shard }) }));
     }
   }
   return legs;
 }
 
-export function checkLegs({ checks, hashOf, validated }) {
+export function checkLegs({ checks, hashOf, validated, legName = DEFAULT_LEG_NAME }) {
   return (checks ?? [])
-    .map((check) => ({ name: check.name, run: check.run, advisory: check.advisory === true, hash: hashOf(check) }))
+    .map((check) => ({ name: check.name, run: check.run, advisory: check.advisory === true, hash: hashOf(check), label: legLabel(legName, { task: check.name }) }))
     .filter((leg) => !validated.has(leg.hash));
 }
 
@@ -157,6 +188,30 @@ function readWorkspace() {
   return { packages, graph, dirOf };
 }
 
+const treeEntries = (dir) =>
+  git('ls-tree', '-r', '-z', treeRef(dir))
+    .split('\0')
+    .filter(Boolean)
+    .map((line) => {
+      const [meta, path] = line.split('\t');
+      return { path, blob: meta.split(' ')[2] };
+    });
+
+const readBlobs = (blobs) => {
+  const texts = {};
+  const unique = [...new Set(blobs)];
+  for (let i = 0; i < unique.length; i++) {
+    texts[unique[i]] = git('cat-file', 'blob', unique[i]);
+  }
+  return texts;
+};
+
+const treeDigestOf = (dir) => {
+  const entries = treeEntries(dir);
+  const blobs = readBlobs(entries.filter(({ path }) => basename(path) === 'package.json').map(({ blob }) => blob));
+  return contentDigest(entries, (blob) => blobs[blob] ?? blob);
+};
+
 const trackedFiles = () =>
   git('ls-tree', '-r', '-z', '--full-tree', 'HEAD')
     .split('\0')
@@ -178,11 +233,13 @@ function computeHashes(config, configPath) {
   for (const task of config.tasks ?? []) {
     hashes[task.name] = {};
     for (const pkg of Object.keys(packages)) {
-      const trees = Object.fromEntries(closure(pkg, graph).map((dep) => [dirOf[dep], revParse(treeRef(dirOf[dep]))]));
+      const trees = Object.fromEntries(closure(pkg, graph).map((dep) => [dirOf[dep], treeDigestOf(dirOf[dep])]));
       hashes[task.name][pkg] = packageTaskHash({ task, pkg, node, trees, shared });
     }
   }
-  const trees = lintInputs(trackedFiles(), config.ignore ?? [], configPath);
+  const tracked = trackedFiles();
+  const trackedBlobs = readBlobs(tracked.filter(({ path }) => basename(path) === 'package.json').map(({ blob }) => blob));
+  const trees = lintInputs(tracked, config.ignore ?? [], configPath, (blob) => trackedBlobs[blob] ?? blob);
   const lintHash = config.lint ? taskHash({ task: 'lint', command: config.lint, node, trees, shared: {} }) : '';
   const checks = config.checks ?? [];
   const checkHashes = Object.fromEntries(
@@ -198,9 +255,11 @@ function main([command]) {
 
   switch (command) {
     case 'plan': {
+      const { names, legName } = resolveNaming(config);
       const changed = BASE ? git('diff', '--name-only', `${BASE}...HEAD`).split('\n').filter(Boolean) : undefined;
       if (changed && skipsAll(changed, config.ignore ?? [], CONFIG)) {
         output('skip', true);
+        output('names', JSON.stringify(names));
         output('legs', '[]');
         output('lint-hash', '');
         output('lint-needed', false);
@@ -210,10 +269,11 @@ function main([command]) {
       const validated = new Set(previous.split('\n').filter(Boolean));
       const { tasks, packages, hashes, lintHash, checks, checkHashes } = computeHashes(config, CONFIG);
       output('skip', false);
-      output('legs', JSON.stringify(planLegs({ tasks, packages, hashes, validated })));
+      output('names', JSON.stringify(names));
+      output('legs', JSON.stringify(planLegs({ tasks, packages, hashes, validated, legName })));
       output('lint-hash', lintHash);
       output('lint-needed', lintHash !== '' && !validated.has(lintHash));
-      const checkPlan = checkLegs({ checks, hashOf: (check) => checkHashes[check.name], validated });
+      const checkPlan = checkLegs({ checks, hashOf: (check) => checkHashes[check.name], validated, legName });
       output('checks', JSON.stringify(checkPlan));
       return output('check-hashes', JSON.stringify(checkPlan.map((leg) => leg.hash)));
     }
