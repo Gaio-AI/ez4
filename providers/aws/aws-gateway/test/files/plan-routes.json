@@ -1,0 +1,401 @@
+[
+  {
+    "type": "aws:lambda.permission",
+    "entryId": "0a0dbcf008769acec16a579abfeeef7a",
+    "dependencies": [
+      "3f0324a5c47e8ee62087579a6766e107",
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "fromService": "ez4-plan-test-plan-service-get-item"
+    }
+  },
+  {
+    "type": "aws:log.group",
+    "entryId": "18ea669b48e9b488e5b757ae5c80956e",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "groupName": "ez4-plan-test-plan-service-get-item",
+      "retention": 7,
+      "tags": {
+        "Project": "plan-test"
+      }
+    }
+  },
+  {
+    "type": "aws:lambda.function",
+    "entryId": "2138ad73cfd698a51b01aab4d98e9c3e",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "579e7547f8b9b28c67117ac350d68c72",
+      "9275cb96ef674c6d50f7fb540b3ae7d5"
+    ],
+    "parameters": {
+      "handlerName": "apiEntryPoint",
+      "sourceFile": "test/files/plan-handlers.ts",
+      "functionName": "ez4-plan-test-plan-service-health",
+      "logLevel": "warning",
+      "architecture": "x86",
+      "runtime": "node24",
+      "release": {
+        "version": "1.0.0"
+      },
+      "timeout": 29,
+      "memory": 256,
+      "tags": {
+        "Project": "plan-test"
+      }
+    },
+    "function": {
+      "sourceFile": "test/files/plan-handlers.ts",
+      "dependencyFiles": [
+        "lib/request.ts",
+        "test/files/plan-handlers.ts"
+      ],
+      "valuesHash": "e890b25c2c3177f37db08330d8c7b6c1",
+      "variables": {
+        "PROJECT_NAME": "plan-test",
+        "SERVICE_NAME": "plan",
+        "HEALTH_MODE": "head"
+      },
+      "bundleHash": "b80fa1fbde15df7f41a0ac456f4b4a6c87047d56ac4e1f0fa691e52fc8602130"
+    }
+  },
+  {
+    "type": "aws:lambda.permission",
+    "entryId": "3566f79a83134c6a778edf60f2816be8",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "e3dbf8359f6db02badbfc3157febd98c"
+    ],
+    "parameters": {
+      "fromService": "ez4-plan-test-plan-service-create-item"
+    }
+  },
+  {
+    "type": "aws:lambda.function",
+    "entryId": "3f0324a5c47e8ee62087579a6766e107",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "579e7547f8b9b28c67117ac350d68c72",
+      "18ea669b48e9b488e5b757ae5c80956e"
+    ],
+    "parameters": {
+      "handlerName": "apiEntryPoint",
+      "sourceFile": "test/files/plan-handlers.ts",
+      "functionName": "ez4-plan-test-plan-service-get-item",
+      "logLevel": "warning",
+      "architecture": "x86",
+      "runtime": "node24",
+      "release": {
+        "version": "1.0.0"
+      },
+      "timeout": 29,
+      "memory": 256,
+      "tags": {
+        "Project": "plan-test"
+      }
+    },
+    "function": {
+      "sourceFile": "test/files/plan-handlers.ts",
+      "dependencyFiles": [
+        "lib/request.ts",
+        "test/files/plan-handlers.ts"
+      ],
+      "valuesHash": "11bb88df4ec735fba2873c57bf42a8b1",
+      "variables": {
+        "PROJECT_NAME": "plan-test",
+        "SERVICE_NAME": "plan"
+      },
+      "bundleHash": "366c24ddef06dcbe658c5e0d80d4a502362730be142c12984c14eba8be1b44f8"
+    }
+  },
+  {
+    "type": "aws:api.gateway",
+    "entryId": "48deaaec3047256e12a20b1c9f627b6c",
+    "dependencies": [],
+    "parameters": {
+      "gatewayId": "ez4-plan-test-plan-service",
+      "gatewayName": "Plan API",
+      "protocol": "http",
+      "tags": {
+        "Project": "plan-test"
+      }
+    }
+  },
+  {
+    "type": "aws:lambda.permission",
+    "entryId": "49a456323e847a30630930fcccd9196a",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "c196043c80e38a1ce2fafb04a5ecaa2c"
+    ],
+    "parameters": {
+      "fromService": "items-authorizer"
+    }
+  },
+  {
+    "type": "aws:iam.role",
+    "entryId": "579e7547f8b9b28c67117ac350d68c72",
+    "dependencies": [],
+    "parameters": {
+      "roleName": "ez4-plan-test-role",
+      "roleDocument": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AllowAssumeRole",
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole",
+            "Principal": {
+              "Service": [
+                "lambda.amazonaws.com"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "aws:api.integration",
+    "entryId": "64a15415e2d7c1b2cf582685e9c36ce3",
+    "dependencies": [
+      "3566f79a83134c6a778edf60f2816be8",
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "e3dbf8359f6db02badbfc3157febd98c"
+    ],
+    "parameters": {
+      "fromService": "ez4-plan-test-plan-service-create-item",
+      "timeout": 19
+    }
+  },
+  {
+    "type": "aws:api.route",
+    "entryId": "670074b2370a497501032c70471a35b2",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "ac61105c93d93f8dbb11bcaa1d62c880"
+    ],
+    "parameters": {
+      "routePath": "GET /health"
+    }
+  },
+  {
+    "type": "aws:api.route",
+    "entryId": "82234eb2872a9e4c7c0f71bdbee6a6a0",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "64a15415e2d7c1b2cf582685e9c36ce3",
+      "f424b8bf6163a2518a1c3a76d3313720"
+    ],
+    "parameters": {
+      "routePath": "POST /items"
+    }
+  },
+  {
+    "type": "aws:log.group",
+    "entryId": "908ca5db5177dfdc2ff58a368e0077e6",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "groupName": "ez4-plan-test-plan-service-items-authorizer",
+      "retention": 7,
+      "tags": {
+        "Project": "plan-test"
+      }
+    }
+  },
+  {
+    "type": "aws:log.group",
+    "entryId": "9275cb96ef674c6d50f7fb540b3ae7d5",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "groupName": "ez4-plan-test-plan-service-health",
+      "retention": 7,
+      "tags": {
+        "Project": "plan-test"
+      }
+    }
+  },
+  {
+    "type": "aws:api.stage",
+    "entryId": "92967f5a55e8680e46dd6fc97cf086e1",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "autoDeploy": true
+    }
+  },
+  {
+    "type": "aws:lambda.permission",
+    "entryId": "a68431a095840c5be36dc0940fccc4cb",
+    "dependencies": [
+      "2138ad73cfd698a51b01aab4d98e9c3e",
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "fromService": "ez4-plan-test-plan-service-health"
+    }
+  },
+  {
+    "type": "aws:api.integration",
+    "entryId": "ac61105c93d93f8dbb11bcaa1d62c880",
+    "dependencies": [
+      "2138ad73cfd698a51b01aab4d98e9c3e",
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "a68431a095840c5be36dc0940fccc4cb"
+    ],
+    "parameters": {
+      "fromService": "ez4-plan-test-plan-service-health",
+      "timeout": 29
+    }
+  },
+  {
+    "type": "aws:api.route",
+    "entryId": "ae9d60ccc91fdc45edaa663587309f6d",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "d1a4f44c8aa8a8f9fb4df34d49520e50"
+    ],
+    "parameters": {
+      "routePath": "GET /items/{itemId}"
+    }
+  },
+  {
+    "type": "aws:lambda.function",
+    "entryId": "c196043c80e38a1ce2fafb04a5ecaa2c",
+    "dependencies": [
+      "579e7547f8b9b28c67117ac350d68c72",
+      "908ca5db5177dfdc2ff58a368e0077e6"
+    ],
+    "parameters": {
+      "handlerName": "apiEntryPoint",
+      "sourceFile": "test/files/plan-handlers.ts",
+      "functionName": "ez4-plan-test-plan-service-items-authorizer",
+      "logLevel": "warning",
+      "architecture": "x86",
+      "runtime": "node24",
+      "release": {
+        "version": "1.0.0"
+      },
+      "timeout": 19,
+      "memory": 512,
+      "tags": {
+        "Project": "plan-test"
+      }
+    },
+    "function": {
+      "sourceFile": "test/files/plan-handlers.ts",
+      "dependencyFiles": [
+        "lib/authorizer.ts",
+        "test/files/plan-handlers.ts"
+      ],
+      "valuesHash": "e3c19163f11a4c3563a147bfadd072be",
+      "variables": {
+        "PROJECT_NAME": "plan-test",
+        "SERVICE_NAME": "plan",
+        "ITEMS_LIMIT": "100"
+      },
+      "bundleHash": "d168dee147a14b57d7873bea705f4e039b6bd2b827d68da94eca5325ff7fe4a2"
+    }
+  },
+  {
+    "type": "aws:log.group",
+    "entryId": "cd0bc19643bda0bde48af051696283a9",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "groupName": "ez4-plan-test-plan-service-create-item",
+      "retention": 7,
+      "tags": {
+        "Project": "plan-test"
+      }
+    }
+  },
+  {
+    "type": "aws:api.integration",
+    "entryId": "d1a4f44c8aa8a8f9fb4df34d49520e50",
+    "dependencies": [
+      "0a0dbcf008769acec16a579abfeeef7a",
+      "3f0324a5c47e8ee62087579a6766e107",
+      "48deaaec3047256e12a20b1c9f627b6c"
+    ],
+    "parameters": {
+      "fromService": "ez4-plan-test-plan-service-get-item",
+      "timeout": 29
+    }
+  },
+  {
+    "type": "aws:lambda.function",
+    "entryId": "e3dbf8359f6db02badbfc3157febd98c",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "579e7547f8b9b28c67117ac350d68c72",
+      "cd0bc19643bda0bde48af051696283a9"
+    ],
+    "parameters": {
+      "handlerName": "apiEntryPoint",
+      "sourceFile": "test/files/plan-handlers.ts",
+      "functionName": "ez4-plan-test-plan-service-create-item",
+      "logLevel": "warning",
+      "architecture": "x86",
+      "runtime": "node24",
+      "release": {
+        "version": "1.0.0"
+      },
+      "timeout": 19,
+      "memory": 512,
+      "tags": {
+        "Project": "plan-test"
+      }
+    },
+    "function": {
+      "sourceFile": "test/files/plan-handlers.ts",
+      "dependencyFiles": [
+        "lib/request.ts",
+        "test/files/plan-handlers.ts"
+      ],
+      "valuesHash": "8f075a6dbce82dd958ba839c0c97eecf",
+      "variables": {
+        "PROJECT_NAME": "plan-test",
+        "SERVICE_NAME": "plan",
+        "ITEMS_LIMIT": "100"
+      },
+      "bundleHash": "508bb92f11b1caa3fed00b19dbceb91e018ae4940d3064bbc65ea1e3ce51ca41"
+    }
+  },
+  {
+    "type": "aws:api.route",
+    "entryId": "f2c0d813a394a99575dd0fb3c5d4735c",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "ac61105c93d93f8dbb11bcaa1d62c880"
+    ],
+    "parameters": {
+      "routePath": "HEAD /health"
+    }
+  },
+  {
+    "type": "aws:api.authorizer",
+    "entryId": "f424b8bf6163a2518a1c3a76d3313720",
+    "dependencies": [
+      "48deaaec3047256e12a20b1c9f627b6c",
+      "49a456323e847a30630930fcccd9196a",
+      "c196043c80e38a1ce2fafb04a5ecaa2c"
+    ],
+    "parameters": {
+      "name": "items-authorizer",
+      "headerNames": [
+        "authorization"
+      ]
+    }
+  }
+]

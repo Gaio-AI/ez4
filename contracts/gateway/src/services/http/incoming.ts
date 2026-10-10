@@ -35,6 +35,13 @@ export type HttpIncoming<T extends HttpRequest> = T & {
   readonly path: string;
 
   /**
+   * Route that matched the request, as declared (e.g. `GET /items/{id}`).
+   *
+   * - Set when the route is served by a route group's function.
+   */
+  readonly routeKey?: string;
+
+  /**
    * Raw body data (when provided in the request).
    */
   readonly data?: string;

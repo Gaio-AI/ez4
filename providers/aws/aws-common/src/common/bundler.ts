@@ -41,6 +41,21 @@ export type BundlerOptions = {
 };
 
 /**
+ * A bundle of several handlers, which its template reads from `__EZ4_HANDLERS` in the given order.
+ */
+export type BundlerGroupOptions = Omit<BundlerOptions, 'handler'> & {
+  /**
+   * Name the bundle is cached and written under, unique among the bundles of a deploy.
+   */
+  groupName: string;
+  handlers: BundlerEntrypoint[];
+};
+
+const isGroupOptions = (options: BundlerOptions | BundlerGroupOptions): options is BundlerGroupOptions => {
+  return 'handlers' in options;
+};
+
+/**
  * A file's contribution to the bundle hash: where it sits in the project, and what it holds.
  *
  * Both halves are deliberate. The path is relative so the same tree hashes the same from any
@@ -109,14 +124,14 @@ const maxTokens = Math.max(1, Math.floor(cpus().length / 2));
 
 const scheduleQueue: {
   provider: string;
-  options: BundlerOptions;
+  options: BundlerOptions | BundlerGroupOptions;
   resolve: (outputFile: string) => void;
   reject: (reason?: any) => void;
 }[] = [];
 
 let activeTokens = 0;
 
-export const getFunctionBundle = async (provider: string, options: BundlerOptions) => {
+export const getFunctionBundle = async (provider: string, options: BundlerOptions | BundlerGroupOptions) => {
   if (activeTokens < maxTokens) {
     try {
       activeTokens++;
@@ -153,22 +168,17 @@ export const getBundledPackages = (bundleFile: string) => {
   return packagesCache.get(bundleFile);
 };
 
-export const buildFunctionBundle = async (provider: string, options: BundlerOptions) => {
-  const { sourceFile, functionName } = options.handler;
+export const buildFunctionBundle = async (provider: string, options: BundlerOptions | BundlerGroupOptions) => {
+  const { cacheKey, sourceName, targetFile } = getBundleTarget(options);
 
-  const cacheKey = `${sourceFile}:${functionName}`;
   const cacheFile = fileCache.get(cacheKey);
 
   if (cacheFile && existsSync(cacheFile)) {
     return cacheFile;
   }
 
-  const { dir: targetPath, name: targetName } = parse(sourceFile);
-  const { resourceName, filePrefix, target, debug } = options;
+  const { resourceName, target, debug } = options;
 
-  const handlerName = toKebabCase(functionName);
-
-  const targetFile = join(targetPath, `${filePrefix}.${targetName}.${handlerName}.mjs`);
   const outputFile = getTemporaryPath(targetFile);
 
   const result = await build({
@@ -224,7 +234,7 @@ export const buildFunctionBundle = async (provider: string, options: BundlerOpti
   });
 
   if (errors.length) {
-    throw new SourceFileError(sourceFile);
+    throw new SourceFileError(sourceName);
   }
 
   packagesCache.set(outputFile, await collectBundledPackages(Object.keys(result.metafile.inputs)));
@@ -232,6 +242,32 @@ export const buildFunctionBundle = async (provider: string, options: BundlerOpti
   fileCache.set(cacheKey, outputFile);
 
   return outputFile;
+};
+
+const getBundleTarget = (options: BundlerOptions | BundlerGroupOptions) => {
+  const { filePrefix } = options;
+
+  // A source file always has an extension, so no handler key reads as a group one.
+  if (isGroupOptions(options)) {
+    const { groupName } = options;
+
+    return {
+      cacheKey: `group:${groupName}`,
+      targetFile: `${filePrefix}.${toKebabCase(groupName)}.mjs`,
+      sourceName: groupName
+    };
+  }
+
+  const { sourceFile, functionName } = options.handler;
+  const { dir: targetPath, name: targetName } = parse(sourceFile);
+
+  const handlerName = toKebabCase(functionName);
+
+  return {
+    cacheKey: `${sourceFile}:${functionName}`,
+    targetFile: join(targetPath, `${filePrefix}.${targetName}.${handlerName}.mjs`),
+    sourceName: sourceFile
+  };
 };
 
 const getCompatibilityCode = () => {
@@ -247,14 +283,14 @@ const __dirname = __EZ4_DIRNAME(__filename);
 `;
 };
 
-const getEntrypointCode = async (options: BundlerOptions) => {
+const getEntrypointCode = async (options: BundlerOptions | BundlerGroupOptions) => {
   const template = await readFile(options.templateFile);
   const context = buildServiceContext(options.context ?? {});
 
-  const { handler, listener } = options;
+  const { listener } = options;
 
   return `
-import { ${handler.functionName} as handle } from '${getEntrypointImport(handler)}';
+${getHandlerCode(options)}
 ${listener ? `import { ${listener.functionName} as dispatch } from '${getEntrypointImport(listener)}'` : `const dispatch = () => {}`};
 ${context.packages.join('\n')}
 
@@ -279,6 +315,23 @@ const __EZ4_CONTEXT = ${context.services};
 
 ${template}
 `;
+};
+
+const getHandlerCode = (options: BundlerOptions | BundlerGroupOptions) => {
+  if (!isGroupOptions(options)) {
+    const { handler } = options;
+
+    return `import { ${handler.functionName} as handle } from '${getEntrypointImport(handler)}';`;
+  }
+
+  // Aliased by position, since handlers of different files may share a name.
+  const imports = options.handlers.map((handler, index) => {
+    return `import { ${handler.functionName} as __EZ4_HANDLER_${index} } from '${getEntrypointImport(handler)}';`;
+  });
+
+  const handlers = options.handlers.map((_, index) => `__EZ4_HANDLER_${index}`);
+
+  return `${imports.join('\n')}\nconst __EZ4_HANDLERS = [${handlers.join(', ')}];`;
 };
 
 const getEntrypointImport = (entrypoint: BundlerEntrypoint) => {

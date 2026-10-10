@@ -249,6 +249,13 @@ export type ProjectDefaultOptions = {
   logLevel?: LogLevel;
 
   /**
+   * Log level of the platform lines (start, end and the report with duration, memory and init duration)
+   * for all handlers. Platform lines have no error level, which logs as warning.
+   * Default is: `warning`
+   */
+  systemLogLevel?: LogLevel;
+
+  /**
    * Default log retention (in days) for all handlers.
    */
   logRetention?: number;

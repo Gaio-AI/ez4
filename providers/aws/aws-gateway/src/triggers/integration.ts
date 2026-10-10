@@ -147,6 +147,7 @@ const getIntegrationFunction = (
         ...target.preferences
       },
       scope: readsScope ? mergeScopeHeaders(defaults, target) : undefined,
+      systemLogLevel: options.defaults?.systemLogLevel,
       architecture,
       logLevel,
       runtime,

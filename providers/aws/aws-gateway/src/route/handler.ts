@@ -8,7 +8,7 @@ import { deepCompare, deepEqual } from '@ez4/utils';
 import { getGatewayId } from '../gateway/utils';
 import { getIntegrationId } from '../integration/utils';
 import { tryGetAuthorizerId } from '../authorizer/utils';
-import { importRoute, createRoute, deleteRoute, updateRoute } from './client';
+import { importRoute, createRoute, deleteRoute, updateRoute, getStageDeployments, waitStageDeployment } from './client';
 import { RouteServiceName } from './types';
 
 export const getRouteHandler = (): StepHandler<RouteState> => ({
@@ -101,7 +101,15 @@ const updateResource = (candidate: RouteState, current: RouteState, context: Ste
       authorizerId: oldAuthorizerId
     };
 
+    // A route moved to another integration holds the update until its stages deploy the move, since the
+    // deletions of the plan (the prior integration and its function) come after it.
+    const priorDeployments = newIntegrationId !== oldIntegrationId ? await getStageDeployments(result.apiId) : undefined;
+
     await checkGeneralUpdates(logger, result.apiId, result.routeId, newRequest, oldRequest);
+
+    if (priorDeployments) {
+      await waitStageDeployment(logger, result.apiId, priorDeployments);
+    }
 
     return {
       ...result,
