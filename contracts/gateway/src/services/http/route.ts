@@ -7,6 +7,9 @@ import type { HttpHandler } from './handler';
 import type { HttpErrors } from './errors';
 import type { HttpPath } from './path';
 
+// Brings the `Http.Service` groups declaration of `./group` to whoever reads the route contract.
+export type { HttpGroup } from './group';
+
 /**
  * HTTP route.
  */
@@ -57,6 +60,18 @@ export interface HttpRoute<T extends HttpRequest, U extends AuthRequest> extends
    * - Invoked only after the authorizer (if defined) succeeds.
    */
   readonly handler: HttpHandler<T>;
+
+  /**
+   * Route group whose function serves the route.
+   *
+   * - Routes of the same group share one function, log group and integration, which picks the
+   *   route by its key (`path`) and keeps its own validation, errors, preferences and scope.
+   * - Function settings (memory, timeout, runtime, listener, ...) come from the service `groups`,
+   *   then `defaults`: the route may declare one only with that same value.
+   * - Route variables join the group's function, and a variable can't take two values in it.
+   * - Without a group, the route keeps a function of its own.
+   */
+  readonly group?: string;
 
   /**
    * Maps known exceptions to HTTP status codes.

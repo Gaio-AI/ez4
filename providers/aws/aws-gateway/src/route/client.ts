@@ -3,6 +3,7 @@ import type { Arn, OperationLogLine } from '@ez4/aws-common';
 
 import {
   GetRoutesCommand,
+  GetStagesCommand,
   CreateRouteCommand,
   UpdateRouteCommand,
   DeleteRouteCommand,
@@ -10,8 +11,24 @@ import {
   NotFoundException
 } from '@aws-sdk/client-apigatewayv2';
 
+import { setTimeout } from 'node:timers/promises';
+
 import { waitCreation, waitDeletion } from '@ez4/aws-common';
+import { Logger } from '@ez4/logger';
 import { getApiGatewayV2Client } from '../utils/deploy';
+
+/**
+ * How a route moved to another integration waits for its stages (in milliseconds).
+ */
+export const StageDeploymentWait = {
+  // Every route moving at once polls, so the interval keeps the control plane calls of a large move low.
+  pollInterval: 2000,
+  timeout: 60000,
+
+  // A stage that already serves its new deployment still sends some requests to the prior
+  // integration for a few seconds, and deleting what that integration invokes fails them.
+  settleTime: 20000
+};
 
 export type CreateRequest = {
   routePath: string;
@@ -111,6 +128,68 @@ export const updateRoute = async (logger: OperationLogLine, apiId: string, route
       })
     })
   );
+};
+
+/**
+ * The deployment each auto deployed stage of the API serves, by stage name.
+ */
+export const getStageDeployments = async (apiId: string) => {
+  const response = await getApiGatewayV2Client().send(
+    new GetStagesCommand({
+      ApiId: apiId
+    })
+  );
+
+  const deployments: Record<string, string | undefined> = {};
+
+  for (const { StageName, AutoDeploy, DeploymentId } of response.Items ?? []) {
+    if (StageName && AutoDeploy) {
+      deployments[StageName] = DeploymentId;
+    }
+  }
+
+  return deployments;
+};
+
+/**
+ * Wait until every auto deployed stage serves a deployment newer than the given ones, and then for the
+ * stage to settle, so the resources the route used before can be deleted. A stage that doesn't deploy in
+ * time only gives up the wait: the route itself is already updated.
+ */
+export const waitStageDeployment = async (
+  logger: OperationLogLine,
+  apiId: string,
+  priorDeployments: Record<string, string | undefined>
+) => {
+  const stageNames = Object.keys(priorDeployments);
+
+  if (!stageNames.length) {
+    return;
+  }
+
+  logger.update(`Waiting for stage deployment`);
+
+  const { pollInterval, timeout, settleTime } = StageDeploymentWait;
+
+  const deadline = Date.now() + timeout;
+
+  let deployed = false;
+
+  while (!deployed && Date.now() < deadline) {
+    const deployments = await getStageDeployments(apiId);
+
+    deployed = stageNames.every((stageName) => deployments[stageName] !== priorDeployments[stageName]);
+
+    if (!deployed) {
+      await setTimeout(pollInterval);
+    }
+  }
+
+  if (!deployed) {
+    Logger.warn(`API ${apiId}: stages didn't deploy the route change in ${timeout / 1000}s; deleting its prior integration anyway.`);
+  }
+
+  await setTimeout(settleTime);
 };
 
 export const deleteRoute = async (logger: OperationLogLine, apiId: string, routeId: string) => {

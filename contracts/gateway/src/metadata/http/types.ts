@@ -24,6 +24,7 @@ export type HttpService = Omit<ServiceMetadata, 'variables' | 'services'> &
     displayName?: string;
     description?: string;
     defaults?: HttpDefaults;
+    groups?: Record<string, HttpGroup>;
     routes: HttpRoute[];
     cache?: HttpCache;
     access?: HttpAccess;
@@ -98,7 +99,21 @@ export type HttpRoute = HttpDefaults & {
   authorizer?: AuthHandler;
   variables?: LinkedVariables;
   disabled?: boolean;
+  group?: string;
   cors?: boolean;
+  vpc?: boolean;
+};
+
+export type HttpGroup = {
+  listener?: ServiceListener;
+  architecture?: ArchitectureType;
+  runtime?: RuntimeType;
+  logRetention?: number;
+  logLevel?: LogLevel;
+  timeout?: number;
+  memory?: number;
+  files?: string[];
+  debug?: boolean;
   vpc?: boolean;
 };
 

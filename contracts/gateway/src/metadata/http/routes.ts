@@ -141,6 +141,14 @@ const getTypeFromMembers = (
         break;
       }
 
+      // Which function serves a route is the owner's deployment, never the client's contract.
+      case 'group': {
+        if (!external) {
+          route.group = getPropertyString(member);
+        }
+        break;
+      }
+
       case 'path': {
         const path = getPropertyString(member);
 
