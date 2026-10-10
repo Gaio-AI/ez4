@@ -1,0 +1,76 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestService": {
+    "type": "@ez4/http",
+    "name": "TestService",
+    "context": {},
+    "file": "test/http/input/output-import-group.ts",
+    "variables": {},
+    "services": {},
+    "displayName": "Remote API",
+    "routes": [
+      {
+        "name": "testRoute",
+        "path": "GET /test-route",
+        "handler": {
+          "name": "testHandler",
+          "file": "test/http/input/output-import-group.ts",
+          "position": [
+            26,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "remote"
+      }
+    ],
+    "defaults": {
+      "memory": 256
+    },
+    "groups": {
+      "remote": {
+        "memory": 512
+      }
+    }
+  },
+  "TestImport": {
+    "type": "@ez4/import:http",
+    "name": "TestImport",
+    "context": {},
+    "file": "test/http/input/output-import-group.ts",
+    "reference": "TestService",
+    "routes": [
+      {
+        "name": "testRoute",
+        "path": "GET /test-route",
+        "handler": {
+          "name": "testHandler",
+          "file": "test/http/input/output-import-group.ts",
+          "position": [
+            26,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      }
+    ],
+    "displayName": "Remote API",
+    "defaults": {
+      "memory": 256
+    },
+    "project": "name from project in ez4.project.js"
+  }
+}

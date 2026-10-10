@@ -69,6 +69,7 @@ export const prepareScheduleTarget = (state: EntryStates, service: CronService, 
       sourceFile: listener.file,
       module: listener.module
     },
+    systemLogLevel: defaults?.systemLogLevel,
     architecture,
     logLevel,
     runtime,

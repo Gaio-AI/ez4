@@ -23,6 +23,7 @@ import { IncompleteServiceError } from '../../errors/service';
 import { attachProviderLinkedServices } from '../utils/provider';
 import { getFullTypeName } from '../utils/name';
 import { createHttpService, HttpNamespaceType } from './types';
+import { checkHttpRouteGroups, getHttpGroupsMetadata } from './groups';
 import { getHttpDefaultsMetadata } from './defaults';
 import { getHttpThrottlingMetadata } from './throttling';
 import { getHttpAccessMetadata } from './access';
@@ -78,6 +79,11 @@ export const getHttpServicesMetadata = (reflection: ReflectionTypes) => {
           break;
         }
 
+        case 'groups': {
+          service.groups = getHttpGroupsMetadata(member.value, declaration, reflection, errorList);
+          break;
+        }
+
         case 'cache': {
           service.cache = getHttpCacheMetadata(member.value, declaration, reflection, errorList);
           break;
@@ -125,6 +131,8 @@ export const getHttpServicesMetadata = (reflection: ReflectionTypes) => {
     }
 
     attachLinkedServices(service, reflection, errorList, fileName);
+
+    checkHttpRouteGroups(service, errorList);
 
     allServices[declaration.name] = service;
   }

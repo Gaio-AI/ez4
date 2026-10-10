@@ -25,6 +25,7 @@ export const createTargetFunction = <E extends EntryState>(
     functionName: parameters.functionName,
     description: parameters.description,
     logLevel: debug ? LogLevel.Debug : parameters.logLevel,
+    systemLogLevel: parameters.systemLogLevel,
     architecture: parameters.architecture,
     runtime: parameters.runtime,
     release: parameters.release,

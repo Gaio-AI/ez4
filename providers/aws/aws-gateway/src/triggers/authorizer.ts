@@ -78,6 +78,7 @@ export const getAuthorizerFunction = (
       context: service.context,
       release: options.release,
       tags: options.tags,
+      systemLogLevel: options.defaults?.systemLogLevel,
       architecture,
       logLevel,
       runtime,

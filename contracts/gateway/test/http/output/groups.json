@@ -1,0 +1,115 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestService": {
+    "type": "@ez4/http",
+    "name": "TestService",
+    "context": {},
+    "file": "test/http/input/output-groups.ts",
+    "variables": {},
+    "services": {},
+    "routes": [
+      {
+        "path": "GET /tags",
+        "handler": {
+          "name": "listTags",
+          "file": "test/http/input/output-groups.ts",
+          "position": [
+            59,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "tags",
+        "memory": 512,
+        "variables": {
+          "TAGS_TABLE": "tags"
+        }
+      },
+      {
+        "path": "POST /tags",
+        "handler": {
+          "name": "createTag",
+          "file": "test/http/input/output-groups.ts",
+          "position": [
+            65,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "tags",
+        "variables": {
+          "TAGS_TABLE": "tags",
+          "TAGS_LIMIT": "100"
+        }
+      },
+      {
+        "path": "GET /audit",
+        "handler": {
+          "name": "listAudit",
+          "file": "test/http/input/output-groups.ts",
+          "position": [
+            71,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "audit",
+        "logLevel": "information"
+      },
+      {
+        "path": "GET /health",
+        "handler": {
+          "name": "health",
+          "file": "test/http/input/output-groups.ts",
+          "position": [
+            77,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "memory": 1024
+      }
+    ],
+    "defaults": {
+      "logLevel": "information"
+    },
+    "groups": {
+      "tags": {
+        "listener": {
+          "name": "tagsListener",
+          "file": "test/http/input/output-groups.ts",
+          "position": [
+            57,
+            1
+          ]
+        },
+        "architecture": "arm",
+        "logRetention": 14,
+        "timeout": 10,
+        "memory": 512,
+        "files": [
+          "path/to/file.json"
+        ],
+        "debug": false,
+        "vpc": false
+      }
+    }
+  }
+}

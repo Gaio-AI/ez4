@@ -96,6 +96,23 @@ listener: typeof routeListener;
  
 > Use `typeof` because the route listener is referenced by type. See the gateway [listener](./gateway-listener.md) for more details.
 
+#### Group (optional)
+
+Route group whose function serves the route.
+
+- Routes of the same group share one function, log group and integration; without a group, the route keeps a function of its own.
+- The function picks the route by its key (the `path`), and each route keeps its own validation, response, `httpErrors`, `preferences` and `scope`.
+- The incoming request carries the matched `routeKey`.
+- Function settings (`listener`, `memory`, `timeout`, `architecture`, `runtime`, `logRetention`, `logLevel`, `files`, `debug` and `vpc`) come from the service `groups`, then `defaults`: a route may declare one only with that same value.
+- Route variables join the group's function, and a variable can't take two values in it.
+- A handler whose context needs a VPC (Aurora outside the Data API, a Valkey cache) fails the deploy unless its group sets `vpc: true`, so one route never takes the others off the internet.
+- The function is named `<service>-group-<group>`, which must fit 64 characters and not be the name of another function of the service.
+- Clients of an imported service ignore it.
+
+```ts
+group: 'users';
+```
+
 #### HTTP errors (optional)
 
 Maps exceptions to HTTP status codes.

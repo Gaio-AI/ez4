@@ -1,5 +1,5 @@
 import type { EntryState } from '@ez4/state';
-import type { IntegrationFunctionParameters } from './types';
+import type { IntegrationFunctionParameters, IntegrationGroupParameters, IntegrationGroupRoute } from './types';
 
 import { join } from 'node:path';
 
@@ -24,6 +24,63 @@ const templateFiles: Record<IntegrationFunctionType, string> = {
 // Shared with the source hash, so a change to the template reaches every function it wraps.
 export const getIntegrationTemplateFile = (type: IntegrationFunctionType) => {
   return join(__MODULE_PATH, templateFiles[type]);
+};
+
+export const getGroupTemplateFile = () => {
+  return join(__MODULE_PATH, '../lib/group.ts');
+};
+
+/**
+ * The handlers a group function imports, each once, and the position of each route's handler among them.
+ */
+const getGroupHandlers = (routes: IntegrationGroupRoute[]) => {
+  const handlerKeys: string[] = [];
+
+  const handlers: IntegrationGroupRoute['handler'][] = [];
+  const positions: number[] = [];
+
+  for (const { handler } of routes) {
+    const handlerKey = `${handler.module ?? handler.sourceFile}:${handler.functionName}`;
+
+    let position = handlerKeys.indexOf(handlerKey);
+
+    if (position < 0) {
+      position = handlers.push(handler) - 1;
+      handlerKeys.push(handlerKey);
+    }
+
+    positions.push(position);
+  }
+
+  return { handlers, positions };
+};
+
+export const bundleGroupFunction = async (parameters: IntegrationGroupParameters, connections: EntryState[]) => {
+  const { groupName, routes, listener, functionName, context, references, debug } = parameters;
+
+  const { handlers, positions } = getGroupHandlers(routes);
+
+  // Each route's settings go as a JSON string, which the template parses on the route's first request.
+  const groupRoutes = routes.map(({ routeKey, handler: _handler, ...config }, index) => {
+    return [routeKey, { handler: positions[index], config: JSON.stringify(config) }];
+  });
+
+  const definitions = getDefinitionsObject(connections);
+
+  return getFunctionBundle(IntegrationServiceName, {
+    context: context && references ? pickObject(context, references) : context,
+    templateFile: getGroupTemplateFile(),
+    resourceName: functionName,
+    filePrefix: 'api',
+    define: {
+      ...definitions,
+      __EZ4_ROUTES: JSON.stringify(Object.fromEntries(groupRoutes))
+    },
+    groupName,
+    handlers,
+    listener,
+    debug
+  });
 };
 
 export const bundleRequestFunction = async (parameters: IntegrationFunctionParameters, connections: EntryState[]) => {

@@ -84,6 +84,7 @@ export const prepareSubscriptions = (
           sourceFile: listener.file,
           module: listener.module
         },
+        systemLogLevel: defaults?.systemLogLevel,
         architecture,
         logLevel,
         runtime,

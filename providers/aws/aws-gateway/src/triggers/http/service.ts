@@ -4,7 +4,7 @@ import type { EntryStates } from '@ez4/state';
 import type { GatewayState } from '../../gateway/types';
 
 import { getServiceName, isLinkedContextVpcRequired, linkServiceContext } from '@ez4/project/library';
-import { getCorsConfiguration, isHttpService } from '@ez4/gateway/library';
+import { getCorsConfiguration, getHttpGroupFunctionName, isHttpService } from '@ez4/gateway/library';
 import { createLogGroup, createLogPolicy } from '@ez4/aws-logs';
 import { getFunctionState } from '@ez4/aws-function';
 import { isRoleState } from '@ez4/aws-identity';
@@ -15,8 +15,9 @@ import { createGateway } from '../../gateway/service';
 import { GatewayProtocol } from '../../gateway/types';
 import { getDisplayName, getInternalName } from '../utils/name';
 import { getIntegrationRequestFunction } from '../integration';
+import { getIntegrationGroupFunction } from '../group';
 import { getAuthorizerFunction } from '../authorizer';
-import { RoleMissingError } from '../errors';
+import { GroupVpcRequiredError, RoleMissingError } from '../errors';
 import { prepareLinkedClient } from './client';
 import { assertIntegrationLimit } from './limits';
 
@@ -73,18 +74,26 @@ export const connectHttpServices = (event: ConnectResourceEvent) => {
       throw new RoleMissingError();
     }
 
-    for (const { disabled, authorizer, handler } of service.routes) {
+    for (const { disabled, authorizer, handler, group } of service.routes) {
       if (disabled) {
         continue;
       }
 
-      const handlerName = getInternalName(service, handler.name);
+      const handlerName = getInternalName(service, group ? getHttpGroupFunctionName(group) : handler.name);
       const handlerState = getFunctionState(context, handlerName, options);
 
       linkServiceContext(state, handlerState.entryId, service.context);
 
       if (!handlerState.parameters.vpc && handler.isolated) {
-        handlerState.parameters.vpc = isLinkedContextVpcRequired(service.context, handler.provider?.services);
+        const vpcRequired = isLinkedContextVpcRequired(service.context, handler.provider?.services);
+
+        // The group's function serves every route of it: one route's VPC need would take the others off the
+        // internet without a word, so the group has to opt in.
+        if (vpcRequired && group) {
+          throw new GroupVpcRequiredError(group);
+        }
+
+        handlerState.parameters.vpc = vpcRequired;
       }
 
       if (authorizer) {
@@ -140,7 +149,10 @@ const createRoutes = (
       continue;
     }
 
-    const integrationState = getIntegrationRequestFunction(state, service, gatewayState, route, options, context);
+    const integrationState = route.group
+      ? getIntegrationGroupFunction(state, service, gatewayState, route.group, options, context)
+      : getIntegrationRequestFunction(state, service, gatewayState, route, options, context);
+
     const authorizerState = getAuthorizerFunction(state, service, gatewayState, route, options, context);
 
     createRoute(state, gatewayState, integrationState, authorizerState, {

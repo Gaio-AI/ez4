@@ -36,6 +36,39 @@ export type IntegrationFunctionParameters = Omit<
   debug?: boolean;
 };
 
+/**
+ * A route of a group function, with what its template needs to serve it on its own.
+ */
+export type IntegrationGroupRoute = {
+  routeKey: string;
+  handler: IntegrationEntryPoint;
+  headersSchema?: ObjectSchema;
+  identitySchema?: ObjectSchema | UnionSchema;
+  parametersSchema?: ObjectSchema;
+  querySchema?: ObjectSchema;
+  bodySchema?: ObjectSchema | UnionSchema | ArraySchema | ScalarSchema;
+  responseSchema?: ObjectSchema | UnionSchema | ArraySchema | ScalarSchema;
+  errorsMap?: Record<string, number>;
+  preferences?: HttpPreferences;
+  scope?: Runtime.ScopeHeaders;
+};
+
+export type IntegrationGroupParameters = Omit<
+  FunctionParameters,
+  'getFunctionFiles' | 'getFunctionBundle' | 'getFunctionHash' | 'getFunctionVariables' | 'sourceFile' | 'handlerName'
+> & {
+  /**
+   * Name the group's bundle is built under, unique in the deploy.
+   */
+  groupName: string;
+  routes: IntegrationGroupRoute[];
+  listener?: IntegrationFunction;
+  context?: Record<string, ContextSource>;
+  variables: (LinkedVariables | undefined)[];
+  references?: string[];
+  debug?: boolean;
+};
+
 export const enum IntegrationFunctionType {
   HttpRequest = 'http-request',
   WsConnection = 'ws-connection',

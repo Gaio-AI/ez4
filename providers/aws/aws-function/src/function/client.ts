@@ -20,7 +20,6 @@ import {
   waitUntilFunctionUpdated,
   waitUntilPublishedVersionActive,
   ResourceNotFoundException,
-  SystemLogLevel,
   LogFormat,
   ListVersionsByFunctionCommand
 } from '@aws-sdk/client-lambda';
@@ -32,7 +31,7 @@ import { getFunctionArchitecture } from '../utils/architecture';
 import { getFunctionRuntime } from '../utils/runtime';
 import { FunctionDefaults } from '../utils/defaults';
 import { assertVariables } from './helpers/variables';
-import { getLogLevel } from './helpers/logging';
+import { getLogLevel, getSystemLogLevel } from './helpers/logging';
 import { getZipBuffer } from './helpers/zip';
 import { getSafeDescription } from '../utils/description';
 import { Tasks } from '@ez4/utils';
@@ -46,6 +45,7 @@ export type CreateRequest = {
   description?: string;
   logGroup?: string;
   logLevel?: LogLevel;
+  systemLogLevel?: LogLevel;
   variables?: LinkedVariables;
   architecture: ArchitectureType;
   runtime: RuntimeType;
@@ -72,6 +72,7 @@ export type UpdateConfigurationRequest = {
   description?: string;
   logGroup?: string;
   logLevel?: LogLevel;
+  systemLogLevel?: LogLevel;
   variables?: LinkedVariables;
   runtime?: RuntimeType;
   timeout?: number;
@@ -121,7 +122,7 @@ export const createFunction = async (logger: OperationLogLine, request: CreateRe
   const sourceFile = await getSourceZipFile(request.sourceFile, request.files);
   const handlerName = getSourceHandlerName(request.handlerName);
 
-  const { description, memory, timeout, architecture, runtime, roleArn, logGroup, logLevel, vpcConfig } = request;
+  const { description, memory, timeout, architecture, runtime, roleArn, logGroup, logLevel, systemLogLevel, vpcConfig } = request;
 
   const client = getLambdaClient();
 
@@ -147,7 +148,7 @@ export const createFunction = async (logger: OperationLogLine, request: CreateRe
         LoggingConfig: {
           LogGroup: logGroup,
           ApplicationLogLevel: getLogLevel(logLevel ?? FunctionDefaults.LogLevel),
-          SystemLogLevel: SystemLogLevel.Warn,
+          SystemLogLevel: getSystemLogLevel(systemLogLevel),
           LogFormat: LogFormat.Json
         },
         Code: {
@@ -279,7 +280,7 @@ export const updateConfiguration = async (logger: OperationLogLine, functionName
     assertVariables(variables);
   }
 
-  const { description, memory, timeout, runtime, roleArn, logGroup, logLevel, vpcConfig } = request;
+  const { description, memory, timeout, runtime, roleArn, logGroup, logLevel, systemLogLevel, vpcConfig } = request;
 
   const client = getLambdaClient();
 
@@ -301,7 +302,7 @@ export const updateConfiguration = async (logger: OperationLogLine, functionName
       LoggingConfig: {
         LogGroup: logGroup,
         ApplicationLogLevel: getLogLevel(logLevel ?? FunctionDefaults.LogLevel),
-        SystemLogLevel: SystemLogLevel.Warn,
+        SystemLogLevel: getSystemLogLevel(systemLogLevel),
         LogFormat: LogFormat.Json
       },
       Environment: {
