@@ -14,11 +14,11 @@ declare class TestDb extends Database.Service<PostgresEngine> {
   tables: [];
 }
 
-type Statement = string | { text: string };
+type Statement = string | { text: string; types?: { getTypeParser: (type: number) => (value: string) => unknown } };
 
 type FakeConnection = {
   query: (statement: Statement) => Promise<{ rows: unknown[]; rowCount: number }>;
-  release: () => void;
+  release: (destroy?: boolean) => void;
 };
 
 const Endpoint = 'cluster.example.us-east-1.rds.amazonaws.com';
@@ -38,10 +38,12 @@ const getText = (statement: Statement) => {
 describe('aurora native driver', () => {
   let poolOptions: PoolConfig[];
   let statements: string[];
+  let queries: Statement[];
+  let releases: (boolean | undefined)[];
 
-  // Each entry answers one `pool.connect()`: an error to throw, or a connection whose `query` runs the given
-  // function (which may throw).
-  let connections: (Error | ((text: string) => unknown))[];
+  // Each entry answers one `pool.connect()`: an error to throw, a connection whose `query` runs the given
+  // function (which may throw), or the name of a connection to hand out again, as the pool does with an idle one.
+  let connections: (Error | ((text: string) => unknown) | string)[];
 
   const makeClient = () => {
     return Client.make<TestDb>({
@@ -59,7 +61,11 @@ describe('aurora native driver', () => {
   beforeEach(() => {
     poolOptions = [];
     statements = [];
+    queries = [];
+    releases = [];
     connections = [];
+
+    const named: Record<string, FakeConnection> = {};
 
     process.env.AWS_REGION = 'us-east-1';
     process.env.AWS_ACCESS_KEY_ID = 'AKIDEXAMPLE';
@@ -74,18 +80,32 @@ describe('aurora native driver', () => {
         throw next;
       }
 
+      if (typeof next === 'string' && named[next]) {
+        return named[next];
+      }
+
+      const run = typeof next === 'string' ? () => [{ one: 1 }] : next;
+
       const connection: FakeConnection = {
         query: async (statement) => {
           const text = getText(statement);
 
           statements.push(text);
+          queries.push(statement);
 
-          const rows = next(text);
+          const rows = run(text);
 
           return { rows: Array.isArray(rows) ? rows : [], rowCount: 0 };
         },
-        release: () => {}
+        release: (destroy) => {
+          releases.push(destroy);
+          this.emit('release', undefined, connection);
+        }
       };
+
+      if (typeof next === 'string') {
+        named[next] = connection;
+      }
 
       return connection;
     });
@@ -241,5 +261,63 @@ describe('aurora native driver', () => {
 
     equal(statements.filter((text) => text === 'BEGIN').length, 2);
     equal(statements.filter((text) => text === 'COMMIT').length, 1);
+  });
+
+  it('assert :: results come in the shapes the data api driver returns', async () => {
+    await makeClient().rawQuery('SELECT 1');
+
+    const [query] = queries;
+
+    ok(typeof query === 'object' && query.types);
+
+    equal(query.types.getTypeParser(20)('12'), 12);
+    equal(query.types.getTypeParser(1700)('1.5'), 1.5);
+    equal(query.types.getTypeParser(1184)('2026-09-17 20:08:20.8-03'), '2026-09-17 23:08:20.800');
+    equal(query.types.getTypeParser(1082)('2026-09-17'), '2026-09-17');
+  });
+
+  it('assert :: opening a connection that times out is retried', async () => {
+    connections.push(new Error('Connection terminated due to connection timeout'));
+
+    const rows = await makeClient().rawQuery('SELECT 1');
+
+    equal(poolOptions.length, 2);
+    equal(rows.length, 1);
+  });
+
+  it('assert :: a connection idle within the timeout is used again', async (context) => {
+    context.mock.timers.enable({ apis: ['Date'], now: 0 });
+
+    connections.push('idle', 'idle');
+
+    const client = makeClient();
+
+    await client.rawQuery('SELECT 1');
+
+    context.mock.timers.tick(299_000);
+
+    await client.rawQuery('SELECT 2');
+
+    equal(poolOptions.length, 2);
+    equal(releases.includes(true), false);
+  });
+
+  it('assert :: a connection idle past the timeout (a frozen lambda) is discarded before use', async (context) => {
+    context.mock.timers.enable({ apis: ['Date'], now: 0 });
+
+    connections.push('idle', 'idle');
+
+    const client = makeClient();
+
+    await client.rawQuery('SELECT 1');
+
+    // The pool's idle timer doesn't run while the Lambda is frozen, so the connection is still handed out.
+    context.mock.timers.tick(300_000);
+
+    await client.rawQuery('SELECT 2');
+
+    equal(poolOptions.length, 3);
+    equal(releases.filter((destroy) => destroy === true).length, 1);
+    equal(statements.length, 2);
   });
 });

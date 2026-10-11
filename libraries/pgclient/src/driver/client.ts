@@ -11,6 +11,7 @@ import { DatabaseError } from 'pg';
 import { logQueryError, logQuerySuccess } from './utils/logger';
 import { detectFieldData, prepareFieldData } from './utils/fields';
 import { sendDataApiStatement } from './utils/data-api';
+import { getDataApiResultTypes } from './utils/results';
 import { prepareStatement } from './utils/prepare';
 import { rollbackFailedTransaction } from '../utils/transaction';
 import { parseRecords } from '../utils/records';
@@ -19,15 +20,22 @@ const ALL_TRANSACTIONS: Record<string, PoolClient> = {};
 
 export type ClientDriverOptions = {
   dataApi?: boolean | ClientDataApiOptions;
+
+  /**
+   * Return raw results in the shapes the Data API driver returns, without the rest of its behavior.
+   */
+  dataApiResults?: boolean;
 };
 
 export class ClientDriver implements PgClientDriver {
   protected pool?: Pool;
   protected dataApi?: ClientDataApiOptions;
+  protected dataApiResults?: boolean;
 
   constructor(pool?: Pool, options?: ClientDriverOptions) {
     this.pool = pool;
     this.dataApi = getDataApiOptions(options?.dataApi);
+    this.dataApiResults = options?.dataApiResults;
   }
 
   async getConnection() {
@@ -50,7 +58,9 @@ export class ClientDriver implements PgClientDriver {
     }
 
     try {
-      const { rows: records, rowCount: rows } = await sendStatement(client, statement, this.dataApi, options);
+      const { rows: records, rowCount: rows } = this.dataApi
+        ? await sendDataApiStatement(client, statement, this.dataApi, options)
+        : await sendStatement(client, statement, this.dataApiResults);
 
       if (options?.debug || Runtime.isDebug()) {
         logQuerySuccess(statement, transactionId);
@@ -188,12 +198,16 @@ const getDataApiOptions = (dataApi: boolean | ClientDataApiOptions | undefined) 
   return dataApi || undefined;
 };
 
-const sendStatement = (client: PoolClient, statement: PgExecuteStatement, dataApi?: ClientDataApiOptions, options?: PgExecuteOptions) => {
-  if (dataApi) {
-    return sendDataApiStatement(client, statement, dataApi, options);
-  }
-
+const sendStatement = (client: PoolClient, statement: PgExecuteStatement, dataApiResults?: boolean) => {
   const [query, variables] = prepareStatement(statement.query, statement.variables);
+
+  if (dataApiResults) {
+    return client.query({
+      types: getDataApiResultTypes(!statement.metadata),
+      values: variables,
+      text: query
+    });
+  }
 
   return client.query(query, variables);
 };
