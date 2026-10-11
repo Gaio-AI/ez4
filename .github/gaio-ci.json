@@ -19,8 +19,8 @@
     "foundation/project/bin/*.mjs.map"
   ],
   "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
-  "lint": "npm run build && npm query .workspace | jq -r '.[].name' | xargs -P \"$(nproc)\" -I{} npm run lint -w {} --if-present && node --test scripts/ci-config.test.mjs",
-  "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js"],
+  "lint": "bash scripts/ci-build-once.sh && npm query .workspace | jq -r '.[].name' | xargs -P \"$(nproc)\" -I{} npm run lint -w {} --if-present && node --test scripts/ci-config.test.mjs",
+  "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js", "scripts/ci-build-once.sh"],
   "ignore": [".github/", "*.md"],
   "tasks": [
     {
@@ -63,7 +63,7 @@
         "@ez4/docs-topology"
       ],
       "run": "npm test -w {package}",
-      "prepare": { "*": "npm run build && npm link -w @ez4/project --prefer-offline --no-audit" }
+      "prepare": { "*": "bash scripts/ci-build-once.sh" }
     }
   ],
   "services": {

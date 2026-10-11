@@ -5,6 +5,13 @@ on:
       config: { type: string, default: .github/gaio-ci.json }
       force: { type: boolean, default: false }
       pr-workflow: { type: string, default: pr.yml }
+      suite-runs-on: { type: string, default: ubuntu-latest }
+      suite-timeout-minutes: { type: number, default: 60 }
+      # IAM role ARNs assumed through GitHub OIDC instead of the aws-access-key-id / aws-secret-access-key
+      # secrets: aws-role for the suite and the release PR's install, aws-deploy-role for ship-serial and every
+      # deploy-app.yml job. aws-region stays required.
+      aws-role: { type: string, default: '' }
+      aws-deploy-role: { type: string, default: '' }
     secrets:
       aws-access-key-id:
         required: false
@@ -50,25 +57,32 @@ jobs:
         with:
           path: .validated
           key: validated-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+  # The full suite runs only for a tree about to ship: a push that leaves every unit tagged ships
+  # nothing, and its pull requests already passed their quick checks.
   suite:
-    needs: gate
-    if: ${{ !cancelled() && needs.gate.outputs.tested != 'true' }}
+    needs: [gate, untagged]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.gate.outputs.tested != 'true' && needs.untagged.outputs.apps != '[]' }}
     permissions:
       contents: read
       statuses: write
+      id-token: write
     uses: ./.github/workflows/gaio-pr.yml
     with:
       config: ${{ inputs.config }}
       sha: ${{ github.sha }}
       force: ${{ inputs.force }}
+      mode: full
+      runs-on: ${{ inputs.suite-runs-on }}
+      timeout-minutes: ${{ inputs.suite-timeout-minutes }}
+      aws-role: ${{ inputs.aws-role }}
     secrets:
       aws-access-key-id: ${{ secrets.aws-access-key-id }}
       aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
       aws-region: ${{ secrets.aws-region }}
       doppler-token: ${{ secrets.doppler-token }}
   version:
-    needs: [gate, suite]
-    if: always() && needs.gate.result == 'success' && (needs.suite.result == 'success' || needs.suite.result == 'skipped')
+    needs: gate
+    if: always() && needs.gate.result == 'success'
     runs-on: ubuntu-latest
     # Queues instead of racing, so the release branch is always built from the newest main.
     concurrency:
@@ -78,6 +92,7 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
+      id-token: write
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -96,13 +111,24 @@ jobs:
         env:
           CONFIG: ${{ inputs.config }}
         run: echo "codeartifact=$(jq -r '.codeartifact // false' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      - name: Assume the AWS role
+        id: aws
+        if: inputs.aws-role != '' && steps.pending.outputs.pending == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ inputs.aws-role }}
+          role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
+          aws-region: ${{ secrets.aws-region }}
+          output-credentials: true
+          output-env-credentials: false
       - name: Set up
         if: steps.pending.outputs.pending == 'true'
         uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.config.outputs.codeartifact }}
-          aws-access-key-id: ${{ secrets.aws-access-key-id }}
-          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          aws-session-token: ${{ steps.aws.outputs.aws-session-token }}
           aws-region: ${{ secrets.aws-region }}
       - name: Open or update the release PR
         uses: ./.github/gaio-actions/version
@@ -111,8 +137,6 @@ jobs:
           config: ${{ inputs.config }}
           pr-workflow: ${{ inputs.pr-workflow }}
   untagged:
-    needs: [gate, suite]
-    if: always() && needs.gate.result == 'success' && (needs.suite.result == 'success' || needs.suite.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -130,8 +154,8 @@ jobs:
           command: untagged
           config: ${{ inputs.config }}
   deploy:
-    needs: untagged
-    if: ${{ !cancelled() && needs.untagged.result == 'success' && needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial != 'true' }}
+    needs: [gate, untagged, suite]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.untagged.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.suite.result) && needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial != 'true' }}
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.untagged.outputs.max-parallel) }}
@@ -141,12 +165,14 @@ jobs:
     uses: ./.github/workflows/gaio-deploy-app.yml
     permissions:
       contents: write
+      id-token: write
     with:
       config: ${{ inputs.config }}
       app: ${{ matrix.app.name }}
       dir: ${{ matrix.app.dir }}
       sha: ${{ github.sha }}
       demo: ${{ matrix.app.demo }}
+      aws-role: ${{ inputs.aws-deploy-role }}
     secrets:
       aws-access-key-id: ${{ secrets.aws-access-key-id }}
       aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
@@ -154,8 +180,8 @@ jobs:
       doppler-stg-token: ${{ secrets.doppler-stg-token }}
       doppler-prd-token: ${{ secrets.doppler-prd-token }}
   ship-serial:
-    needs: untagged
-    if: ${{ !cancelled() && needs.untagged.result == 'success' && needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial == 'true' }}
+    needs: [gate, untagged, suite]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.untagged.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.suite.result) && needs.untagged.outputs.apps != '[]' && needs.untagged.outputs.serial == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     # No timeout and no cancel: an interrupted ez4 deploy corrupts its state.
@@ -164,6 +190,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -179,13 +206,26 @@ jobs:
         run: |
           echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
           echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      # The session must outlast every unit: credentials that expire mid-deploy leave ez4 state half written.
+      - name: Assume the AWS role
+        id: aws
+        if: inputs.aws-deploy-role != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ inputs.aws-deploy-role }}
+          role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
+          aws-region: ${{ secrets.aws-region }}
+          role-duration-seconds: 10800
+          output-credentials: true
+          output-env-credentials: false
       - name: Set up
         uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.tools.outputs.codeartifact }}
           doppler: ${{ steps.tools.outputs.doppler }}
-          aws-access-key-id: ${{ secrets.aws-access-key-id }}
-          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          aws-session-token: ${{ steps.aws.outputs.aws-session-token }}
           aws-region: ${{ secrets.aws-region }}
       - name: Ship units in order
         uses: ./.github/gaio-actions/ship
@@ -195,6 +235,7 @@ jobs:
           sha: ${{ github.sha }}
           doppler-stg-token: ${{ secrets.doppler-stg-token }}
           doppler-prd-token: ${{ secrets.doppler-prd-token }}
-          aws-access-key-id: ${{ secrets.aws-access-key-id }}
-          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          aws-session-token: ${{ steps.aws.outputs.aws-session-token }}
           aws-region: ${{ secrets.aws-region }}

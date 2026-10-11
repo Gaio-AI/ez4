@@ -4,6 +4,7 @@
 //
 //   record <sha>  post `Tested tree` = HEAD^{tree} on <sha> (a PR run posts its merge tree on the PR head)
 //   check <sha>   tested=true when <sha>, the PR head it merged or a merged parent carries <sha>'s tree
+//   quick <sha>   post `Quick checks` = STATE (success | failure) on <sha>, the status a PR merges on
 //
 // Any API failure answers "not tested": the caller then runs the full suite.
 import { execFileSync } from 'node:child_process';
@@ -11,6 +12,18 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const CONTEXT = 'Tested tree';
+
+/**
+ * What a pull request must pass to merge: lint and the config's quick legs, never the full suite,
+ * which runs once on the tree a release ships.
+ */
+export const QUICK_CONTEXT = 'Quick checks';
+
+export function quickStatus(state) {
+  if (state === 'success') return { state, description: 'lint, typecheck and the quick checks passed' };
+  if (state === 'failure') return { state, description: 'a quick check failed; see the run' };
+  throw new Error(`state: success or failure, got ${state}`);
+}
 
 /** Statuses come newest first, so only the latest `Tested tree` status counts. */
 export function carriesTree(statuses, tree) {
@@ -72,6 +85,24 @@ function main([command, sha]) {
         `description=${tree}`
       ]);
       return output('tree', tree);
+    }
+    case 'quick': {
+      const { state, description } = quickStatus(process.env.STATE ?? '');
+      run('gh', [
+        'api',
+        '--method',
+        'POST',
+        `repos/${process.env.GITHUB_REPOSITORY}/statuses/${sha}`,
+        '-f',
+        `state=${state}`,
+        '-f',
+        `context=${QUICK_CONTEXT}`,
+        '-f',
+        `description=${description}`,
+        '-f',
+        `target_url=${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+      ]);
+      return output('state', state);
     }
     case 'check': {
       const tree = run('git', ['rev-parse', `${sha}^{tree}`]);

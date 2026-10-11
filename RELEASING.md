@@ -5,11 +5,11 @@ install from there. Releases are driven by [changesets](https://github.com/chang
 merging the release pull request publishes to CodeArtifact on its own.
 
 CI and release logic is a copy of [`Gaio-AI/gaio-actions`](https://github.com/Gaio-AI/gaio-actions)
-at its `feat: gate lint and tests on the changeset check (#12)` commit (`22e51ad`): `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
+at its `feat!: v3, AWS roles assumed through GitHub OIDC (#16)` commit (`91317e3`): `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
 gaio-actions is private, and GitHub does not let a public repo call a private repo's workflows.
 To update the copy, take the workflows and the actions' `action.yml` and `.mjs` files (no tests)
-from a gaio-actions commit, rewrite `Gaio-AI/gaio-actions/<action>@v1` to
-`./.github/gaio-actions/<action>` and `Gaio-AI/gaio-actions/.github/workflows/<name>.yml@v1` to
+from a gaio-actions commit, rewrite `Gaio-AI/gaio-actions/<action>@v3` to
+`./.github/gaio-actions/<action>` and `Gaio-AI/gaio-actions/.github/workflows/<name>.yml@v3` to
 `./.github/workflows/gaio-<name>.yml`, and update the commit above. This repo keeps two thin
 callers (`.github/workflows/pr.yml`, `.github/workflows/release.yml`) and its commands in
 `.github/gaio-ci.json`.
@@ -19,12 +19,16 @@ callers (`.github/workflows/pr.yml`, `.github/workflows/release.yml`) and its co
 1. `main` is the only long-lived branch. Work branches start from `main` and open their pull request
    against `main`. Protected: no direct pushes, no force pushes.
 2. Every pull request that changes a published package carries a changeset.
-3. Pull requests merge by squash. The required check is the `Tested tree` status, posted once every PR check passes. The branch must be up to date
-   with `main` before merge (**Update branch**), so the tested tree is the tree that lands.
-4. A push to `main` with pending changesets rebuilds `release/main` (`main` plus
+3. Pull requests merge by squash. The required check is the `Quick checks` status: the changeset check and
+   lint (which builds every package), in one job with no services. The branch does not have to be up to date
+   with `main`: what several merges make together is tested once, by the full suite on the release pull request.
+4. A push to `main` runs no suite. With pending changesets it rebuilds `release/main` (`main` plus
    `npm run version-packages`) and opens or updates the release pull request `release/main` → `main`
    (title `chore(release): ...`). Nothing publishes at this step.
-5. A person reviews the release pull request and squash-merges it. That is the only way to release.
+5. Before merging the release pull request, dispatch the full suite on it:
+   `gh workflow run pr.yml -R Gaio-AI/ez4 --ref release/main -f mode=full`. It runs every test leg in one
+   job and posts `Tested tree`. Then a person squash-merges the release pull request; that is the only way
+   to release. Skipping the dispatch is safe: the merge then runs the suite before publishing.
 6. The push of that merge sees that `v<version>` (the version of `foundation/utils/package.json`) has
    no tag, runs `npm run release` in the `production` environment, then tags `v<version>` and creates
    its GitHub Release. There is no demo stage.
@@ -134,21 +138,23 @@ A published version is immutable. A mistake means publishing the next one.
 
 ## What CI covers
 
-`.github/workflows/pr.yml` calls `.github/workflows/gaio-pr.yml` on `pull_request` (drafts
-skipped) and on `workflow_dispatch` (`force` ignores the validated manifest). The release workflow
-dispatches it on `release/main`, since a pull request opened with `GITHUB_TOKEN` starts no
-`pull_request` run.
+`.github/workflows/pr.yml` calls `.github/workflows/gaio-pr.yml` in one of two modes, one job each:
 
-- `changeset` (pull requests only): `npm run changeset:check` (the `Breaking:` rule), then
-  `changeset status --since=origin/<base>`.
-- `lint`: `npm run build && npm run lint && node --test scripts/ci-config.test.mjs`.
-- `tasks`: one `test` leg per workspace listed in the task's `packages` (foundation, contracts,
-  `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`),
-  with Postgres 16 on `:5432`, DynamoDB local 3.3.0 on `:8000` and Valkey 8 on `:6379`, and the AWS
-  secrets in the environment. Each leg runs `npm run build` and `npm link -w @ez4/project`, then
-  `npm test -w <package>`.
-- A task whose content hash already passed is skipped, and a passing run posts `Tested tree` on the
-  head commit, so `release.yml` on `main` does not test the same tree again.
+- `quick`, what a pull request runs (drafts skipped): `changeset` (`npm run changeset:check`, the
+  `Breaking:` rule, then `changeset status --since=origin/<base>`) and `lint`
+  (`scripts/ci-build-once.sh`, then every workspace's lint, then `node --test scripts/ci-config.test.mjs`).
+  No services, and it always posts `Quick checks`. The release workflow dispatches it on `release/main`
+  without running anything, since a pull request opened with `GITHUB_TOKEN` starts no `pull_request` run.
+- `full`, the suite a release ships on (`workflow_dispatch` with `mode: full`, or `release.yml` on an
+  untested tree): lint and one `test` leg per workspace listed in the task's `packages` (foundation,
+  contracts, `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`),
+  one after another in the same job, with Postgres 16 on `:5432`, DynamoDB local 3.3.0 on `:8000` and
+  Valkey 8 on `:6379` started once. Every leg's `prepare` is `scripts/ci-build-once.sh`, which builds and
+  links the ez4 CLI on the first leg and skips on the rest of the job. It posts `Tested tree` and
+  `Quick checks` only when every leg passed.
+
+A lint or leg whose content hash already passed is skipped (`force` ignores the validated manifest), and
+`release.yml` skips the suite when the pushed tree already has `Tested tree` or nothing is untagged.
 
 CI does **not** run the specs under `providers/aws/*`, `tests/*` or `examples/*`: run the ones for the
 packages a change touches before merging the release pull request, against the lab account where they
@@ -161,8 +167,8 @@ need real AWS.
 | `codeartifact` | Log in to CodeArtifact (`@ez4` namespace) before installing. |
 | `deploy-doppler` | `false`: publishing needs no Doppler. |
 | `changeset` | Pull request changeset check, `Breaking:` rule included; `{base}` is the base branch. |
-| `lint` | One root-level task. |
-| `shared-inputs` | Files whose change invalidates every task hash. |
+| `lint` | One root-level task, in both modes; it builds through `scripts/ci-build-once.sh`. |
+| `shared-inputs` | Files whose change invalidates every task hash, the build-once script included. |
 | `ignore` | Paths that alone run no lint or task. A PR that changes anything under `.changeset/` always runs the changeset check; a changeset-only PR keeps lint and tasks hash-skipped. |
 | `tasks` | The `test` leg per workspace described above. |
 | `services` | Containers started for every task leg. |
@@ -175,7 +181,12 @@ need real AWS.
 
 | Repo secret | Workflow secret | Used by |
 |---|---|---|
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | `aws-access-key-id`, `aws-secret-access-key`, `aws-region` | CodeArtifact login, the test legs and `npm run release` |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | `aws-access-key-id`, `aws-secret-access-key`, `aws-region` | CodeArtifact login, the full suite and `npm run release` |
+
+The copied workflows can assume an IAM role through GitHub OIDC instead (`aws-role` in both callers,
+`aws-deploy-role` in `release.yml`), and fall back to the static keys while the input is empty, as it is
+here. Both callers grant `id-token: write` either way, because a reusable workflow cannot get a permission
+its caller withholds.
 
 ## Recovery
 
@@ -203,8 +214,8 @@ pull request.
 
 1. Settings → Actions → General: "Allow GitHub Actions to create and approve pull requests" stays
    enabled, so the release workflow can open the release pull request.
-2. The `main` ruleset requires the `Tested tree` status, never `ci / checks` (the release pull request's dispatched run is not attached to it), squash merges only,
-   and branches up to date before merge, with no bypass actor. Any ruleset written against
+2. The `main` ruleset requires the `Quick checks` status, never `ci / checks` (the release pull request's dispatched run is not attached to it), squash merges only,
+   and does not require branches up to date before merge, with no bypass actor. Any ruleset written against
    `~DEFAULT_BRANCH` names `refs/heads/main` explicitly.
 3. Merge the pull request that adds the gaio-actions callers to `main`. `main` has no pending changeset
    and `v<version>` is already tagged, so the merge publishes nothing. The first `release.yml` run

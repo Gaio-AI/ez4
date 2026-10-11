@@ -1,17 +1,22 @@
 name: PR
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review, edited]
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
     inputs:
+      mode:
+        description: quick (lint and the quick tasks) or full (the suite a release ships on).
+        type: choice
+        options: [quick, full]
+        default: quick
       force:
         description: Ignore the validated manifest and run every task.
         type: boolean
         default: false
 permissions: {}
 concurrency:
-  group: pr-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: pr-${{ github.event_name }}-${{ github.ref }}-${{ inputs.mode || 'quick' }}
+  cancel-in-progress: true
 jobs:
   ci:
     if: github.event.pull_request.draft != true
@@ -19,7 +24,9 @@ jobs:
     permissions:
       contents: read
       statuses: write
+      id-token: write
     with:
+      mode: ${{ inputs.mode || 'quick' }}
       force: ${{ inputs.force == true }}
     secrets:
       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}

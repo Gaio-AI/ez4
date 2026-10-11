@@ -58,7 +58,22 @@ test('the build outputs are cached by relative globs that cover every dist and t
 
 test('lint builds first, lints every workspace and still runs this config test', () => {
   const { lint } = config;
-  assert.ok(lint.indexOf('npm run build') < lint.indexOf('npm run lint'), 'build before lint');
+  assert.ok(lint.startsWith('bash scripts/ci-build-once.sh && '), 'build before lint');
+  assert.match(lint, /npm run lint -w \{\}/);
   assert.match(lint, /node --test scripts\/ci-config\.test\.mjs/);
   assert.match(lint, /-P "\$\(nproc\)"/);
+});
+
+test('the suite builds once per job: lint and every test leg share one build', () => {
+  const task = config.tasks.find((t) => t.name === 'test');
+  assert.deepEqual(task.prepare, { '*': 'bash scripts/ci-build-once.sh' });
+  assert.ok(config['shared-inputs'].includes('scripts/ci-build-once.sh'));
+  const script = read('scripts/ci-build-once.sh');
+  assert.match(script, /RUNNER_TEMP/);
+  assert.ok(script.indexOf('npm run build') < script.indexOf('npm link -w @ez4/project'), 'build before link');
+});
+
+test('the callers grant id-token (the copied workflows request it) and the PR caller passes its mode', () => {
+  for (const file of ['.github/workflows/pr.yml', '.github/workflows/release.yml']) assert.match(read(file), /^      id-token: write$/m, file);
+  assert.match(read('.github/workflows/pr.yml'), /mode: \$\{\{ inputs\.mode \|\| 'quick' \}\}/);
 });
