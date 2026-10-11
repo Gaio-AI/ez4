@@ -1,5 +1,6 @@
 import type { PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { Arn } from '@ez4/aws-common';
+import type { PoolClient } from 'pg';
 
 import { rootCertificates } from 'node:tls';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -26,11 +27,15 @@ const IDLE_TIMEOUT = 300_000;
 const CONNECT_ATTEMPTS = 6;
 const CONNECT_DELAY = 500;
 
+// When the pool last took each connection back, by the wall clock.
+const IDLE_SINCE = new WeakMap<PoolClient, number>();
+
 export class NativeClientDriver extends ClientDriver {
   #connection: NativeClientConnection;
 
   constructor(connection: NativeClientConnection) {
-    super();
+    // The services were written against the Data API, so raw queries keep its result shapes.
+    super(undefined, { dataApiResults: true });
 
     this.#connection = connection;
   }
@@ -39,6 +44,17 @@ export class NativeClientDriver extends ClientDriver {
     if (!this.pool) {
       this.pool = await createAuroraPool(this.#connection);
     }
+
+    const connection = await connectWithRetry(() => super.getConnection());
+    const idleSince = IDLE_SINCE.get(connection);
+
+    // The pool's idle timer doesn't run while the Lambda is frozen, so a connection idle for longer than the
+    // timeout is still handed out, and the proxy or the server may have closed it in the meantime.
+    if (idleSince === undefined || Date.now() - idleSince < IDLE_TIMEOUT) {
+      return connection;
+    }
+
+    connection.release(true);
 
     return connectWithRetry(() => super.getConnection());
   }
@@ -61,7 +77,7 @@ const createAuroraPool = async (connection: NativeClientConnection) => {
 
   const credentials = user ? getIamCredentials(host, user) : await getSecretCredentials(connection.secretArn);
 
-  return createPool({
+  const pool = createPool({
     host,
     database,
     ...credentials,
@@ -72,6 +88,12 @@ const createAuroraPool = async (connection: NativeClientConnection) => {
       ca: [...rootCertificates, RdsCertificates]
     }
   });
+
+  pool.on('release', (_error, connection) => {
+    IDLE_SINCE.set(connection, Date.now());
+  });
+
+  return pool;
 };
 
 const getIamCredentials = (hostname: string, username: string) => {
@@ -125,9 +147,13 @@ const retryEndedConnection = async <T>(operation: () => Promise<T>) => {
 
 const UNAVAILABLE_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH', '57P03']);
 
+// The pool raises both without a code: the first waiting for a free connection, the second when opening a new
+// one takes longer than the connection timeout.
+const UNAVAILABLE_MESSAGES = ['timeout exceeded when trying to connect', 'Connection terminated due to connection timeout'];
+
 /**
- * The database can't take connections yet: refused or reset while it restarts or resumes, or starting up.
- * Nothing ran, so trying again is safe.
+ * The database can't take connections yet: refused, reset or slow to answer while it restarts or resumes, or
+ * starting up. Nothing ran, so trying again is safe.
  */
 export const isUnavailableDatabase = (error: unknown) => {
   const code = getErrorCode(error);
@@ -136,7 +162,7 @@ export const isUnavailableDatabase = (error: unknown) => {
     return true;
   }
 
-  return error instanceof Error && error.message.includes('timeout exceeded when trying to connect');
+  return error instanceof Error && UNAVAILABLE_MESSAGES.some((message) => error.message.includes(message));
 };
 
 const ENDED_CODES = new Set(['57P01', '57P05']);

@@ -46,6 +46,12 @@ const FRACTION_PATTERN = /\.(\d+)$/;
 
 const ARRAY_ELEMENT_PATTERN = /"((?:[^"\\]|\\.)*)"|([^,{}"]+)|([{}])/g;
 
+export const getDataApiResultTypes = (parseJson: boolean) => {
+  return {
+    getTypeParser: (type: number) => getValueParser(type, parseJson)
+  };
+};
+
 export const createResultTypes = (parseJson: boolean) => {
   let fieldBytes = 0;
 
