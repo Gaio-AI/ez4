@@ -1,7 +1,9 @@
-import { describe, it } from 'node:test';
-import { equal } from 'node:assert/strict';
+import type { Socket } from 'node:net';
 
-import { createPool } from '@ez4/pgclient/driver';
+import { describe, it } from 'node:test';
+import { equal, rejects } from 'node:assert/strict';
+
+import { ClientDriver, createPool } from '@ez4/pgclient/driver';
 
 import { TestConnection } from './common/data-api';
 
@@ -54,6 +56,43 @@ describe('client driver pool', () => {
 
     equal(warn.mock.callCount(), 1);
     equal(warn.mock.calls[0].arguments[0].idleConnectionEnded.code, '57P01');
+
+    await pool.end();
+  });
+
+  it('assert :: connection dropped during a statement', async (context) => {
+    context.mock.method(console, 'error', () => {});
+
+    const pool = createPool(TestConnection);
+    const driver = new ClientDriver(pool);
+
+    // The socket closes with no error response from the server, as when a proxy or a restarting database drops
+    // the connection while the statement runs.
+    pool.once('acquire', (client) => {
+      const stream: Socket = Reflect.get(Reflect.get(client, 'connection'), 'stream');
+
+      setTimeout(() => stream.destroy(), 100);
+    });
+
+    await rejects(driver.executeStatement({ query: 'SELECT pg_sleep(5)' }), /Connection terminated unexpectedly/);
+
+    const { records } = await driver.executeStatement({ query: 'SELECT 1 AS one' });
+
+    equal(records[0]?.one, 1);
+
+    await pool.end();
+  });
+
+  it('assert :: one error listener on every checkout', async () => {
+    const pool = createPool({ ...TestConnection, poolSize: 1 });
+
+    for (let checkout = 0; checkout < 20; checkout++) {
+      const client = await pool.connect();
+
+      equal(client.listenerCount('error'), 1);
+
+      client.release();
+    }
 
     await pool.end();
   });

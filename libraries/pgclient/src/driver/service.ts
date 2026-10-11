@@ -48,12 +48,12 @@ export const createPool = (connection: ClientConnection) => {
   };
 
   if ('connectionString' in connection && connection.connectionString) {
-    return listenIdleErrors(new Pool({ ...baseOptions, connectionString: connection.connectionString }));
+    return listenConnectionErrors(new Pool({ ...baseOptions, connectionString: connection.connectionString }));
   }
 
   const { database, password, user, host, port } = connection as Extract<ClientConnection, { host: string }>;
 
-  return listenIdleErrors(
+  return listenConnectionErrors(
     new Pool({
       ...baseOptions,
       ssl: connection.ssl ?? false,
@@ -64,6 +64,10 @@ export const createPool = (connection: ClientConnection) => {
       port
     })
   );
+};
+
+const listenConnectionErrors = (pool: Pool) => {
+  return listenCheckedOutErrors(listenIdleErrors(pool));
 };
 
 // The server or a proxy may end an idle pooled connection (idle session timeout, restart, failover), and in a
@@ -79,6 +83,24 @@ const listenIdleErrors = (pool: Pool) => {
         message: error.message
       }
     });
+  });
+
+  return pool;
+};
+
+// The pool listens only while a connection is idle. A checked-out connection that the server or a proxy drops
+// while a statement runs (restart, failover, a zero-downtime patch) fails the statement and also emits 'error',
+// which crashes the process when nothing listens. The statement's rejection already carries the failure, and the
+// pool discards the dead connection when it comes back.
+const ignoreCheckedOutError = () => {};
+
+const listenCheckedOutErrors = (pool: Pool) => {
+  pool.on('acquire', (client) => {
+    client.on('error', ignoreCheckedOutError);
+  });
+
+  pool.on('release', (_error, client) => {
+    client.off('error', ignoreCheckedOutError);
   });
 
   return pool;
