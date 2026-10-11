@@ -1,0 +1,47 @@
+name: Suite
+description: Run the planned legs one after another in this job. See suite.mjs.
+inputs:
+  config:
+    default: .github/gaio-ci.json
+  legs:
+    default: '[]'
+  checks:
+    default: '[]'
+  lint-hash:
+    description: The lint hash when the plan needs lint; empty skips it.
+    default: ''
+  passed-dir:
+    default: passed
+  names:
+    description: The stage names `validated plan` resolved, for the log groups.
+    default: '{}'
+  doppler-token:
+    default: ''
+  aws-access-key-id:
+    default: ''
+  aws-secret-access-key:
+    default: ''
+  aws-session-token:
+    description: The session token of temporary credentials (an assumed role); empty for static keys.
+    default: ''
+  aws-region:
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+        LEGS: ${{ inputs.legs }}
+        CHECKS: ${{ inputs.checks }}
+        LINT_HASH: ${{ inputs.lint-hash }}
+        PASSED_DIR: ${{ inputs.passed-dir }}
+        NAMES: ${{ inputs.names }}
+        DOPPLER_TOKEN: ${{ inputs.doppler-token }}
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        AWS_SESSION_TOKEN: ${{ inputs.aws-session-token }}
+        AWS_REGION: ${{ inputs.aws-region }}
+      run: |
+        [ -n "$AWS_SESSION_TOKEN" ] || unset AWS_SESSION_TOKEN
+        LINT_COMMAND=$(jq -r '.lint // ""' "$CONFIG") node "$GITHUB_ACTION_PATH/suite.mjs"

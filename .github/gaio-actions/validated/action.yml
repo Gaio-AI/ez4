@@ -6,6 +6,9 @@ inputs:
     required: true
   config:
     default: .github/gaio-ci.json
+  mode:
+    description: "plan only: quick (the config's quick tasks and checks) | full (every leg)."
+    default: full
   base:
     default: ''
   force:
@@ -53,6 +56,7 @@ runs:
       env:
         COMMAND: ${{ inputs.command }}
         CONFIG: ${{ inputs.config }}
+        MODE: ${{ inputs.mode }}
         BASE: ${{ inputs.base }}
         MANIFEST: .validated
         PASSED_DIR: ${{ inputs.passed-dir }}

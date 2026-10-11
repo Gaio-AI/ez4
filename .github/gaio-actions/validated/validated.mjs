@@ -18,6 +18,29 @@ export function skipsAll(changed, ignore, configPath) {
   return !mustRun(changed, configPath) && !changed.some((path) => path.startsWith('.changeset/')) && onlyIgnored(changed, ignore);
 }
 
+export function isReleaseDispatch(event, ref) {
+  return event === 'workflow_dispatch' && ref.startsWith('release/');
+}
+
+const MODES = ['quick', 'full'];
+
+/**
+ * A PR runs only the entries marked `quick` (lint-like work that needs no services or secrets); the
+ * suite a release ships on runs every entry.
+ */
+export function forMode(entries, mode) {
+  if (!MODES.includes(mode)) throw new Error(`mode: quick or full, got ${mode}`);
+  return (entries ?? []).filter((entry) => mode === 'full' || entry.quick === true);
+}
+
+/**
+ * The release branch only bumps versions and changelogs, which hash like the code main already
+ * checked, so its quick checks pass without running; its full suite is what a release waits on.
+ */
+export function skipsMode(mode, event, ref) {
+  return mode === 'quick' && isReleaseDispatch(event, ref);
+}
+
 // Version bumps come from the release flow, not from a code change: a manifest whose only difference is
 // `version` (and any CHANGELOG.md) must hash identically so a released tree reuses the validated cache.
 export function normalizePackageJson(text) {
@@ -241,7 +264,7 @@ const trackedFiles = () =>
       return { path, blob: meta.split(' ')[2] };
     });
 
-function computeHashes(config, configPath) {
+function computeHashes(config, configPath, mode = 'full') {
   const node = readText('.nvmrc').trim();
   const { packages, graph, dirOf } = readWorkspace();
   const shared = {};
@@ -249,8 +272,9 @@ function computeHashes(config, configPath) {
     const blob = revParse(`HEAD:${file}`);
     if (blob) shared[file] = blob;
   }
+  const tasks = forMode(config.tasks, mode);
   const hashes = {};
-  for (const task of config.tasks ?? []) {
+  for (const task of tasks) {
     hashes[task.name] = {};
     for (const pkg of Object.keys(packages)) {
       const trees = Object.fromEntries(closure(pkg, graph).map((dep) => [dirOf[dep], treeDigestOf(dirOf[dep])]));
@@ -261,15 +285,15 @@ function computeHashes(config, configPath) {
   const trackedBlobs = readBlobs(tracked.filter(({ path }) => basename(path) === 'package.json').map(({ blob }) => blob));
   const trees = lintInputs(tracked, config.ignore ?? [], configPath, (blob) => trackedBlobs[blob] ?? blob);
   const lintHash = config.lint ? taskHash({ task: 'lint', command: config.lint, node, trees, shared: {} }) : '';
-  const checks = config.checks ?? [];
+  const checks = forMode(config.checks, mode);
   const checkHashes = Object.fromEntries(
     checks.map(({ name, run }) => [name, taskHash({ task: `check:${name}`, command: run, node, trees, shared: {} })])
   );
-  return { tasks: config.tasks ?? [], packages, hashes, lintHash, checks, checkHashes };
+  return { tasks, packages, hashes, lintHash, checks, checkHashes };
 }
 
 function main([command]) {
-  const { CONFIG = '.github/gaio-ci.json', BASE = '', MANIFEST = '.validated', PASSED_DIR = 'passed', LEGS = '[]', LINT_HASH = '', CHECK_HASHES = '' } = process.env;
+  const { CONFIG = '.github/gaio-ci.json', BASE = '', MANIFEST = '.validated', PASSED_DIR = 'passed', LEGS = '[]', LINT_HASH = '', CHECK_HASHES = '', MODE = 'full' } = process.env;
   const config = JSON.parse(readFileSync(CONFIG, 'utf8'));
   const previous = readText(MANIFEST);
 
@@ -278,7 +302,8 @@ function main([command]) {
       const { names, legName } = resolveNaming(config);
       const buildCache = resolveBuildCache(config).join('\n');
       const changed = BASE ? git('diff', '--name-only', `${BASE}...HEAD`).split('\n').filter(Boolean) : undefined;
-      if (changed && skipsAll(changed, config.ignore ?? [], CONFIG)) {
+      const releaseSkip = skipsMode(MODE, process.env.GITHUB_EVENT_NAME ?? '', process.env.GITHUB_REF_NAME ?? '');
+      if (releaseSkip || (changed && skipsAll(changed, config.ignore ?? [], CONFIG))) {
         output('skip', true);
         output('names', JSON.stringify(names));
         output('build-cache', '');
@@ -289,7 +314,7 @@ function main([command]) {
         return output('check-hashes', '[]');
       }
       const validated = new Set(previous.split('\n').filter(Boolean));
-      const { tasks, packages, hashes, lintHash, checks, checkHashes } = computeHashes(config, CONFIG);
+      const { tasks, packages, hashes, lintHash, checks, checkHashes } = computeHashes(config, CONFIG, MODE);
       output('skip', false);
       output('names', JSON.stringify(names));
       output('build-cache', buildCache);

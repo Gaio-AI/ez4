@@ -11,6 +11,9 @@ inputs:
     default: ''
   aws-secret-access-key:
     default: ''
+  aws-session-token:
+    description: The session token of temporary credentials (an assumed role); empty for static keys.
+    default: ''
   aws-region:
     default: ''
   doppler:
@@ -35,14 +38,17 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: node_modules
-        key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}
     - if: inputs.install == 'true' && inputs.codeartifact == 'true'
       shell: bash
       env:
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        AWS_SESSION_TOKEN: ${{ inputs.aws-session-token }}
         AWS_REGION: ${{ inputs.aws-region }}
-      run: aws codeartifact login --tool npm --domain gaio --repository npm --namespace ez4
+      run: |
+        [ -n "$AWS_SESSION_TOKEN" ] || unset AWS_SESSION_TOKEN
+        aws codeartifact login --tool npm --domain gaio --repository npm --namespace ez4
     - if: inputs.install == 'true'
       shell: bash
       env:

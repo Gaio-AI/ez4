@@ -7,6 +7,9 @@ on:
       dir: { type: string, required: true }
       sha: { type: string, required: true }
       demo: { type: boolean, default: true }
+      # An IAM role ARN assumed through GitHub OIDC instead of the aws-access-key-id / aws-secret-access-key
+      # secrets, in the `demo` and `production` environments alike. aws-region stays required.
+      aws-role: { type: string, default: '' }
     secrets:
       aws-access-key-id:
         required: false
@@ -29,6 +32,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,13 +45,26 @@ jobs:
         run: |
           echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
           echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      # The session must outlast the deploy: credentials that expire mid-deploy leave ez4 state half written.
+      - name: Assume the AWS role
+        id: aws
+        if: inputs.aws-role != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ inputs.aws-role }}
+          role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
+          aws-region: ${{ secrets.aws-region }}
+          role-duration-seconds: 10800
+          output-credentials: true
+          output-env-credentials: false
       - name: Set up
         uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.tools.outputs.codeartifact }}
           doppler: ${{ steps.tools.outputs.doppler }}
-          aws-access-key-id: ${{ secrets.aws-access-key-id }}
-          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          aws-session-token: ${{ steps.aws.outputs.aws-session-token }}
           aws-region: ${{ secrets.aws-region }}
       - name: Deploy ${{ inputs.app }} to demo
         env:
@@ -56,10 +73,12 @@ jobs:
           CONFIG: ${{ inputs.config }}
           STAGE: demo
           DOPPLER_TOKEN: ${{ secrets.doppler-stg-token }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_ACCESS_KEY_ID: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
           AWS_REGION: ${{ secrets.aws-region }}
         run: |
+          [ -n "$AWS_SESSION_TOKEN" ] || unset AWS_SESSION_TOKEN
           cmd=$(jq -r --arg d "$DIR" --arg s "$STAGE" '([.apps[] | objects | select(.dir == $d)] | first) as $u | if $u and ($u | has($s)) then $u[$s] // "" else .deploy end' "$CONFIG")
           if [ -z "$cmd" ]; then echo "$STAGE is skipped for $DIR"; exit 0; fi
           cmd=${cmd//\{app\}/$APP}
@@ -75,6 +94,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,13 +107,26 @@ jobs:
         run: |
           echo "codeartifact=$(jq -r 'if has("deploy-codeartifact") then .["deploy-codeartifact"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
           echo "doppler=$(jq -r 'if has("deploy-doppler") then .["deploy-doppler"] else true end' "$CONFIG")" >> "$GITHUB_OUTPUT"
+      # The session must outlast the deploy: credentials that expire mid-deploy leave ez4 state half written.
+      - name: Assume the AWS role
+        id: aws
+        if: inputs.aws-role != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ inputs.aws-role }}
+          role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
+          aws-region: ${{ secrets.aws-region }}
+          role-duration-seconds: 10800
+          output-credentials: true
+          output-env-credentials: false
       - name: Set up
         uses: ./.github/gaio-actions/setup
         with:
           codeartifact: ${{ steps.tools.outputs.codeartifact }}
           doppler: ${{ steps.tools.outputs.doppler }}
-          aws-access-key-id: ${{ secrets.aws-access-key-id }}
-          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          aws-session-token: ${{ steps.aws.outputs.aws-session-token }}
           aws-region: ${{ secrets.aws-region }}
       - name: Deploy ${{ inputs.app }} to prd
         env:
@@ -102,10 +135,12 @@ jobs:
           CONFIG: ${{ inputs.config }}
           STAGE: prd
           DOPPLER_TOKEN: ${{ secrets.doppler-prd-token }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-access-key }}
+          AWS_ACCESS_KEY_ID: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
           AWS_REGION: ${{ secrets.aws-region }}
         run: |
+          [ -n "$AWS_SESSION_TOKEN" ] || unset AWS_SESSION_TOKEN
           cmd=$(jq -r --arg d "$DIR" --arg s "$STAGE" '([.apps[] | objects | select(.dir == $d)] | first) as $u | if $u and ($u | has($s)) then $u[$s] // "" else .deploy end' "$CONFIG")
           if [ -z "$cmd" ]; then echo "$STAGE is skipped for $DIR"; exit 0; fi
           cmd=${cmd//\{app\}/$APP}

@@ -17,6 +17,9 @@ inputs:
     default: ''
   aws-secret-access-key:
     default: ''
+  aws-session-token:
+    description: The session token of temporary credentials (an assumed role); empty for static keys.
+    default: ''
   aws-region:
     default: ''
 runs:
@@ -32,5 +35,8 @@ runs:
         DOPPLER_PRD_TOKEN: ${{ inputs.doppler-prd-token }}
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        AWS_SESSION_TOKEN: ${{ inputs.aws-session-token }}
         AWS_REGION: ${{ inputs.aws-region }}
-      run: node "$GITHUB_ACTION_PATH/ship.mjs"
+      run: |
+        [ -n "$AWS_SESSION_TOKEN" ] || unset AWS_SESSION_TOKEN
+        node "$GITHUB_ACTION_PATH/ship.mjs"
