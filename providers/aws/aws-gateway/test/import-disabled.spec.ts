@@ -58,6 +58,8 @@ const service = {
   ]
 } as unknown as HttpImport;
 
+const target = { type: '@ez4/http', name: 'ConsumerApi', context: {}, variables: {} };
+
 const getContext = (state: EntryStates) => {
   return {
     role: null,
@@ -88,7 +90,7 @@ describe('aws gateway disabled import', () => {
     ok(gatewayState && isGatewayState(gatewayState));
     equal(gatewayState.parameters.import, true);
 
-    const source = prepareHttpLinkedImport({ service, options: getOptions(), context });
+    const source = prepareHttpLinkedImport({ service, options: getOptions(), context, target });
 
     deepEqual(source?.dependencyIds, [gatewayState.entryId]);
     deepEqual(source?.connectionIds, [gatewayState.entryId]);
@@ -116,7 +118,7 @@ describe('aws gateway disabled import', () => {
 
     const context = getContext({});
 
-    const source = prepareHttpLinkedImport({ service, options: getOptions(true), context });
+    const source = prepareHttpLinkedImport({ service, options: getOptions(true), context, target });
 
     ok(source);
 

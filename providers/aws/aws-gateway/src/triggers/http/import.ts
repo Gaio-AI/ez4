@@ -1,4 +1,4 @@
-import type { PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
+import type { LinkServiceEvent, PrepareResourceEvent } from '@ez4/project/library';
 
 import { getServiceName, MissingImportedProjectError } from '@ez4/project/library';
 import { isHttpImport } from '@ez4/gateway/library';
@@ -8,8 +8,8 @@ import { createGateway } from '../../gateway/service';
 import { GatewayProtocol } from '../../gateway/types';
 import { prepareDisabledClient, prepareLinkedClient } from './client';
 
-export const prepareHttpLinkedImport = (event: ServiceEvent) => {
-  const { service, options, context } = event;
+export const prepareHttpLinkedImport = (event: LinkServiceEvent) => {
+  const { service, options, context, target } = event;
   const { imports } = options;
 
   if (isHttpImport(service)) {
@@ -23,7 +23,7 @@ export const prepareHttpLinkedImport = (event: ServiceEvent) => {
       return prepareDisabledClient(service);
     }
 
-    return prepareLinkedClient(context, service, options);
+    return prepareLinkedClient(context, service, options, target.variables);
   }
 
   return null;

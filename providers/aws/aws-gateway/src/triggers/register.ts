@@ -1,4 +1,4 @@
-import type { ConnectResourceEvent, PolicyResourceEvent, PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
+import type { ConnectResourceEvent, LinkServiceEvent, PolicyResourceEvent, PrepareResourceEvent } from '@ez4/project/library';
 
 import { registerTriggers as registerAwsTriggers } from '@ez4/aws-common';
 import { registerTriggers as registerAwsFunctionTriggers } from '@ez4/aws-function';
@@ -45,7 +45,7 @@ const prepareExecutionPolicy = (event: PolicyResourceEvent) => {
   return prepareWsExecutionPolicy(event);
 };
 
-const prepareLinkedService = (event: ServiceEvent) => {
+const prepareLinkedService = (event: LinkServiceEvent) => {
   return prepareHttpLinkedService(event) ?? prepareWsLinkedService(event) ?? prepareHttpLinkedImport(event);
 };
 
