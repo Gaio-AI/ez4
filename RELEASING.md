@@ -177,16 +177,22 @@ need real AWS.
 
 `scripts/ci-config.test.mjs` checks this file and the callers (`node --test scripts/ci-config.test.mjs`).
 
-## Secrets
+## AWS access
 
-| Repo secret | Workflow secret | Used by |
-|---|---|---|
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | `aws-access-key-id`, `aws-secret-access-key`, `aws-region` | CodeArtifact login, the full suite and `npm run release` |
+The workflows assume IAM roles through GitHub OIDC; the repository holds no access key. The roles are
+defined in `Gaio-AI/gaio-iac` (`infrastructure/github-oidc.tf`), and their trust policies name this
+repository by id.
 
-The copied workflows can assume an IAM role through GitHub OIDC instead (`aws-role` in both callers,
-`aws-deploy-role` in `release.yml`), and fall back to the static keys while the input is empty, as it is
-here. Both callers grant `id-token: write` either way, because a reusable workflow cannot get a permission
-its caller withholds.
+| Repo setting | Workflow input | Role | Used by |
+|---|---|---|---|
+| variable `AWS_CI_ROLE` | `aws-role` (both callers) | `github-actions-ci` | CodeArtifact login for installs, the suite and the release PR |
+| variable `AWS_PUBLISH_ROLE` | `aws-deploy-role` (`release.yml`) | `github-actions-publish-ez4` | `npm run release`, only from a `production` job on `main` |
+| secret `AWS_REGION` | `aws-region` | | every AWS step |
+
+Both callers grant `id-token: write`, because a reusable workflow cannot get a permission its caller
+withholds. The role ARNs are variables rather than secrets because a caller cannot read secrets in `with:`,
+so the account id shows in the run logs of this public repository; the trust policies, not the ARN, keep
+other repositories out. A pull request from a fork gets no OIDC token.
 
 ## Recovery
 

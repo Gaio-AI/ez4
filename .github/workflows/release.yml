@@ -17,7 +17,8 @@ jobs:
       actions: write
       statuses: write
       id-token: write
+    with:
+      aws-role: ${{ vars.AWS_CI_ROLE }}
+      aws-deploy-role: ${{ vars.AWS_PUBLISH_ROLE }}
     secrets:
-      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       aws-region: ${{ secrets.AWS_REGION }}
