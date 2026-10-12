@@ -23,6 +23,27 @@ import { run } from 'node:test';
 const INCLUDE_PATTERN = /\.(spec|test)\.(js|ts)$/;
 const EXCLUDE_PATTERN = /^node_modules\//;
 
+/**
+ * Test files whose path contains any pattern (every test file when no pattern is given), minus the
+ * ones whose path contains a pattern given as `!pattern`.
+ */
+export const getTestFiles = (files: string[], filePatterns: string[] = []) => {
+  const excludePatterns = filePatterns.filter((filePattern) => filePattern.startsWith('!')).map((filePattern) => filePattern.slice(1));
+  const includePatterns = filePatterns.filter((filePattern) => !filePattern.startsWith('!'));
+
+  return files.filter((file) => {
+    if (!INCLUDE_PATTERN.test(file) || EXCLUDE_PATTERN.test(file)) {
+      return false;
+    }
+
+    if (includePatterns.length && !includePatterns.some((filePattern) => file.includes(filePattern))) {
+      return false;
+    }
+
+    return !excludePatterns.some((filePattern) => file.includes(filePattern));
+  });
+};
+
 export const testCommand = async (input: InputOptions) => {
   const project = await loadProject(input.project);
   const options = getServeOptions(input, project);
@@ -83,13 +104,7 @@ export const testCommand = async (input: InputOptions) => {
       recursive: true
     });
 
-    const testFiles = allFiles.filter((file) => {
-      if (INCLUDE_PATTERN.test(file)) {
-        return !EXCLUDE_PATTERN.test(file) && (!filePatterns || filePatterns.some((filePattern) => file.includes(filePattern)));
-      }
-
-      return false;
-    });
+    const testFiles = getTestFiles(allFiles, filePatterns);
 
     return testFiles.map((testFile) => {
       return join(workingDirectory, testFile);

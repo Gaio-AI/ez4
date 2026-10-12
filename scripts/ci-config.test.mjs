@@ -90,6 +90,33 @@ test('the suite builds once per job: lint and every test leg share one build', (
   assert.ok(script.indexOf('npm run build') < script.indexOf('npm link -w @ez4/project'), 'build before link');
 });
 
+// The suite holds the CI credentials, so the offline specs run against a dead endpoint with fake keys, and a
+// profile (which the SDK would take over the keys) or a credentials file can't bring a real account back.
+const OFFLINE_TEST =
+  "npm run build && tsc -p tsconfig.test.json --noEmit && AWS_ENDPOINT_URL=http://127.0.0.1:9 AWS_ACCESS_KEY_ID=offline AWS_SECRET_ACCESS_KEY=offline AWS_SESSION_TOKEN= AWS_REGION=us-east-1 AWS_PROFILE= AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null ez4 test -- '!.lab.spec'";
+
+const specFiles = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) return ['node_modules', 'dist'].includes(entry.name) ? [] : specFiles(`${dir}/${entry.name}`);
+    return /\.(spec|test)\.(js|ts)$/.test(entry.name) ? [`${dir}/${entry.name}`] : [];
+  });
+
+test('every aws provider spec not named *.lab.spec.ts runs in the suite, with AWS out of reach', () => {
+  const task = config.tasks.find((t) => t.name === 'test-offline');
+  assert.ok(task, 'test-offline task');
+  assert.equal(task.script, 'test:offline');
+  assert.equal(task.run, 'npm run test:offline -w {package}');
+  assert.deepEqual(task.prepare, { '*': 'bash scripts/ci-build-once.sh' });
+
+  const offline = readdirSync('providers/aws')
+    .map((dir) => `providers/aws/${dir}`)
+    .filter((dir) => specFiles(dir).some((file) => !file.includes('.lab.spec')))
+    .map((dir) => JSON.parse(read(`${dir}/package.json`)));
+
+  for (const { name, scripts } of offline) assert.equal(scripts['test:offline'], OFFLINE_TEST, name);
+  assert.deepEqual([...task.packages].sort(), offline.map(({ name }) => name).sort());
+});
+
 test('the callers grant id-token (the copied workflows request it) and the PR caller passes its mode', () => {
   for (const file of ['.github/workflows/pr.yml', '.github/workflows/release.yml']) assert.match(read(file), /^      id-token: write$/m, file);
   assert.match(read('.github/workflows/pr.yml'), /mode: \$\{\{ inputs\.mode \|\| 'quick' \}\}/);

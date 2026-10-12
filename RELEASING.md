@@ -146,8 +146,9 @@ A published version is immutable. A mistake means publishing the next one.
   No services, and it always posts `Quick checks`. The release workflow dispatches it on `release/main`
   without running anything, since a pull request opened with `GITHUB_TOKEN` starts no `pull_request` run.
 - `full`, the suite a release ships on (`workflow_dispatch` with `mode: full`, or `release.yml` on an
-  untested tree): lint and one `test` leg per workspace listed in the task's `packages` (foundation,
-  contracts, `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`),
+  untested tree): lint, one `test` leg per workspace listed in that task's `packages` (foundation,
+  contracts, `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`)
+  and one `test-offline` leg per `providers/aws/*` package with offline specs (below),
   one after another in the same job, with Postgres 16 on `:5432`, DynamoDB local 3.3.0 on `:8000` and
   Valkey 8 on `:6379` started once. Every leg's `prepare` is `scripts/ci-build-once.sh`, which builds and
   links the ez4 CLI on the first leg and skips on the rest of the job. It posts `Tested tree` and
@@ -156,9 +157,19 @@ A published version is immutable. A mistake means publishing the next one.
 A lint or leg whose content hash already passed is skipped (`force` ignores the validated manifest), and
 `release.yml` skips the suite when the pushed tree already has `Tested tree` or nothing is untagged.
 
-CI does **not** run the specs under `providers/aws/*`, `tests/*` or `examples/*`: run the ones for the
-packages a change touches before merging the release pull request, against the lab account where they
-need real AWS.
+A spec under `providers/aws/*` that needs real AWS (it deploys, or calls a client it doesn't mock) is a
+lab spec, named `<name>.lab.spec.ts`. Every other spec there runs in CI through its package's
+`npm run test:offline`, which runs `ez4 test -- '!.lab.spec'` with AWS out of reach: `AWS_ENDPOINT_URL`
+on a closed port, fake keys, and `AWS_PROFILE`, `AWS_SESSION_TOKEN` and the config and credentials files
+emptied, because the suite runs with the repository's AWS secrets in its environment and the SDK takes a
+profile over the keys. So a new spec runs in CI unless its name says otherwise, and one that reaches AWS
+fails there instead of never running: name it `*.lab.spec.ts`. `scripts/ci-config.test.mjs` fails when a
+`providers/aws/*` package with an offline spec has no `test:offline` or is missing from the `test-offline`
+task.
+
+CI does **not** run the lab specs, `tests/*` or `examples/*`: run the lab specs of the packages a change
+touches before merging the release pull request. `npm test` in a provider package runs all of its specs,
+lab ones included, with `-e ../../../local.env`, the file that points them at the lab account.
 
 ## `.github/gaio-ci.json`
 
@@ -170,7 +181,7 @@ need real AWS.
 | `lint` | One root-level task, in both modes; it builds through `scripts/ci-build-once.sh`. |
 | `shared-inputs` | Files whose change invalidates every task hash, the build-once script included. |
 | `ignore` | Paths that alone run no lint or task. A PR that changes anything under `.changeset/` always runs the changeset check; a changeset-only PR keeps lint and tasks hash-skipped. |
-| `tasks` | The `test` leg per workspace described above. |
+| `tasks` | The `test` leg per workspace and the `test-offline` leg per `providers/aws/*` package, described above. |
 | `services` | Containers started for every task leg. |
 | `apps` | One release unit, `ez4`: `foundation/utils` carries the version, tagged `v{version}`, no demo, published by `npm run release`. |
 | `version` | Command that consumes the changesets. |

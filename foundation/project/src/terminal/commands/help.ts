@@ -25,7 +25,7 @@ const HELP_LINES = [
   '  help      Display the command line options',
   '',
   LogFormat.toBold('Options:'),
-  '  --                 Specify test patterns, scripts to run, or generator arguments',
+  '  --                 Specify test patterns (!pattern excludes), scripts to run, or generator arguments',
   '  --branch, -b       Specify the name for resource branch deployment or destruction',
   '  --project, -p      Specify the project configuration file (Default is ez4.project.js)',
   '  --environment, -e  Specify the environment variables file to load',

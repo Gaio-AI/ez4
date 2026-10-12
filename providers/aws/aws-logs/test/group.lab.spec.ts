@@ -11,11 +11,9 @@ import {
   PutLogEventsCommand
 } from '@aws-sdk/client-cloudwatch-logs';
 
-import { createLogGroup, hasUnexpiredLogs, isLogGroupState, registerTriggers } from '@ez4/aws-logs';
+import { createLogGroup, isLogGroupState, registerTriggers } from '@ez4/aws-logs';
 import { deploy } from '@ez4/aws-common';
 import { deepClone } from '@ez4/utils';
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 const logsClient = new CloudWatchLogsClient({});
 
@@ -46,26 +44,6 @@ const logGroupExists = async (groupName: string) => {
 
   return !!response.logGroups?.length;
 };
-
-describe('group :: unexpired logs', () => {
-  const now = Date.now();
-
-  it('has nothing to keep when no stream ever received an event', () => {
-    equal(hasUnexpiredLogs(7, undefined, now), false);
-  });
-
-  it('keeps logs that have not reached the retention', () => {
-    equal(hasUnexpiredLogs(7, now - DAY_IN_MS, now), true);
-  });
-
-  it('has nothing to keep once the retention has passed', () => {
-    equal(hasUnexpiredLogs(7, now - 8 * DAY_IN_MS, now), false);
-  });
-
-  it('keeps logs without a retention, which never expire', () => {
-    equal(hasUnexpiredLogs(undefined, now - 365 * DAY_IN_MS, now), true);
-  });
-});
 
 describe('group', { timeout: 60000 }, () => {
   let lastState: EntryStates | undefined;
