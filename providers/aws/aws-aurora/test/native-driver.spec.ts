@@ -5,6 +5,7 @@ import type { PoolConfig } from 'pg';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { equal, ok, rejects } from 'node:assert/strict';
 import { rootCertificates } from 'node:tls';
+import { EventEmitter } from 'node:events';
 
 import pg from 'pg';
 
@@ -16,7 +17,8 @@ declare class TestDb extends Database.Service<PostgresEngine> {
 
 type Statement = string | { text: string; types?: { getTypeParser: (type: number) => (value: string) => unknown } };
 
-type FakeConnection = {
+// An event emitter, as a pg client is: the pool's listeners add and remove theirs on each connection it hands out.
+type FakeConnection = EventEmitter & {
   query: (statement: Statement) => Promise<{ rows: unknown[]; rowCount: number }>;
   release: (destroy?: boolean) => void;
 };
@@ -86,8 +88,8 @@ describe('aurora native driver', () => {
 
       const run = typeof next === 'string' ? () => [{ one: 1 }] : next;
 
-      const connection: FakeConnection = {
-        query: async (statement) => {
+      const connection: FakeConnection = Object.assign(new EventEmitter(), {
+        query: async (statement: Statement) => {
           const text = getText(statement);
 
           statements.push(text);
@@ -97,11 +99,11 @@ describe('aurora native driver', () => {
 
           return { rows: Array.isArray(rows) ? rows : [], rowCount: 0 };
         },
-        release: (destroy) => {
+        release: (destroy?: boolean) => {
           releases.push(destroy);
           this.emit('release', undefined, connection);
         }
-      };
+      });
 
       if (typeof next === 'string') {
         named[next] = connection;
