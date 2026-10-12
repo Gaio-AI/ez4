@@ -14,6 +14,8 @@ import {
   UpdateAliasCommand,
   PutFunctionEventInvokeConfigCommand,
   DeleteFunctionEventInvokeConfigCommand,
+  PutFunctionConcurrencyCommand,
+  DeleteFunctionConcurrencyCommand,
   TagResourceCommand,
   UntagResourceCommand,
   waitUntilFunctionActive,
@@ -52,6 +54,7 @@ export type CreateRequest = {
   timeout: number;
   memory: number;
   retryAttempts?: number;
+  reservedConcurrency?: number;
   vpc?: boolean;
   vpcConfig?: FunctionVpcConfig;
   tags?: ResourceTags;
@@ -236,6 +239,40 @@ export const updateRetryAttempts = async (logger: OperationLogLine, functionName
       new DeleteFunctionEventInvokeConfigCommand({
         FunctionName: functionName,
         Qualifier: FunctionDefaults.AliasName
+      })
+    );
+  } catch (error) {
+    if (!(error instanceof ResourceNotFoundException)) {
+      throw error;
+    }
+  }
+};
+
+export const updateReservedConcurrency = async (
+  logger: OperationLogLine,
+  functionName: string,
+  reservedConcurrency: number | undefined
+) => {
+  logger.update(`Updating reserved concurrency`);
+
+  const client = getLambdaClient();
+
+  // Set on the function, not on a version, so it holds through new versions and the alias.
+  if (reservedConcurrency !== undefined) {
+    await client.send(
+      new PutFunctionConcurrencyCommand({
+        FunctionName: functionName,
+        ReservedConcurrentExecutions: reservedConcurrency
+      })
+    );
+
+    return;
+  }
+
+  try {
+    await client.send(
+      new DeleteFunctionConcurrencyCommand({
+        FunctionName: functionName
       })
     );
   } catch (error) {

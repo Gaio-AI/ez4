@@ -18,6 +18,7 @@ import {
   unpublishFunctions,
   updateAlias,
   updateRetryAttempts,
+  updateReservedConcurrency,
   untagFunction,
   tagFunction
 } from './client';
@@ -161,6 +162,10 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
         await updateRetryAttempts(logger, functionName, parameters.retryAttempts);
       }
 
+      if (parameters.reservedConcurrency !== undefined) {
+        await updateReservedConcurrency(logger, functionName, parameters.reservedConcurrency);
+      }
+
       return {
         variables: protectVariables(variables),
         functionArn: importedFunction.functionArn,
@@ -202,6 +207,10 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
 
     if (parameters.retryAttempts !== undefined) {
       await updateRetryAttempts(logger, functionName, parameters.retryAttempts);
+    }
+
+    if (parameters.reservedConcurrency !== undefined) {
+      await updateReservedConcurrency(logger, functionName, parameters.reservedConcurrency);
     }
 
     return {
@@ -258,6 +267,8 @@ const updateResource = (candidate: FunctionState, current: FunctionState, contex
     await checkTagUpdates(logger, result.functionArn, parameters, current.parameters, hasSourceUpdated);
 
     await checkRetryUpdates(logger, functionName, parameters, current, context);
+
+    await checkConcurrencyUpdates(logger, functionName, parameters, current, context);
 
     const shouldPublish = hasSourceUpdated || hasConfigurationUpdated;
     const functionVersion = shouldPublish ? await publishFunction(logger, functionName) : result.functionVersion;
@@ -320,6 +331,7 @@ const checkConfigurationUpdates = async (
       functionName: true,
       architecture: true,
       retryAttempts: true,
+      reservedConcurrency: true,
       release: true,
       tags: true
     }
@@ -386,6 +398,25 @@ const checkRetryUpdates = async (
 
   if (hasRetryChange || hasRetryToRestore) {
     await updateRetryAttempts(logger, functionName, retryAttempts);
+  }
+};
+
+const checkConcurrencyUpdates = async (
+  logger: OperationLogLine,
+  functionName: string,
+  candidate: FunctionParameters,
+  current: FunctionState,
+  context: StepContext
+) => {
+  const { reservedConcurrency } = candidate;
+
+  // A function that never reserves concurrency doesn't call the API either, so deploying it needs no
+  // permission over the function concurrency.
+  const hasConcurrencyChange = reservedConcurrency !== current.parameters.reservedConcurrency;
+  const hasConcurrencyToRestore = reservedConcurrency !== undefined && (current.partial || context.force);
+
+  if (hasConcurrencyChange || hasConcurrencyToRestore) {
+    await updateReservedConcurrency(logger, functionName, reservedConcurrency);
   }
 };
 

@@ -82,7 +82,7 @@ defaults: Http.UseDefaults<{
 Function settings of each route group, by the name routes give in their `group` field.
 
 - Routes with the same group share one function, log group and integration.
-- Settings: `listener`, `memory`, `timeout`, `architecture`, `runtime`, `logRetention`, `logLevel`, `files`, `debug` and `vpc`.
+- Settings: `listener`, `memory`, `timeout`, `architecture`, `runtime`, `logRetention`, `logLevel`, `files`, `debug`, `vpc` and `reservedConcurrency`.
 - Each setting falls back to `defaults`, then to the project defaults: only a group whose function differs needs an entry.
 - A group without routes is an error.
 

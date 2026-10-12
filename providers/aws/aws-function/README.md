@@ -35,7 +35,9 @@ Ensure the user performing deployments has the permissions below:
         "lambda:AddPermission",
         "lambda:RemovePermission",
         "lambda:TagResource",
-        "lambda:UntagResource"
+        "lambda:UntagResource",
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency"
       ],
       "Resource": ["arn:aws:lambda:*:{account-id}:function:{prefix}-*"]
     },
@@ -62,6 +64,10 @@ A function that needs a VPC (e.g. linked to a database through a native connecti
 - with the security groups tagged `ez4:functions` = `true`, or its default security group when none is tagged.
 
 Tag private subnets routed through a NAT to give those functions outbound access. The configuration in use is kept in the state, so a deploy after the tags change shows the move in the plan and reconfigures the functions.
+
+#### Reserved concurrency
+
+A function with `reservedConcurrency` (an HTTP route or route group declares it) has that many concurrent executions reserved: it never runs more at once, and the rest of the account can't take them. The deploy reserves it on creation and on the next deploy of an existing function, changes it without publishing a version, and removes the reservation once the option is taken out. A function that never declares it doesn't call the concurrency API, so only deployments that use the option need `lambda:PutFunctionConcurrency` and `lambda:DeleteFunctionConcurrency`.
 
 ## License
 

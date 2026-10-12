@@ -53,6 +53,7 @@ export const getIntegrationGroupFunction = (
       debug = defaults.debug ?? options.debug,
       listener = defaults.listener,
       files = defaults.files,
+      reservedConcurrency,
       vpc
     } = group;
 
@@ -89,6 +90,7 @@ export const getIntegrationGroupFunction = (
         module: listener.module
       },
       systemLogLevel: options.defaults?.systemLogLevel,
+      reservedConcurrency,
       architecture,
       logLevel,
       runtime,

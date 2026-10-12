@@ -19,7 +19,7 @@ describe('http route group metadata errors', () => {
   registerTriggers();
 
   it('assert :: route setting apart from its group', () => {
-    const errors = parseFile('invalid-group-setting', 4);
+    const errors = parseFile('invalid-group-setting', 5);
 
     const settings = errors.map((error) => {
       ok(error instanceof InvalidRouteGroupError);
@@ -28,7 +28,10 @@ describe('http route group metadata errors', () => {
       return `${error.routePath} ${error.propertyName}`;
     });
 
-    equal(settings.sort().join(', '), 'DELETE /tags timeout, GET /tags memory, POST /tags logLevel, PUT /tags listener');
+    equal(
+      settings.sort().join(', '),
+      'DELETE /tags timeout, GET /tags memory, PATCH /tags reservedConcurrency, POST /tags logLevel, PUT /tags listener'
+    );
   });
 
   it('assert :: group variable with two values', () => {

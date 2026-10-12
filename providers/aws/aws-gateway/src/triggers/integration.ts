@@ -92,6 +92,8 @@ const getIntegrationFunction = (
 
   const provider = 'provider' in handler ? handler.provider : undefined;
 
+  const reservedConcurrency = 'reservedConcurrency' in target ? target.reservedConcurrency : undefined;
+
   const { request, response } = handler;
 
   const internalName = getInternalName(service, handler.name);
@@ -148,6 +150,7 @@ const getIntegrationFunction = (
       },
       scope: readsScope ? mergeScopeHeaders(defaults, target) : undefined,
       systemLogLevel: options.defaults?.systemLogLevel,
+      reservedConcurrency,
       architecture,
       logLevel,
       runtime,

@@ -30,6 +30,13 @@ export declare class TestService extends Http.Service {
       group: 'tags';
       // The group has another listener.
       listener: typeof otherListener;
+    }>,
+    Http.UseRoute<{
+      path: 'PATCH /tags';
+      handler: typeof patchTag;
+      group: 'tags';
+      // The group reserves none, so the route would reserve for the others too.
+      reservedConcurrency: 5;
     }>
   ];
 
@@ -68,6 +75,12 @@ function deleteTag(): Http.SuccessEmptyResponse {
 }
 
 function updateTag(): Http.SuccessEmptyResponse {
+  return {
+    status: 204
+  };
+}
+
+function patchTag(): Http.SuccessEmptyResponse {
   return {
     status: 204
   };

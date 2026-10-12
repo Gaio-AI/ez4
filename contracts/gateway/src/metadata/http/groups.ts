@@ -31,6 +31,7 @@ import {
   UnusedGroupError
 } from '../../errors/http/group';
 
+import { getReservedConcurrency } from '../utils/concurrency';
 import { getFullTypeName } from '../utils/name';
 import { HttpNamespaceType } from './types';
 
@@ -47,7 +48,8 @@ const GROUP_SETTINGS = [
   'memory',
   'files',
   'debug',
-  'vpc'
+  'vpc',
+  'reservedConcurrency'
 ] as const;
 
 // Lambda's limit for a function name.
@@ -156,6 +158,11 @@ const getTypeFromMembers = (parent: TypeModel, members: MemberType[], errorList:
         break;
       }
 
+      case 'reservedConcurrency': {
+        group.reservedConcurrency = getReservedConcurrency(member, errorList, parent.file);
+        break;
+      }
+
       case 'listener': {
         group.listener = getServiceListener(member.value, errorList);
         break;
@@ -214,7 +221,9 @@ export const checkHttpRouteGroups = (service: HttpService, errorList: Error[]) =
     const group = service.groups?.[groupName] ?? {};
 
     for (const setting of GROUP_SETTINGS) {
-      const groupValue = group[setting] ?? (setting !== 'vpc' ? defaults?.[setting] : undefined);
+      // Neither is a service default. A default reservation would hold that many executions for every
+      // function of the service, idle or not.
+      const groupValue = group[setting] ?? (setting !== 'vpc' && setting !== 'reservedConcurrency' ? defaults?.[setting] : undefined);
 
       for (const route of members) {
         const routeValue = route[setting];

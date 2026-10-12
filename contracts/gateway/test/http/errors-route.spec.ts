@@ -1,7 +1,7 @@
 import { ok, deepEqual } from 'assert/strict';
 import { describe, it } from 'node:test';
 
-import { registerTriggers, IncompleteRouteError } from '@ez4/gateway/library';
+import { registerTriggers, IncompleteRouteError, InvalidReservedConcurrencyError } from '@ez4/gateway/library';
 import { InvalidServicePropertyError } from '@ez4/common/library';
 
 import { parseFile } from './common/parser';
@@ -24,5 +24,17 @@ describe('http route metadata errors', () => {
 
     ok(error1 instanceof InvalidServicePropertyError);
     deepEqual(error1.propertyName, 'invalid_property');
+  });
+
+  it('assert :: invalid reserved concurrency', () => {
+    const errors = parseFile('invalid-reserved-concurrency', 3);
+
+    const values = errors.map((error) => {
+      ok(error instanceof InvalidReservedConcurrencyError);
+
+      return error.concurrencyValue;
+    });
+
+    deepEqual(values.sort(), [-1, 0, 2.5]);
   });
 });
