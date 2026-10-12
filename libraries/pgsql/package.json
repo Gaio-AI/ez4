@@ -1,7 +1,7 @@
 {
   "name": "@ez4/pgsql",
   "description": "EZ4: A PostgreSQL builder",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
