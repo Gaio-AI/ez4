@@ -42,6 +42,23 @@ test('no workflow calls the private gaio-actions repo, which a public repo canno
   }
 });
 
+test('the callers assume the AWS roles through OIDC and pass no access key', () => {
+  const pr = read('.github/workflows/pr.yml');
+  const release = read('.github/workflows/release.yml');
+
+  assert.match(pr, /^      aws-role: \$\{\{ vars\.AWS_CI_ROLE \}\}$/m);
+  assert.match(release, /^      aws-role: \$\{\{ vars\.AWS_CI_ROLE \}\}$/m);
+  assert.match(release, /^      aws-deploy-role: \$\{\{ vars\.AWS_PUBLISH_ROLE \}\}$/m);
+
+  for (const [file, text] of [
+    ['pr.yml', pr],
+    ['release.yml', release]
+  ]) {
+    assert.doesNotMatch(text, /AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|aws-access-key-id|aws-secret-access-key/, file);
+    assert.match(text, /^      id-token: write$/m, file);
+  }
+});
+
 test('a manual release runs only on main, so a dispatch from another branch never deploys it', () => {
   const release = readFileSync('.github/workflows/release.yml', 'utf8');
   assert.match(release, /^  workflow_dispatch:/m);
