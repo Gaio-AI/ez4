@@ -1,5 +1,7 @@
 export * from './triggers/register';
 
+export * from './metadata/documentation';
+
 export * from './metadata/any';
 export * from './metadata/boolean';
 export * from './metadata/number';

@@ -1,6 +1,6 @@
 import type { AllType, ReflectionTypes, TypeClass } from '@ez4/reflection';
 import type { Incomplete } from '@ez4/utils';
-import type { HttpService } from './types';
+import type { HttpServer, HttpService } from './types';
 
 import {
   DuplicateServiceError,
@@ -50,6 +50,12 @@ export const getHttpServicesMetadata = (reflection: ReflectionTypes) => {
 
     const service = createHttpService(declaration.name, fileName, getDeclarationDescription(declaration));
     const properties = new Set(['routes']);
+
+    const servers = getHttpServers(declaration);
+
+    if (servers.length) {
+      service.servers = servers;
+    }
 
     for (const member of getModelMembers(declaration)) {
       if (!isModelProperty(member) || member.inherited) {
@@ -145,6 +151,24 @@ export const getHttpServicesMetadata = (reflection: ReflectionTypes) => {
 
 const isCompleteService = (type: Incomplete<HttpService>): type is HttpService => {
   return isObjectWith(type, ['routes', 'variables', 'services']);
+};
+
+/**
+ * Read the `@server <url> [description]` tags of the service: where its documentation says it is
+ * served. Documentation only, since a deployed service learns its address from its stage.
+ */
+const getHttpServers = (declaration: TypeClass): HttpServer[] => {
+  const servers: HttpServer[] = [];
+
+  for (const { name, text } of declaration.tags ?? []) {
+    const [url, ...description] = text?.trim().split(/\s+/) ?? [];
+
+    if (name === 'server' && url) {
+      servers.push({ url, ...(description.length && { description: description.join(' ') }) });
+    }
+  }
+
+  return servers;
 };
 
 const attachLinkedServices = (service: HttpService, reflection: ReflectionTypes, errorList: Error[], fileName?: string) => {

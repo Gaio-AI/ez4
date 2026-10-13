@@ -9,6 +9,7 @@ import { isRoleState } from '@ez4/aws-identity';
 import { createLogGroup } from '@ez4/aws-logs';
 
 import { Defaults } from '../utils/defaults';
+import { getOptionalRuntimeSchema } from '../utils/schema';
 import { IntegrationFunctionType } from '../integration/function/types';
 import { createIntegrationFunction } from '../integration/function/service';
 import { getIntegration, createIntegration } from '../integration/service';
@@ -115,13 +116,13 @@ const getIntegrationFunction = (
       functionName: integrationName,
       description: handler.summary ?? handler.description,
       ...(request && {
-        ...('headers' in request && { headersSchema: request.headers }),
-        ...('query' in request && { querySchema: request.query }),
-        ...('identity' in request && { identitySchema: request.identity }),
-        ...('parameters' in request && { parametersSchema: request.parameters }),
-        bodySchema: request.body
+        ...('headers' in request && { headersSchema: getOptionalRuntimeSchema(request.headers) }),
+        ...('query' in request && { querySchema: getOptionalRuntimeSchema(request.query) }),
+        ...('identity' in request && { identitySchema: getOptionalRuntimeSchema(request.identity) }),
+        ...('parameters' in request && { parametersSchema: getOptionalRuntimeSchema(request.parameters) }),
+        bodySchema: getOptionalRuntimeSchema(request.body)
       }),
-      responseSchema: response?.body,
+      responseSchema: getOptionalRuntimeSchema(response?.body),
       timeout: Math.max(5, timeout - 1),
       variables: [options.variables, service.variables],
       references: handler.references ?? (provider?.services && Object.keys(provider.services)),

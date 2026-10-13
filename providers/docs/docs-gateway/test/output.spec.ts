@@ -42,4 +42,5 @@ describe('gateway documentation (open api output)', () => {
   it('assert :: nullable fields', () => testFile('nullable'));
   it('assert :: response headers', () => testFile('headers'));
   it('assert :: handler errors', () => testFile('throws'));
+  it('assert :: documentation from jsdoc', () => testFile('documentation'));
 });
