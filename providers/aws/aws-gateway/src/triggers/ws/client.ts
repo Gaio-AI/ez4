@@ -6,6 +6,7 @@ import { getDefinitionName } from '@ez4/project/library';
 
 import { getGatewayState } from '../../gateway/utils';
 import { Defaults } from '../../utils/defaults';
+import { getOptionalRuntimeSchema } from '../../utils/schema';
 
 export const prepareLinkedClient = (context: EventContext, service: WsService, options: DeployOptions): ContextSource => {
   const gatewayState = getGatewayState(context, service.name, options);
@@ -16,7 +17,7 @@ export const prepareLinkedClient = (context: EventContext, service: WsService, o
   const clientOptions = JSON.stringify({
     path: service.stageName ?? Defaults.StageName,
     preferences: service.message.preferences ?? service.defaults?.preferences,
-    messageSchema: service.schema
+    messageSchema: getOptionalRuntimeSchema(service.schema)
   });
 
   return {

@@ -1,5 +1,6 @@
 import type { HttpRoute, HttpService } from '@ez4/gateway/library';
-import { getPropertyName, type NamingStyle, type ObjectSchema } from '@ez4/schema';
+import { getPropertyName, isReferenceSchema, type NamingStyle, type ObjectSchema } from '@ez4/schema';
+import { isDocumentedRequired } from '@ez4/schema/library';
 
 import { isAnyArray, isEmptyObject } from '@ez4/utils';
 
@@ -43,12 +44,16 @@ const getRouteOutput = (service: HttpService, route: HttpRoute, namingStyle?: Na
 
   output.push(`operationId: ${getNameOutput(name ?? handler.name)}`);
 
-  if (handler.summary) {
-    output.push(`summary: "${getMultilineOutput(handler.summary)}"`);
+  const summary = handler.summary ?? getFirstSentence(handler.comment);
+  const description = handler.description ?? handler.comment;
+
+  if (summary) {
+    output.push(`summary: "${getMultilineOutput(summary)}"`);
   }
 
-  if (handler.description) {
-    output.push(`description: "${getMultilineOutput(handler.description)}"`);
+  // A comment of one sentence is all summary.
+  if (description && getSingleLine(description) !== summary) {
+    output.push(`description: "${getMultilineOutput(description)}"`);
   }
 
   if (handler.tags?.length) {
@@ -110,15 +115,44 @@ const getParametersOutput = (target: string, schema: ObjectSchema, namingStyle?:
     const propertySchema = schema.properties[propertyKey];
     const propertyName = getNameOutput(getPropertyName(propertyKey, namingStyle));
 
-    // A header, path or query value arrives as a string and is never null, so a nullable parameter is
-    // documented by its type alone, and the gateway refuses it missing unless it's optional.
-    const isRequired = !propertySchema.optional;
-    const schemaOutput = getSchemaOutput({ ...propertySchema, nullable: false }, namingStyle);
+    // The parameter carries the description, so its schema doesn't repeat it.
+    const description = isReferenceSchema(propertySchema) ? undefined : propertySchema.description;
+    const valueSchema = isReferenceSchema(propertySchema) ? propertySchema : { ...propertySchema, description: undefined };
 
-    output.push(`- name: ${propertyName}`, ...getIndentedOutput([`in: ${target}`, `required: ${isRequired}`, ...schemaOutput]));
+    // A header, path or query value arrives as a string and is never null, so a nullable parameter is
+    // documented by its type alone, and the gateway refuses it missing unless it's optional. One the
+    // handler refuses missing itself is documented as required (`@required`).
+    const isRequired = !propertySchema.optional || isDocumentedRequired(propertySchema);
+    const schemaOutput = getSchemaOutput({ ...valueSchema, nullable: false }, namingStyle);
+
+    const parameterOutput = [`in: ${target}`];
+
+    if (description) {
+      parameterOutput.push(`description: "${getMultilineOutput(description)}"`);
+    }
+
+    output.push(`- name: ${propertyName}`, ...getIndentedOutput([...parameterOutput, `required: ${isRequired}`, ...schemaOutput]));
   }
 
   return output;
+};
+
+const getSingleLine = (text: string) => {
+  return text.replace(/\s+/g, ' ').trim().replace(/\.$/, '');
+};
+
+/**
+ * The first sentence of a handler's JSDoc, on one line and without its period, as the operation's
+ * summary.
+ */
+const getFirstSentence = (text?: string) => {
+  const [paragraph = ''] = text?.split(/\n\s*\n/) ?? [];
+  const [sentence = ''] = paragraph
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/(?<=[.!?])\s/);
+
+  return getSingleLine(sentence) || undefined;
 };
 
 const getHeadersOutput = (schema: ObjectSchema) => {

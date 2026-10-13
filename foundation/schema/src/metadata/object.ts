@@ -3,6 +3,7 @@ import type { ObjectSchema, ObjectSchemaProperties } from '../types/type-object'
 import type { ReferenceSchema } from '../types/type-reference';
 import type { SchemaDefinitions } from '../types/common';
 import type { SchemaContext } from '../types/context';
+import type { DocumentedSchemaDefinitions } from './documentation';
 
 import { isTypeIntersection, isTypeModel, isTypeObject } from '@ez4/reflection';
 import { getDeclarationDescription } from '@ez4/common/library';
@@ -12,6 +13,7 @@ import { getModelProperties } from '../reflection/model';
 import { getObjectProperties } from '../reflection/object';
 import { createSchemaContext } from '../types/context';
 import { createReferenceSchema } from './reference';
+import { isDocumentationSchemaContext } from './documentation';
 import { SchemaType } from '../types/common';
 import { getAnySchema } from './any';
 
@@ -93,7 +95,7 @@ export const getObjectSchema = (
 
     const modelSchema = createObjectSchema({
       properties: getAnySchemaFromMembers(reflection, context, getModelProperties(type, reflection)),
-      description: description ?? getDeclarationDescription(type),
+      description: description ?? getDocumentedDescription(type, context),
       definitions: type.definitions,
       identity
     });
@@ -114,7 +116,7 @@ const getAnySchemaFromMembers = (reflection: ReflectionTypes, context: SchemaCon
   for (const member of members) {
     const { name, value } = member;
 
-    const propertyDescription = getDeclarationDescription(member);
+    const propertyDescription = getDocumentedDescription(member, context);
     const propertySchema = getAnySchema(value, reflection, context, propertyDescription);
 
     if (propertySchema) {
@@ -125,10 +127,34 @@ const getAnySchemaFromMembers = (reflection: ReflectionTypes, context: SchemaCon
       if (propertyName !== name) {
         Object.assign(propertySchema, { alias: name });
       }
+
+      if (isDocumentationSchemaContext(context) && propertySchema.optional && hasRequiredTag(member)) {
+        const definitions: DocumentedSchemaDefinitions = { ...propertySchema.definitions, documentedRequired: true };
+
+        propertySchema.definitions = definitions;
+      }
     }
   }
 
   return properties;
+};
+
+/**
+ * The `@description` tag, or the JSDoc text itself when the schema is documentation too. A
+ * declaration with other tags reads an empty `@description`.
+ */
+const getDocumentedDescription = (type: ModelProperty | TypeModel, context: SchemaContext) => {
+  const tagged = getDeclarationDescription(type) || undefined;
+
+  if (tagged || !isDocumentationSchemaContext(context)) {
+    return tagged;
+  }
+
+  return type.description?.trim() || undefined;
+};
+
+const hasRequiredTag = (member: ModelProperty) => {
+  return !!member.tags?.some(({ name }) => name === 'required');
 };
 
 const getAnySchemaFromDynamicMembers = (reflection: ReflectionTypes, context: SchemaContext, type: TypeObject) => {

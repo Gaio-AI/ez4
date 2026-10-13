@@ -28,12 +28,37 @@ export type CreateResponse = {
   objectKey: string;
 };
 
+const TEXT_APPLICATION_TYPES = new Set([
+  'application/javascript',
+  'application/json',
+  'application/ld+json',
+  'application/manifest+json',
+  'application/xml',
+  'application/yaml',
+  'image/svg+xml'
+]);
+
+/**
+ * The media type of a deployed file, naming UTF-8 for a text one: without a charset a browser guesses
+ * the encoding of a plain-text or Markdown file, and reads accents as mojibake. What a bucket deploys
+ * is built text, written in UTF-8.
+ */
+export const getContentType = (filePath: string) => {
+  const contentType = mime.getType(filePath);
+
+  if (contentType && (contentType.startsWith('text/') || TEXT_APPLICATION_TYPES.has(contentType))) {
+    return `${contentType}; charset=utf-8`;
+  }
+
+  return contentType;
+};
+
 export const putObject = async (logger: OperationLogLine, bucketName: string, request: ObjectParameters): Promise<CreateResponse> => {
   logger.update(`Creating object`);
 
   const { objectKey, filePath, cacheControl } = request;
 
-  const contentType = mime.getType(filePath);
+  const contentType = getContentType(filePath);
 
   await getS3Client().send(
     new PutObjectCommand({

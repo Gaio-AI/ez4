@@ -18,17 +18,43 @@ ez4 generate -- gateway:oas [ folder ]
 
 It writes an OpenAPI 3.1 document for every HTTP service of the project, named after the service (`<service-name>-oas.yml`), in the given folder (the current one by default).
 
+## Service documentation
+
+The JSDoc of the service class gives the document its `info.description` and `servers`:
+
+| Tag                           | OpenAPI                                         |
+| ----------------------------- | ----------------------------------------------- |
+| `@description <text>`         | `info.description`                              |
+| `@server <url> [description]` | `servers`, one entry per tag, in their order    |
+
+The rest of the class JSDoc stays out of the document, so it can keep notes for the people who build the service.
+
+```ts
+/**
+ * Internal notes about how the service is built.
+ *
+ * @description Manage the items of an account.
+ * @server https://api.example.com Production
+ */
+export declare class ItemsApi extends Http.Service {
+  // ...
+}
+```
+
 ## Route documentation
 
 The operation of each route takes its documentation from the JSDoc of the route handler:
 
-| Tag                         | OpenAPI                                                     |
-| --------------------------- | ----------------------------------------------------------- |
-| `@summary <text>`           | `summary`                                                   |
-| `@description <text>`       | `description`                                               |
-| `@deprecated`               | `deprecated: true`                                          |
-| `@tag <name>`               | `tags`, one entry per tag, in their order                   |
-| `@throws <status> [<text>]` | An error response (see [Error responses](#error-responses)) |
+| Tag                         | OpenAPI                                                         |
+| --------------------------- | --------------------------------------------------------------- |
+| JSDoc text                  | `description`, and its first sentence the `summary`             |
+| `@summary <text>`           | `summary`, in place of the first sentence                       |
+| `@description <text>`       | `description`, in place of the JSDoc text                       |
+| `@deprecated`               | `deprecated: true`                                              |
+| `@tag <name>`               | `tags`, one entry per tag, in their order                       |
+| `@throws <status> [<text>]` | An error response (see [Error responses](#error-responses))     |
+
+A JSDoc text of one sentence is the `summary` alone. The function's own description, which the providers give the deployed function, still comes from the `@summary` and `@description` tags only.
 
 ```ts
 /**
@@ -55,6 +81,23 @@ Request and response bodies are in `components.schemas`:
 A property is required unless it's optional (`?:`). A nullable property (`| null`) is still required, and its schema takes `null` too (`type: [string, 'null']`, `null` in an `enum`, or an `anyOf` option for a reference or a union).
 
 Headers, path parameters and query strings are strings that are never null, so they're documented by their type alone: a request one is required unless it's optional, and a response header is required unless it's optional or nullable.
+
+The JSDoc of a property, or its `@description` tag, is its `description` (for a header, path parameter or query string, the parameter's). An optional request property tagged `@required` is documented as required: the gateway lets it be missing, so the handler can answer its absence with an error of its own, such as a `428` for a missing `If-Match`.
+
+```ts
+declare class UpdateItemRequest implements Http.Request {
+  headers: {
+    /**
+     * The revision the change is based on.
+     *
+     * @required
+     */
+    'if-match'?: string;
+  };
+}
+```
+
+Descriptions and `@required` are documentation only: a deployed function bundles the request and response schemas without them, so changing a comment redeploys nothing.
 
 ## Response headers
 
