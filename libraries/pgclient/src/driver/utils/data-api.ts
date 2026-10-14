@@ -16,7 +16,7 @@ export const sendDataApiStatement = async (
   options?: PgExecuteOptions
 ) => {
   // The Data API binds every occurrence of a named parameter on its own.
-  const [query, variables] = prepareStatement(statement.query, statement.variables, true);
+  const [query, variables] = prepareStatement(statement.query, statement.variables, { bindEachOccurrence: true });
 
   const resultTypes = createResultTypes(!statement.metadata);
 

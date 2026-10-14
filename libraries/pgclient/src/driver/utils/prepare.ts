@@ -1,9 +1,22 @@
 import type { FieldParameter } from './fields';
 
+export type PrepareStatementOptions = {
+  /**
+   * Bind every occurrence of a named parameter on its own, as the Data API does.
+   */
+  bindEachOccurrence?: boolean;
+
+  /**
+   * Bind a list of scalars as one Postgres array where the statement casts its parameter to an array type
+   * (`:ids::uuid[]`). Without it the list keeps its JSON binding, as the Data API has no array parameters.
+   */
+  bindArrays?: boolean;
+};
+
 export const prepareStatement = (
   query: string,
   variables?: FieldParameter[],
-  bindEachOccurrence?: boolean
+  options?: PrepareStatementOptions
 ): [string, unknown[] | undefined] => {
   if (!variables?.length) {
     return [query, undefined];
@@ -19,27 +32,34 @@ export const prepareStatement = (
 
   let totalFields = 0;
 
-  const preparedQuery = query.replaceAll(/:(\w+)/g, (occurrence, fieldName) => {
+  const bindField = (key: string, value: unknown) => {
+    if (!fieldIndexes[key] || options?.bindEachOccurrence) {
+      fieldIndexes[key] = ++totalFields;
+      preparedValues.push(value);
+    }
+
+    return fieldIndexes[key];
+  };
+
+  const preparedQuery = query.replaceAll(/:(\w+)(::\w+\[\])?/g, (occurrence, fieldName: string, arrayCast?: string) => {
     const parameter = fieldParameters[fieldName];
 
     if (!parameter) {
       return occurrence;
     }
 
-    const { type, value } = parameter;
+    const { type, value, elements } = parameter;
 
-    if (!fieldIndexes[fieldName] || bindEachOccurrence) {
-      fieldIndexes[fieldName] = ++totalFields;
-      preparedValues.push(value);
+    // The statement's own cast types the array, and the parameter's JSON binding keeps a separate index.
+    if (arrayCast && elements && options?.bindArrays) {
+      return `$${bindField(`${fieldName}[]`, elements)}${arrayCast}`;
     }
 
-    const index = fieldIndexes[fieldName];
+    const index = bindField(fieldName, value);
 
-    if (type) {
-      return `$${index}::${type}`;
-    }
+    const placeholder = type ? `$${index}::${type}` : `$${index}`;
 
-    return `$${index}`;
+    return arrayCast ? `${placeholder}${arrayCast}` : placeholder;
   });
 
   return [preparedQuery, preparedValues];

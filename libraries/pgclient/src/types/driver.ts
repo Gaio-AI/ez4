@@ -82,4 +82,14 @@ export interface PgClientDriver {
    * @param schema Value schema.
    */
   prepareVariable(name: string, value: unknown, schema?: AnySchema): unknown;
+
+  /**
+   * Prepare a list of values to be bound as one array variable, for a driver that can bind arrays.
+   *
+   * @param name Variable name.
+   * @param values List values.
+   * @param schema Schema of one list value.
+   * @returns The prepared variable, or `undefined` when the list can't go as one array (each value is then bound on its own).
+   */
+  prepareArrayVariable?(name: string, values: unknown[], schema?: AnySchema): unknown;
 }
