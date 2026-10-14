@@ -62,13 +62,14 @@
   },
   "dependencies": {
     "@aws-sdk/client-ecr": "^3.1127.0",
+    "@aws-sdk/client-ecs": "^3.1151.0",
     "@ez4/agent": "^1.7.0",
     "@ez4/aws-common": "^1.7.0",
     "@ez4/aws-identity": "^1.7.0",
     "@ez4/aws-logs": "^1.7.0",
     "@ez4/aws-vpc": "^1.7.0",
-    "@ez4/project": "^1.7.0",
     "@ez4/common": "^1.7.0",
+    "@ez4/project": "^1.7.0",
     "@ez4/state": "^1.7.0",
     "@ez4/utils": "^1.7.0"
   }
