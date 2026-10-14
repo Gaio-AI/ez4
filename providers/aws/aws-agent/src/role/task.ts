@@ -4,34 +4,40 @@ import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
 import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
-import { toKebabCase } from '@ez4/utils';
+import { getAgentBucketName, getAgentKey, getAgentsBaseName } from '../utils/names';
 import { PRESET_POLICIES } from './presets';
 
 export const buildAgentTaskRole = <E extends EntryState>(
   state: EntryStates<E>,
   agent: AgentService,
   options: DeployOptions,
-  accountId: string
+  accountId: string,
+  linkedAgents: string[] = []
 ): RoleState => {
   const servicePrefix = getServiceName(agent, options);
   const roleName = `${servicePrefix}-task-role`;
   const policyName = `${servicePrefix}-task-policy`;
 
-  const agentKebabName = toKebabCase(agent.name);
-  const basePrefix = getServiceName('', options);
+  const bucketName = getAgentBucketName(options);
+  const agentKey = getAgentKey(agent);
 
   const grants: IdentityGrant[] = [
     // S3 runtime access: own invocation input, results, and artifacts
     {
-      resourceIds: [`arn:aws:s3:::${basePrefix}-agents/invocations/${agentKebabName}/*`],
+      resourceIds: [`arn:aws:s3:::${bucketName}/invocations/${agentKey}/*`],
       permissions: ['s3:GetObject']
     },
     {
       resourceIds: [
-        `arn:aws:s3:::${basePrefix}-agents/results/${agentKebabName}/*`,
-        `arn:aws:s3:::${basePrefix}-agents/artifacts/${agentKebabName}/*`
+        `arn:aws:s3:::${bucketName}/results/${agentKey}/*`,
+        `arn:aws:s3:::${bucketName}/artifacts/${agentKey}/*`
       ],
       permissions: ['s3:PutObject']
+    },
+    // Read of every agent's artifacts
+    {
+      resourceIds: [`arn:aws:s3:::${bucketName}/artifacts/*`],
+      permissions: ['s3:GetObject']
     },
     // Heartbeat / task describe
     {
@@ -39,6 +45,33 @@ export const buildAgentTaskRole = <E extends EntryState>(
       permissions: ['ecs:DescribeTasks']
     }
   ];
+
+  for (const linked of linkedAgents) {
+    grants.push(
+      {
+        resourceIds: [`arn:aws:s3:::${bucketName}/invocations/${linked}/*`],
+        permissions: ['s3:PutObject']
+      },
+      {
+        resourceIds: [`arn:aws:s3:::${bucketName}/results/${linked}/*`],
+        permissions: ['s3:GetObject']
+      }
+    );
+  }
+
+  if (linkedAgents.length > 0) {
+    const baseName = getAgentsBaseName(options);
+    grants.push(
+      {
+        resourceIds: [`arn:aws:ecs:*:${accountId}:task-definition/${baseName}-*`],
+        permissions: ['ecs:RunTask']
+      },
+      {
+        resourceIds: [`arn:aws:iam::${accountId}:role/${baseName}-*`],
+        permissions: ['iam:PassRole']
+      }
+    );
+  }
 
   // Presets
   if (agent.permissions?.presets) {
@@ -87,7 +120,8 @@ export const buildAgentTaskRole = <E extends EntryState>(
 export const createAgentTaskRole = async <E extends EntryState>(
   state: EntryStates<E>,
   agent: AgentService,
-  options: DeployOptions
+  options: DeployOptions,
+  linkedAgents: string[] = []
 ): Promise<RoleState> => {
-  return buildAgentTaskRole(state, agent, options, await getAccountId());
+  return buildAgentTaskRole(state, agent, options, await getAccountId(), linkedAgents);
 };

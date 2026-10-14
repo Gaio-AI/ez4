@@ -8,6 +8,7 @@ import { createAgentService } from '@ez4/agent/library';
 import { buildAgentTaskRole } from '../src/role/task';
 import { buildAgentExecutionRole } from '../src/role/execution';
 import { RoleServiceType } from '@ez4/aws-identity';
+import { getAgentBucketName } from '../src/utils/names';
 
 describe('agent task and execution roles', () => {
   const options: DeployOptions = {
@@ -84,5 +85,21 @@ describe('agent task and execution roles', () => {
 
     // Should have policy dependency for secrets
     equal(role.dependencies.length, 1);
+  });
+
+  it('assert :: task role keys match runtime keys and allow invoking linked agents', () => {
+    const state: EntryStates = {};
+    const agent = { ...createAgentService('ImplementAgent'), services: { review: { reference: 'ReviewAgent' } } } as never;
+    const role = buildAgentTaskRole(state, agent, options, '123456789012', ['ReviewAgent']);
+    const policy = state[role.dependencies[0]] as { parameters: { policyDocument: { Statement: { Action: string | string[]; Resource: string | string[] }[] } } };
+    const statements = policy.parameters.policyDocument.Statement;
+    const resources = statements.flatMap((statement) => [statement.Resource].flat());
+    const actions = statements.flatMap((statement) => [statement.Action].flat());
+    const bucket = getAgentBucketName(options);
+    ok(resources.includes(`arn:aws:s3:::${bucket}/invocations/ImplementAgent/*`));
+    ok(resources.includes(`arn:aws:s3:::${bucket}/artifacts/*`));
+    ok(resources.includes(`arn:aws:s3:::${bucket}/invocations/ReviewAgent/*`));
+    ok(actions.includes('ecs:RunTask'));
+    ok(actions.includes('iam:PassRole'));
   });
 });
