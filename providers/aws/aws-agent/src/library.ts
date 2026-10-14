@@ -23,3 +23,9 @@ export * from './taskdef/client';
 
 export * from './network/discovery';
 export * from './network/errors';
+
+export * from './runtime/types';
+export * from './runtime/storage';
+export * from './runtime/artifacts';
+export * from './runtime/timer';
+export * from './runtime/main';
