@@ -48,3 +48,8 @@ export * from './proxy/config';
 export * from './proxy/credential';
 export * from './proxy/client';
 export * from './proxy/taskdef';
+
+export * from './namespace/types';
+export * from './namespace/service';
+export * from './namespace/handler';
+export * from './namespace/client';
