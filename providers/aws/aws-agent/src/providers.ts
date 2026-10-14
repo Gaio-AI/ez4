@@ -14,6 +14,8 @@ import { getEventsRuleHandler } from './events/handler';
 import { EventsRuleServiceType } from './events/types';
 import { getAgentNamespaceHandler } from './namespace/handler';
 import { AgentNamespaceServiceType } from './namespace/types';
+import { getProxyServiceHandler } from './proxy/ecs-handler';
+import { ProxyServiceServiceType } from './proxy/ecs-types';
 
 export const registerAgentProviders = () => {
   tryRegisterProvider(EcrRepositoryServiceType, getEcrRepositoryHandler());
@@ -23,4 +25,5 @@ export const registerAgentProviders = () => {
   tryRegisterProvider(ProxyCredentialServiceType, getProxyCredentialHandler());
   tryRegisterProvider(EventsRuleServiceType, getEventsRuleHandler());
   tryRegisterProvider(AgentNamespaceServiceType, getAgentNamespaceHandler());
+  tryRegisterProvider(ProxyServiceServiceType, getProxyServiceHandler());
 };
