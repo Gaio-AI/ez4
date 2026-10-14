@@ -6,8 +6,12 @@ import { getAgentEntryDefinition } from '../src/runtime/bundle';
 describe('agent bundle definition', () => {
   it('assert :: hook indexes follow the handlers order', () => {
     const agent = {
-      ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i',
-      inputSchema: { type: 'object', properties: {} }, outputSchema: { type: 'object', properties: {} },
+      ...createAgentService('EchoAgent'),
+      provider: 'claude',
+      model: 'm',
+      instructions: 'i',
+      inputSchema: { type: 'object', properties: {} },
+      outputSchema: { type: 'object', properties: {} },
       finish: { name: 'finish', file: 'agent.ts', position: [0, 0] }
     } as never;
     const definition = getAgentEntryDefinition(agent);

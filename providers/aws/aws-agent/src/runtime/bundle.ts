@@ -45,6 +45,8 @@ export const buildAgentBundle = async (agent: AgentService, options: DeployOptio
     define: { __EZ4_AGENT: JSON.stringify(getAgentEntryDefinition(agent)) },
     target: 'node24'
   });
-  const hash = createHash('sha256').update(await readFile(file)).digest('hex');
+  const hash = createHash('sha256')
+    .update(await readFile(file))
+    .digest('hex');
   return { file, hash };
 };
