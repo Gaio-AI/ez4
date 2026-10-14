@@ -48,13 +48,19 @@ export const startAgent = async (
   const { agentName, invocationId, bucketName, timeoutSeconds } = readAgentEnvironment(env);
   const hook = (index: number) => (index >= 0 ? handlers[index] : undefined);
   return runAgentRuntime({
-    agentName, invocationId, timeoutSeconds,
+    agentName,
+    invocationId,
+    timeoutSeconds,
     storage: ports.storage ?? createS3Storage(bucketName),
     provider: ports.provider ?? (await AgentProviders[definition.provider]()),
-    model: definition.model, instructions: definition.instructions,
-    tools: definition.tools, mcpServers: definition.mcpServers,
-    inputSchema: definition.inputSchema, outputSchema: definition.outputSchema,
-    prepare: hook(definition.hooks.prepare) as never, finish: hook(definition.hooks.finish) as never,
+    model: definition.model,
+    instructions: definition.instructions,
+    tools: definition.tools,
+    mcpServers: definition.mcpServers,
+    inputSchema: definition.inputSchema,
+    outputSchema: definition.outputSchema,
+    prepare: hook(definition.hooks.prepare) as never,
+    finish: hook(definition.hooks.finish) as never,
     context
   });
 };

@@ -7,9 +7,16 @@ import { readAgentEnvironment, startAgent, MissingAgentEnvironmentError } from '
 const schema = { type: SchemaType.Object, properties: { text: { type: SchemaType.String } } } as const;
 
 const definition = {
-  name: 'EchoAgent', provider: 'claude' as const, model: 'm', instructions: 'echo',
-  tools: { mode: 'readonly' as const }, mcpServers: {},
-  inputSchema: schema, outputSchema: schema, timeout: 60, hooks: { prepare: 0, finish: -1 }
+  name: 'EchoAgent',
+  provider: 'claude' as const,
+  model: 'm',
+  instructions: 'echo',
+  tools: { mode: 'readonly' as const },
+  mcpServers: {},
+  inputSchema: schema,
+  outputSchema: schema,
+  timeout: 60,
+  hooks: { prepare: 0, finish: -1 }
 };
 
 const memoryStorage = (files: Record<string, unknown>) => ({
@@ -22,13 +29,18 @@ const memoryStorage = (files: Record<string, unknown>) => ({
 describe('agent container entrypoint', () => {
   it('assert :: reads the EZ4_AGENT_* environment', () => {
     deepEqual(readAgentEnvironment({ EZ4_AGENT_NAME: 'EchoAgent', EZ4_AGENT_ID: 'id-1', EZ4_AGENT_BUCKET: 'b', EZ4_AGENT_TIMEOUT: '60' }), {
-      agentName: 'EchoAgent', invocationId: 'id-1', bucketName: 'b', timeoutSeconds: 60
+      agentName: 'EchoAgent',
+      invocationId: 'id-1',
+      bucketName: 'b',
+      timeoutSeconds: 60
     });
   });
 
   it('assert :: missing variable names it', () => {
-    throws(() => readAgentEnvironment({ EZ4_AGENT_NAME: 'EchoAgent', EZ4_AGENT_BUCKET: 'b', EZ4_AGENT_TIMEOUT: '60' }),
-      (error: unknown) => error instanceof MissingAgentEnvironmentError && error.message.includes('EZ4_AGENT_ID'));
+    throws(
+      () => readAgentEnvironment({ EZ4_AGENT_NAME: 'EchoAgent', EZ4_AGENT_BUCKET: 'b', EZ4_AGENT_TIMEOUT: '60' }),
+      (error: unknown) => error instanceof MissingAgentEnvironmentError && error.message.includes('EZ4_AGENT_ID')
+    );
   });
 
   it('assert :: runs the bundled prepare hook with the linked context and exits 0', async () => {
@@ -41,9 +53,13 @@ describe('agent container entrypoint', () => {
     };
     const provider = { run: async (request: { prompt: string }) => ({ output: { text: request.prompt } }) };
 
-    const code = await startAgent(definition, [prepare], linked,
+    const code = await startAgent(
+      definition,
+      [prepare],
+      linked,
       { EZ4_AGENT_NAME: 'EchoAgent', EZ4_AGENT_ID: 'id-1', EZ4_AGENT_BUCKET: 'b', EZ4_AGENT_TIMEOUT: '60' },
-      { storage: memoryStorage(files), provider: provider as never });
+      { storage: memoryStorage(files), provider: provider as never }
+    );
 
     equal(code, 0);
     equal(seenContext, linked);
