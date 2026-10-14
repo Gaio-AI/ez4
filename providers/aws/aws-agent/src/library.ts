@@ -26,6 +26,7 @@ export * from './events/types';
 export * from './events/service';
 export * from './events/handler';
 export * from './dispatch/handler';
+export * from './dispatch/resources';
 
 export * from './network/discovery';
 export * from './network/errors';

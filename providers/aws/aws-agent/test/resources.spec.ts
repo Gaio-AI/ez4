@@ -4,11 +4,17 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { equal, ok, deepEqual } from 'node:assert/strict';
 
+import { join } from 'node:path';
+
+// The package bundler defines __MODULE_PATH; source imports in tests need it set.
+(globalThis as { __MODULE_PATH?: string }).__MODULE_PATH = join(import.meta.dirname, '../dist');
 import { createAgentService } from '@ez4/agent/library';
 import { createCronService } from '@ez4/scheduler/library';
 import { RoleServiceType } from '@ez4/aws-identity';
 import { BucketServiceType } from '@ez4/aws-bucket';
 import { LogGroupServiceType } from '@ez4/aws-logs';
+import { FunctionServiceType } from '@ez4/aws-function';
+import { EventsRuleServiceType } from '../src/events/types';
 
 import { prepareAgentResources } from '../src/triggers/resources';
 import { getAgentBucketName, getAgentClusterName, getAgentKey } from '../src/utils/names';
@@ -38,7 +44,8 @@ const ports = {
     getTaggedSecurityGroupIds: async () => ['sg-agents']
   },
   bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' }),
-  identity: async () => ({ region: 'us-east-1', accountId: '123456789012' })
+  identity: async () => ({ region: 'us-east-1', accountId: '123456789012' }),
+  dispatcherBundle: async () => '/tmp/dispatcher.mjs',
 };
 
 const countType = (state: EntryStates, type: string) => Object.values(state).filter((entry) => entry?.type === type).length;
@@ -60,9 +67,10 @@ describe('agent resources wiring', () => {
     equal(countType(state, EcrRepositoryServiceType), 2);
     equal(countType(state, EcrImageServiceType), 2);
     equal(countType(state, EcsTaskDefServiceType), 2);
-    equal(countType(state, LogGroupServiceType), 2);
-    // 2 task roles + 1 shared execution role
-    equal(countType(state, RoleServiceType), 3);
+    // 2 agent log groups + 1 dispatcher log group
+    equal(countType(state, LogGroupServiceType), 3);
+    // 2 task roles + 1 shared execution role + 1 dispatcher role
+    equal(countType(state, RoleServiceType), 4);
 
     const bucket = Object.values(state).find((entry) => entry?.type === BucketServiceType)!;
     equal((bucket.parameters as { bucketName: string }).bucketName, getAgentBucketName(options));
@@ -85,5 +93,19 @@ describe('agent resources wiring', () => {
 
   it('assert :: bucket keys use the agent name verbatim', () => {
     equal(getAgentKey({ ...createAgentService('EchoAgent') } as never), 'EchoAgent');
+  });
+  it('assert :: prepareAgentResources creates dispatcher function and events rules once', async () => {
+    const state: EntryStates = {};
+    const context = makeContext();
+    const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
+    const second = { ...createAgentService('ReviewAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
+
+    for (const service of [first, second]) {
+      const event = { state, service, metadata: {}, options, context } as PrepareResourceEvent;
+      equal(await prepareAgentResources(event, ports), true);
+    }
+
+    equal(countType(state, FunctionServiceType), 1);
+    equal(countType(state, EventsRuleServiceType), 2);
   });
 });

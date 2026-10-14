@@ -1,4 +1,5 @@
 import type { AgentService } from '@ez4/agent/library';
+import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
 import type { ConnectResourceEvent, DeployOptions, PrepareResourceEvent } from '@ez4/project/library';
 import type { NetworkLookup } from '../network/discovery';
@@ -6,7 +7,7 @@ import type { NetworkLookup } from '../network/discovery';
 import { isAgentService } from '@ez4/agent/library';
 import { createBucket, createBucketStateId } from '@ez4/aws-bucket';
 import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
-import { createLogGroup } from '@ez4/aws-logs';
+import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
 import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
 import { linkEntryConnection } from '@ez4/state';
 import { hashData } from '@ez4/utils';
@@ -21,16 +22,19 @@ import { buildAgentExecutionRole } from '../role/execution';
 import { buildAgentTaskRole } from '../role/task';
 import { createEcsTaskDefinition } from '../taskdef/service';
 import { getAgentBucketName, getAgentClusterName, getAgentLogGroupName, getAgentRepositoryName, getAgentsBaseName } from '../utils/names';
+import { buildDispatcherBundle, prepareDispatcher } from '../dispatch/resources';
 
 export type AgentResourcePorts = {
   network: NetworkLookup;
   bundle: (agent: AgentService, options: DeployOptions) => Promise<{ file: string; hash: string }>;
   identity: () => Promise<{ region: string; accountId: string }>;
+  dispatcherBundle: () => Promise<string>;
 };
 
 const defaultPorts: AgentResourcePorts = {
   network: { getDefaultVpcId, getTaggedSubnetIds, getTaggedSecurityGroupIds },
   bundle: buildAgentBundle,
+  dispatcherBundle: buildDispatcherBundle,
   identity: async () => {
     const [region, accountId] = await Promise.all([getRegion(), getAccountId()]);
     return { region, accountId };
@@ -64,6 +68,23 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     .filter((name) => !!name && isAgentService(event.metadata[name] ?? {}));
   const taskRole = buildAgentTaskRole(state, service, options, accountId, linkedAgents);
   const logGroup = createLogGroup(state, { groupName: getAgentLogGroupName(service, options), retention: 30, tags: options.tags });
+  const dispatcherGroupName = `${getAgentsBaseName(options)}-dispatcher`;
+  const dispatcherGroupId = hashData(LogGroupServiceType, dispatcherGroupName);
+  const dispatcherLogGroup =
+    (state[dispatcherGroupId] as LogGroupState | undefined) ??
+    createLogGroup(state, {
+      groupName: dispatcherGroupName,
+      retention: 30,
+      tags: options.tags
+    });
+  prepareDispatcher(state, options, {
+    region,
+    accountId,
+    bucketName,
+    clusterName,
+    logGroup: dispatcherLogGroup,
+    bundle: ports.dispatcherBundle
+  });
   const repository = createEcrRepository(state, {
     repositoryName: getAgentRepositoryName(service, options),
     scanOnPush: true,
