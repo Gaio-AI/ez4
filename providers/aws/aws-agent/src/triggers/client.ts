@@ -11,6 +11,7 @@ import { createBucketStateId } from '@ez4/aws-bucket';
 import { createEcsClusterStateId } from '../cluster/service';
 import { createEcsTaskDefStateId } from '../taskdef/service';
 import { getAgentBucketName, getAgentClusterName } from '../utils/names';
+
 export interface LinkedAgentEvent {
   service: ServiceMetadata;
   target?: ServiceMetadata;
@@ -71,6 +72,7 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
     subnets: `@{EZ4_RAW_EXPRESSION}:${subnetIds}.split(',')`,
     securityGroups: `@{EZ4_RAW_EXPRESSION}:${securityGroupIds}.split(',')`,
     ...(replyToQueueUrl && { replyTo: `@{EZ4_RAW_EXPRESSION}:${replyToQueueUrl}` }),
+    timeout: agent.resources?.timeout ?? 3600,
     inputSchema: agent.inputSchema ?? { type: 'object' }
   };
 

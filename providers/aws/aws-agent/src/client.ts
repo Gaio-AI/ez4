@@ -14,6 +14,7 @@ export interface ClientParameters {
   subnets: string[];
   securityGroups: string[];
   replyTo?: string;
+  timeout?: number;
   inputSchema: ObjectSchema;
   s3Client?: S3Client;
   ecsClient?: ECSClient;
@@ -23,6 +24,7 @@ export namespace Client {
   export const make = <S extends Agent.Service<any, any>>(parameters: ClientParameters): Agent.Client<S> => {
     const s3 = parameters.s3Client ?? new S3Client();
     const ecs = parameters.ecsClient ?? new ECSClient();
+    const timeout = parameters.timeout ?? 3600;
 
     return {
       async invoke(input: Agent.InputOf<S>, options?: Agent.InvokeOptions): Promise<{ id: string }> {
@@ -32,10 +34,22 @@ export namespace Client {
         }
 
         const id = randomUUID();
-        const invocationPayload = {
+        const now = Date.now();
+        const deadline = new Date(now + (timeout + 300) * 1000).toISOString();
+
+        const invocationPayload: {
+          input: Agent.InputOf<S>;
+          correlation?: string;
+          replyTo?: string;
+          deadline: string;
+          cluster: string;
+          taskArn?: string;
+        } = {
           input,
           correlation: options?.correlation,
-          replyTo: parameters.replyTo
+          replyTo: parameters.replyTo,
+          deadline,
+          cluster: parameters.cluster
         };
 
         await s3.send(
@@ -47,7 +61,7 @@ export namespace Client {
           })
         );
 
-        await ecs.send(
+        const runTaskResult = await ecs.send(
           new RunTaskCommand({
             cluster: parameters.cluster,
             taskDefinition: parameters.taskDefinition,
@@ -77,6 +91,19 @@ export namespace Client {
           })
         );
 
+        const taskArn = runTaskResult.tasks?.[0]?.taskArn;
+        if (taskArn) {
+          invocationPayload.taskArn = taskArn;
+          await s3.send(
+            new PutObjectCommand({
+              Bucket: parameters.bucket,
+              Key: `invocations/${parameters.agentName}/${id}.json`,
+              Body: Buffer.from(JSON.stringify(invocationPayload), 'utf-8'),
+              ContentType: 'application/json'
+            })
+          );
+        }
+
         return { id };
       },
 
@@ -88,20 +115,29 @@ export namespace Client {
               Key: `results/${parameters.agentName}/${id}.json`
             })
           );
-          const stream = res.Body as Readable;
-          const chunks: Buffer[] = [];
-          for await (const chunk of stream) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          }
-          return JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Agent.Result<S>;
-        } catch (err: unknown) {
-          const anyErr = err as { name?: string; $metadata?: { httpStatusCode?: number } };
-          if (anyErr?.name === 'NoSuchKey' || anyErr?.$metadata?.httpStatusCode === 404) {
+          if (!res.Body) {
             return undefined;
+          }
+          const raw = await streamToString(res.Body as Readable);
+          return JSON.parse(raw) as Agent.Result<S>;
+        } catch (err: unknown) {
+          if (err && typeof err === 'object' && ('name' in err || '$metadata' in err)) {
+            const awsErr = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+            if (awsErr.name === 'NoSuchKey' || awsErr.$metadata?.httpStatusCode === 404) {
+              return undefined;
+            }
           }
           throw err;
         }
       }
     };
   };
+}
+
+async function streamToString(stream: Readable): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf-8');
 }

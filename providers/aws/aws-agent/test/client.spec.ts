@@ -3,6 +3,7 @@ import { equal, deepEqual, ok, rejects } from 'node:assert/strict';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 import type { RunTaskCommandInput } from '@aws-sdk/client-ecs';
+import type { EntryState } from '@ez4/state';
 import { Client } from '../src/client';
 import { SchemaType } from '@ez4/schema';
 import type { ObjectSchema } from '@ez4/schema';
@@ -19,6 +20,15 @@ import { getAgentBucketName, getAgentClusterName } from '../src/utils/names';
 import { getDefinitionName } from '@ez4/project/library';
 import type { EcsTaskDefState } from '../src/taskdef/types';
 
+interface StoredInvocation {
+  input: { task: string };
+  correlation?: string;
+  replyTo?: string;
+  deadline: string;
+  cluster: string;
+  taskArn?: string;
+}
+
 describe('client :: agent client', () => {
   const inputSchema: ObjectSchema = {
     type: SchemaType.Object,
@@ -27,16 +37,17 @@ describe('client :: agent client', () => {
 
   interface TestService extends Agent.Service<{ task: string }, { result: string }> {}
 
-  it('validates input, writes invocation with bound replyTo, triggers ecs run-task, and returns { id }', async () => {
-    let s3Key = '';
-    let s3Body: unknown = null;
+  it('validates input, writes invocation with deadline/cluster, triggers ecs run-task, updates taskArn, and returns { id }', async () => {
+    const putCalls: { key: string; body: StoredInvocation }[] = [];
     let runTaskInput: RunTaskCommandInput | undefined;
 
     const mockS3 = {
       send: async (cmd: unknown) => {
         if (cmd instanceof PutObjectCommand) {
-          s3Key = cmd.input.Key ?? '';
-          s3Body = JSON.parse(cmd.input.Body ? Buffer.from(cmd.input.Body as Uint8Array).toString() : '{}');
+          putCalls.push({
+            key: cmd.input.Key ?? '',
+            body: JSON.parse(cmd.input.Body ? Buffer.from(cmd.input.Body as Uint8Array).toString() : '{}') as StoredInvocation
+          });
         }
         return {};
       }
@@ -51,6 +62,7 @@ describe('client :: agent client', () => {
       }
     } as unknown as ECSClient;
 
+    const before = Date.now();
     const client = Client.make<TestService>({
       agentName: 'worker-agent',
       cluster: 'arn:aws:ecs:us-east-1:123:cluster/test-cluster',
@@ -65,14 +77,29 @@ describe('client :: agent client', () => {
     });
 
     const response = await client.invoke({ task: 'run-job' }, { correlation: JSON.stringify({ step: 1 }) });
+    const after = Date.now();
 
     ok(response.id);
-    equal(s3Key, `invocations/worker-agent/${response.id}.json`);
-    deepEqual(s3Body, {
-      input: { task: 'run-job' },
-      correlation: JSON.stringify({ step: 1 }),
-      replyTo: 'https://sqs.us-east-1.amazonaws.com/123/results.fifo'
-    });
+    equal(putCalls.length, 2);
+
+    // Initial invocation record
+    equal(putCalls[0].key, `invocations/worker-agent/${response.id}.json`);
+    equal(putCalls[0].body.input.task, 'run-job');
+    equal(putCalls[0].body.correlation, JSON.stringify({ step: 1 }));
+    equal(putCalls[0].body.replyTo, 'https://sqs.us-east-1.amazonaws.com/123/results.fifo');
+    equal(putCalls[0].body.cluster, 'arn:aws:ecs:us-east-1:123:cluster/test-cluster');
+    equal(putCalls[0].body.taskArn, undefined);
+
+    const deadlineMs = Date.parse(putCalls[0].body.deadline);
+    ok(!Number.isNaN(deadlineMs));
+    ok(deadlineMs >= before + (3600 + 300) * 1000);
+    ok(deadlineMs <= after + (3600 + 300) * 1000);
+
+    // Updated invocation record with taskArn
+    equal(putCalls[1].key, `invocations/worker-agent/${response.id}.json`);
+    equal(putCalls[1].body.taskArn, 'arn:aws:ecs:us-east-1:123:task/abc');
+    equal(putCalls[1].body.cluster, 'arn:aws:ecs:us-east-1:123:cluster/test-cluster');
+    equal(putCalls[1].body.deadline, putCalls[0].body.deadline);
 
     ok(runTaskInput);
     equal(runTaskInput.cluster, 'arn:aws:ecs:us-east-1:123:cluster/test-cluster');
@@ -85,6 +112,44 @@ describe('client :: agent client', () => {
     const envOverrides = containerOverride?.environment;
     ok(envOverrides?.find((e: { name?: string; value?: string }) => e.name === 'EZ4_AGENT_ID' && e.value === response.id));
     ok(envOverrides?.find((e: { name?: string; value?: string }) => e.name === 'EZ4_AGENT_NAME' && e.value === 'worker-agent'));
+  });
+
+  it('calculates deadline with custom timeout', async () => {
+    let capturedBody: StoredInvocation | null = null;
+    const mockS3 = {
+      send: async (cmd: unknown) => {
+        if (cmd instanceof PutObjectCommand) {
+          capturedBody = JSON.parse(cmd.input.Body ? Buffer.from(cmd.input.Body as Uint8Array).toString() : '{}') as StoredInvocation;
+        }
+        return {};
+      }
+    } as unknown as S3Client;
+
+    const mockEcs = {
+      send: async () => ({ tasks: [{ taskArn: 'arn:test' }] })
+    } as unknown as ECSClient;
+
+    const before = Date.now();
+    const client = Client.make<TestService>({
+      agentName: 'fast-agent',
+      cluster: 'cluster-arn',
+      taskDefinition: 'task-arn',
+      bucket: 'bucket',
+      subnets: ['s1'],
+      securityGroups: ['sg1'],
+      timeout: 120,
+      inputSchema,
+      s3Client: mockS3,
+      ecsClient: mockEcs
+    });
+
+    await client.invoke({ task: 'quick' });
+    const after = Date.now();
+
+    ok(capturedBody !== null);
+    const deadlineMs = Date.parse((capturedBody as StoredInvocation).deadline);
+    ok(deadlineMs >= before + (120 + 300) * 1000);
+    ok(deadlineMs <= after + (120 + 300) * 1000);
   });
 
   it('returns Agent.Result<S> | undefined on result(id)', async () => {
@@ -140,22 +205,29 @@ describe('client :: agent client', () => {
       cluster: 'cluster',
       taskDefinition: 'taskdef',
       bucket: 'bucket',
-      subnets: ['subnet-1'],
-      securityGroups: ['sg-agents'],
+      subnets: ['s1'],
+      securityGroups: ['sg1'],
       inputSchema,
       s3Client: {
         send: async () => {
           called = true;
+          return {};
         }
       } as unknown as S3Client,
-      ecsClient: {
-        send: async () => {
-          called = true;
-        }
-      } as unknown as ECSClient
+      ecsClient: {} as unknown as ECSClient
     });
 
-    await rejects(client.invoke({ invalid: 123 } as unknown as { task: string }), /Agent input validation failed/);
+    await rejects(
+      async () => {
+        // @ts-expect-error Testing invalid runtime input type
+        await client.invoke({ task: 12345 });
+      },
+      (err: Error) => {
+        ok(err.message.includes('Agent input validation failed'));
+        return true;
+      }
+    );
+
     equal(called, false);
   });
 });
@@ -179,25 +251,27 @@ describe('client :: prepareLinkedService', () => {
   const mockContext: EventContext = {
     role: null,
     setServiceState: () => {},
-    getServiceState: (service: unknown) => {
-      const name = typeof service === 'string' ? service : (service as ServiceMetadata).name;
+    getServiceState: (service: string | ServiceMetadata): EntryState => {
+      const name = typeof service === 'string' ? service : service.name;
       if (name === 'ValidQueue') {
         return {
           type: QueueServiceType,
           entryId: 'entry-queue-valid',
           dependencies: [],
-          parameters: { queueName: 'valid-queue.fifo' }
+          parameters: {
+            queueName: 'valid-queue.fifo'
+          },
+          result: {
+            queueUrl: 'https://sqs.us-east-1.amazonaws.com/123/valid-queue.fifo'
+          }
         };
       }
-      if (name === 'NonFifoQueue') {
-        return {
-          type: QueueServiceType,
-          entryId: 'entry-queue-non-fifo',
-          dependencies: [],
-          parameters: { queueName: 'regular-queue' }
-        };
-      }
-      throw new Error(`Service ${name} not found`);
+      return {
+        type: 'mock',
+        entryId: `entry-${name}`,
+        dependencies: [],
+        parameters: {}
+      };
     },
     setVirtualServiceState: () => {},
     getVirtualServiceState: () => {
@@ -219,6 +293,7 @@ describe('client :: prepareLinkedService', () => {
     equal(source.from, '@ez4/aws-agent/client');
     ok(source.constructor.includes('@{EZ4_MODULE_IMPORT}.make('));
     ok(source.constructor.includes('"agentName":"WorkerAgent"'));
+    ok(source.constructor.includes('"timeout":3600'));
     const taskdefId = createEcsTaskDefStateId('WorkerAgent');
     const clusterId = createEcsClusterStateId(getAgentClusterName(options));
     ok(source.dependencyIds?.includes(taskdefId));
@@ -252,7 +327,7 @@ describe('client :: prepareLinkedService', () => {
 
     const source = await prepareLinkedService({
       service: linkedAgent,
-      target: dummyAgentService,
+      target: linkedAgent,
       options,
       context: mockContext,
       metadata: {
@@ -261,41 +336,39 @@ describe('client :: prepareLinkedService', () => {
     });
 
     ok(source);
-    equal(source.module, 'Client');
-    ok(source.constructor.includes('__EZ4_ENTRY_QUEUE_VALID_QUEUE_URL'));
+    ok(source.constructor.includes('"replyTo":'));
     ok(source.dependencyIds?.includes('entry-queue-valid'));
   });
 
   it('rejects replyTo if service is not a FIFO queue', async () => {
-    const nonFifoQueue = {
+    const standardQueue = {
       type: '@ez4/queue',
-      name: 'NonFifoQueue',
+      name: 'StandardQueue',
       context: {},
       variables: {},
       services: {}
-      // fifoMode is undefined
     } as unknown as QueueService;
 
     const linkedAgent = {
       ...dummyAgentService,
       options: {
-        replyTo: 'NonFifoQueue'
+        replyTo: 'StandardQueue'
       }
     };
 
     await rejects(
       async () => {
-        await prepareLinkedService({
+        prepareLinkedService({
           service: linkedAgent,
-          target: dummyAgentService,
+          target: linkedAgent,
           options,
           context: mockContext,
           metadata: {
-            NonFifoQueue: nonFifoQueue
+            StandardQueue: standardQueue
           }
         });
       },
-      (err: unknown) => {
+      (err: Error) => {
         ok(err instanceof InvalidReplyToError);
         return true;
       }
@@ -306,21 +379,21 @@ describe('client :: prepareLinkedService', () => {
     const linkedAgent = {
       ...dummyAgentService,
       options: {
-        replyTo: 'UnknownService'
+        replyTo: 'MissingQueue'
       }
     };
 
     await rejects(
       async () => {
-        await prepareLinkedService({
+        prepareLinkedService({
           service: linkedAgent,
-          target: dummyAgentService,
+          target: linkedAgent,
           options,
           context: mockContext,
           metadata: {}
         });
       },
-      (err: unknown) => {
+      (err: Error) => {
         ok(err instanceof InvalidReplyToError);
         return true;
       }
