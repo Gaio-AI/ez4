@@ -10,6 +10,7 @@ export const ServiceType = '@ez4/agent';
 export type AgentService = Omit<ServiceMetadata, 'variables' | 'services'> &
   Required<Pick<ServiceMetadata, 'variables' | 'services'>> & {
     type: typeof ServiceType;
+    name: string;
     file?: string;
     description?: string;
     provider?: Agent.ProviderName;
@@ -40,5 +41,5 @@ export const createAgentService = (name: string, file?: string, description?: st
     ...(file && { file }),
     variables: {},
     services: {}
-  };
+  } as AgentService;
 };

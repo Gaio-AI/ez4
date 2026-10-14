@@ -1,5 +1,5 @@
 import type { Service as CommonService } from '@ez4/common';
-import type { InputOf, OutputOf, Service } from './contract';
+import type { Service } from './contract';
 
 export interface Artifacts {
   put(key: string, body: string | Uint8Array): Promise<void>;
@@ -26,12 +26,12 @@ export interface FinishRequest<I, O> {
   readonly artifacts: Artifacts;
 }
 
-export type PrepareHook<S extends Service<any, any>> = (
-  request: PrepareRequest<InputOf<S>>,
-  context: CommonService.Context<S>
+export type PrepareHook<I = unknown> = (
+  request: PrepareRequest<I>,
+  context: CommonService.Context<Service<any, any>>
 ) => Promise<PrepareResult> | PrepareResult;
 
-export type FinishHook<S extends Service<any, any>> = (
-  request: FinishRequest<InputOf<S>, OutputOf<S>>,
-  context: CommonService.Context<S>
-) => Promise<OutputOf<S>> | OutputOf<S>;
+export type FinishHook<I = unknown, O = unknown> = (
+  request: FinishRequest<I, O>,
+  context: CommonService.Context<Service<any, any>>
+) => Promise<O> | O;

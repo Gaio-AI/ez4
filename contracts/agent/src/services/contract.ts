@@ -1,3 +1,5 @@
+import type { LinkedVariables } from '@ez4/project/library';
+import type { Service as CommonService } from '@ez4/common';
 import type { Status as ResultStatus, ErrorCode as ResultErrorCode, Result as AgentResult } from './result';
 import type {
   Artifacts as HookArtifacts,
@@ -61,23 +63,22 @@ export namespace Agent {
   export type PrepareRequest<I> = HookPrepareRequest<I>;
   export type PrepareResult = HookPrepareResult;
   export type FinishRequest<I, O> = HookFinishRequest<I, O>;
-  export type PrepareHook<S extends Service<any, any>> = HookPrepareHook<S>;
-  export type FinishHook<S extends Service<any, any>> = HookFinishHook<S>;
 
+  export type PrepareHook<I = unknown> = HookPrepareHook<I>;
+  export type FinishHook<I = unknown, O = unknown> = HookFinishHook<I, O>;
+
+  export type Result<S extends Service<any, any>> = AgentResult<S>;
   export type InputOf<S> = S extends Service<infer I, any> ? I : never;
   export type OutputOf<S> = S extends Service<any, infer O> ? O : never;
 
-  export type Result<S extends Service<any, any>> = AgentResult<S>;
-
   export type LinkOptions = {
     readonly replyTo?: string;
-    [key: string]: unknown;
   };
 
   export type InvokeOptions = ClientInvokeOptions;
   export type Client<S extends Service<any, any>> = AgentClient<S>;
 
-  export abstract class Service<I extends Input, O extends Output> {
+  export abstract class Service<I extends Input, O extends Output> implements CommonService.Provider {
     abstract readonly provider: ProviderName;
     abstract readonly model: string;
     abstract readonly instructions: string;
@@ -85,18 +86,18 @@ export namespace Agent {
     abstract readonly output: O;
     readonly tools?: Tools;
     readonly mcpServers?: Record<string, McpServer>;
-    readonly prepare?: PrepareHook<any>;
-    readonly finish?: FinishHook<any>;
+    readonly prepare?: PrepareHook<I>;
+    readonly finish?: FinishHook<I, O>;
     readonly image?: Image;
     readonly resources?: Resources;
     readonly permissions?: Permissions;
     readonly egress?: string[];
     readonly secrets?: Record<string, string>;
-    readonly variables?: Record<string, string | number | boolean>;
+    readonly variables?: LinkedVariables;
     readonly services?: Record<string, unknown>;
-    readonly tags?: Record<string, string>;
+    readonly tags?: CommonService.Tags;
     readonly client!: Client<this>;
-    readonly options?: LinkOptions;
+    readonly options!: LinkOptions;
   }
 }
 
