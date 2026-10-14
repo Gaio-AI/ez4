@@ -22,6 +22,11 @@ export * from './taskdef/service';
 export * from './taskdef/handler';
 export * from './taskdef/client';
 
+export * from './events/types';
+export * from './events/service';
+export * from './events/handler';
+export * from './dispatch/handler';
+
 export * from './network/discovery';
 export * from './network/errors';
 
