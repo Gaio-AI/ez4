@@ -30,6 +30,7 @@ import {
 import { IncompleteRouteError } from '../../errors/http/route';
 import { MismatchParametersTypeError } from '../../errors/parameters';
 import { getAuthHandlerMetadata } from '../auth/handler';
+import { getReservedConcurrency } from '../utils/concurrency';
 import { getFullTypeName } from '../utils/name';
 import { isHttpPath } from '../utils/path';
 import { getWebPreferencesMetadata } from '../preferences';
@@ -145,6 +146,14 @@ const getTypeFromMembers = (
       case 'group': {
         if (!external) {
           route.group = getPropertyString(member);
+        }
+        break;
+      }
+
+      // How much the route's function may run at once is the owner's deployment too.
+      case 'reservedConcurrency': {
+        if (!external) {
+          route.reservedConcurrency = getReservedConcurrency(member, errorList, type.file);
         }
         break;
       }

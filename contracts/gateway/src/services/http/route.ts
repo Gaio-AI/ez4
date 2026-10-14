@@ -127,4 +127,15 @@ export interface HttpRoute<T extends HttpRequest, U extends AuthRequest> extends
    * - May increase cold‑start latency.
    */
   readonly vpc?: boolean;
+
+  /**
+   * Concurrent executions reserved for the route's function, a positive integer.
+   *
+   * - The function never runs more than this many requests at once, and requests over it fail
+   *   instead of taking concurrency from the other functions of the account.
+   * - The reservation is taken from the account's concurrency even while the function is idle.
+   * - Without it, the function shares the account's unreserved concurrency.
+   * - A route of a group takes it from the service `groups`.
+   */
+  readonly reservedConcurrency?: number;
 }

@@ -119,6 +119,7 @@ export type HttpRoute = HttpDefaults & {
   group?: string;
   cors?: boolean;
   vpc?: boolean;
+  reservedConcurrency?: number;
 };
 
 export type HttpGroup = {
@@ -132,6 +133,7 @@ export type HttpGroup = {
   files?: string[];
   debug?: boolean;
   vpc?: boolean;
+  reservedConcurrency?: number;
 };
 
 export type HttpDefaults = {

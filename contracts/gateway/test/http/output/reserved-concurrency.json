@@ -1,0 +1,163 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestService": {
+    "type": "@ez4/http",
+    "name": "TestService",
+    "context": {},
+    "file": "test/http/input/output-reserved-concurrency.ts",
+    "variables": {},
+    "services": {},
+    "displayName": "Remote API",
+    "routes": [
+      {
+        "name": "signUp",
+        "path": "POST /sign-up",
+        "handler": {
+          "name": "signUp",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            42,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "reservedConcurrency": 5
+      },
+      {
+        "path": "GET /tags",
+        "handler": {
+          "name": "listTags",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            48,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "tags"
+      },
+      {
+        "path": "POST /tags",
+        "handler": {
+          "name": "createTag",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            54,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "tags",
+        "reservedConcurrency": 2
+      },
+      {
+        "path": "GET /health",
+        "handler": {
+          "name": "health",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            60,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      }
+    ],
+    "defaults": {
+      "memory": 256
+    },
+    "groups": {
+      "tags": {
+        "reservedConcurrency": 2
+      }
+    }
+  },
+  "TestImport": {
+    "type": "@ez4/import:http",
+    "name": "TestImport",
+    "context": {},
+    "file": "test/http/input/output-reserved-concurrency.ts",
+    "reference": "TestService",
+    "routes": [
+      {
+        "name": "signUp",
+        "path": "POST /sign-up",
+        "handler": {
+          "name": "signUp",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            42,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      },
+      {
+        "path": "GET /tags",
+        "handler": {
+          "name": "listTags",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            48,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      },
+      {
+        "path": "POST /tags",
+        "handler": {
+          "name": "createTag",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            54,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      },
+      {
+        "path": "GET /health",
+        "handler": {
+          "name": "health",
+          "file": "test/http/input/output-reserved-concurrency.ts",
+          "position": [
+            60,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        }
+      }
+    ],
+    "displayName": "Remote API",
+    "defaults": {
+      "memory": 256
+    },
+    "project": "name from project in ez4.project.js"
+  }
+}

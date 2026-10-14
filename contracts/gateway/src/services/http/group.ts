@@ -78,4 +78,12 @@ export interface HttpGroup<T extends HttpRequest> {
    * - The function also runs in the VPC when a route's linked services need it.
    */
   readonly vpc?: boolean;
+
+  /**
+   * Concurrent executions reserved for the group's function, a positive integer.
+   *
+   * - Every route of the group shares the reservation.
+   * - Without it, the function shares the account's unreserved concurrency.
+   */
+  readonly reservedConcurrency?: number;
 }

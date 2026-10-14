@@ -52,6 +52,7 @@ export const createIntegrationFunction = <E extends EntryState>(
     files: parameters.files,
     tags: parameters.tags,
     vpc: parameters.vpc,
+    reservedConcurrency: parameters.reservedConcurrency,
     getFunctionVariables: () => {
       return variables.reduce<LinkedVariables>((variables, current) => ({ ...variables, ...current }), {});
     },
@@ -111,6 +112,7 @@ export const createIntegrationGroupFunction = <E extends EntryState>(
     files: parameters.files,
     tags: parameters.tags,
     vpc: parameters.vpc,
+    reservedConcurrency: parameters.reservedConcurrency,
     getFunctionVariables: () => {
       return variables.reduce<LinkedVariables>((variables, current) => ({ ...variables, ...current }), {});
     },

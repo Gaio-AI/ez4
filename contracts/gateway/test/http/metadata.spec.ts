@@ -50,5 +50,6 @@ describe('http metadata', () => {
   it('assert :: service scope', () => testFile('scope'));
   it('assert :: import api', () => testFile('import'));
   it('assert :: route groups', () => testFile('groups'));
+  it('assert :: route reserved concurrency', () => testFile('reserved-concurrency'));
   it('assert :: import api with route groups', () => testFile('import-group'));
 });
