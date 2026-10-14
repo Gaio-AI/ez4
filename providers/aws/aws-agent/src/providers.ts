@@ -8,10 +8,13 @@ import { EcrImageServiceType } from './image/state';
 import { EcrRepositoryServiceType } from './image/types';
 import { getEcsTaskDefHandler } from './taskdef/handler';
 import { EcsTaskDefServiceType } from './taskdef/types';
+import { getProxyCredentialHandler } from './proxy/credential';
+import { ProxyCredentialServiceType } from './proxy/types';
 
 export const registerAgentProviders = () => {
   tryRegisterProvider(EcrRepositoryServiceType, getEcrRepositoryHandler());
   tryRegisterProvider(EcrImageServiceType, getEcrImageHandler());
   tryRegisterProvider(EcsClusterServiceType, getEcsClusterHandler());
   tryRegisterProvider(EcsTaskDefServiceType, getEcsTaskDefHandler());
+  tryRegisterProvider(ProxyCredentialServiceType, getProxyCredentialHandler());
 };

@@ -35,3 +35,9 @@ export * from './runtime/bundle';
 export * from './runtime/providers/index';
 
 export * from './client';
+
+export * from './proxy/types';
+export * from './proxy/auth';
+export * from './proxy/config';
+export * from './proxy/credential';
+export * from './proxy/client';

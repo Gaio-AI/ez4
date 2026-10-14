@@ -25,3 +25,6 @@ export const getAgentLogGroupName = (agent: Pick<AgentService, 'name'>, options:
 
 export const getAgentRepositoryName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
   `${getAgentsBaseName(options)}/${toKebabCase(agent.name)}`;
+
+export const getAgentProxySecretName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
+  `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}-proxy`;
