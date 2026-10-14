@@ -10,7 +10,7 @@ import {
   ResourceNotFoundException
 } from '@aws-sdk/client-secrets-manager';
 import { getAwsClientOptions } from '@ez4/aws-common';
-import { generateAgentPassword } from './auth';
+import { generateAgentPassword, generateHtpasswd } from './auth';
 
 let clientInstance: SecretsManagerClient | null = null;
 
@@ -73,7 +73,8 @@ export const createProxySecret = async (
 
   const secretString = JSON.stringify({
     username: agentName,
-    password
+    password,
+    htpasswd: generateHtpasswd({ [agentName]: password }).trim()
   });
 
   const response = await getSecretsManagerClient().send(

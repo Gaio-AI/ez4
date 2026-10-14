@@ -97,6 +97,40 @@ describe('agent ECS task definition builder', () => {
     equal(envMap['EZ4_AGENT_TIMEOUT'], '3600');
   });
 
+  it('assert :: builds task definition with proxy configuration and secrets', () => {
+    const dummyAgent = {
+      type: ServiceType,
+      name: 'ProxyAgent'
+    } as unknown as AgentService;
+
+    const taskDef = buildTaskDefinitionInput(
+      dummyAgent,
+      'ecr-uri',
+      'arn:aws:iam::123456789012:role/task-role',
+      'arn:aws:iam::123456789012:role/exec-role',
+      'arn:aws:logs:us-east-1:123456789012:log-group:/ez4/agents/proxy-agent',
+      {
+        bucketName: 'agent-bucket',
+        baseName: 'ez4-stg-agents',
+        proxy: { url: 'http://proxy.x.local:3128', secretArn: 'arn:s' }
+      }
+    );
+
+    const container = taskDef.containerDefinitions?.[0];
+    ok(container !== undefined);
+
+    const envMap = Object.fromEntries((container.environment ?? []).map((e) => [e.name, e.value]));
+    equal(envMap['EZ4_AGENT_PROXY_URL'], 'http://proxy.x.local:3128');
+    ok(envMap['NO_PROXY']?.includes('169.254.170.2'));
+
+    const secrets = container.secrets ?? [];
+    const proxyPasswordSecret = secrets.find((s) => s.name === 'EZ4_AGENT_PROXY_PASSWORD');
+    deepEqual(proxyPasswordSecret, {
+      name: 'EZ4_AGENT_PROXY_PASSWORD',
+      valueFrom: 'arn:s:password::'
+    });
+  });
+
   it('assert :: creates task definition state entry with correct parameters and ID', () => {
     const states: Record<string, EcsTaskDefState> = {};
 

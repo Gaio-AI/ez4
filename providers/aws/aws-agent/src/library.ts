@@ -47,3 +47,4 @@ export * from './proxy/auth';
 export * from './proxy/config';
 export * from './proxy/credential';
 export * from './proxy/client';
+export * from './proxy/taskdef';

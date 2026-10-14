@@ -28,3 +28,7 @@ export const getAgentRepositoryName = (agent: Pick<AgentService, 'name'>, option
 
 export const getAgentProxySecretName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
   `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}-proxy`;
+
+export const getAgentsNamespaceName = (options: DeployOptions) => `${getAgentsBaseName(options)}.local`;
+
+export const getAgentProxyUrl = (options: DeployOptions) => `http://proxy.${getAgentsNamespaceName(options)}:3128`;

@@ -101,6 +101,7 @@ export const generateSquidConfig = (options: SquidConfigOptions): string => {
 
   lines.push('http_access deny all');
   lines.push('coredump_dir /var/spool/squid');
-  lines.push('access_log stdio:/var/log/squid/access.log');
+  lines.push('cache deny all');
+  lines.push('access_log stdio:/proc/self/fd/1');
   return lines.join('\n') + '\n';
 };

@@ -5,6 +5,7 @@ import type { EcsTaskDefParameters, EcsTaskDefState } from './types';
 
 import { attachEntry } from '@ez4/state';
 import { hashData, toKebabCase } from '@ez4/utils';
+import { buildNoProxyList } from '../proxy/config';
 import { EcsTaskDefServiceType } from './types';
 
 export interface TaskDefOptions {
@@ -12,6 +13,7 @@ export interface TaskDefOptions {
   bucketName: string;
   noProxy?: string;
   region?: string;
+  proxy?: { url: string; secretArn: string };
 }
 
 export const createEcsTaskDefStateId = (agentName: string) => {
@@ -68,7 +70,25 @@ export const buildTaskDefinitionInput = (
     return { name, valueFrom: arn };
   });
 
+  if (options.proxy) {
+    secrets.push({
+      name: 'EZ4_AGENT_PROXY_PASSWORD',
+      valueFrom: `${options.proxy.secretArn}:password::`
+    });
+  }
+
   const logGroupName = logGroupArn.includes(':log-group:') ? logGroupArn.split(':log-group:')[1] : logGroupArn;
+
+  const environment = [
+    { name: 'EZ4_AGENT_NAME', value: agent.name },
+    { name: 'EZ4_AGENT_BUCKET', value: options.bucketName },
+    { name: 'EZ4_AGENT_TIMEOUT', value: String(timeout) },
+    { name: 'NO_PROXY', value: options.noProxy ?? buildNoProxyList(region).join(',') }
+  ];
+
+  if (options.proxy) {
+    environment.push({ name: 'EZ4_AGENT_PROXY_URL', value: options.proxy.url });
+  }
 
   return {
     family: `${options.baseName}-${toKebabCase(agent.name)}`,
@@ -93,12 +113,7 @@ export const buildTaskDefinitionInput = (
             drop: ['ALL']
           }
         },
-        environment: [
-          { name: 'EZ4_AGENT_NAME', value: agent.name },
-          { name: 'EZ4_AGENT_BUCKET', value: options.bucketName },
-          { name: 'EZ4_AGENT_TIMEOUT', value: String(timeout) },
-          { name: 'NO_PROXY', value: options.noProxy ?? '169.254.169.254' }
-        ],
+        environment,
         secrets: secrets.length > 0 ? secrets : undefined,
         logConfiguration: {
           logDriver: 'awslogs',

@@ -25,6 +25,21 @@ export class MissingAgentEnvironmentError extends Error {
   }
 }
 
+/** Points HTTP clients (the provider CLI and its tools) at the egress proxy, authenticated as this agent. */
+export const applyProxyEnvironment = (env: Record<string, string | undefined>) => {
+  const proxyUrl = env.EZ4_AGENT_PROXY_URL;
+  const password = env.EZ4_AGENT_PROXY_PASSWORD;
+  const agentName = env.EZ4_AGENT_NAME;
+  if (!proxyUrl || !password || !agentName) return;
+  const url = new URL(proxyUrl);
+  url.username = encodeURIComponent(agentName);
+  url.password = encodeURIComponent(password);
+  const value = url.toString().replace(/\/$/, '');
+  env.HTTPS_PROXY = env.HTTP_PROXY = env.https_proxy = env.http_proxy = value;
+  env.NODE_USE_ENV_PROXY = '1';
+  delete env.EZ4_AGENT_PROXY_PASSWORD;
+};
+
 const required = (env: Record<string, string | undefined>, name: string) => {
   const value = env[name];
   if (!value) throw new MissingAgentEnvironmentError(name);
@@ -45,6 +60,7 @@ export const startAgent = async (
   env: Record<string, string | undefined> = process.env,
   ports: { storage?: AgentStorage; provider?: AgentProvider } = {}
 ): Promise<number> => {
+  applyProxyEnvironment(env);
   const { agentName, invocationId, bucketName, timeoutSeconds } = readAgentEnvironment(env);
   const hook = (index: number) => (index >= 0 ? handlers[index] : undefined);
   return runAgentRuntime({
