@@ -57,3 +57,5 @@ export * from './namespace/types';
 export * from './namespace/service';
 export * from './namespace/handler';
 export * from './namespace/client';
+
+export { getSecretResourceArn } from './utils/names';

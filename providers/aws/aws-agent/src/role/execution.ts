@@ -2,7 +2,7 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import type { AgentService } from '@ez4/agent/library';
 import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
-import { getAgentsBaseName } from '../utils/names';
+import { getAgentsBaseName, getSecretResourceArn } from '../utils/names';
 import {
   createRole,
   createPolicy,
@@ -42,12 +42,13 @@ export const buildAgentExecutionRole = <E extends EntryState>(
 
   // Secrets policy for valueFrom injection
   if (agent.secrets && Object.keys(agent.secrets).length > 0) {
-    const secretResourceIds = Object.values(agent.secrets).map((secretRef) => {
-      if (secretRef.startsWith('arn:')) {
-        return secretRef;
-      }
-      return `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef}-*`;
-    });
+    const secretResourceIds = [
+      ...new Set(
+        Object.values(agent.secrets).map((secretRef) =>
+          getSecretResourceArn(secretRef, region, accountId)
+        )
+      )
+    ];
 
     baseExecutionGrants.push({
       resourceIds: secretResourceIds,
