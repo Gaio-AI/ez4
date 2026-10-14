@@ -20,6 +20,7 @@
     "foundation/validator",
     "foundation/transform",
     "libraries/http",
+    "contracts/agent",
     "contracts/gateway",
     "contracts/database",
     "contracts/cache",
