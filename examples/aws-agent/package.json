@@ -1,0 +1,32 @@
+{
+  "name": "aws-agent",
+  "description": "Example of an agent service using AWS Fargate.",
+  "version": "0.0.0",
+  "author": "Silas B.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.7"
+  },
+  "workspaces": [
+    "examples/*"
+  ],
+  "scripts": {
+    "deploy": "tsc && ez4 deploy -e local.env",
+    "destroy": "ez4 destroy -e local.env",
+    "serve": "ez4 serve -e local.env --debug",
+    "test": "ez4 test -e local.env"
+  },
+  "dependencies": {
+    "@ez4/agent": "^1.7.0",
+    "@ez4/aws-agent": "^1.7.0",
+    "@ez4/aws-queue": "^1.7.0",
+    "@ez4/aws-scheduler": "^1.7.0",
+    "@ez4/common": "^1.7.0",
+    "@ez4/local-agent": "^1.7.0",
+    "@ez4/project": "^1.7.0",
+    "@ez4/queue": "^1.7.0",
+    "@ez4/scheduler": "^1.7.0"
+  }
+}
