@@ -6,16 +6,10 @@ export const generateDockerfile = (agent: AgentService): string => {
   const aptPackages = (agent.image?.aptPackages ?? []).join(' ');
   const npmPackages = (agent.image?.npmPackages ?? []).join(' ');
 
-  const lines: string[] = [
-    `FROM ${base}`,
-    'WORKDIR /app',
-    'ENV NODE_ENV=production'
-  ];
+  const lines: string[] = [`FROM ${base}`, 'WORKDIR /app', 'ENV NODE_ENV=production'];
 
   if (aptPackages) {
-    lines.push(
-      `RUN apt-get update && apt-get install -y --no-install-recommends ${aptPackages} && rm -rf /var/lib/apt/lists/*`
-    );
+    lines.push(`RUN apt-get update && apt-get install -y --no-install-recommends ${aptPackages} && rm -rf /var/lib/apt/lists/*`);
   }
 
   if (npmPackages) {

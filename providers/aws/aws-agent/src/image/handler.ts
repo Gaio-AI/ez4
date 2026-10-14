@@ -4,13 +4,7 @@ import type { EcrRepositoryResult, EcrRepositoryState } from './types';
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
-import {
-  findRepository,
-  createRepository,
-  deleteRepository,
-  setLifecyclePolicy,
-  updateScanningConfiguration
-} from './client';
+import { findRepository, createRepository, deleteRepository, setLifecyclePolicy, updateScanningConfiguration } from './client';
 import { EcrRepositoryServiceName } from './types';
 
 export const getEcrRepositoryHandler = (): StepHandler<EcrRepositoryState> => ({

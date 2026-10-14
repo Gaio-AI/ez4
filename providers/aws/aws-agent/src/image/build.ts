@@ -84,11 +84,7 @@ export const buildAndPushImage = async (options: ImageBuildOptions): Promise<str
     });
   }
 
-  await commandRunner(
-    'docker',
-    ['buildx', 'build', '--platform', 'linux/amd64', '-t', fullImageUri, '--push', '.'],
-    { cwd: workDir }
-  );
+  await commandRunner('docker', ['buildx', 'build', '--platform', 'linux/amd64', '-t', fullImageUri, '--push', '.'], { cwd: workDir });
 
   return fullImageUri;
 };

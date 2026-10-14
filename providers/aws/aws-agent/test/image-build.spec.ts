@@ -84,18 +84,15 @@ describe('agent image builder', () => {
     process.env.PATH = '/non-existent-directory';
 
     try {
-      await rejects(
-        async () => {
-          await buildAndPushImage({
-            agentName: 'TestAgent',
-            repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
-            dockerfile: 'FROM node:24-bookworm-slim',
-            bundleHash: 'abc12345',
-            workDir: '/tmp'
-          });
-        },
-        MissingDockerCliError
-      );
+      await rejects(async () => {
+        await buildAndPushImage({
+          agentName: 'TestAgent',
+          repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
+          dockerfile: 'FROM node:24-bookworm-slim',
+          bundleHash: 'abc12345',
+          workDir: '/tmp'
+        });
+      }, MissingDockerCliError);
     } finally {
       process.env.PATH = originalPath;
     }
