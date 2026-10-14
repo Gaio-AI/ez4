@@ -4,3 +4,9 @@ export * from './image/dockerfile';
 export * from './image/build';
 export * from './image/service';
 export * from './image/handler';
+
+export * from './role/presets';
+export * from './role/task';
+export * from './role/execution';
+export * from './triggers/policy';
+export * from './triggers/identity';
