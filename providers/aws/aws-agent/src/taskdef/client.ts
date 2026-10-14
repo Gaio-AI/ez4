@@ -1,12 +1,16 @@
 import type { OperationLogLine } from '@ez4/aws-common';
 import type { RegisterTaskDefinitionCommandInput } from '@aws-sdk/client-ecs';
-import type { EcsTaskDefParameters, EcsTaskDefResult } from './types';
+import type { ResourceTags } from '@ez4/aws-common';
+import type { EcsTaskDefResult } from './types';
 
 import { RegisterTaskDefinitionCommand, DeregisterTaskDefinitionCommand, DescribeTaskDefinitionCommand } from '@aws-sdk/client-ecs';
 
 import { getEcsClient, getEcsTagList } from '../cluster/client';
 
-export const registerTaskDefinition = async (logger: OperationLogLine, parameters: EcsTaskDefParameters): Promise<EcsTaskDefResult> => {
+export const registerTaskDefinition = async (
+  logger: OperationLogLine,
+  parameters: { agentName: string; taskDefinition: RegisterTaskDefinitionCommandInput; tags?: ResourceTags }
+): Promise<Omit<EcsTaskDefResult, 'subnetIds' | 'securityGroupIds'>> => {
   logger.update('Registering ECS task definition');
 
   const { taskDefinition, tags } = parameters;
@@ -45,7 +49,10 @@ export const deregisterTaskDefinition = async (logger: OperationLogLine, taskDef
   }
 };
 
-export const describeTaskDefinition = async (logger: OperationLogLine, taskDefinitionArn: string): Promise<EcsTaskDefResult | null> => {
+export const describeTaskDefinition = async (
+  logger: OperationLogLine,
+  taskDefinitionArn: string
+): Promise<Omit<EcsTaskDefResult, 'subnetIds' | 'securityGroupIds'> | null> => {
   logger.update('Describing ECS task definition');
 
   try {

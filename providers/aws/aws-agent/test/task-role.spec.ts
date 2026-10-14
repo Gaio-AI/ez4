@@ -73,7 +73,7 @@ describe('agent task and execution roles', () => {
     const role = buildAgentExecutionRole(state, agent, options, region, accountId);
     ok(role);
     equal(role.type, RoleServiceType);
-    equal(role.parameters.roleName, 'ez4-test-stg-code-agent-execution-role');
+    equal(role.parameters.roleName, 'ez4-test-stg-agents-execution-role');
 
     const trustStatement = role.parameters.roleDocument.Statement[0];
     ok(trustStatement);

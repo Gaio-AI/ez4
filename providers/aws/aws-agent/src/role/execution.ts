@@ -2,7 +2,7 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import type { AgentService } from '@ez4/agent/library';
 import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
-import { getServiceName } from '@ez4/project/library';
+import { getAgentsBaseName } from '../utils/names';
 import {
   createRole,
   createPolicy,
@@ -20,7 +20,7 @@ export const buildAgentExecutionRole = <E extends EntryState>(
   region: string,
   accountId: string
 ): RoleState => {
-  const servicePrefix = getServiceName(agent, options);
+  const servicePrefix = getAgentsBaseName(options);
   const roleName = `${servicePrefix}-execution-role`;
 
   const attachedPolicies: PolicyState[] = [];

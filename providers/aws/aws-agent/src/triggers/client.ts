@@ -6,10 +6,11 @@ import type { EcsClusterState } from '../cluster/types';
 import type { EcsTaskDefState } from '../taskdef/types';
 import { isAgentService, InvalidReplyToError } from '@ez4/agent/library';
 import { isQueueService } from '@ez4/queue/library';
-import { getDefinitionName, getServiceName } from '@ez4/project/library';
+import { getDefinitionName } from '@ez4/project/library';
+import { createBucketStateId } from '@ez4/aws-bucket';
 import { createEcsClusterStateId } from '../cluster/service';
 import { createEcsTaskDefStateId } from '../taskdef/service';
-
+import { getAgentBucketName, getAgentClusterName } from '../utils/names';
 export interface LinkedAgentEvent {
   service: ServiceMetadata;
   target?: ServiceMetadata;
@@ -52,23 +53,23 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
     replyToQueueUrl = getDefinitionName<QueueState>(queueEntryId, 'queueUrl');
   }
 
-  const basePrefix = getServiceName('', options);
-  const clusterName = `${basePrefix}-agents-cluster`;
-  const clusterStateId = createEcsClusterStateId(clusterName);
+  const clusterStateId = createEcsClusterStateId(getAgentClusterName(options));
   const taskDefStateId = createEcsTaskDefStateId(agent.name);
 
-  dependencyIds.push(clusterStateId, taskDefStateId);
+  dependencyIds.push(taskDefStateId, clusterStateId, createBucketStateId(getAgentBucketName(options)));
 
   const clusterArn = getDefinitionName<EcsClusterState>(clusterStateId, 'clusterArn');
   const taskDefinitionArn = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'taskDefinitionArn');
+  const subnetIds = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'subnetIds');
+  const securityGroupIds = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'securityGroupIds');
 
   const clientParameters = {
     agentName: agent.name,
     cluster: `@{EZ4_RAW_EXPRESSION}:${clusterArn}`,
     taskDefinition: `@{EZ4_RAW_EXPRESSION}:${taskDefinitionArn}`,
-    bucket: `${basePrefix}-agents`,
-    subnets: [],
-    securityGroups: [],
+    bucket: getAgentBucketName(options),
+    subnets: `@{EZ4_RAW_EXPRESSION}:${subnetIds}.split(',')`,
+    securityGroups: `@{EZ4_RAW_EXPRESSION}:${securityGroupIds}.split(',')`,
     ...(replyToQueueUrl && { replyTo: `@{EZ4_RAW_EXPRESSION}:${replyToQueueUrl}` }),
     inputSchema: agent.inputSchema ?? { type: 'object' }
   };

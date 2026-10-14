@@ -84,7 +84,7 @@ describe('agent ECS task definition builder', () => {
 
     equal(taskDef.cpu, '1024');
     equal(taskDef.memory, '2048');
-    equal(taskDef.ephemeralStorage?.sizeInGiB, 20);
+    equal(taskDef.ephemeralStorage?.sizeInGiB, 21);
 
     const container = taskDef.containerDefinitions?.[0];
     ok(container !== undefined);
@@ -99,10 +99,11 @@ describe('agent ECS task definition builder', () => {
       states,
       {
         agentName: 'TestAgent',
-        taskDefinition: {
-          family: 'ez4-testagent',
-          containerDefinitions: []
-        }
+        agent: { name: 'TestAgent' },
+        bucketName: 'agent-bucket',
+        region: 'us-east-1',
+        subnetIds: ['subnet-1'],
+        securityGroupIds: ['sg-1']
       },
       ['dep1']
     );
@@ -123,15 +124,18 @@ describe('agent ECS task definition builder', () => {
       dependencies: [],
       parameters: {
         agentName: 'TestAgent',
-        taskDefinition: {
-          family: 'ez4-testagent',
-          containerDefinitions: []
-        }
+        agent: { name: 'TestAgent' },
+        bucketName: 'agent-bucket',
+        region: 'us-east-1',
+        subnetIds: ['subnet-1'],
+        securityGroupIds: ['sg-1']
       },
       result: {
         family: 'ez4-testagent',
         revision: 1,
-        taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/ez4-testagent:1'
+        taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/ez4-testagent:1',
+        subnetIds: ['subnet-1'],
+        securityGroupIds: ['sg-1']
       }
     };
 
@@ -160,11 +164,11 @@ describe('agent ECS task definition builder', () => {
       dependencies: [],
       parameters: {
         agentName: 'TestAgent',
-        taskDefinition: {
-          family: 'ez4-testagent',
-          containerDefinitions: [],
-          cpu: '2048'
-        }
+        agent: { name: 'TestAgent', resources: { cpu: 2048 } },
+        bucketName: 'agent-bucket',
+        region: 'us-east-1',
+        subnetIds: ['subnet-1'],
+        securityGroupIds: ['sg-1']
       }
     };
 
@@ -178,11 +182,11 @@ describe('agent ECS task definition builder', () => {
       dependencies: [],
       parameters: {
         agentName: 'TestAgent',
-        taskDefinition: {
-          family: 'ez4-testagent',
-          containerDefinitions: [],
-          cpu: '1024'
-        }
+        agent: { name: 'TestAgent', resources: { cpu: 1024 } },
+        bucketName: 'agent-bucket',
+        region: 'us-east-1',
+        subnetIds: ['subnet-1'],
+        securityGroupIds: ['sg-1']
       }
     };
 

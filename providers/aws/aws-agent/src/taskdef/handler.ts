@@ -1,10 +1,16 @@
 import type { StepContext, StepHandler } from '@ez4/state';
+import type { RoleState } from '@ez4/aws-identity';
+import type { EcrImageState } from '../image/state';
 import type { EcsTaskDefResult, EcsTaskDefState } from './types';
 
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { RoleServiceType } from '@ez4/aws-identity';
+import { getLogGroupName } from '@ez4/aws-logs';
 import { deepCompare } from '@ez4/utils';
 
+import { EcrImageServiceType } from '../image/state';
 import { registerTaskDefinition, deregisterTaskDefinition, describeTaskDefinition } from './client';
+import { buildTaskDefinitionInput } from './service';
 import { EcsTaskDefServiceName } from './types';
 
 export const getEcsTaskDefHandler = (): StepHandler<EcsTaskDefState> => ({
@@ -23,63 +29,63 @@ const equalsResource = (candidate: EcsTaskDefState, current: EcsTaskDefState) =>
 const previewResource = (candidate: EcsTaskDefState, current: EcsTaskDefState) => {
   const target = { ...candidate.parameters, dependencies: candidate.dependencies };
   const source = { ...current.parameters, dependencies: current.dependencies };
-
   const changes = deepCompare(target, source);
-
-  if (!changes.counts) {
-    return undefined;
-  }
-
-  return {
-    ...changes,
-    name: target.agentName
-  };
+  if (!changes.counts) return undefined;
+  return { ...changes, name: target.agentName };
 };
 
-const replaceResource = async (candidate: EcsTaskDefState, current: EcsTaskDefState) => {
-  if (current.result) {
-    throw new ReplaceResourceError(EcsTaskDefServiceName, candidate.entryId, current.entryId);
-  }
-
-  return createResource(candidate);
+const replaceResource = async (candidate: EcsTaskDefState, current: EcsTaskDefState, context: StepContext) => {
+  if (current.result) throw new ReplaceResourceError(EcsTaskDefServiceName, candidate.entryId, current.entryId);
+  return createResource(candidate, context);
 };
 
-const createResource = (candidate: EcsTaskDefState): Promise<EcsTaskDefResult> => {
+const registerDefinition = (candidate: EcsTaskDefState, context: StepContext): Promise<EcsTaskDefResult> => {
   const parameters = candidate.parameters;
+  const imageUri = context.getDependencies<EcrImageState>(EcrImageServiceType).at(0)?.result?.imageUri;
+  if (!imageUri) throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'imageUri');
 
+  const roles = context.getDependencies<RoleState>(RoleServiceType);
+  const taskRoleArn = roles.find(({ parameters }) => !parameters.roleName.endsWith('-execution-role'))?.result?.roleArn;
+  const executionRoleArn = roles.find(({ parameters }) => parameters.roleName.endsWith('-execution-role'))?.result?.roleArn;
+  if (!taskRoleArn) throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'taskRoleArn');
+  if (!executionRoleArn) throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'executionRoleArn');
+
+  const logGroupName = getLogGroupName(EcsTaskDefServiceName, candidate.entryId, context);
+  const taskDefinition = buildTaskDefinitionInput(parameters.agent, imageUri, taskRoleArn, executionRoleArn, logGroupName, {
+    bucketName: parameters.bucketName,
+    region: parameters.region
+  });
   return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'creation', async (logger) => {
-    return registerTaskDefinition(logger, parameters);
+    const result = await registerTaskDefinition(logger, { agentName: parameters.agentName, taskDefinition, tags: parameters.tags });
+    return { ...result, subnetIds: parameters.subnetIds, securityGroupIds: parameters.securityGroupIds };
   });
 };
 
-const updateResource = async (candidate: EcsTaskDefState, current: EcsTaskDefState): Promise<EcsTaskDefResult | void> => {
+const createResource = registerDefinition;
+
+const updateResource = async (
+  candidate: EcsTaskDefState,
+  current: EcsTaskDefState,
+  context: StepContext
+): Promise<EcsTaskDefResult | void> => {
   const { result, parameters } = candidate;
-  const { agentName } = parameters;
+  if (!result) throw new CorruptedResourceError(EcsTaskDefServiceName, parameters.agentName);
 
-  return OperationLogger.logExecution(EcsTaskDefServiceName, agentName, 'updates', async (logger) => {
-    if (!result) {
-      throw new CorruptedResourceError(EcsTaskDefServiceName, agentName);
-    }
-
-    // Check if definition changed compared to current parameters
-    const changes = deepCompare(candidate.parameters, current.parameters);
-    if (changes.counts) {
-      const newResult = await registerTaskDefinition(logger, candidate.parameters);
-      candidate.result = newResult;
-      return;
-    }
-
+  if (
+    deepCompare({ ...parameters, dependencies: candidate.dependencies }, { ...current.parameters, dependencies: current.dependencies })
+      .counts
+  ) {
+    return registerDefinition(candidate, context);
+  }
+  return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'updates', async (logger) => {
     const existing = await describeTaskDefinition(logger, result.taskDefinitionArn);
-    if (!existing) {
-      const newResult = await registerTaskDefinition(logger, candidate.parameters);
-      candidate.result = newResult;
-    }
+    if (!existing) return registerDefinition(candidate, context);
+    return { ...result, subnetIds: parameters.subnetIds, securityGroupIds: parameters.securityGroupIds };
   });
 };
 
 const deleteResource = async (current: EcsTaskDefState, context: StepContext) => {
   const { result, parameters } = current;
-
   if (result && context.force) {
     return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'deletion', async (logger) => {
       await deregisterTaskDefinition(logger, result.taskDefinitionArn);

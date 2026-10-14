@@ -4,3 +4,4 @@ export * from './image/dockerfile';
 export * from './image/build';
 export * from './image/service';
 export * from './image/handler';
+export * from './triggers/register';

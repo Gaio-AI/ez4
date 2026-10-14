@@ -12,6 +12,12 @@ import { InvalidReplyToError } from '@ez4/agent/library';
 import type { EventContext, DeployOptions, ServiceMetadata } from '@ez4/project/library';
 import type { QueueService } from '@ez4/queue/library';
 import { QueueServiceType } from '@ez4/aws-queue';
+import { createEcsClusterStateId } from '../src/cluster/service';
+import { createEcsTaskDefStateId } from '../src/taskdef/service';
+import { createBucketStateId } from '@ez4/aws-bucket';
+import { getAgentBucketName, getAgentClusterName } from '../src/utils/names';
+import { getDefinitionName } from '@ez4/project/library';
+import type { EcsTaskDefState } from '../src/taskdef/types';
 
 describe('client :: agent client', () => {
   const inputSchema: ObjectSchema = {
@@ -213,6 +219,16 @@ describe('client :: prepareLinkedService', () => {
     equal(source.from, '@ez4/aws-agent/client');
     ok(source.constructor.includes('@{EZ4_MODULE_IMPORT}.make('));
     ok(source.constructor.includes('"agentName":"WorkerAgent"'));
+    const taskdefId = createEcsTaskDefStateId('WorkerAgent');
+    const clusterId = createEcsClusterStateId(getAgentClusterName(options));
+    ok(source.dependencyIds?.includes(taskdefId));
+    ok(source.dependencyIds?.includes(createBucketStateId(getAgentBucketName(options))));
+    ok(source.dependencyIds?.includes(clusterId));
+    ok(source.constructor.includes(getDefinitionName<EcsTaskDefState>(taskdefId, 'subnetIds')));
+    ok(source.constructor.includes(getDefinitionName<EcsTaskDefState>(taskdefId, 'securityGroupIds')));
+    ok(source.constructor.includes(getAgentBucketName(options)));
+    ok(!source.constructor.includes('-agents-cluster'));
+    ok(!source.constructor.includes('"subnets":[]'));
   });
 
   it('prepares linked service with valid FIFO replyTo queue', async () => {

@@ -1,5 +1,5 @@
 import type { EntryState, EntryStates } from '@ez4/state';
-import type { AgentService } from '@ez4/agent/library';
+import type { AgentRuntimeFields } from './types';
 import type { RegisterTaskDefinitionCommandInput } from '@aws-sdk/client-ecs';
 import type { EcsTaskDefParameters, EcsTaskDefState } from './types';
 
@@ -18,7 +18,7 @@ export const createEcsTaskDefStateId = (agentName: string) => {
 };
 
 export const buildTaskDefinitionInput = (
-  agent: AgentService,
+  agent: AgentRuntimeFields,
   imageUri: string,
   taskRoleArn: string,
   executionRoleArn: string,
@@ -27,7 +27,7 @@ export const buildTaskDefinitionInput = (
 ): RegisterTaskDefinitionCommandInput => {
   const cpu = String(agent.resources?.cpu ?? 1024);
   const memory = String(agent.resources?.memory ?? 2048);
-  const storage = agent.resources?.storage ?? 20;
+  const storage = agent.resources?.storage ?? 21;
   const timeout = agent.resources?.timeout ?? 14400;
 
   // Derive region and account from taskRoleArn or executionRoleArn or options
