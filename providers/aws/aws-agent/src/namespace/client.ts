@@ -41,9 +41,7 @@ export const waitForOperation = async (
   sleep: (ms: number) => Promise<void> = defaultSleep
 ): Promise<string | undefined> => {
   for (let i = 0; i < 60; i++) {
-    const response = await getServiceDiscoveryClient().send(
-      new GetOperationCommand({ OperationId: operationId })
-    );
+    const response = await getServiceDiscoveryClient().send(new GetOperationCommand({ OperationId: operationId }));
 
     const operation = response.Operation;
 
@@ -61,9 +59,7 @@ export const waitForOperation = async (
   throw new Error(`Operation ${operationId} timed out`);
 };
 
-export const findNamespace = async (
-  name: string
-): Promise<{ Id: string; Arn: string } | null> => {
+export const findNamespace = async (name: string): Promise<{ Id: string; Arn: string } | null> => {
   const response = await getServiceDiscoveryClient().send(
     new ListNamespacesCommand({
       Filters: [{ Name: 'NAME', Values: [name], Condition: 'EQ' }]
@@ -99,9 +95,7 @@ export const createAgentNamespaceResource = async (
   } else {
     logger.update('Creating Cloud Map namespace');
 
-    const tags = parameters.tags
-      ? Object.entries(parameters.tags).map(([Key, Value]) => ({ Key, Value }))
-      : undefined;
+    const tags = parameters.tags ? Object.entries(parameters.tags).map(([Key, Value]) => ({ Key, Value })) : undefined;
 
     const createNsResponse = await getServiceDiscoveryClient().send(
       new CreatePrivateDnsNamespaceCommand({
@@ -123,9 +117,7 @@ export const createAgentNamespaceResource = async (
 
     namespaceId = targetNamespaceId;
 
-    const nsResponse = await getServiceDiscoveryClient().send(
-      new GetNamespaceCommand({ Id: namespaceId })
-    );
+    const nsResponse = await getServiceDiscoveryClient().send(new GetNamespaceCommand({ Id: namespaceId }));
 
     if (!nsResponse.Namespace?.Arn) {
       throw new Error(`Failed to obtain ARN for namespace ${namespaceId}`);

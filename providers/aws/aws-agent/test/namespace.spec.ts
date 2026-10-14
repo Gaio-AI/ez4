@@ -6,11 +6,7 @@ import type { StepOptions } from '@ez4/state';
 import { describe, it, afterEach } from 'node:test';
 import { equal, deepEqual, ok, rejects } from 'node:assert/strict';
 
-import {
-  setServiceDiscoveryClient,
-  waitForOperation,
-  createAgentNamespaceResource
-} from '../src/namespace/client';
+import { setServiceDiscoveryClient, waitForOperation, createAgentNamespaceResource } from '../src/namespace/client';
 import { createAgentNamespace, createAgentNamespaceStateId } from '../src/namespace/service';
 import { getAgentNamespaceHandler } from '../src/namespace/handler';
 import { AgentNamespaceServiceType } from '../src/namespace/types';
@@ -61,10 +57,7 @@ describe('Cloud Map namespace and discovery service', () => {
 
     setServiceDiscoveryClient(fakeClient as unknown as ServiceDiscoveryClient);
 
-    await rejects(
-      async () => waitForOperation('op-fail'),
-      /Namespace creation failed/
-    );
+    await rejects(async () => waitForOperation('op-fail'), /Namespace creation failed/);
   });
 
   it('assert :: createAgentNamespaceResource sends CreatePrivateDnsNamespaceCommand and CreateServiceCommand when missing', async () => {
