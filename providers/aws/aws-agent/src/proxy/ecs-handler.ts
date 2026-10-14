@@ -4,12 +4,7 @@ import type { ProxyCredentialState } from './types';
 import type { AgentNamespaceState } from '../namespace/types';
 import type { ProxyServiceResult, ProxyServiceState } from './ecs-types';
 
-import {
-  CorruptedResourceError,
-  IncompleteResourceError,
-  OperationLogger,
-  ReplaceResourceError
-} from '@ez4/aws-common';
+import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { RoleServiceType } from '@ez4/aws-identity';
 import { getLogGroupName } from '@ez4/aws-logs';
 import { deepCompare } from '@ez4/utils';
@@ -49,11 +44,7 @@ const previewResource = (candidate: ProxyServiceState, current: ProxyServiceStat
   };
 };
 
-const replaceResource = async (
-  candidate: ProxyServiceState,
-  current: ProxyServiceState,
-  context: StepContext
-) => {
+const replaceResource = async (candidate: ProxyServiceState, current: ProxyServiceState, context: StepContext) => {
   if (current.result) {
     throw new ReplaceResourceError(ProxyServiceServiceName, candidate.entryId, current.entryId);
   }
@@ -61,16 +52,11 @@ const replaceResource = async (
   return createResource(candidate, context);
 };
 
-const deploy = (
-  candidate: ProxyServiceState,
-  context: StepContext
-): Promise<ProxyServiceResult> => {
+const deploy = (candidate: ProxyServiceState, context: StepContext): Promise<ProxyServiceResult> => {
   const parameters = candidate.parameters;
 
   const roles = context.getDependencies<RoleState>(RoleServiceType);
-  const executionRoleArn = roles.find(({ parameters: roleParams }) =>
-    roleParams.roleName.endsWith('-execution-role')
-  )?.result?.roleArn;
+  const executionRoleArn = roles.find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-execution-role'))?.result?.roleArn;
 
   const credentialArns = context
     .getDependencies<ProxyCredentialState>(ProxyCredentialServiceType)
@@ -78,9 +64,7 @@ const deploy = (
     .filter((arn): arn is string => !!arn)
     .sort();
 
-  const registryArn = context
-    .getDependencies<AgentNamespaceState>(AgentNamespaceServiceType)
-    .at(0)?.result?.discoveryServiceArn;
+  const registryArn = context.getDependencies<AgentNamespaceState>(AgentNamespaceServiceType).at(0)?.result?.discoveryServiceArn;
 
   const logGroupName = getLogGroupName(ProxyServiceServiceName, candidate.entryId, context);
 
@@ -101,14 +85,9 @@ const deploy = (
     region: parameters.region
   });
 
-  return OperationLogger.logExecution(
-    ProxyServiceServiceName,
-    parameters.serviceName,
-    'creation',
-    async (logger) => {
-      return upsertProxyService(logger, parameters, taskDefinitionInput, registryArn);
-    }
-  );
+  return OperationLogger.logExecution(ProxyServiceServiceName, parameters.serviceName, 'creation', async (logger) => {
+    return upsertProxyService(logger, parameters, taskDefinitionInput, registryArn);
+  });
 };
 
 const createResource = deploy;
@@ -140,13 +119,8 @@ const deleteResource = async (current: ProxyServiceState, context: StepContext) 
   const { result, parameters } = current;
 
   if (result && context.force) {
-    return OperationLogger.logExecution(
-      ProxyServiceServiceName,
-      parameters.serviceName,
-      'deletion',
-      async (logger) => {
-        await deleteProxyService(logger, parameters);
-      }
-    );
+    return OperationLogger.logExecution(ProxyServiceServiceName, parameters.serviceName, 'deletion', async (logger) => {
+      await deleteProxyService(logger, parameters);
+    });
   }
 };

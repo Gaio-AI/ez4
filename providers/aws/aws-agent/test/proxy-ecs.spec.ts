@@ -7,14 +7,8 @@ import { describe, it, afterEach } from 'node:test';
 import { equal, deepEqual, ok } from 'node:assert/strict';
 
 import { setEcsClient } from '../src/cluster/client';
-import {
-  buildCreateServiceInput,
-  upsertProxyService
-} from '../src/proxy/ecs-client';
-import {
-  createProxyService,
-  createProxyServiceStateId
-} from '../src/proxy/ecs-service';
+import { buildCreateServiceInput, upsertProxyService } from '../src/proxy/ecs-client';
+import { createProxyService, createProxyServiceStateId } from '../src/proxy/ecs-service';
 import { getProxyServiceHandler } from '../src/proxy/ecs-handler';
 import { ProxyServiceServiceType } from '../src/proxy/ecs-types';
 

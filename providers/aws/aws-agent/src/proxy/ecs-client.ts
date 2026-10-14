@@ -42,9 +42,7 @@ export const upsertProxyService = async (
 ): Promise<ProxyServiceResult> => {
   logger.update('Registering proxy task definition');
 
-  const taskDefResponse = await getEcsClient().send(
-    new RegisterTaskDefinitionCommand(taskDefinitionInput)
-  );
+  const taskDefResponse = await getEcsClient().send(new RegisterTaskDefinitionCommand(taskDefinitionInput));
 
   const taskDefinitionArn = taskDefResponse.taskDefinition?.taskDefinitionArn;
   if (!taskDefinitionArn) {
@@ -60,9 +58,7 @@ export const upsertProxyService = async (
     })
   );
 
-  const activeService = describeResponse.services?.find(
-    (s) => s.serviceName === parameters.serviceName && s.status === 'ACTIVE'
-  );
+  const activeService = describeResponse.services?.find((s) => s.serviceName === parameters.serviceName && s.status === 'ACTIVE');
 
   let serviceArn: string;
 
@@ -87,9 +83,7 @@ export const upsertProxyService = async (
     logger.update('Creating ECS proxy service');
 
     const createResponse = await getEcsClient().send(
-      new CreateServiceCommand(
-        buildCreateServiceInput(parameters, taskDefinitionArn, registryArn)
-      )
+      new CreateServiceCommand(buildCreateServiceInput(parameters, taskDefinitionArn, registryArn))
     );
 
     if (!createResponse.service?.serviceArn) {
@@ -105,10 +99,7 @@ export const upsertProxyService = async (
   };
 };
 
-export const deleteProxyService = async (
-  logger: OperationLogLine,
-  parameters: ProxyServiceParameters
-): Promise<void> => {
+export const deleteProxyService = async (logger: OperationLogLine, parameters: ProxyServiceParameters): Promise<void> => {
   logger.update('Deleting ECS proxy service');
 
   try {
