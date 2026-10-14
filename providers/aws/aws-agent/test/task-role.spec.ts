@@ -45,15 +45,12 @@ describe('agent task and execution roles', () => {
     equal(trustStatement.Effect, 'Allow');
     ok('Service' in trustStatement.Principal);
     equal(
-      Array.isArray(trustStatement.Principal.Service)
-        ? trustStatement.Principal.Service[0]
-        : trustStatement.Principal.Service,
+      Array.isArray(trustStatement.Principal.Service) ? trustStatement.Principal.Service[0] : trustStatement.Principal.Service,
       'ecs-tasks.amazonaws.com'
     );
     ok(trustStatement.Condition?.StringEquals);
     equal(
-      trustStatement.Condition.StringEquals['AWS:SourceAccount'] ||
-        trustStatement.Condition.StringEquals['aws:SourceAccount'],
+      trustStatement.Condition.StringEquals['AWS:SourceAccount'] || trustStatement.Condition.StringEquals['aws:SourceAccount'],
       '123456789012'
     );
 
@@ -81,9 +78,7 @@ describe('agent task and execution roles', () => {
     ok(trustStatement);
     ok('Service' in trustStatement.Principal);
     equal(
-      Array.isArray(trustStatement.Principal.Service)
-        ? trustStatement.Principal.Service[0]
-        : trustStatement.Principal.Service,
+      Array.isArray(trustStatement.Principal.Service) ? trustStatement.Principal.Service[0] : trustStatement.Principal.Service,
       'ecs-tasks.amazonaws.com'
     );
 

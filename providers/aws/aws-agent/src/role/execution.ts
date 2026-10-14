@@ -3,7 +3,15 @@ import type { AgentService } from '@ez4/agent/library';
 import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
 import { getServiceName } from '@ez4/project/library';
-import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId, getRegion } from '@ez4/aws-identity';
+import {
+  createRole,
+  createPolicy,
+  createPolicyDocument,
+  createRoleDocument,
+  createRoleStatement,
+  getAccountId,
+  getRegion
+} from '@ez4/aws-identity';
 
 export const buildAgentExecutionRole = <E extends EntryState>(
   state: EntryStates<E>,

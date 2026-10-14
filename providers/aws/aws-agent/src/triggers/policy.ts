@@ -26,10 +26,7 @@ export const buildExecutionPolicy = (event: PolicyResourceEvent, region: string,
           permissions: ['s3:PutObject']
         },
         {
-          resourceIds: [
-            `arn:aws:s3:::${policyPrefix}-agents/results/*`,
-            `arn:aws:s3:::${policyPrefix}-agents/artifacts/*`
-          ],
+          resourceIds: [`arn:aws:s3:::${policyPrefix}-agents/results/*`, `arn:aws:s3:::${policyPrefix}-agents/artifacts/*`],
           permissions: ['s3:GetObject']
         }
       ]),

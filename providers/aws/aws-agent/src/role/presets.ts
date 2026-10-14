@@ -4,12 +4,7 @@ import type { IdentityGrant } from '@ez4/project/library';
 export const PRESET_POLICIES: Record<Agent.Preset, IdentityGrant> = {
   'logs-read': {
     resourceIds: ['*'],
-    permissions: [
-      'logs:DescribeLogGroups',
-      'logs:DescribeLogStreams',
-      'logs:GetLogEvents',
-      'logs:FilterLogEvents'
-    ]
+    permissions: ['logs:DescribeLogGroups', 'logs:DescribeLogStreams', 'logs:GetLogEvents', 'logs:FilterLogEvents']
   },
   'lambda-read': {
     resourceIds: ['*'],
