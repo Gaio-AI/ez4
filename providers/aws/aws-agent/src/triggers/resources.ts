@@ -11,6 +11,7 @@ import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '
 import { linkEntryConnection } from '@ez4/state';
 import { hashData } from '@ez4/utils';
 
+import { buildAgentBundle } from '../runtime/bundle';
 import { createEcsCluster, createEcsClusterStateId } from '../cluster/service';
 import { createAgentImage } from '../image/state';
 import { createEcrRepository } from '../image/service';
@@ -29,7 +30,7 @@ export type AgentResourcePorts = {
 
 const defaultPorts: AgentResourcePorts = {
   network: { getDefaultVpcId, getTaggedSubnetIds, getTaggedSecurityGroupIds },
-  bundle: () => Promise.reject(new Error('agent bundle builder not registered')),
+  bundle: buildAgentBundle,
   identity: async () => {
     const [region, accountId] = await Promise.all([getRegion(), getAccountId()]);
     return { region, accountId };
