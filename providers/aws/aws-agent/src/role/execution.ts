@@ -43,11 +43,7 @@ export const buildAgentExecutionRole = <E extends EntryState>(
   // Secrets policy for valueFrom injection
   if (agent.secrets && Object.keys(agent.secrets).length > 0) {
     const secretResourceIds = [
-      ...new Set(
-        Object.values(agent.secrets).map((secretRef) =>
-          getSecretResourceArn(secretRef, region, accountId)
-        )
-      )
+      ...new Set(Object.values(agent.secrets).map((secretRef) => getSecretResourceArn(secretRef, region, accountId)))
     ];
 
     baseExecutionGrants.push({
