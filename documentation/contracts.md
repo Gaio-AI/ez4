@@ -74,6 +74,7 @@ Circular linked services are supported. EZ4 resolves linked contexts lazily and 
 
 ## All contracts
 
+- [Agent](../contracts/agent/README.md)
 - [Gateway](../contracts/gateway/README.md)
 - [Database](../contracts/database/README.md)
 - [Cache](../contracts/cache/README.md)
@@ -85,6 +86,41 @@ Circular linked services are supported. EZ4 resolves linked contexts lazily and 
 - [Email](../contracts/email/README.md)
 - [Validation](../contracts/validation/README.md)
 - [Factory](../contracts/factory/README.md)
+
+## Agent
+
+The Agent contract allows declaring autonomous LLM-powered services running on AWS ECS Fargate with dedicated IAM isolation, domain egress restrictions, and async agent-to-agent callbacks.
+
+### Service Definition
+
+```typescript
+import { Agent } from '@ez4/agent';
+
+export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
+  provider: 'claude';
+  model: 'claude-sonnet-4-5';
+  instructions: 'You are an autonomous code reviewer.';
+  tools: {
+    mode: 'readonly';
+    allowed: ['Read', 'Grep', 'Glob'];
+  };
+  egress: ['api.github.com'];
+  permissions: {
+    presets: ['logs-read'];
+  };
+  resources: {
+    cpu: 1024;
+    memory: 2048;
+    timeout: 3600;
+  };
+}
+```
+
+### Client Invocation
+
+```typescript
+const { id } = await context.services.CodeReviewAgent.invoke({ pullRequest: 42 }, { correlation: JSON.stringify({ reviewId: 'rev-1' }) });
+```
 
 ## What's next
 
