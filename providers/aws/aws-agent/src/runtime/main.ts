@@ -28,6 +28,7 @@ export interface RunAgentRuntimeParameters {
   prepare?: Agent.PrepareHook<unknown>;
   finish?: Agent.FinishHook<unknown, unknown>;
   timeoutSeconds: number;
+  context?: object;
   workdir?: string;
   env?: Record<string, string>;
 }
@@ -47,6 +48,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     prepare,
     finish,
     timeoutSeconds,
+    context = {},
     workdir = process.cwd(),
     env = {}
   } = parameters;
@@ -77,7 +79,6 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     const artifacts = createArtifactsClient(storage, agentName, invocationId);
     let effectivePrompt = typeof envelope.input === 'string' ? envelope.input : JSON.stringify(envelope.input);
     let effectiveWorkdir = workdir;
-    const dummyContext = {} as unknown as CommonService.Context<Agent.Service<any, any>>;
 
     if (prepare) {
       try {
@@ -88,7 +89,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
             workdir: effectiveWorkdir,
             artifacts
           },
-          dummyContext
+          context as CommonService.Context<Agent.Service<any, any>>
         );
         if (prepareResult?.prompt) {
           effectivePrompt = prepareResult.prompt;
@@ -172,7 +173,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
             workdir: effectiveWorkdir,
             artifacts
           },
-          dummyContext
+          context as CommonService.Context<Agent.Service<any, any>>
         );
       } catch (finishErr: unknown) {
         const message = finishErr instanceof Error ? finishErr.message : String(finishErr);
