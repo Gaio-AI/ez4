@@ -1,5 +1,6 @@
 import type { Agent } from '@ez4/agent';
 import type { SquidConfigOptions } from './types';
+import type { AgentService } from '@ez4/agent/library';
 
 export interface AgentDomainInput {
   domains?: string[];
@@ -58,6 +59,15 @@ export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: stri
 
   return Array.from(domains).sort();
 };
+const PROVIDER_DOMAINS: Record<string, string[]> = { claude: ['api.anthropic.com'] };
+
+/** Domains an agent may reach through the proxy: declared egress, AWS APIs from its permissions, and its LLM provider. */
+export const getAgentEgressDomains = (agent: Pick<AgentService, 'egress' | 'permissions' | 'provider'>, region: string): string[] => {
+  const domains = new Set(resolveAgentAllowedDomains({ egress: agent.egress, permissions: agent.permissions }, region));
+  for (const domain of PROVIDER_DOMAINS[agent.provider ?? ''] ?? []) domains.add(domain);
+  return Array.from(domains).sort();
+};
+
 
 export const buildNoProxyList = (region: string): string[] => {
   return [
@@ -91,6 +101,9 @@ export const generateSquidConfig = (options: SquidConfigOptions): string => {
   ];
 
   for (const agent of agents) {
+    if (!agent.allowedDomains || agent.allowedDomains.length === 0) {
+      continue;
+    }
     const userAcl = `user_${agent.agentName}`;
     const domainAcl = `domains_${agent.agentName}`;
     const normalizedDomains = agent.allowedDomains.map(normalizeDomain);

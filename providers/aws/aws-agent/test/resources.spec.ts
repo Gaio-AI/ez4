@@ -15,6 +15,10 @@ import { BucketServiceType } from '@ez4/aws-bucket';
 import { LogGroupServiceType } from '@ez4/aws-logs';
 import { FunctionServiceType } from '@ez4/aws-function';
 import { EventsRuleServiceType } from '../src/events/types';
+import { AgentNamespaceServiceType } from '../src/namespace/types';
+import { ProxyServiceServiceType, type ProxyServiceState } from '../src/proxy/ecs-types';
+import { ProxyCredentialServiceType, type ProxyCredentialState } from '../src/proxy/types';
+import type { EcsTaskDefState } from '../src/taskdef/types';
 
 import { prepareAgentResources } from '../src/triggers/resources';
 import { getAgentBucketName, getAgentClusterName, getAgentKey } from '../src/utils/names';
@@ -41,7 +45,8 @@ const ports = {
   network: {
     getDefaultVpcId: async () => 'vpc-1',
     getTaggedSubnetIds: async () => ['subnet-a', 'subnet-b'],
-    getTaggedSecurityGroupIds: async () => ['sg-agents']
+    getTaggedSecurityGroupIds: async (_vpc: string, tag: { key: string }) =>
+      tag.key === 'ez4:agents-proxy' ? ['sg-proxy'] : ['sg-agents']
   },
   bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' }),
   identity: async () => ({ region: 'us-east-1', accountId: '123456789012' }),
@@ -57,18 +62,19 @@ describe('agent resources wiring', () => {
     const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
     const second = { ...createAgentService('ReviewAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
 
+    const metadata = { EchoAgent: first, ReviewAgent: second };
+
     for (const service of [first, second]) {
-      const event = { state, service, metadata: {}, options, context } as PrepareResourceEvent;
+      const event = { state, service, metadata, options, context } as PrepareResourceEvent;
       equal(await prepareAgentResources(event, ports), true);
     }
-
     equal(countType(state, EcsClusterServiceType), 1);
     equal(countType(state, BucketServiceType), 1);
     equal(countType(state, EcrRepositoryServiceType), 2);
     equal(countType(state, EcrImageServiceType), 2);
     equal(countType(state, EcsTaskDefServiceType), 2);
-    // 2 agent log groups + 1 dispatcher log group
-    equal(countType(state, LogGroupServiceType), 3);
+    // 2 agent log groups + 1 dispatcher log group + 1 proxy log group
+    equal(countType(state, LogGroupServiceType), 4);
     // 2 task roles + 1 shared execution role + 1 dispatcher role
     equal(countType(state, RoleServiceType), 4);
 
@@ -80,7 +86,7 @@ describe('agent resources wiring', () => {
     const taskdef = context.getServiceState('EchoAgent', options);
     equal(taskdef.type, EcsTaskDefServiceType);
     const dependencyTypes = taskdef.dependencies.map((id) => state[id]!.type).sort();
-    deepEqual(dependencyTypes, [EcrImageServiceType, LogGroupServiceType, RoleServiceType, RoleServiceType].sort());
+    deepEqual(dependencyTypes, [EcrImageServiceType, LogGroupServiceType, RoleServiceType, RoleServiceType, ProxyCredentialServiceType].sort());
   });
 
   it('assert :: non-agent services are ignored', async () => {
@@ -100,12 +106,45 @@ describe('agent resources wiring', () => {
     const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
     const second = { ...createAgentService('ReviewAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
 
+    const metadata = { EchoAgent: first, ReviewAgent: second };
+
     for (const service of [first, second]) {
-      const event = { state, service, metadata: {}, options, context } as PrepareResourceEvent;
+      const event = { state, service, metadata, options, context } as PrepareResourceEvent;
       equal(await prepareAgentResources(event, ports), true);
     }
 
     equal(countType(state, FunctionServiceType), 1);
     equal(countType(state, EventsRuleServiceType), 2);
+  });
+  it('assert :: proxy service, namespace, credentials and taskdef proxyUrl wiring for agents', async () => {
+    const state: EntryStates = {};
+    const context = makeContext();
+    const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
+    const second = { ...createAgentService('ReviewAgent'), provider: 'other', model: 'm', instructions: 'i' } as never;
+    const metadata = { EchoAgent: first, ReviewAgent: second };
+
+    for (const service of [first, second]) {
+      const event = { state, service, metadata, options, context } as PrepareResourceEvent;
+      equal(await prepareAgentResources(event, ports), true);
+    }
+
+    equal(countType(state, AgentNamespaceServiceType), 1);
+    equal(countType(state, ProxyServiceServiceType), 1);
+
+    const proxyService = Object.values(state).find((entry): entry is ProxyServiceState => entry?.type === ProxyServiceServiceType)!;
+    const credentialEntries = Object.values(state).filter((entry): entry is ProxyCredentialState => entry?.type === ProxyCredentialServiceType);
+    equal(credentialEntries.length, 2);
+    for (const cred of credentialEntries) {
+      ok(proxyService.dependencies.includes(cred.entryId));
+    }
+
+    deepEqual(proxyService.parameters.securityGroupIds, ['sg-proxy']);
+    ok(proxyService.parameters.squidConfig.includes('api.anthropic.com'));
+
+    const taskdefs = Object.values(state).filter((entry): entry is EcsTaskDefState => entry?.type === EcsTaskDefServiceType);
+    equal(taskdefs.length, 2);
+    for (const td of taskdefs) {
+      equal(td.parameters.proxyUrl, 'http://proxy.ez4-lab-agents.local:3128');
+    }
   });
 });

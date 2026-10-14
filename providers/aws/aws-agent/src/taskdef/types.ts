@@ -16,6 +16,7 @@ export type EcsTaskDefParameters = {
   region: string;
   subnetIds: string[];
   securityGroupIds: string[];
+  proxyUrl?: string;
   tags?: ResourceTags;
 };
 

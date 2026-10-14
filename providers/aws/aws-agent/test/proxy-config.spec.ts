@@ -13,7 +13,7 @@ import {
   ResourceNotFoundException
 } from '@aws-sdk/client-secrets-manager';
 
-import { generateSquidConfig, resolveAgentAllowedDomains, buildNoProxyList, normalizeDomain } from '../src/proxy/config';
+import { generateSquidConfig, resolveAgentAllowedDomains, buildNoProxyList, normalizeDomain, getAgentEgressDomains } from '../src/proxy/config';
 import { generateHtpasswd, generateAgentPassword } from '../src/proxy/auth';
 import { createProxyCredential, getProxyCredentialHandler } from '../src/proxy/credential';
 import { setSecretsManagerClient } from '../src/proxy/client';
@@ -218,5 +218,29 @@ describe('proxy :: configuration and auth', () => {
     equal(secretDeletedId, 'ez4-test-coder-proxy');
 
     setSecretsManagerClient(null);
+  });
+  it('resolves agent egress domains including provider domains', () => {
+    const domains = getAgentEgressDomains(
+      {
+        provider: 'claude',
+        egress: ['github.com']
+      },
+      'us-east-1'
+    );
+    ok(domains.includes('api.anthropic.com'));
+    ok(domains.includes('github.com'));
+  });
+
+  it('skips agents with empty allowedDomains in generateSquidConfig', () => {
+    const config = generateSquidConfig({
+      agents: [
+        {
+          agentName: 'empty-agent',
+          allowedDomains: []
+        }
+      ]
+    });
+    ok(!config.includes('acl domains_empty-agent'));
+    ok(!config.includes('user_empty-agent'));
   });
 });

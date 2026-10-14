@@ -7,10 +7,17 @@ export const AgentNetworkTag: VpcTag = {
   key: 'ez4:agents',
   value: 'true'
 };
+export const AgentProxyNetworkTag: VpcTag = {
+  key: 'ez4:agents-proxy',
+  value: 'true'
+};
+
 
 export interface AgentNetworkConfig {
+  vpcId: string;
   subnetIds: string[];
   securityGroupIds: string[];
+  proxySecurityGroupIds: string[];
 }
 
 export type NetworkLookup = {
@@ -32,9 +39,10 @@ export const discoverAgentNetwork = async (vpcId?: string, lookup: NetworkLookup
     throw new MissingAgentNetworkError('no VPC found or specified');
   }
 
-  const [subnetIds, securityGroupIds] = await Promise.all([
+  const [subnetIds, securityGroupIds, proxySecurityGroupIds] = await Promise.all([
     lookup.getTaggedSubnetIds(resolvedVpcId, AgentNetworkTag),
-    lookup.getTaggedSecurityGroupIds(resolvedVpcId, AgentNetworkTag)
+    lookup.getTaggedSecurityGroupIds(resolvedVpcId, AgentNetworkTag),
+    lookup.getTaggedSecurityGroupIds(resolvedVpcId, AgentProxyNetworkTag)
   ]);
 
   if (!subnetIds || subnetIds.length === 0) {
@@ -44,9 +52,15 @@ export const discoverAgentNetwork = async (vpcId?: string, lookup: NetworkLookup
   if (!securityGroupIds || securityGroupIds.length === 0) {
     throw new MissingAgentNetworkError(`no security groups found with tag 'ez4:agents=true' in VPC ${resolvedVpcId}`);
   }
+  if (!proxySecurityGroupIds || proxySecurityGroupIds.length === 0) {
+    throw new MissingAgentNetworkError(`no security groups found with tag 'ez4:agents-proxy=true' in VPC ${resolvedVpcId}`);
+  }
+
 
   return {
+    vpcId: resolvedVpcId,
     subnetIds,
-    securityGroupIds
+    securityGroupIds,
+    proxySecurityGroupIds
   };
 };

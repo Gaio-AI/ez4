@@ -10,7 +10,7 @@ import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
 import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
 import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
 import { linkEntryConnection } from '@ez4/state';
-import { hashData } from '@ez4/utils';
+import { hashData, toKebabCase } from '@ez4/utils';
 
 import { buildAgentBundle } from '../runtime/bundle';
 import { createEcsCluster, createEcsClusterStateId } from '../cluster/service';
@@ -18,10 +18,23 @@ import { createAgentImage } from '../image/state';
 import { createEcrRepository } from '../image/service';
 import { computeImageTag, generateDockerfile } from '../image/dockerfile';
 import { discoverAgentNetwork } from '../network/discovery';
+import { createProxyCredential, createProxyCredentialStateId } from '../proxy/credential';
+import { createAgentNamespace, createAgentNamespaceStateId } from '../namespace/service';
+import { createProxyService, createProxyServiceStateId } from '../proxy/ecs-service';
+import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
 import { buildAgentExecutionRole } from '../role/execution';
 import { buildAgentTaskRole } from '../role/task';
 import { createEcsTaskDefinition } from '../taskdef/service';
-import { getAgentBucketName, getAgentClusterName, getAgentLogGroupName, getAgentRepositoryName, getAgentsBaseName } from '../utils/names';
+import {
+  getAgentBucketName,
+  getAgentClusterName,
+  getAgentLogGroupName,
+  getAgentRepositoryName,
+  getAgentsBaseName,
+  getAgentsNamespaceName,
+  getAgentProxyUrl,
+  getAgentProxySecretName
+} from '../utils/names';
 import { buildDispatcherBundle, prepareDispatcher } from '../dispatch/resources';
 
 export type AgentResourcePorts = {
@@ -46,6 +59,16 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   if (!isAgentService(service)) return false;
 
   const { region, accountId } = await ports.identity();
+  const network = await discoverAgentNetwork(undefined, ports.network);
+
+  const agents = Object.values(event.metadata).filter(isAgentService);
+  // Every agent's credential exists before the proxy service, which mounts all of their hashes.
+  const credentials = agents.map((agent) => {
+    const secretName = getAgentProxySecretName(agent, options);
+    return state[createProxyCredentialStateId(secretName)] ?? createProxyCredential(state, { secretName, agentName: agent.name, tags: options.tags });
+  });
+  const credential = credentials[agents.findIndex((agent) => agent.name === service.name)];
+
   const clusterName = getAgentClusterName(options);
   const bucketName = getAgentBucketName(options);
   const cluster = state[createEcsClusterStateId(clusterName)] ?? createEcsCluster(state, { clusterName, tags: options.tags });
@@ -54,15 +77,36 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   const executionRoleId = hashData(RoleServiceType, executionRoleName);
   const executionSecrets = Object.assign(
     {},
-    ...Object.values(event.metadata)
-      .filter(isAgentService)
-      .map((agent) => agent.secrets ?? {}),
-    service.secrets ?? {}
+    ...agents.map((agent) => agent.secrets ?? {}),
+    service.secrets ?? {},
+    ...agents.map((agent) => ({
+      [`EZ4_PROXY_${toKebabCase(agent.name)}`]: getAgentProxySecretName(agent, options)
+    }))
   );
   const executionRole =
     (state[executionRoleId] as RoleState | undefined) ??
     buildAgentExecutionRole(state, { ...service, secrets: executionSecrets }, options, region, accountId);
 
+  const namespaceName = getAgentsNamespaceName(options);
+  const namespace = state[createAgentNamespaceStateId(namespaceName)] ?? createAgentNamespace(state, { namespaceName, vpcId: network.vpcId, serviceName: 'proxy', tags: options.tags });
+  const proxyServiceName = `${getAgentsBaseName(options)}-proxy`;
+  if (!state[createProxyServiceStateId(proxyServiceName)]) {
+    const proxyLogGroup = createLogGroup(state, { groupName: proxyServiceName, retention: 30, tags: options.tags });
+    createProxyService(
+      state,
+      {
+        serviceName: proxyServiceName,
+        baseName: getAgentsBaseName(options),
+        clusterName,
+        squidConfig: generateSquidConfig({ agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region) })) }),
+        region,
+        subnetIds: network.subnetIds,
+        securityGroupIds: network.proxySecurityGroupIds,
+        tags: options.tags
+      },
+      [namespace.entryId, proxyLogGroup.entryId, executionRole.entryId, cluster.entryId, ...credentials.map(({ entryId }) => entryId)]
+    );
+  }
   const linkedAgents = Object.values(service.services ?? {})
     .map(({ reference }) => reference)
     .filter((name) => !!name && isAgentService(event.metadata[name] ?? {}));
@@ -101,7 +145,6 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     imageTag: computeImageTag(dockerfile, bundle.hash)
   });
 
-  const network = await discoverAgentNetwork(undefined, ports.network);
   const taskdef = createEcsTaskDefinition(
     state,
     {
@@ -112,9 +155,10 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       region,
       subnetIds: network.subnetIds,
       securityGroupIds: network.securityGroupIds,
+      proxyUrl: getAgentProxyUrl(options),
       tags: options.tags
     },
-    [image.entryId, logGroup.entryId, taskRole.entryId, executionRole.entryId]
+    [image.entryId, logGroup.entryId, taskRole.entryId, executionRole.entryId, credential.entryId]
   );
   linkEntryConnection(state, taskdef.entryId, cluster.entryId);
   linkEntryConnection(state, taskdef.entryId, bucket.entryId);

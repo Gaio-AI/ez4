@@ -1,5 +1,6 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { RoleState } from '@ez4/aws-identity';
+import type { ProxyCredentialState } from '../proxy/types';
 import type { EcrImageState } from '../image/state';
 import type { EcsTaskDefResult, EcsTaskDefState } from './types';
 
@@ -8,6 +9,7 @@ import { RoleServiceType } from '@ez4/aws-identity';
 import { getLogGroupName } from '@ez4/aws-logs';
 import { deepCompare } from '@ez4/utils';
 
+import { ProxyCredentialServiceType } from '../proxy/types';
 import { EcrImageServiceType } from '../image/state';
 import { registerTaskDefinition, deregisterTaskDefinition, describeTaskDefinition } from './client';
 import { buildTaskDefinitionInput } from './service';
@@ -50,11 +52,13 @@ const registerDefinition = (candidate: EcsTaskDefState, context: StepContext): P
   if (!taskRoleArn) throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'taskRoleArn');
   if (!executionRoleArn) throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'executionRoleArn');
 
+  const proxySecretArn = context.getDependencies<ProxyCredentialState>(ProxyCredentialServiceType).at(0)?.result?.secretArn;
   const logGroupName = getLogGroupName(EcsTaskDefServiceName, candidate.entryId, context);
   const taskDefinition = buildTaskDefinitionInput(parameters.agent, imageUri, taskRoleArn, executionRoleArn, logGroupName, {
     baseName: parameters.baseName,
     bucketName: parameters.bucketName,
-    region: parameters.region
+    region: parameters.region,
+    proxy: parameters.proxyUrl && proxySecretArn ? { url: parameters.proxyUrl, secretArn: proxySecretArn } : undefined
   });
   return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'creation', async (logger) => {
     const result = await registerTaskDefinition(logger, { agentName: parameters.agentName, taskDefinition, tags: parameters.tags });
