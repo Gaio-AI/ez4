@@ -28,7 +28,8 @@ export namespace Client {
 
     return PgClient.make({
       driver: new ClientDriver(DB_POOL[database], {
-        dataApi: connection.dataApi
+        dataApi: connection.dataApi,
+        dataApiResults: connection.dataApiResults
       }),
       repository,
       debug

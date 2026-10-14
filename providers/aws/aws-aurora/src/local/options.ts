@@ -29,7 +29,9 @@ export const getConnectionOptions = (service: DatabaseService, options: ServeOpt
     user,
     port,
     poolSize,
-    dataApi: getDataApiOptions(service, dataApi)
+    dataApi: getDataApiOptions(service, dataApi),
+    // A deployed client returns the Data API shapes in both connection modes, so a local one does too.
+    dataApiResults: true
   };
 };
 
