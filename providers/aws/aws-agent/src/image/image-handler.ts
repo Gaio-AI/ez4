@@ -2,7 +2,6 @@ import type { StepContext, StepHandler } from '@ez4/state';
 import type { EcrRepositoryState } from './types';
 import type { EcrImageResult, EcrImageState } from './state';
 
-import { dirname } from 'node:path';
 import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
@@ -73,7 +72,7 @@ const createResource = (candidate: EcrImageState, context: StepContext): Promise
         repositoryUri,
         dockerfile: parameters.dockerfile,
         bundleHash: parameters.bundleHash,
-        workDir: dirname(parameters.bundleFile)
+        bundleFile: parameters.bundleFile
       });
     }
 
@@ -107,7 +106,7 @@ const updateResource = async (candidate: EcrImageState, _current: EcrImageState,
         repositoryUri,
         dockerfile: parameters.dockerfile,
         bundleHash: parameters.bundleHash,
-        workDir: dirname(parameters.bundleFile)
+        bundleFile: parameters.bundleFile
       });
     }
 

@@ -52,6 +52,9 @@ describe('runtime :: execution lifecycle', () => {
 
     let prepareCalled = false;
     let finishCalled = false;
+    const linkedContext = { review: { invoke: async () => ({ id: 'child' }) } };
+    let prepareContext: unknown;
+    let finishContext: unknown;
 
     const exitCode = await runAgentRuntime({
       agentName,
@@ -64,22 +67,27 @@ describe('runtime :: execution lifecycle', () => {
       mcpServers: {},
       instructions: 'Do work',
       model: 'test-model',
-      prepare: async (req: Agent.PrepareRequest<unknown>) => {
+      prepare: async (req: Agent.PrepareRequest<unknown>, context) => {
+        prepareContext = context;
         prepareCalled = true;
         await req.artifacts.put('state.txt', 'started');
         const typedInput = req.input as { task: string };
         return { prompt: `custom prompt for ${typedInput.task}` };
       },
-      finish: async () => {
+      finish: async (_req, context) => {
+        finishContext = context;
         finishCalled = true;
         return { result: 'finished output' };
       },
+      context: linkedContext,
       timeoutSeconds: 30
     });
 
     equal(exitCode, 0);
     ok(prepareCalled);
     ok(finishCalled);
+    equal(prepareContext, linkedContext);
+    equal(finishContext, linkedContext);
     equal(receivedPrompt, 'custom prompt for hello');
 
     const resultRaw = await storage.readJson<Agent.Result<TestAgentService>>(`results/${agentName}/${invocationId}.json`);

@@ -30,7 +30,7 @@ export type ImageBuildOptions = {
   repositoryUri: string;
   dockerfile: string;
   bundleHash: string;
-  workDir: string;
+  bundleFile: string;
   client?: EcrImageClient;
   commandRunner?: (command: string, args: string[], options?: { input?: string; cwd?: string }) => Promise<void>;
 };

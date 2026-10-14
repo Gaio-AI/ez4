@@ -1,6 +1,7 @@
 import type { EcrImageClient } from '../src/image/types';
 import { describe, it } from 'node:test';
-import { ok, equal, rejects } from 'node:assert/strict';
+import { ok, equal, rejects, deepEqual } from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
 import { buildAndPushImage } from '../src/image/build';
 import { MissingDockerCliError } from '../src/image/errors';
 
@@ -28,7 +29,7 @@ describe('agent image builder', () => {
       repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
       dockerfile: 'FROM node:24-bookworm-slim',
       bundleHash: 'abc12345',
-      workDir: '/tmp',
+      bundleFile: import.meta.filename,
       client: mockClient,
       commandRunner: mockRunner
     });
@@ -37,6 +38,33 @@ describe('agent image builder', () => {
     ok(checkedTag.length > 0);
     equal(buildExecuted, false);
     equal(imageUri, `123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent:${checkedTag}`);
+  });
+
+  it('assert :: builds only from a Dockerfile and copied runtime bundle', async () => {
+    let files: string[] = [];
+    let runtime = '';
+    let dockerfile = '';
+    const client: EcrImageClient = {
+      imageExists: async () => false,
+      getAuthorizationToken: async () => ({})
+    };
+    await buildAndPushImage({
+      agentName: 'TestAgent',
+      repositoryUri: 'registry.example/test-agent',
+      dockerfile: 'FROM node:24',
+      bundleHash: 'abc12345',
+      bundleFile: import.meta.filename,
+      client,
+      commandRunner: async (_command, args, options) => {
+        if (args[0] !== 'buildx' || !options?.cwd) return;
+        files = await readdir(options.cwd);
+        runtime = await readFile(`${options.cwd}/runtime.mjs`, 'utf8');
+        dockerfile = await readFile(`${options.cwd}/Dockerfile`, 'utf8');
+      }
+    });
+    deepEqual(files, ['Dockerfile', 'runtime.mjs']);
+    equal(runtime, await readFile(import.meta.filename, 'utf8'));
+    equal(dockerfile, 'FROM node:24');
   });
 
   it('assert :: logs in and executes docker buildx when image does not exist', async () => {
@@ -59,7 +87,7 @@ describe('agent image builder', () => {
       repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
       dockerfile: 'FROM node:24-bookworm-slim',
       bundleHash: 'abc12345',
-      workDir: '/tmp/agent-build',
+      bundleFile: import.meta.filename,
       client: mockClient,
       commandRunner: mockRunner
     });
@@ -90,7 +118,7 @@ describe('agent image builder', () => {
           repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
           dockerfile: 'FROM node:24-bookworm-slim',
           bundleHash: 'abc12345',
-          workDir: '/tmp'
+          bundleFile: import.meta.filename
         });
       }, MissingDockerCliError);
     } finally {

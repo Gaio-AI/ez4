@@ -12,9 +12,7 @@ export const generateDockerfile = (agent: AgentService): string => {
     lines.push(`RUN apt-get update && apt-get install -y --no-install-recommends ${aptPackages} && rm -rf /var/lib/apt/lists/*`);
   }
 
-  if (npmPackages) {
-    lines.push(`RUN npm install -g ${npmPackages}`);
-  }
+  lines.push(`RUN npm install --omit=dev --prefix /app @anthropic-ai/claude-agent-sdk @aws-sdk/client-s3${npmPackages ? ` ${npmPackages}` : ''}`);
 
   lines.push(
     // node images already ship uid/gid 1000 (`node`); create it only on bases that lack it.

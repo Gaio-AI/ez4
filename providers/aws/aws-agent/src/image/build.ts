@@ -2,7 +2,9 @@ import type { ImageBuildOptions } from './types';
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { delimiter } from 'node:path';
+import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { MissingDockerCliError } from './errors';
 import { checkImageExists, fetchAuthorizationToken } from './client';
 import { computeImageTag } from './dockerfile';
@@ -52,7 +54,7 @@ const defaultCommandRunner = (command: string, args: string[], options?: { input
 };
 
 export const buildAndPushImage = async (options: ImageBuildOptions): Promise<string> => {
-  const { repositoryUri, dockerfile, bundleHash, workDir, client, commandRunner = defaultCommandRunner } = options;
+  const { repositoryUri, dockerfile, bundleHash, bundleFile, client, commandRunner = defaultCommandRunner } = options;
 
   if (!isDockerAvailable()) {
     throw new MissingDockerCliError();
@@ -84,7 +86,16 @@ export const buildAndPushImage = async (options: ImageBuildOptions): Promise<str
     });
   }
 
-  await commandRunner('docker', ['buildx', 'build', '--platform', 'linux/amd64', '-t', fullImageUri, '--push', '.'], { cwd: workDir });
+  const buildContext = await mkdtemp(join(tmpdir(), 'ez4-agent-image-'));
+  try {
+    await Promise.all([
+      writeFile(join(buildContext, 'Dockerfile'), dockerfile),
+      copyFile(bundleFile, join(buildContext, 'runtime.mjs'))
+    ]);
+    await commandRunner('docker', ['buildx', 'build', '--platform', 'linux/amd64', '-t', fullImageUri, '--push', '.'], { cwd: buildContext });
+  } finally {
+    await rm(buildContext, { recursive: true, force: true });
+  }
 
   return fullImageUri;
 };
