@@ -10,6 +10,7 @@ export * from './role/task';
 export * from './role/execution';
 export * from './triggers/policy';
 export * from './triggers/identity';
+export * from './triggers/client';
 
 export * from './cluster/types';
 export * from './cluster/service';
@@ -30,3 +31,5 @@ export * from './runtime/artifacts';
 export * from './runtime/timer';
 export * from './runtime/main';
 export * from './runtime/providers/index';
+
+export * from './client';
