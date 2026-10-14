@@ -45,7 +45,7 @@ const ports = {
   },
   bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' }),
   identity: async () => ({ region: 'us-east-1', accountId: '123456789012' }),
-  dispatcherBundle: async () => '/tmp/dispatcher.mjs',
+  dispatcherBundle: async () => '/tmp/dispatcher.mjs'
 };
 
 const countType = (state: EntryStates, type: string) => Object.values(state).filter((entry) => entry?.type === type).length;
