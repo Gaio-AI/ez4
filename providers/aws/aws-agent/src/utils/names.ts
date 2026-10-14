@@ -5,7 +5,10 @@ import { toKebabCase } from '@ez4/utils';
 
 export const getAgentsBaseName = (options: DeployOptions) => {
   const parts = [options.prefix, options.projectName, options.branchName, 'agents'];
-  return parts.filter((part): part is string => !!part).map((part) => toKebabCase(part)).join('-');
+  return parts
+    .filter((part): part is string => !!part)
+    .map((part) => toKebabCase(part))
+    .join('-');
 };
 
 export const getAgentClusterName = (options: DeployOptions) => getAgentsBaseName(options);

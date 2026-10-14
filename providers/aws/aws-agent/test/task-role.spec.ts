@@ -91,7 +91,9 @@ describe('agent task and execution roles', () => {
     const state: EntryStates = {};
     const agent = { ...createAgentService('ImplementAgent'), services: { review: { reference: 'ReviewAgent' } } } as never;
     const role = buildAgentTaskRole(state, agent, options, '123456789012', ['ReviewAgent']);
-    const policy = state[role.dependencies[0]] as { parameters: { policyDocument: { Statement: { Action: string | string[]; Resource: string | string[] }[] } } };
+    const policy = state[role.dependencies[0]] as {
+      parameters: { policyDocument: { Statement: { Action: string | string[]; Resource: string | string[] }[] } };
+    };
     const statements = policy.parameters.policyDocument.Statement;
     const resources = statements.flatMap((statement) => [statement.Resource].flat());
     const actions = statements.flatMap((statement) => [statement.Action].flat());

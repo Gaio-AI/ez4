@@ -28,10 +28,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
       permissions: ['s3:GetObject']
     },
     {
-      resourceIds: [
-        `arn:aws:s3:::${bucketName}/results/${agentKey}/*`,
-        `arn:aws:s3:::${bucketName}/artifacts/${agentKey}/*`
-      ],
+      resourceIds: [`arn:aws:s3:::${bucketName}/results/${agentKey}/*`, `arn:aws:s3:::${bucketName}/artifacts/${agentKey}/*`],
       permissions: ['s3:PutObject']
     },
     // Read of every agent's artifacts
