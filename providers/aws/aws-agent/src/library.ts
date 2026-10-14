@@ -29,3 +29,4 @@ export * from './runtime/storage';
 export * from './runtime/artifacts';
 export * from './runtime/timer';
 export * from './runtime/main';
+export * from './runtime/providers/index';
