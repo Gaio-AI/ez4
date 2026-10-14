@@ -60,8 +60,18 @@ describe('aurora local connection options', () => {
       user: 'postgres',
       port: 5432,
       poolSize: undefined,
-      dataApi: undefined
+      dataApi: undefined,
+      dataApiResults: true
     });
+  });
+
+  it('assert :: native connection keeps the data api results', () => {
+    const service = getService({ connectionMode: ConnectionMode.Native });
+
+    const { dataApi, dataApiResults } = getConnectionOptions(service, getServeOptions(LOCAL_OPTIONS));
+
+    deepEqual(dataApi, undefined);
+    deepEqual(dataApiResults, true);
   });
 
   it('assert :: data api connection (opted in)', () => {

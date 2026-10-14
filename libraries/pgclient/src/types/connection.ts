@@ -34,6 +34,11 @@ export type ClientConnectionOptions = {
    * Make the connection behave like the Aurora Data API (default: `false`).
    */
   dataApi?: boolean | ClientDataApiOptions;
+
+  /**
+   * Return raw results in the shapes the Aurora Data API returns, without the rest of its behavior (default: `false`).
+   */
+  dataApiResults?: boolean;
 };
 
 export type ClientDataApiOptions = {
