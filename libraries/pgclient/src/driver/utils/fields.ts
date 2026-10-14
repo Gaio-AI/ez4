@@ -10,6 +10,35 @@ export type FieldParameter = {
   name: string;
   type?: string;
   value: unknown;
+
+  /**
+   * Values of a list of scalars, bound as one Postgres array where the statement casts the variable to an array type.
+   */
+  elements?: unknown[];
+};
+
+export const prepareArrayFieldData = (name: string, values: unknown[], schema?: AnySchema): FieldParameter | undefined => {
+  if (schema && isJsonLikeField(schema)) {
+    return undefined;
+  }
+
+  const fields = values.map((value) => (schema ? prepareFieldData(name, value, schema) : detectFieldData(name, value)));
+
+  // A null value has no type of its own and goes inside an array of any type.
+  const types = new Set(fields.flatMap(({ type }) => (type ? [type] : [])));
+
+  // Values of mixed types, only nulls or JSON have no single array type.
+  if (types.size !== 1 || types.has('jsonb')) {
+    return undefined;
+  }
+
+  const [type] = types;
+
+  return {
+    name,
+    type: `${type}[]`,
+    value: fields.map(({ value }) => value)
+  };
 };
 
 export const prepareFieldData = (name: string, value: unknown, schema: AnySchema): FieldParameter => {
@@ -75,6 +104,13 @@ export const detectFieldData = (name: string, value: unknown): FieldParameter =>
         return getDateTimeFieldData(name, value.toISOString());
       }
 
+      if (Array.isArray(value)) {
+        return {
+          ...getJsonFieldData(name, value),
+          elements: getScalarElements(value)
+        };
+      }
+
       if (value !== null) {
         return getJsonFieldData(name, value);
       }
@@ -85,6 +121,25 @@ export const detectFieldData = (name: string, value: unknown): FieldParameter =>
     default:
       throw new UnsupportedFieldTypeError(name, typeof value);
   }
+};
+
+const getScalarElements = (values: unknown[]) => {
+  const elements: unknown[] = [];
+
+  for (const value of values) {
+    if (value instanceof Date) {
+      elements.push(value.toISOString());
+      continue;
+    }
+
+    if (value !== null && typeof value === 'object') {
+      return undefined;
+    }
+
+    elements.push(value);
+  }
+
+  return elements;
 };
 
 const getBooleanFieldData = (name: string, value: boolean): FieldParameter => {

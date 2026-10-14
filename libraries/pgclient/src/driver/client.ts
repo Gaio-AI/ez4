@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 import { DatabaseError } from 'pg';
 
 import { logQueryError, logQuerySuccess } from './utils/logger';
-import { detectFieldData, prepareFieldData } from './utils/fields';
+import { detectFieldData, prepareArrayFieldData, prepareFieldData } from './utils/fields';
 import { sendDataApiStatement } from './utils/data-api';
 import { getDataApiResultTypes } from './utils/results';
 import { prepareStatement } from './utils/prepare';
@@ -188,6 +188,15 @@ export class ClientDriver implements PgClientDriver {
 
     return detectFieldData(name, value);
   }
+
+  prepareArrayVariable(name: string, values: unknown[], schema?: AnySchema) {
+    // The Data API has no array parameters, so its emulation binds each value on its own as the Data API does.
+    if (this.dataApi) {
+      return undefined;
+    }
+
+    return prepareArrayFieldData(name, values, schema);
+  }
 }
 
 const getDataApiOptions = (dataApi: boolean | ClientDataApiOptions | undefined) => {
@@ -199,7 +208,7 @@ const getDataApiOptions = (dataApi: boolean | ClientDataApiOptions | undefined) 
 };
 
 const sendStatement = (client: PoolClient, statement: PgExecuteStatement, dataApiResults?: boolean) => {
-  const [query, variables] = prepareStatement(statement.query, statement.variables);
+  const [query, variables] = prepareStatement(statement.query, statement.variables, { bindArrays: true });
 
   if (dataApiResults) {
     return client.query({

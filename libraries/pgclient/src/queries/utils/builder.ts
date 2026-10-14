@@ -19,6 +19,11 @@ export const createQueryBuilder = (driver: PgClientDriver) => {
       }
 
       return driver.prepareVariable(field, value, jsonSchema);
-    }
+    },
+    ...(driver.prepareArrayVariable && {
+      onPrepareArray: (values, { index, schema }) => {
+        return driver.prepareArrayVariable?.(index.toString(), values, schema);
+      }
+    })
   });
 };

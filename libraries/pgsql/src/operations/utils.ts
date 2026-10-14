@@ -40,6 +40,36 @@ export const getOperandValue = (schema: AnySchema | undefined, operand: unknown,
   return field;
 };
 
+export const getOperandArray = (schema: AnySchema | undefined, operands: unknown[], context: SqlOperationContext) => {
+  const { variables, references, options } = context;
+
+  if (!references || !options.onPrepareArray) {
+    return undefined;
+  }
+
+  // SQL written by the caller (raw values and column references) can't go inside a bound array.
+  if (operands.some((operand) => operand instanceof SqlRawValue || operand instanceof SqlColumnReference)) {
+    return undefined;
+  }
+
+  const index = references.counter;
+
+  const preparedArray = options.onPrepareArray(operands, {
+    schema,
+    index
+  });
+
+  if (preparedArray === undefined) {
+    return undefined;
+  }
+
+  references.counter++;
+
+  variables.push(preparedArray);
+
+  return `:${index}`;
+};
+
 export const getOperandPattern = (schema: AnySchema | undefined, operand: unknown, context: SqlOperationContext) => {
   // Text matches literally, so its pattern characters are escaped with the backslash, LIKE's default escape.
   // Raw values and column references are SQL written by the caller and go into the pattern as they are.

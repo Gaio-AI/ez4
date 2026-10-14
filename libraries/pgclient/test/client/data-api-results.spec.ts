@@ -2,6 +2,7 @@ import type { PgStatementMetadata } from '@ez4/pgclient';
 
 import { after, describe, it } from 'node:test';
 import { deepEqual, equal } from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 import { ClientDriver, createPool } from '@ez4/pgclient/driver';
 import { SchemaType } from '@ez4/schema';
@@ -43,6 +44,21 @@ describe('client data api results', () => {
         jsonb: { a: 1 }
       }
     ]);
+  });
+
+  it('assert :: array variables with the data api shapes', async () => {
+    const ids = [randomUUID(), randomUUID()];
+
+    const { records } = await driver.executeStatement({
+      query: `SELECT cardinality(:0) AS "total", :1 = ANY(:2::uuid[]) AS "found"`,
+      variables: [
+        driver.prepareArrayVariable('0', ids, { type: SchemaType.String, format: 'uuid' }),
+        driver.prepareVariable('1', ids[1]),
+        driver.prepareVariable('2', ids)
+      ]
+    });
+
+    deepEqual(records, [{ total: 2, found: true }]);
   });
 
   it('assert :: json scalar with metadata parsed once', async () => {

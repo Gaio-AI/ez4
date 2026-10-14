@@ -43,6 +43,15 @@ export type SqlBuilderOptions = {
    * @returns It must returns the prepared variable value.
    */
   onPrepareVariable?: (value: unknown, context: SqlVariableContext) => unknown;
+
+  /**
+   * When defined it's invoked for a list of values that can be bound as one array variable (`isIn` on a
+   * scalar column), so the statement keeps the same text and size whatever the list length.
+   * @param values List values.
+   * @param context Variable context, with the schema of one list value.
+   * @returns It must return the prepared array variable, or `undefined` to bind each value on its own.
+   */
+  onPrepareArray?: (values: unknown[], context: SqlVariableContext) => unknown;
 };
 
 export class SqlBuilder {
