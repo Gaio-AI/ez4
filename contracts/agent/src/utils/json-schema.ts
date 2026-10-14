@@ -1,12 +1,4 @@
-import type {
-  AnySchema,
-  ObjectSchema,
-  StringSchema,
-  NumberSchema,
-  ArraySchema,
-  UnionSchema,
-  EnumSchema
-} from '@ez4/schema';
+import type { AnySchema, ObjectSchema, StringSchema, NumberSchema, ArraySchema, UnionSchema, EnumSchema } from '@ez4/schema';
 import { SchemaType } from '@ez4/schema';
 import type { JsonSchema } from './schema-types';
 
@@ -66,9 +58,7 @@ const convertArraySchema = (schema: ArraySchema): JsonSchema => {
 const convertEnumSchema = (schema: EnumSchema): JsonSchema => {
   // Support both schema.elements (from test/task) and schema.options (from @ez4/schema EnumSchema AST)
   const anyEnum = schema as unknown as { elements?: (string | number)[]; options?: { value: string | number }[] };
-  const values: (string | number)[] = anyEnum.elements
-    ? anyEnum.elements
-    : (anyEnum.options?.map((opt) => opt.value) ?? []);
+  const values: (string | number)[] = anyEnum.elements ? anyEnum.elements : (anyEnum.options?.map((opt) => opt.value) ?? []);
 
   const output: JsonSchema = {
     type: 'string',

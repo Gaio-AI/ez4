@@ -17,9 +17,6 @@ export class InvalidResourceBoundsError extends TypeError {
     public bounds: [number, number],
     fileName?: string
   ) {
-    super(
-      `Resource '${resourceName}' value ${value} is out of bounds [${bounds[0]}, ${bounds[1]}].`,
-      fileName
-    );
+    super(`Resource '${resourceName}' value ${value} is out of bounds [${bounds[0]}, ${bounds[1]}].`, fileName);
   }
 }

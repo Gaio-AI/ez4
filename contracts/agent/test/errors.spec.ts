@@ -1,10 +1,6 @@
 import { ok } from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import {
-  IncompleteServiceError,
-  InvalidCpuMemoryCombinationError,
-  UnknownPresetError
-} from '@ez4/agent/library';
+import { IncompleteServiceError, InvalidCpuMemoryCombinationError, UnknownPresetError } from '@ez4/agent/library';
 import { parseFile } from './common/parser';
 
 describe('agent metadata errors', () => {

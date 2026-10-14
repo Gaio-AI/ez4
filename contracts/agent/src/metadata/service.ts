@@ -45,11 +45,7 @@ export const getAgentServicesMetadata = (reflection: ReflectionTypes) => {
       continue;
     }
 
-    const service = createAgentService(
-      declaration.name,
-      fileName,
-      getDeclarationDescription(declaration) ?? undefined
-    );
+    const service = createAgentService(declaration.name, fileName, getDeclarationDescription(declaration) ?? undefined);
 
     const members: Record<string, ModelProperty> = {};
     for (const member of getModelMembers(declaration, true)) {
