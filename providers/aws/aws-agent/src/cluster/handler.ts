@@ -47,20 +47,15 @@ const replaceResource = async (candidate: EcsClusterState, current: EcsClusterSt
 const createResource = (candidate: EcsClusterState): Promise<EcsClusterResult> => {
   const parameters = candidate.parameters;
 
-  return OperationLogger.logExecution(
-    EcsClusterServiceName,
-    parameters.clusterName,
-    'creation',
-    async (logger) => {
-      const existing = await findCluster(logger, parameters.clusterName);
+  return OperationLogger.logExecution(EcsClusterServiceName, parameters.clusterName, 'creation', async (logger) => {
+    const existing = await findCluster(logger, parameters.clusterName);
 
-      if (existing) {
-        return existing;
-      }
-
-      return createCluster(logger, parameters);
+    if (existing) {
+      return existing;
     }
-  );
+
+    return createCluster(logger, parameters);
+  });
 };
 
 const updateResource = async (candidate: EcsClusterState, _current: EcsClusterState) => {
@@ -78,13 +73,8 @@ const deleteResource = async (current: EcsClusterState, context: StepContext) =>
   const { result, parameters } = current;
 
   if (result && context.force) {
-    return OperationLogger.logExecution(
-      EcsClusterServiceName,
-      parameters.clusterName,
-      'deletion',
-      async (logger) => {
-        await deleteCluster(logger, parameters.clusterName);
-      }
-    );
+    return OperationLogger.logExecution(EcsClusterServiceName, parameters.clusterName, 'deletion', async (logger) => {
+      await deleteCluster(logger, parameters.clusterName);
+    });
   }
 };

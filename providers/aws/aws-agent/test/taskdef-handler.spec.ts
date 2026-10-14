@@ -4,11 +4,7 @@ import type { EcsTaskDefState } from '../src/taskdef/types';
 import { describe, it } from 'node:test';
 import { ok, equal, deepEqual } from 'node:assert/strict';
 import { ServiceType } from '@ez4/agent/library';
-import {
-  buildTaskDefinitionInput,
-  createEcsTaskDefinition,
-  createEcsTaskDefStateId
-} from '../src/taskdef/service';
+import { buildTaskDefinitionInput, createEcsTaskDefinition, createEcsTaskDefStateId } from '../src/taskdef/service';
 import { getEcsTaskDefHandler } from '../src/taskdef/handler';
 import { EcsTaskDefServiceType } from '../src/taskdef/types';
 
@@ -53,18 +49,10 @@ describe('agent ECS task definition builder', () => {
     equal(container.privileged, false);
     deepEqual(container.linuxParameters?.capabilities?.drop, ['ALL']);
     equal(container.logConfiguration?.logDriver, 'awslogs');
-    equal(
-      container.logConfiguration?.options?.['awslogs-group'],
-      '/ez4/agents/implement'
-    );
-    equal(
-      container.logConfiguration?.options?.['awslogs-region'],
-      'us-east-1'
-    );
+    equal(container.logConfiguration?.options?.['awslogs-group'], '/ez4/agents/implement');
+    equal(container.logConfiguration?.options?.['awslogs-region'], 'us-east-1');
 
-    const envMap = Object.fromEntries(
-      (container.environment ?? []).map((e) => [e.name, e.value])
-    );
+    const envMap = Object.fromEntries((container.environment ?? []).map((e) => [e.name, e.value]));
     equal(envMap['EZ4_AGENT_NAME'], 'ImplementAgent');
     equal(envMap['EZ4_AGENT_BUCKET'], 'ez4-stg-agents');
     equal(envMap['EZ4_AGENT_TIMEOUT'], '3600');
@@ -73,14 +61,8 @@ describe('agent ECS task definition builder', () => {
 
     const secrets = container.secrets ?? [];
     const secretMap = Object.fromEntries(secrets.map((s) => [s.name, s.valueFrom]));
-    equal(
-      secretMap['ANTHROPIC_API_KEY'],
-      'arn:aws:secretsmanager:us-east-1:123456789012:secret:stg/anthropic-key'
-    );
-    equal(
-      secretMap['GITHUB_TOKEN'],
-      'arn:aws:secretsmanager:us-east-1:123456789012:secret:stg/github-app:private_key::'
-    );
+    equal(secretMap['ANTHROPIC_API_KEY'], 'arn:aws:secretsmanager:us-east-1:123456789012:secret:stg/anthropic-key');
+    equal(secretMap['GITHUB_TOKEN'], 'arn:aws:secretsmanager:us-east-1:123456789012:secret:stg/github-app:private_key::');
   });
 
   it('assert :: uses defaults when agent resources omitted', () => {
@@ -106,9 +88,7 @@ describe('agent ECS task definition builder', () => {
 
     const container = taskDef.containerDefinitions?.[0];
     ok(container !== undefined);
-    const envMap = Object.fromEntries(
-      (container.environment ?? []).map((e) => [e.name, e.value])
-    );
+    const envMap = Object.fromEntries((container.environment ?? []).map((e) => [e.name, e.value]));
     equal(envMap['EZ4_AGENT_TIMEOUT'], '14400');
   });
 

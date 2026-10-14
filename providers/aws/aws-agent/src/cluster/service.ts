@@ -9,10 +9,7 @@ export const createEcsClusterStateId = (clusterName: string) => {
   return hashData(EcsClusterServiceType, toKebabCase(clusterName));
 };
 
-export const createEcsCluster = <E extends EntryState>(
-  state: EntryStates<E>,
-  parameters: EcsClusterParameters
-): EcsClusterState => {
+export const createEcsCluster = <E extends EntryState>(state: EntryStates<E>, parameters: EcsClusterParameters): EcsClusterState => {
   const entryId = createEcsClusterStateId(parameters.clusterName);
 
   return attachEntry<E | EcsClusterState, EcsClusterState>(state, {

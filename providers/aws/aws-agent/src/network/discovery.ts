@@ -25,10 +25,7 @@ const defaultLookup: NetworkLookup = {
   getTaggedSecurityGroupIds
 };
 
-export const discoverAgentNetwork = async (
-  vpcId?: string,
-  lookup: NetworkLookup = defaultLookup
-): Promise<AgentNetworkConfig> => {
+export const discoverAgentNetwork = async (vpcId?: string, lookup: NetworkLookup = defaultLookup): Promise<AgentNetworkConfig> => {
   const resolvedVpcId = vpcId ?? (await lookup.getDefaultVpcId());
 
   if (!resolvedVpcId) {
@@ -41,15 +38,11 @@ export const discoverAgentNetwork = async (
   ]);
 
   if (!subnetIds || subnetIds.length === 0) {
-    throw new MissingAgentNetworkError(
-      `no subnets found with tag 'ez4:agents=true' in VPC ${resolvedVpcId}`
-    );
+    throw new MissingAgentNetworkError(`no subnets found with tag 'ez4:agents=true' in VPC ${resolvedVpcId}`);
   }
 
   if (!securityGroupIds || securityGroupIds.length === 0) {
-    throw new MissingAgentNetworkError(
-      `no security groups found with tag 'ez4:agents=true' in VPC ${resolvedVpcId}`
-    );
+    throw new MissingAgentNetworkError(`no security groups found with tag 'ez4:agents=true' in VPC ${resolvedVpcId}`);
   }
 
   return {

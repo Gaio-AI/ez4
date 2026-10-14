@@ -32,10 +32,7 @@ export const getEcsTagList = (tags: ResourceTags): Tag[] => {
   }));
 };
 
-export const findCluster = async (
-  logger: OperationLogLine,
-  clusterName: string
-): Promise<EcsClusterResult | null> => {
+export const findCluster = async (logger: OperationLogLine, clusterName: string): Promise<EcsClusterResult | null> => {
   logger.update('Checking ECS cluster');
 
   try {
@@ -45,9 +42,7 @@ export const findCluster = async (
       })
     );
 
-    const cluster = response.clusters?.find(
-      (c) => c.clusterName === clusterName && c.status !== 'INACTIVE'
-    );
+    const cluster = response.clusters?.find((c) => c.clusterName === clusterName && c.status !== 'INACTIVE');
 
     if (cluster && cluster.clusterArn && cluster.clusterName) {
       return {
@@ -65,10 +60,7 @@ export const findCluster = async (
   }
 };
 
-export const createCluster = async (
-  logger: OperationLogLine,
-  parameters: EcsClusterParameters
-): Promise<EcsClusterResult> => {
+export const createCluster = async (logger: OperationLogLine, parameters: EcsClusterParameters): Promise<EcsClusterResult> => {
   logger.update('Creating ECS cluster');
 
   const { clusterName, tags } = parameters;
@@ -92,10 +84,7 @@ export const createCluster = async (
   };
 };
 
-export const deleteCluster = async (
-  logger: OperationLogLine,
-  clusterName: string
-): Promise<void> => {
+export const deleteCluster = async (logger: OperationLogLine, clusterName: string): Promise<void> => {
   logger.update('Deleting ECS cluster');
 
   try {

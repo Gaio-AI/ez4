@@ -17,10 +17,7 @@ export const getEcsTaskDefHandler = (): StepHandler<EcsTaskDefState> => ({
 });
 
 const equalsResource = (candidate: EcsTaskDefState, current: EcsTaskDefState) => {
-  return (
-    !!candidate.result &&
-    candidate.result.taskDefinitionArn === current.result?.taskDefinitionArn
-  );
+  return !!candidate.result && candidate.result.taskDefinitionArn === current.result?.taskDefinitionArn;
 };
 
 const previewResource = (candidate: EcsTaskDefState, current: EcsTaskDefState) => {
@@ -50,60 +47,42 @@ const replaceResource = async (candidate: EcsTaskDefState, current: EcsTaskDefSt
 const createResource = (candidate: EcsTaskDefState): Promise<EcsTaskDefResult> => {
   const parameters = candidate.parameters;
 
-  return OperationLogger.logExecution(
-    EcsTaskDefServiceName,
-    parameters.agentName,
-    'creation',
-    async (logger) => {
-      return registerTaskDefinition(logger, parameters);
-    }
-  );
+  return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'creation', async (logger) => {
+    return registerTaskDefinition(logger, parameters);
+  });
 };
 
-const updateResource = async (
-  candidate: EcsTaskDefState,
-  current: EcsTaskDefState
-): Promise<EcsTaskDefResult | void> => {
+const updateResource = async (candidate: EcsTaskDefState, current: EcsTaskDefState): Promise<EcsTaskDefResult | void> => {
   const { result, parameters } = candidate;
   const { agentName } = parameters;
 
-  return OperationLogger.logExecution(
-    EcsTaskDefServiceName,
-    agentName,
-    'updates',
-    async (logger) => {
-      if (!result) {
-        throw new CorruptedResourceError(EcsTaskDefServiceName, agentName);
-      }
-
-      // Check if definition changed compared to current parameters
-      const changes = deepCompare(candidate.parameters, current.parameters);
-      if (changes.counts) {
-        const newResult = await registerTaskDefinition(logger, candidate.parameters);
-        candidate.result = newResult;
-        return;
-      }
-
-      const existing = await describeTaskDefinition(logger, result.taskDefinitionArn);
-      if (!existing) {
-        const newResult = await registerTaskDefinition(logger, candidate.parameters);
-        candidate.result = newResult;
-      }
+  return OperationLogger.logExecution(EcsTaskDefServiceName, agentName, 'updates', async (logger) => {
+    if (!result) {
+      throw new CorruptedResourceError(EcsTaskDefServiceName, agentName);
     }
-  );
+
+    // Check if definition changed compared to current parameters
+    const changes = deepCompare(candidate.parameters, current.parameters);
+    if (changes.counts) {
+      const newResult = await registerTaskDefinition(logger, candidate.parameters);
+      candidate.result = newResult;
+      return;
+    }
+
+    const existing = await describeTaskDefinition(logger, result.taskDefinitionArn);
+    if (!existing) {
+      const newResult = await registerTaskDefinition(logger, candidate.parameters);
+      candidate.result = newResult;
+    }
+  });
 };
 
 const deleteResource = async (current: EcsTaskDefState, context: StepContext) => {
   const { result, parameters } = current;
 
   if (result && context.force) {
-    return OperationLogger.logExecution(
-      EcsTaskDefServiceName,
-      parameters.agentName,
-      'deletion',
-      async (logger) => {
-        await deregisterTaskDefinition(logger, result.taskDefinitionArn);
-      }
-    );
+    return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'deletion', async (logger) => {
+      await deregisterTaskDefinition(logger, result.taskDefinitionArn);
+    });
   }
 };

@@ -67,9 +67,7 @@ export const buildTaskDefinitionInput = (
     return { name, valueFrom: arn };
   });
 
-  const logGroupName = logGroupArn.includes(':log-group:')
-    ? logGroupArn.split(':log-group:')[1]
-    : logGroupArn;
+  const logGroupName = logGroupArn.includes(':log-group:') ? logGroupArn.split(':log-group:')[1] : logGroupArn;
 
   return {
     family: `ez4-${toKebabCase(agent.name)}`,
