@@ -11,6 +11,7 @@ import { createLogGroup } from '@ez4/aws-logs';
 import { deepMerge } from '@ez4/utils';
 
 import { Defaults } from '../utils/defaults';
+import { getOptionalRuntimeSchema } from '../utils/schema';
 import { getAuthorizer, createAuthorizer } from '../authorizer/service';
 import { createAuthorizerFunction } from '../authorizer/function/service';
 import { getFunctionName, getInternalName } from './utils/name';
@@ -68,9 +69,9 @@ export const getAuthorizerFunction = (
 
     authorizerState = createAuthorizerFunction(state, context.role, logGroupState, {
       functionName: authorizerName,
-      headersSchema: request?.headers,
-      parametersSchema: request?.parameters,
-      querySchema: request?.query,
+      headersSchema: getOptionalRuntimeSchema(request?.headers),
+      parametersSchema: getOptionalRuntimeSchema(request?.parameters),
+      querySchema: getOptionalRuntimeSchema(request?.query),
       description: authorizer.summary ?? authorizer.description,
       timeout: Math.max(5, timeout - 1),
       variables: [options.variables, service.variables],

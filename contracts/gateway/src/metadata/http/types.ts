@@ -23,6 +23,12 @@ export type HttpService = Omit<ServiceMetadata, 'variables' | 'services'> &
     file?: string;
     displayName?: string;
     description?: string;
+
+    /**
+     * Where the documentation says the service is served (`@server` tags), for the API documentation
+     * only.
+     */
+    servers?: HttpServer[];
     defaults?: HttpDefaults;
     groups?: Record<string, HttpGroup>;
     routes: HttpRoute[];
@@ -42,6 +48,11 @@ export type HttpImport = ServiceMetadata & {
   defaults?: HttpDefaults;
   authorization?: HttpAuthorization;
   routes: HttpRoute[];
+};
+
+export type HttpServer = {
+  url: string;
+  description?: string;
 };
 
 export type HttpPreferences = {
@@ -81,6 +92,12 @@ export type HttpHandler = FunctionSignature & {
   isolated?: boolean;
   deprecated?: boolean;
   tags?: string[];
+
+  /**
+   * The handler's JSDoc text, for the API documentation only: `description`, which the providers
+   * give the function, comes from the `@description` tag alone.
+   */
+  comment?: string;
 
   /**
    * Errors the handler documents raising with `@throws`, for the API documentation only.

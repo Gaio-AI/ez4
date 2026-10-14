@@ -69,6 +69,7 @@ export const getHttpHandlerMetadata = (
 
 const getHandlerDocumentation = (type: TypeCallback | TypeFunction) => {
   const deprecated = type.tags?.some(({ name }) => name === 'deprecated');
+  const comment = type.description?.trim();
   const errors = [];
   const tags = [];
 
@@ -90,6 +91,7 @@ const getHandlerDocumentation = (type: TypeCallback | TypeFunction) => {
 
   return {
     ...(deprecated && { deprecated }),
+    ...(comment && { comment }),
     ...(tags.length && { tags }),
     ...(errors.length && { errors })
   };

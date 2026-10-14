@@ -2,7 +2,7 @@ import type { HttpService } from '@ez4/gateway/library';
 
 import { isEmptyObject } from '@ez4/utils';
 
-import { getIndentedOutput } from '../utils/format';
+import { getIndentedOutput, getMultilineOutput } from '../utils/format';
 import { getServiceRoutesOutput } from './route';
 import { getSecurityOutput } from './security';
 import { getRequestSchemas } from './request';
@@ -29,7 +29,26 @@ export namespace OpenApiGenerator {
   };
 
   const getInformationOutput = (service: HttpService) => {
-    return ['info:', ...getIndentedOutput([`title: ${service.displayName ?? service.name}`, 'version: 1.0.0']), ''];
+    const information = [`title: ${service.displayName ?? service.name}`];
+
+    if (service.description) {
+      information.push(`description: "${getMultilineOutput(service.description)}"`);
+    }
+
+    information.push('version: 1.0.0');
+
+    const output = ['info:', ...getIndentedOutput(information)];
+
+    if (service.servers?.length) {
+      const servers = service.servers.flatMap(({ url, description }) => [
+        `- url: "${getMultilineOutput(url)}"`,
+        ...(description ? getIndentedOutput([`description: "${getMultilineOutput(description)}"`]) : [])
+      ]);
+
+      output.push('servers:', ...getIndentedOutput(servers));
+    }
+
+    return [...output, ''];
   };
 
   const getSchemasOutput = (service: HttpService) => {

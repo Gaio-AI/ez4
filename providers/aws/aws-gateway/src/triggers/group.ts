@@ -12,6 +12,7 @@ import { isRoleState } from '@ez4/aws-identity';
 import { createLogGroup } from '@ez4/aws-logs';
 
 import { Defaults } from '../utils/defaults';
+import { getOptionalRuntimeSchema } from '../utils/schema';
 import { createIntegrationGroupFunction } from '../integration/function/service';
 import { getIntegration, createIntegration } from '../integration/service';
 import { getInternalName } from './utils/name';
@@ -132,13 +133,13 @@ const getGroupRoute = (
       dependencies: context.getDependencyFiles(handler.file)
     },
     ...(request && {
-      ...('headers' in request && { headersSchema: request.headers }),
-      ...('query' in request && { querySchema: request.query }),
-      ...('identity' in request && { identitySchema: request.identity }),
-      ...('parameters' in request && { parametersSchema: request.parameters }),
-      bodySchema: request.body
+      ...('headers' in request && { headersSchema: getOptionalRuntimeSchema(request.headers) }),
+      ...('query' in request && { querySchema: getOptionalRuntimeSchema(request.query) }),
+      ...('identity' in request && { identitySchema: getOptionalRuntimeSchema(request.identity) }),
+      ...('parameters' in request && { parametersSchema: getOptionalRuntimeSchema(request.parameters) }),
+      bodySchema: getOptionalRuntimeSchema(request.body)
     }),
-    responseSchema: response?.body,
+    responseSchema: getOptionalRuntimeSchema(response?.body),
     errorsMap: {
       ...(isAnyObject(defaults.httpErrors) && defaults.httpErrors),
       ...(isAnyObject(route.httpErrors) && route.httpErrors)

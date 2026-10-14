@@ -1,0 +1,157 @@
+# Auto-generated Open API specification, any manual modifications will be lost during regeneration.
+openapi: 3.1.0
+info:
+  title: Test API
+  description: "Manage the items of an account."
+  version: 1.0.0
+servers:
+  - url: "https://api.example.com"
+    description: "Production"
+  - url: "https://sandbox.example.com"
+
+paths:
+  /items/{itemId}:
+    patch:
+      operationId: updateItemHandler
+      summary: "Rename an item"
+      description: "Rename an item. Only the fields sent change;\na body with none changes nothing."
+      parameters:
+        - name: if-match
+          in: header
+          description: "The revision the change is based on."
+          required: true
+          schema:
+            type: string
+        - name: idempotency-key
+          in: header
+          description: "A retry with the same key answers the first answer again."
+          required: false
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          description: "The item to change."
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateItemHandlerRequest'
+      responses:
+        '200':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/updateItemHandler'
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '404':
+          description: "No such item."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+    delete:
+      operationId: deleteItemHandler
+      summary: "Delete an item"
+      description: "Delete an item and everything filed in it."
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: "Successful response."
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+  /items:
+    get:
+      operationId: listItemsHandler
+      summary: "The account's items, oldest first"
+      parameters:
+        - name: folder
+          in: query
+          description: "Only the items filed directly in this folder."
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Successful response."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listItemsHandler'
+        '400':
+          description: "Bad Request"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+components:
+  schemas:
+    updateItemHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        parent_id:
+          type: [string, 'null']
+          description: "Null at the top level."
+      required:
+        - id
+        - parent_id
+    listItemsHandler:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+      required:
+        - items
+    updateItemHandlerRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: "Trimmed; unique in the account."
+        tags:
+          type: array
+          items:
+            type: string
+    HttpError:
+      type: object
+      description: "Error returned by the service."
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: ["error"]
+        message:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - message

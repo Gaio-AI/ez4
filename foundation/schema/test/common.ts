@@ -1,11 +1,11 @@
-import type { SchemaContextOptions } from '@ez4/schema';
+import type { SchemaContext, SchemaContextOptions } from '@ez4/schema';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deepEqual, ok } from 'node:assert/strict';
 
 import { createSchemaContext } from '@ez4/schema';
 import { buildReflection } from '@ez4/project/library';
-import { getAnySchema } from '@ez4/schema/library';
+import { createDocumentationSchemaContext, getAnySchema } from '@ez4/schema/library';
 
 export type TestFileOptions = SchemaContextOptions & {
   overwrite?: boolean;
@@ -13,14 +13,25 @@ export type TestFileOptions = SchemaContextOptions & {
   nullish?: boolean;
 };
 
-export const getTestSchema = (fileName: string, options?: SchemaContextOptions) => {
+const getTestSchemaWithContext = (fileName: string, context: SchemaContext) => {
   const reflection = buildReflection([`./test/input/${fileName}.ts`]);
 
   const entryKey = Object.keys(reflection).find((key) => key.endsWith('TestSchema'));
 
   ok(entryKey);
 
-  return getAnySchema(reflection[entryKey], reflection, createSchemaContext(options));
+  return getAnySchema(reflection[entryKey], reflection, context);
+};
+
+export const getTestSchema = (fileName: string, options?: SchemaContextOptions) => {
+  return getTestSchemaWithContext(fileName, createSchemaContext(options));
+};
+
+/**
+ * The schema as an HTTP contract builds it, documented by the JSDoc of its types.
+ */
+export const getDocumentationTestSchema = (fileName: string) => {
+  return getTestSchemaWithContext(fileName, createDocumentationSchemaContext());
 };
 
 export const testFile = (fileName: string, options?: TestFileOptions) => {
