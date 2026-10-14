@@ -45,8 +45,7 @@ const ports = {
   network: {
     getDefaultVpcId: async () => 'vpc-1',
     getTaggedSubnetIds: async () => ['subnet-a', 'subnet-b'],
-    getTaggedSecurityGroupIds: async (_vpc: string, tag: { key: string }) =>
-      tag.key === 'ez4:agents-proxy' ? ['sg-proxy'] : ['sg-agents']
+    getTaggedSecurityGroupIds: async (_vpc: string, tag: { key: string }) => (tag.key === 'ez4:agents-proxy' ? ['sg-proxy'] : ['sg-agents'])
   },
   bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' }),
   identity: async () => ({ region: 'us-east-1', accountId: '123456789012' }),
@@ -86,7 +85,10 @@ describe('agent resources wiring', () => {
     const taskdef = context.getServiceState('EchoAgent', options);
     equal(taskdef.type, EcsTaskDefServiceType);
     const dependencyTypes = taskdef.dependencies.map((id) => state[id]!.type).sort();
-    deepEqual(dependencyTypes, [EcrImageServiceType, LogGroupServiceType, RoleServiceType, RoleServiceType, ProxyCredentialServiceType].sort());
+    deepEqual(
+      dependencyTypes,
+      [EcrImageServiceType, LogGroupServiceType, RoleServiceType, RoleServiceType, ProxyCredentialServiceType].sort()
+    );
   });
 
   it('assert :: non-agent services are ignored', async () => {
@@ -132,7 +134,9 @@ describe('agent resources wiring', () => {
     equal(countType(state, ProxyServiceServiceType), 1);
 
     const proxyService = Object.values(state).find((entry): entry is ProxyServiceState => entry?.type === ProxyServiceServiceType)!;
-    const credentialEntries = Object.values(state).filter((entry): entry is ProxyCredentialState => entry?.type === ProxyCredentialServiceType);
+    const credentialEntries = Object.values(state).filter(
+      (entry): entry is ProxyCredentialState => entry?.type === ProxyCredentialServiceType
+    );
     equal(credentialEntries.length, 2);
     for (const cred of credentialEntries) {
       ok(proxyService.dependencies.includes(cred.entryId));

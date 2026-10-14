@@ -65,7 +65,10 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   // Every agent's credential exists before the proxy service, which mounts all of their hashes.
   const credentials = agents.map((agent) => {
     const secretName = getAgentProxySecretName(agent, options);
-    return state[createProxyCredentialStateId(secretName)] ?? createProxyCredential(state, { secretName, agentName: agent.name, tags: options.tags });
+    return (
+      state[createProxyCredentialStateId(secretName)] ??
+      createProxyCredential(state, { secretName, agentName: agent.name, tags: options.tags })
+    );
   });
   const credential = credentials[agents.findIndex((agent) => agent.name === service.name)];
 
@@ -88,7 +91,9 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     buildAgentExecutionRole(state, { ...service, secrets: executionSecrets }, options, region, accountId);
 
   const namespaceName = getAgentsNamespaceName(options);
-  const namespace = state[createAgentNamespaceStateId(namespaceName)] ?? createAgentNamespace(state, { namespaceName, vpcId: network.vpcId, serviceName: 'proxy', tags: options.tags });
+  const namespace =
+    state[createAgentNamespaceStateId(namespaceName)] ??
+    createAgentNamespace(state, { namespaceName, vpcId: network.vpcId, serviceName: 'proxy', tags: options.tags });
   const proxyServiceName = `${getAgentsBaseName(options)}-proxy`;
   if (!state[createProxyServiceStateId(proxyServiceName)]) {
     const proxyLogGroup = createLogGroup(state, { groupName: proxyServiceName, retention: 30, tags: options.tags });
@@ -98,7 +103,9 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
         serviceName: proxyServiceName,
         baseName: getAgentsBaseName(options),
         clusterName,
-        squidConfig: generateSquidConfig({ agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region) })) }),
+        squidConfig: generateSquidConfig({
+          agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region) }))
+        }),
         region,
         subnetIds: network.subnetIds,
         securityGroupIds: network.proxySecurityGroupIds,

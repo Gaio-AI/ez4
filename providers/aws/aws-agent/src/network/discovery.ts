@@ -12,7 +12,6 @@ export const AgentProxyNetworkTag: VpcTag = {
   value: 'true'
 };
 
-
 export interface AgentNetworkConfig {
   vpcId: string;
   subnetIds: string[];
@@ -55,7 +54,6 @@ export const discoverAgentNetwork = async (vpcId?: string, lookup: NetworkLookup
   if (!proxySecurityGroupIds || proxySecurityGroupIds.length === 0) {
     throw new MissingAgentNetworkError(`no security groups found with tag 'ez4:agents-proxy=true' in VPC ${resolvedVpcId}`);
   }
-
 
   return {
     vpcId: resolvedVpcId,

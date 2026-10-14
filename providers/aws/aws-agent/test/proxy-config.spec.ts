@@ -13,7 +13,13 @@ import {
   ResourceNotFoundException
 } from '@aws-sdk/client-secrets-manager';
 
-import { generateSquidConfig, resolveAgentAllowedDomains, buildNoProxyList, normalizeDomain, getAgentEgressDomains } from '../src/proxy/config';
+import {
+  generateSquidConfig,
+  resolveAgentAllowedDomains,
+  buildNoProxyList,
+  normalizeDomain,
+  getAgentEgressDomains
+} from '../src/proxy/config';
 import { generateHtpasswd, generateAgentPassword } from '../src/proxy/auth';
 import { createProxyCredential, getProxyCredentialHandler } from '../src/proxy/credential';
 import { setSecretsManagerClient } from '../src/proxy/client';

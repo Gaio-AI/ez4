@@ -83,7 +83,6 @@ describe('agent network discovery', () => {
     );
   });
 
-
   it('assert :: returns subnets and security groups when discovered', async () => {
     const mockLookup = {
       getDefaultVpcId: async () => 'vpc-12345',

@@ -68,7 +68,6 @@ export const getAgentEgressDomains = (agent: Pick<AgentService, 'egress' | 'perm
   return Array.from(domains).sort();
 };
 
-
 export const buildNoProxyList = (region: string): string[] => {
   return [
     'localhost',
