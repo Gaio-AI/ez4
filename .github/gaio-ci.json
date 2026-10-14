@@ -76,6 +76,7 @@
         "@ez4/aws-dynamodb",
         "@ez4/aws-function",
         "@ez4/aws-gateway",
+        "@ez4/aws-identity",
         "@ez4/aws-logs",
         "@ez4/aws-queue",
         "@ez4/aws-scheduler",

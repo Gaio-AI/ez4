@@ -7,6 +7,8 @@ import {
   UpdateRoleCommand,
   DeleteRoleCommand,
   UpdateAssumeRolePolicyCommand,
+  PutRolePermissionsBoundaryCommand,
+  DeleteRolePermissionsBoundaryCommand,
   AttachRolePolicyCommand,
   DetachRolePolicyCommand,
   TagRoleCommand,
@@ -20,6 +22,7 @@ import { getIAMClient } from '../utils/deploy';
 export type CreateRequest = {
   roleName: string;
   roleDocument: RoleDocument;
+  permissionsBoundary?: Arn;
   description?: string;
   tags?: ResourceTags;
 };
@@ -29,7 +32,11 @@ export type ImportOrCreateResponse = {
   roleArn: Arn;
 };
 
-export const importRole = async (logger: OperationLogLine, roleName: string): Promise<ImportOrCreateResponse | undefined> => {
+export type ImportResponse = ImportOrCreateResponse & {
+  permissionsBoundary?: Arn;
+};
+
+export const importRole = async (logger: OperationLogLine, roleName: string): Promise<ImportResponse | undefined> => {
   logger.update(`Importing IAM role`);
 
   try {
@@ -40,10 +47,12 @@ export const importRole = async (logger: OperationLogLine, roleName: string): Pr
     );
 
     const roleArn = response.Role!.Arn as Arn;
+    const permissionsBoundary = response.Role!.PermissionsBoundary?.PermissionsBoundaryArn as Arn | undefined;
 
     return {
       roleName,
-      roleArn
+      roleArn,
+      permissionsBoundary
     };
   } catch (error) {
     if (!(error instanceof NoSuchEntityException)) {
@@ -57,13 +66,14 @@ export const importRole = async (logger: OperationLogLine, roleName: string): Pr
 export const createRole = async (logger: OperationLogLine, request: CreateRequest): Promise<ImportOrCreateResponse> => {
   logger.update(`Creating IAM role`);
 
-  const { roleName, description, roleDocument } = request;
+  const { roleName, description, roleDocument, permissionsBoundary } = request;
 
   const response = await getIAMClient().send(
     new CreateRoleCommand({
       RoleName: roleName,
       Description: description,
       AssumeRolePolicyDocument: JSON.stringify(roleDocument),
+      PermissionsBoundary: permissionsBoundary,
       Tags: getTagList({
         ...request.tags,
         ManagedBy: 'EZ4'
@@ -97,6 +107,27 @@ export const updateAssumeRole = async (logger: OperationLogLine, roleName: strin
     new UpdateAssumeRolePolicyCommand({
       RoleName: roleName,
       PolicyDocument: JSON.stringify(roleDocument)
+    })
+  );
+};
+
+export const updatePermissionsBoundary = async (logger: OperationLogLine, roleName: string, permissionsBoundary: Arn | undefined) => {
+  logger.update(`Updating IAM permissions boundary`);
+
+  if (permissionsBoundary) {
+    await getIAMClient().send(
+      new PutRolePermissionsBoundaryCommand({
+        RoleName: roleName,
+        PermissionsBoundary: permissionsBoundary
+      })
+    );
+
+    return;
+  }
+
+  await getIAMClient().send(
+    new DeleteRolePermissionsBoundaryCommand({
+      RoleName: roleName
     })
   );
 };

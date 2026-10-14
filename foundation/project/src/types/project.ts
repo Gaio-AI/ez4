@@ -167,6 +167,13 @@ export type ProjectDeployOptions = {
    * Specify the deployment release.
    */
   release?: ProjectDeployReleaseOptions;
+
+  /**
+   * Name of the customer managed policy (at the root path of the deploy account) set as the permissions
+   * boundary of every role the deployment creates. A role that already exists gets it on the next deploy,
+   * and loses it when the option goes.
+   */
+  permissionsBoundary?: string;
 };
 
 export type ProjectDeployReleaseOptions = {

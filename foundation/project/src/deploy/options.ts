@@ -20,6 +20,7 @@ export const getDeployOptions = (input: InputOptions, project: ProjectOptions): 
     concurrency: project.deployOptions?.maxConcurrency ?? 25,
     debug: input.debug ?? project.debugMode,
     release: project.deployOptions?.release,
+    permissionsBoundary: project.deployOptions?.permissionsBoundary,
     defaults: project.defaultOptions,
     variables: project.variables,
     force: input.force,

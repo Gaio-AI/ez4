@@ -6,7 +6,18 @@ import type { RoleState, RoleResult, RoleParameters } from './types';
 import { applyTagUpdates, OperationLogger, IncompleteResourceError, ReplaceResourceError, CorruptedResourceError } from '@ez4/aws-common';
 import { deepCompare, deepEqual } from '@ez4/utils';
 
-import { attachPolicy, createRole, deleteRole, detachPolicy, importRole, tagRole, untagRole, updateAssumeRole, updateRole } from './client';
+import {
+  attachPolicy,
+  createRole,
+  deleteRole,
+  detachPolicy,
+  importRole,
+  tagRole,
+  untagRole,
+  updateAssumeRole,
+  updatePermissionsBoundary,
+  updateRole
+} from './client';
 import { PolicyServiceType } from '../policy/types';
 import { RoleServiceName } from './types';
 
@@ -51,7 +62,13 @@ const createResource = (candidate: RoleState, context: StepContext): Promise<Rol
   const { parameters } = candidate;
 
   return OperationLogger.logExecution(RoleServiceName, parameters.roleName, 'creation', async (logger) => {
-    const response = (await importRole(logger, parameters.roleName)) || (await createRole(logger, parameters));
+    const importedRole = await importRole(logger, parameters.roleName);
+    const response = importedRole ?? (await createRole(logger, parameters));
+
+    // A role that already exists keeps the boundary it has until set here, before any policy is attached.
+    if (importedRole && importedRole.permissionsBoundary !== parameters.permissionsBoundary) {
+      await updatePermissionsBoundary(logger, response.roleName, parameters.permissionsBoundary);
+    }
 
     const policies = context.getDependencies<PolicyState>(PolicyServiceType);
     const policyArns = getPolicyArns(response.roleName, policies);
@@ -80,6 +97,7 @@ const updateResource = (candidate: RoleState, current: RoleState, context: StepC
     const policies = context.getDependencies<PolicyState>(PolicyServiceType);
     const policyArns = getPolicyArns(result.roleName, policies);
 
+    await checkBoundaryUpdates(logger, result.roleName, candidate.parameters, current.parameters);
     await checkPolicyUpdates(logger, result.roleName, policyArns, result.policyArns);
     await checkDocumentUpdates(logger, result.roleName, candidate.parameters, current.parameters);
     await checkGeneralUpdates(logger, result.roleName, candidate.parameters, current.parameters);
@@ -120,6 +138,14 @@ const getPolicyArns = (roleName: string, policyStates: PolicyState[]) => {
 const checkGeneralUpdates = async (logger: OperationLogLine, roleName: string, candidate: RoleParameters, current: RoleParameters) => {
   if (candidate.description !== current.description) {
     await updateRole(logger, roleName, candidate.description);
+  }
+};
+
+// Goes before the policy and trust updates: a deployer may be allowed to change a role only while it holds
+// the boundary.
+const checkBoundaryUpdates = async (logger: OperationLogLine, roleName: string, candidate: RoleParameters, current: RoleParameters) => {
+  if (candidate.permissionsBoundary !== current.permissionsBoundary) {
+    await updatePermissionsBoundary(logger, roleName, candidate.permissionsBoundary);
   }
 };
 
