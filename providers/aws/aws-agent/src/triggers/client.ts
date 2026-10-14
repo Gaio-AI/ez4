@@ -73,8 +73,7 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
     inputSchema: agent.inputSchema ?? { type: 'object' }
   };
 
-  const constructorParams = JSON.stringify(clientParameters)
-    .replace(/"@\{EZ4_RAW_EXPRESSION\}:(.*?)"/g, '$1');
+  const constructorParams = JSON.stringify(clientParameters).replace(/"@\{EZ4_RAW_EXPRESSION\}:(.*?)"/g, '$1');
 
   return {
     module: 'Client',

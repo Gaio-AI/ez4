@@ -58,10 +58,7 @@ describe('client :: agent client', () => {
       ecsClient: mockEcs
     });
 
-    const response = await client.invoke(
-      { task: 'run-job' },
-      { correlation: JSON.stringify({ step: 1 }) }
-    );
+    const response = await client.invoke({ task: 'run-job' }, { correlation: JSON.stringify({ step: 1 }) });
 
     ok(response.id);
     equal(s3Key, `invocations/worker-agent/${response.id}.json`);
@@ -140,14 +137,19 @@ describe('client :: agent client', () => {
       subnets: ['subnet-1'],
       securityGroups: ['sg-agents'],
       inputSchema,
-      s3Client: { send: async () => { called = true; } } as unknown as S3Client,
-      ecsClient: { send: async () => { called = true; } } as unknown as ECSClient
+      s3Client: {
+        send: async () => {
+          called = true;
+        }
+      } as unknown as S3Client,
+      ecsClient: {
+        send: async () => {
+          called = true;
+        }
+      } as unknown as ECSClient
     });
 
-    await rejects(
-      client.invoke({ invalid: 123 } as unknown as { task: string }),
-      /Agent input validation failed/
-    );
+    await rejects(client.invoke({ invalid: 123 } as unknown as { task: string }), /Agent input validation failed/);
     equal(called, false);
   });
 });

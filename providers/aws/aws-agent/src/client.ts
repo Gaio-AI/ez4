@@ -25,10 +25,7 @@ export namespace Client {
     const ecs = parameters.ecsClient ?? new ECSClient();
 
     return {
-      async invoke(
-        input: Agent.InputOf<S>,
-        options?: Agent.InvokeOptions
-      ): Promise<{ id: string }> {
+      async invoke(input: Agent.InputOf<S>, options?: Agent.InvokeOptions): Promise<{ id: string }> {
         const errors = await validate(input, parameters.inputSchema);
         if (errors && errors.length > 0) {
           throw new Error(`Agent input validation failed: ${JSON.stringify(getErrorDetails(errors))}`);
