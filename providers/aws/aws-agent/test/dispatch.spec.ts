@@ -19,9 +19,14 @@ const stoppedEvent = {
     stoppedReason: 'Essential container exited',
     containers: [{ exitCode: 137 }],
     overrides: {
-      containerOverrides: [{
-        environment: [{ name: 'EZ4_AGENT_NAME', value: agent }, { name: 'EZ4_AGENT_ID', value: id }]
-      }]
+      containerOverrides: [
+        {
+          environment: [
+            { name: 'EZ4_AGENT_NAME', value: agent },
+            { name: 'EZ4_AGENT_ID', value: id }
+          ]
+        }
+      ]
     }
   }
 };
@@ -32,15 +37,21 @@ const makePorts = () => {
   const stopped: { cluster: string; taskArn: string }[] = [];
   const ports: DispatchPorts = {
     get: async (key) => storage.get(key),
-    put: async (key, value) => { storage.set(key, value); },
+    put: async (key, value) => {
+      storage.set(key, value);
+    },
     putConditional: async (key, value) => {
       if (storage.has(key)) return false;
       storage.set(key, value);
       return true;
     },
     list: async (prefix) => [...storage.keys()].filter((key) => key.startsWith(prefix)),
-    send: async (url, body, messageId, group) => { messages.push({ queueUrl: url, body, id: messageId, agentName: group }); },
-    stopTask: async (cluster, taskArn) => { stopped.push({ cluster, taskArn }); },
+    send: async (url, body, messageId, group) => {
+      messages.push({ queueUrl: url, body, id: messageId, agentName: group });
+    },
+    stopTask: async (cluster, taskArn) => {
+      stopped.push({ cluster, taskArn });
+    },
     now: () => now
   };
   return { storage, messages, stopped, ports };
@@ -50,7 +61,12 @@ describe('dispatcher decisions', () => {
   it('delivers an existing result once to its FIFO reply queue', async () => {
     const { storage, messages, ports } = makePorts();
     const result: Agent.Result<Agent.Service<Agent.Input, Agent.Output>> = {
-      id, agent, status: 'succeeded', output: { patch: 'diff' }, correlation: 'trace', finishedAt: now.toISOString()
+      id,
+      agent,
+      status: 'succeeded',
+      output: { patch: 'diff' },
+      correlation: 'trace',
+      finishedAt: now.toISOString()
     };
     storage.set(invocationKey, JSON.stringify({ replyTo: queueUrl, correlation: 'trace' }));
     storage.set(resultKey, JSON.stringify(result));
@@ -79,9 +95,15 @@ describe('dispatcher decisions', () => {
 
   it('stops an overdue task and delivers a timed_out result on the scheduled sweep', async () => {
     const { storage, messages, stopped, ports } = makePorts();
-    storage.set(invocationKey, JSON.stringify({
-      replyTo: queueUrl, deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn'
-    }));
+    storage.set(
+      invocationKey,
+      JSON.stringify({
+        replyTo: queueUrl,
+        deadline: '2026-10-14T11:59:59.000Z',
+        cluster: 'cluster-1',
+        taskArn: 'task-arn'
+      })
+    );
 
     await dispatchDecision({ source: 'aws.events' }, ports);
 
