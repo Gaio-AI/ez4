@@ -8,6 +8,7 @@ import { hashData, toKebabCase } from '@ez4/utils';
 import { EcsTaskDefServiceType } from './types';
 
 export interface TaskDefOptions {
+  baseName: string;
   bucketName: string;
   noProxy?: string;
   region?: string;
@@ -28,7 +29,7 @@ export const buildTaskDefinitionInput = (
   const cpu = String(agent.resources?.cpu ?? 1024);
   const memory = String(agent.resources?.memory ?? 2048);
   const storage = agent.resources?.storage ?? 21;
-  const timeout = agent.resources?.timeout ?? 14400;
+  const timeout = agent.resources?.timeout ?? 3600;
 
   // Derive region and account from taskRoleArn or executionRoleArn or options
   // arn:aws:iam::<account>:role/...
@@ -70,7 +71,7 @@ export const buildTaskDefinitionInput = (
   const logGroupName = logGroupArn.includes(':log-group:') ? logGroupArn.split(':log-group:')[1] : logGroupArn;
 
   return {
-    family: `ez4-${toKebabCase(agent.name)}`,
+    family: `${options.baseName}-${toKebabCase(agent.name)}`,
     networkMode: 'awsvpc',
     requiresCompatibilities: ['FARGATE'],
     cpu,

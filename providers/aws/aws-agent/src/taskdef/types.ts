@@ -10,6 +10,7 @@ export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secr
 
 export type EcsTaskDefParameters = {
   agentName: string;
+  baseName: string;
   agent: AgentRuntimeFields;
   bucketName: string;
   region: string;

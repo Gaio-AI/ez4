@@ -7,6 +7,8 @@ import { ServiceType } from '@ez4/agent/library';
 import { buildTaskDefinitionInput, createEcsTaskDefinition, createEcsTaskDefStateId } from '../src/taskdef/service';
 import { getEcsTaskDefHandler } from '../src/taskdef/handler';
 import { EcsTaskDefServiceType } from '../src/taskdef/types';
+import { getAgentsBaseName } from '../src/utils/names';
+import type { DeployOptions } from '@ez4/project/library';
 
 describe('agent ECS task definition builder', () => {
   it('assert :: builds Fargate task definition with awsvpc, user 1000, and dropped capabilities', () => {
@@ -33,11 +35,13 @@ describe('agent ECS task definition builder', () => {
       'arn:aws:logs:us-east-1:123456789012:log-group:/ez4/agents/implement',
       {
         bucketName: 'ez4-stg-agents',
+        baseName: getAgentsBaseName({ prefix: 'ez4', projectName: 'stg', branchName: '', lockId: 'x' } as DeployOptions),
         noProxy: '169.254.169.254'
       }
     );
 
     equal(taskDef.networkMode, 'awsvpc');
+    equal(taskDef.family, 'ez4-stg-agents-implement-agent');
     deepEqual(taskDef.requiresCompatibilities, ['FARGATE']);
     equal(taskDef.cpu, '2048');
     equal(taskDef.memory, '4096');
@@ -78,7 +82,8 @@ describe('agent ECS task definition builder', () => {
       'arn:aws:iam::123456789012:role/exec-role',
       'arn:aws:logs:us-east-1:123456789012:log-group:/ez4/agents/default',
       {
-        bucketName: 'agent-bucket'
+        bucketName: 'agent-bucket',
+        baseName: getAgentsBaseName({ prefix: 'ez4', projectName: 'stg', branchName: '', lockId: 'x' } as DeployOptions)
       }
     );
 
@@ -89,7 +94,7 @@ describe('agent ECS task definition builder', () => {
     const container = taskDef.containerDefinitions?.[0];
     ok(container !== undefined);
     const envMap = Object.fromEntries((container.environment ?? []).map((e) => [e.name, e.value]));
-    equal(envMap['EZ4_AGENT_TIMEOUT'], '14400');
+    equal(envMap['EZ4_AGENT_TIMEOUT'], '3600');
   });
 
   it('assert :: creates task definition state entry with correct parameters and ID', () => {
@@ -99,6 +104,7 @@ describe('agent ECS task definition builder', () => {
       states,
       {
         agentName: 'TestAgent',
+        baseName: 'ez4-stg-agents',
         agent: { name: 'TestAgent' },
         bucketName: 'agent-bucket',
         region: 'us-east-1',
@@ -124,6 +130,7 @@ describe('agent ECS task definition builder', () => {
       dependencies: [],
       parameters: {
         agentName: 'TestAgent',
+        baseName: 'ez4-stg-agents',
         agent: { name: 'TestAgent' },
         bucketName: 'agent-bucket',
         region: 'us-east-1',
@@ -164,6 +171,7 @@ describe('agent ECS task definition builder', () => {
       dependencies: [],
       parameters: {
         agentName: 'TestAgent',
+        baseName: 'ez4-stg-agents',
         agent: { name: 'TestAgent', resources: { cpu: 2048 } },
         bucketName: 'agent-bucket',
         region: 'us-east-1',
@@ -182,6 +190,7 @@ describe('agent ECS task definition builder', () => {
       dependencies: [],
       parameters: {
         agentName: 'TestAgent',
+        baseName: 'ez4-stg-agents',
         agent: { name: 'TestAgent', resources: { cpu: 1024 } },
         bucketName: 'agent-bucket',
         region: 'us-east-1',

@@ -52,6 +52,7 @@ const registerDefinition = (candidate: EcsTaskDefState, context: StepContext): P
 
   const logGroupName = getLogGroupName(EcsTaskDefServiceName, candidate.entryId, context);
   const taskDefinition = buildTaskDefinitionInput(parameters.agent, imageUri, taskRoleArn, executionRoleArn, logGroupName, {
+    baseName: parameters.baseName,
     bucketName: parameters.bucketName,
     region: parameters.region
   });

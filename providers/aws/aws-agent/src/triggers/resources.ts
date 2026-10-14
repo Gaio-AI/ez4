@@ -84,6 +84,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     state,
     {
       agentName: service.name,
+      baseName: getAgentsBaseName(options),
       agent: { name: service.name, resources: service.resources, secrets: service.secrets },
       bucketName,
       region,
