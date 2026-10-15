@@ -12,7 +12,7 @@ export declare class PeriodicCaller extends Cron.Service {
   };
 }
 
-export const callerHandler = async (_request: Cron.Incoming<null>, context: Service.Context<PeriodicCaller>): Promise<void> => {
+export async function callerHandler(_request: Cron.Incoming<null>, context: Service.Context<PeriodicCaller>): Promise<void> {
   const { runId } = await context.echoFlow.start({ text: 'scheduled ping' });
   console.log(`Started echo workflow ${runId}`);
-};
+}
