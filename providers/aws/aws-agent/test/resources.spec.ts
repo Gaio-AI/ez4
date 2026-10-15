@@ -10,7 +10,7 @@ import { join } from 'node:path';
 (globalThis as { __MODULE_PATH?: string }).__MODULE_PATH = join(import.meta.dirname, '../dist');
 import { createAgentService } from '@ez4/agent/library';
 import { createCronService } from '@ez4/scheduler/library';
-import { RoleServiceType } from '@ez4/aws-identity';
+import { RoleServiceType, isRoleState } from '@ez4/aws-identity';
 import { BucketServiceType } from '@ez4/aws-bucket';
 import { LogGroupServiceType } from '@ez4/aws-logs';
 import { FunctionServiceType } from '@ez4/aws-function';
@@ -171,5 +171,40 @@ describe('agent resources wiring', () => {
       const env = taskInput.containerDefinitions?.[0]?.environment;
       equal(env?.find((e) => e.name === 'EZ4_AGENT_PROXY_URL')?.value, 'http://proxy.ez4-lab-agents.local:3128');
     }
+  });
+
+  it('scopes workspace EFS policy to the created file system and access point', async () => {
+    const state: EntryStates = {};
+    const agent = {
+      ...createAgentService('WorkspaceAgent'),
+      provider: 'claude',
+      model: 'm',
+      instructions: 'i',
+      workspace: { repos: [{ name: 'api', url: 'https://github.com/acme/api.git', branch: 'main' }] }
+    } as never;
+    const event = { state, service: agent, metadata: { WorkspaceAgent: agent }, options, context: makeContext() } as PrepareResourceEvent;
+    equal(await prepareAgentResources(event, ports), true);
+
+    const taskRole = Object.values(state).find(
+      (entry) => entry && isRoleState(entry) && entry.parameters.roleName.endsWith('-task-role')
+    )!;
+    const policy = state[taskRole.dependencies[0]] as {
+      dependencies: string[];
+      parameters: { getPolicyDocument: (context: StepContext) => { Statement: { Resource: string[]; Condition?: { StringEquals: Record<string, string> } }[] } };
+    };
+    const fileSystem = Object.values(state).find((entry) => entry?.type === 'aws:efs.filesystem')!;
+    const accessPoint = Object.values(state).find((entry) => entry?.type === 'aws:efs.access-point')!;
+    ok(policy.dependencies.includes(fileSystem.entryId));
+    ok(policy.dependencies.includes(accessPoint.entryId));
+
+    const document = policy.parameters.getPolicyDocument({
+      getDependencies: (type: string) =>
+        type === fileSystem.type
+          ? [{ ...fileSystem, result: { fileSystemId: 'fs-own', fileSystemArn: 'arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-own' } }]
+          : [{ ...accessPoint, result: { accessPointId: 'fsap-own', accessPointArn: 'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own' } }]
+    } as unknown as StepContext);
+    const grant = document.Statement.find((statement) => statement.Condition?.StringEquals?.['elasticfilesystem:AccessPointArn']);
+    deepEqual(grant?.Resource, ['arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-own']);
+    equal(grant?.Condition?.StringEquals['elasticfilesystem:AccessPointArn'], 'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own');
   });
 });

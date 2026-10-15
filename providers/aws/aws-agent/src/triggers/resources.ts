@@ -204,14 +204,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   const linkedAgents = Object.values(service.services ?? {})
     .map(({ reference }) => reference)
     .filter((name) => !!name && isAgentService(event.metadata[name] ?? {}));
-  const workspaceArns =
-    service.workspace && workspaceResources
-      ? {
-          fileSystemArn: `arn:aws:elasticfilesystem:${region}:${accountId}:file-system/*`,
-          accessPointArn: `arn:aws:elasticfilesystem:${region}:${accountId}:access-point/*`
-        }
-      : undefined;
-  const taskRole = buildAgentTaskRole(state, service, options, accountId, linkedAgents, workspaceArns);
+  const taskRole = buildAgentTaskRole(state, service, options, accountId, linkedAgents, service.workspace ? workspaceResources : undefined);
   const logGroup = createLogGroup(state, { groupName: getAgentLogGroupName(service, options), retention: 30, tags: options.tags });
   const dispatcherGroupName = `${getAgentsBaseName(options)}-dispatcher`;
   const dispatcherGroupId = hashData(LogGroupServiceType, dispatcherGroupName);

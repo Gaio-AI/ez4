@@ -1,5 +1,5 @@
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
-import type { StepHandler } from '@ez4/state';
+import type { StepContext, StepHandler } from '@ez4/state';
 import type { PolicyDocument } from '../types/policy';
 import type { PolicyState, PolicyResult, PolicyParameters } from './types';
 
@@ -23,8 +23,8 @@ const equalsResource = (candidate: PolicyState, current: PolicyState) => {
 };
 
 const previewResource = (candidate: PolicyState, current: PolicyState) => {
-  const target = { ...candidate.parameters, dependencies: candidate.dependencies };
-  const source = { ...current.parameters, dependencies: current.dependencies };
+  const target = { ...candidate.parameters, getPolicyDocument: undefined, dependencies: candidate.dependencies };
+  const source = { ...current.parameters, getPolicyDocument: undefined, dependencies: current.dependencies };
 
   const changes = deepCompare(target, source);
 
@@ -38,16 +38,16 @@ const previewResource = (candidate: PolicyState, current: PolicyState) => {
   };
 };
 
-const replaceResource = async (candidate: PolicyState, current: PolicyState) => {
+const replaceResource = async (candidate: PolicyState, current: PolicyState, context: StepContext) => {
   if (current.result) {
     throw new ReplaceResourceError(PolicyServiceName, candidate.entryId, current.entryId);
   }
 
-  return createResource(candidate);
+  return createResource(candidate, context);
 };
 
-const createResource = (candidate: PolicyState): Promise<PolicyResult> => {
-  const { parameters } = candidate;
+const createResource = (candidate: PolicyState, context: StepContext): Promise<PolicyResult> => {
+  const parameters = resolvePolicyParameters(candidate.parameters, context);
 
   return OperationLogger.logExecution(PolicyServiceName, parameters.policyName, 'creation', async (logger) => {
     const importedPolicy = await importPolicy(logger, parameters.policyName);
@@ -58,7 +58,8 @@ const createResource = (candidate: PolicyState): Promise<PolicyResult> => {
       return {
         versionHistory,
         currentVersion,
-        policyArn
+        policyArn,
+        resolvedDocument: parameters.policyDocument
       };
     }
 
@@ -67,13 +68,15 @@ const createResource = (candidate: PolicyState): Promise<PolicyResult> => {
     return {
       versionHistory: [],
       currentVersion: response.currentVersion,
-      policyArn: response.policyArn
+      policyArn: response.policyArn,
+      resolvedDocument: parameters.policyDocument
     };
   });
 };
 
-const updateResource = (candidate: PolicyState, current: PolicyState) => {
-  const { result, parameters } = candidate;
+const updateResource = (candidate: PolicyState, current: PolicyState, context: StepContext) => {
+  const { result } = candidate;
+  const parameters = resolvePolicyParameters(candidate.parameters, context);
   const { policyName } = parameters;
 
   return OperationLogger.logExecution(PolicyServiceName, policyName, 'updates', async (logger) => {
@@ -81,9 +84,9 @@ const updateResource = (candidate: PolicyState, current: PolicyState) => {
       throw new CorruptedResourceError(PolicyServiceName, policyName);
     }
 
-    await checkTagUpdates(logger, result.policyArn, candidate.parameters, current.parameters);
+    await checkTagUpdates(logger, result.policyArn, parameters, current.parameters);
 
-    const newResult = await checkDocumentUpdates(logger, result, candidate.parameters, current.parameters);
+    const newResult = await checkDocumentUpdates(logger, result, parameters, current.parameters);
 
     return {
       ...result,
@@ -107,21 +110,24 @@ const deleteResource = async (current: PolicyState) => {
   }
 };
 
+const resolvePolicyParameters = (parameters: PolicyParameters, context: StepContext): PolicyParameters => {
+  const { getPolicyDocument, ...request } = parameters;
+  return { ...request, policyDocument: getPolicyDocument?.(context) ?? request.policyDocument };
+};
+
 const checkDocumentUpdates = async (
   logger: OperationLogLine,
   result: PolicyResult,
   candidate: PolicyParameters,
   current: PolicyParameters
 ) => {
-  const hasChanges = !deepEqual(candidate, current, {
-    exclude: {
-      policyName: true,
-      tags: true
-    }
-  });
+  const hasChanges = result.resolvedDocument
+    ? !deepEqual(candidate.policyDocument, result.resolvedDocument)
+    : !deepEqual(candidate, current, { exclude: { policyName: true, tags: true, getPolicyDocument: true } });
 
   if (hasChanges) {
-    return createVersion(logger, result, candidate.policyDocument);
+    const updated = await createVersion(logger, result, candidate.policyDocument);
+    return { ...updated, resolvedDocument: candidate.policyDocument };
   }
 
   return result;

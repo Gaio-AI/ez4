@@ -1,9 +1,11 @@
-import type { EntryState, EntryStates } from '@ez4/state';
+import type { EntryState, EntryStates, StepContext } from '@ez4/state';
 import type { AgentService } from '@ez4/agent/library';
 import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
+import type { FileSystemState, AccessPointState } from '@ez4/aws-efs';
 import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
+import { FileSystemServiceType, AccessPointServiceType } from '@ez4/aws-efs';
 import { getAgentBucketName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
 import { toKebabCase } from '@ez4/utils';
 import { PRESET_POLICIES } from './presets';
@@ -68,10 +70,8 @@ export const buildTaskRoleGrants = (
     }
   ];
 
-  if (agent.workspace) {
-    const fileSystemArn = workspaceArns?.fileSystemArn ?? `arn:aws:elasticfilesystem:*:${accountId}:file-system/*`;
-    const accessPointArn = workspaceArns?.accessPointArn ?? `arn:aws:elasticfilesystem:*:${accountId}:access-point/*`;
-    grants.push(...buildWorkspaceGrants(fileSystemArn, accessPointArn));
+  if (agent.workspace && workspaceArns) {
+    grants.push(...buildWorkspaceGrants(workspaceArns.fileSystemArn, workspaceArns.accessPointArn));
   }
 
   for (const linked of linkedAgents) {
@@ -120,7 +120,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
   options: DeployOptions,
   accountId: string,
   linkedAgents: string[] = [],
-  workspaceArns?: { fileSystemArn: string; accessPointArn: string }
+  workspaceArns?: { fileSystem: FileSystemState; accessPoint: AccessPointState }
 ): RoleState => {
   const servicePrefix = getServiceName(agent, options);
   const roleName = getAgentTaskRoleName(agent, options);
@@ -128,13 +128,26 @@ export const buildAgentTaskRole = <E extends EntryState>(
 
   const bucketName = getAgentBucketName(options);
 
-  const grants = buildTaskRoleGrants(agent, linkedAgents, bucketName, options, accountId, workspaceArns);
+  const grants = buildTaskRoleGrants(agent, linkedAgents, bucketName, options, accountId);
 
   const policyState = createPolicy(state, {
     policyName,
     policyDocument: createPolicyDocument(grants),
+    ...(workspaceArns && {
+      getPolicyDocument: (context: StepContext) => {
+        const fileSystem = context.getDependencies<FileSystemState>(FileSystemServiceType).find((entry) => entry.entryId === workspaceArns.fileSystem.entryId);
+        const accessPoint = context.getDependencies<AccessPointState>(AccessPointServiceType).find((entry) => entry.entryId === workspaceArns.accessPoint.entryId);
+        if (!fileSystem?.result?.fileSystemArn || !accessPoint?.result?.accessPointArn) {
+          throw new Error('Workspace file system or access point ARN is unavailable');
+        }
+        return createPolicyDocument([...grants, ...buildWorkspaceGrants(fileSystem.result.fileSystemArn, accessPoint.result.accessPointArn)]);
+      }
+    }),
     tags: options.tags
   });
+  if (workspaceArns) {
+    policyState.dependencies.push(workspaceArns.fileSystem.entryId, workspaceArns.accessPoint.entryId);
+  }
 
   const roleDocument = createRoleDocument([
     createRoleStatement(
