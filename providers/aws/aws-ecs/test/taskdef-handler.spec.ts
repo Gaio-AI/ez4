@@ -18,7 +18,7 @@ describe('ECS task definition handler and builder', () => {
     });
   });
 
-  it('assert :: same hash skips re-registration', async () => {
+  it('assert :: a new hash keeps the family, so the plan updates instead of replacing', async () => {
     const handler = getEcsTaskDefHandler();
     const candidate: EcsTaskDefState = {
       type: EcsTaskDefServiceType,
@@ -45,14 +45,11 @@ describe('ECS task definition handler and builder', () => {
 
     deepEqual(handler.equals(candidate, current), true);
 
-    const differentHash: EcsTaskDefState = {
-      ...current,
-      parameters: {
-        ...current.parameters,
-        hash: 'h2'
-      }
-    };
-    deepEqual(handler.equals(candidate, differentHash), false);
+    const newRevision: EcsTaskDefState = { ...candidate, parameters: { ...candidate.parameters, hash: 'h2' } };
+    deepEqual(handler.equals(newRevision, current), true);
+
+    const otherFamily: EcsTaskDefState = { ...candidate, parameters: { ...candidate.parameters, family: 'other-family' } };
+    deepEqual(handler.equals(otherFamily, current), false);
   });
 
   it('assert :: creates task definition state entry with parameters and hash', () => {

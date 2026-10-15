@@ -5,8 +5,9 @@ import { deepCompare } from '@ez4/utils';
 import { registerTaskDefinition, deregisterTaskDefinition, describeTaskDefinition } from './client';
 import { EcsTaskDefServiceName } from './types';
 
+// A family keeps its identity across revisions: a new hash registers a new revision through update.
 const equalsResource = (candidate: EcsTaskDefState, current: EcsTaskDefState) =>
-  !!current.result && candidate.parameters.hash === current.parameters.hash;
+  !!current.result && candidate.parameters.family === current.parameters.family;
 
 const previewResource = (candidate: EcsTaskDefState, current: EcsTaskDefState) => {
   const target = { ...candidate.parameters, getTaskDefinition: undefined, dependencies: candidate.dependencies };
@@ -36,7 +37,7 @@ export const getEcsTaskDefHandler = (): StepHandler<EcsTaskDefState> => ({
   update: async (candidate, current, context) => {
     const { result, parameters } = candidate;
     if (!result) throw new CorruptedResourceError(EcsTaskDefServiceName, parameters.family);
-    if (!equalsResource(candidate, current) || candidate.dependencies.join(',') !== current.dependencies.join(',')) {
+    if (candidate.parameters.hash !== current.parameters.hash || candidate.dependencies.join(',') !== current.dependencies.join(',')) {
       return registerDefinition(candidate, context);
     }
     return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.family, 'updates', async (logger) => {

@@ -5,8 +5,11 @@ import { deepCompare } from '@ez4/utils';
 import { upsertEcsService, deleteEcsService } from './client';
 import { EcsServiceServiceName } from './types';
 
+// A service keeps its identity across task definition changes: a new hash rolls it out through update.
 const equalsResource = (candidate: EcsServiceState, current: EcsServiceState) =>
-  !!current.result && candidate.parameters.hash === current.parameters.hash;
+  !!current.result &&
+  candidate.parameters.serviceName === current.parameters.serviceName &&
+  candidate.parameters.clusterName === current.parameters.clusterName;
 
 const previewResource = (candidate: EcsServiceState, current: EcsServiceState) => {
   const target = {
@@ -45,7 +48,7 @@ export const getEcsServiceHandler = (): StepHandler<EcsServiceState> => ({
   },
   update: async (candidate, current, context) => {
     if (!candidate.result) throw new CorruptedResourceError(EcsServiceServiceName, candidate.parameters.serviceName);
-    if (!equalsResource(candidate, current) || candidate.dependencies.join(',') !== current.dependencies.join(',')) {
+    if (candidate.parameters.hash !== current.parameters.hash || candidate.dependencies.join(',') !== current.dependencies.join(',')) {
       return deploy(candidate, context);
     }
     return undefined;
