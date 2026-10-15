@@ -25,3 +25,17 @@ export class DuplicateWorkspaceRepoError extends Error {
     this.name = 'DuplicateWorkspaceRepoError';
   }
 }
+
+export class UnknownWorkflowAgentError extends Error {
+  constructor(workflow: string, alias: string) {
+    super(`Unknown agent '${alias}' in workflow '${workflow}': expected an Agent.Service class declared in the project`);
+    this.name = 'UnknownWorkflowAgentError';
+  }
+}
+
+export class InvalidMaxStepsError extends Error {
+  constructor(workflow: string, value: unknown) {
+    super(`Invalid maxSteps '${String(value)}' in workflow '${workflow}': expected an integer from 1 to 100`);
+    this.name = 'InvalidMaxStepsError';
+  }
+}

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import { deepEqual, throws } from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { buildMetadata } from '@ez4/project/library';
-import { registerTriggers, type AgentService } from '@ez4/agent/library';
+import { registerTriggers, type AgentService, type AgentWorkflowService, isAgentWorkflowService } from '@ez4/agent/library';
 import { IncompleteServiceError, InvalidCpuMemoryCombinationError, UnknownPresetError } from '@ez4/agent/library';
 
 const testFile = (fileName: string, overwrite = false) => {
@@ -30,6 +30,19 @@ describe('agent metadata parser and validation', () => {
 
   it('assert :: workspace agent metadata matches golden json', () => {
     testFile('workspace-agent');
+  });
+  it('assert :: workflow metadata matches golden json', () => {
+    testFile('workflow');
+  });
+
+  it('assert :: workflow maps aliases to agent classes', () => {
+    registerTriggers();
+    const { metadata } = buildMetadata(['./test/input/output-workflow.ts']);
+    const workflow = metadata.ReviewLoop as AgentWorkflowService;
+    deepEqual(workflow.agents, { worker: 'BasicAgent' });
+    deepEqual(workflow.maxSteps, 4);
+    deepEqual(workflow.handler.name, 'reviewLoopStep');
+    deepEqual(isAgentWorkflowService(workflow), true);
   });
 
   it('assert :: workspace repos are normalized', () => {

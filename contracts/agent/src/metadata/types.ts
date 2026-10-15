@@ -6,6 +6,34 @@ import type { Agent } from '../services/contract';
 import { createServiceMetadata } from '@ez4/project/library';
 
 export const ServiceType = '@ez4/agent';
+export const WorkflowServiceType = '@ez4/agent-workflow';
+
+export type AgentWorkflowService = Omit<ServiceMetadata, 'variables' | 'services'> &
+  Required<Pick<ServiceMetadata, 'variables' | 'services'>> & {
+    name: string;
+    file?: string;
+    description?: string;
+    tags?: Record<string, string>;
+    type: typeof WorkflowServiceType;
+    inputSchema: ObjectSchema;
+    agents: Record<string, string>;
+    handler: FunctionSignature;
+    maxSteps: number;
+  };
+
+export const isAgentWorkflowService = (service: ServiceMetadata): service is AgentWorkflowService => {
+  return service.type === WorkflowServiceType;
+};
+
+export const createAgentWorkflowService = (name: string, file?: string, description?: string) => ({
+  ...createServiceMetadata<AgentWorkflowService>(WorkflowServiceType, name),
+  ...(description && { description }),
+  ...(file && { file }),
+  variables: {},
+  services: {},
+  agents: {},
+  maxSteps: 10
+}) as AgentWorkflowService;
 
 export type AgentService = Omit<ServiceMetadata, 'variables' | 'services'> &
   Required<Pick<ServiceMetadata, 'variables' | 'services'>> & {

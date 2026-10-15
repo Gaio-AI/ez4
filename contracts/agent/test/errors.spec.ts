@@ -5,7 +5,9 @@ import {
   InvalidCpuMemoryCombinationError,
   UnknownPresetError,
   InvalidWorkspaceRepoError,
-  DuplicateWorkspaceRepoError
+  DuplicateWorkspaceRepoError,
+  UnknownWorkflowAgentError,
+  InvalidMaxStepsError
 } from '@ez4/agent/library';
 import { parseFile } from './common/parser';
 
@@ -53,5 +55,19 @@ describe('agent metadata errors', () => {
   it('assert :: duplicate workspace repo names are rejected', () => {
     const errors = parseFile('duplicate-workspace-repo', 1);
     ok(errors.some((error) => error instanceof DuplicateWorkspaceRepoError && error.message.includes('api')));
+  });
+
+  it('assert :: unknown workflow agent alias reports workflow and agent name', () => {
+    const errors = parseFile('invalid-workflow-agent', 1);
+    const error = errors.find((entry) => entry instanceof UnknownWorkflowAgentError);
+    ok(error);
+    ok(error.message.includes('InvalidWorkflowAgent') && error.message.includes('ghost'));
+  });
+
+  it('assert :: invalid maxSteps is rejected naming workflow and value', () => {
+    const errors = parseFile('invalid-workflow-steps', 1);
+    const error = errors.find((entry) => entry instanceof InvalidMaxStepsError);
+    ok(error);
+    ok(error.message.includes('InvalidWorkflowSteps') && error.message.includes('0'));
   });
 });

@@ -2,10 +2,10 @@ import { describe, it } from 'node:test';
 import { rejects, equal, ok } from 'node:assert/strict';
 import { registerTriggers } from '../src/main';
 import { AgentNotEmulatedError } from '../src/errors/stub';
-import { createAgentStubClient } from '../src/client/stub';
+import { createAgentStubClient, createWorkflowEmulatorClient } from '../src/client/stub';
 import type { AgentStubClient } from '../src/client/stub';
 import { triggerAllAsync } from '@ez4/project/library';
-import { createAgentService } from '@ez4/agent/library';
+import { createAgentService, createAgentWorkflowService } from '@ez4/agent/library';
 import type { EmulateServiceEvent } from '@ez4/project/library';
 
 describe('local agent stub emulator', () => {
@@ -75,5 +75,47 @@ describe('local agent stub emulator', () => {
         return true;
       }
     );
+  });
+
+  it('assert :: workflow start is not emulated', async () => {
+    const client = createWorkflowEmulatorClient('ReviewLoop');
+    await rejects(
+      async () => {
+        await client.start({ issueId: 'x' });
+      },
+      (error: unknown) => {
+        ok(error instanceof AgentNotEmulatedError);
+        equal(error.agentName, 'ReviewLoop');
+        return true;
+      }
+    );
+  });
+
+  it('assert :: emulator:getServices returns stub emulator for workflow services', async () => {
+    registerTriggers();
+    const dummyWorkflow = createAgentWorkflowService('ReviewLoop');
+    const result = await triggerAllAsync('emulator:getServices', (handler) => {
+      const event: EmulateServiceEvent = {
+        service: dummyWorkflow,
+        options: {
+          prefix: 'test',
+          projectName: 'test',
+          branchName: 'main',
+          serviceHost: 'localhost',
+          version: 1,
+          localOptions: {},
+          testOptions: {}
+        },
+        context: {
+          makeClient: () => undefined,
+          makeClients: () => ({})
+        }
+      };
+      return handler(event);
+    });
+    ok(result);
+    equal(result.type, 'AgentWorkflow');
+    equal(result.name, 'ReviewLoop');
+    equal(typeof result.exportHandler, 'function');
   });
 });

@@ -17,6 +17,20 @@ import type {
   WorkspaceRef as AgentWorkspaceRef,
   WorkspaceRequest as AgentWorkspaceRequest
 } from './workspace';
+import type {
+  WorkflowAgents as AgentWorkflowAgents,
+  AgentsOf as AgentAgentsOf,
+  WorkflowInputOf as AgentWorkflowInputOf,
+  StateOf as AgentStateOf,
+  WorkflowEvent as AgentWorkflowEvent,
+  WorkflowNext as AgentWorkflowNext,
+  WorkflowStep as AgentWorkflowStep,
+  WorkflowRequest as AgentWorkflowRequest,
+  WorkflowHandler as AgentWorkflowHandler,
+  WorkflowStatus as AgentWorkflowStatus,
+  WorkflowRun as AgentWorkflowRun,
+  WorkflowClient as AgentWorkflowClient
+} from './workflow';
 
 export interface LinkOptions extends Record<string, unknown> {
   readonly replyTo?: string;
@@ -32,6 +46,18 @@ export namespace Agent {
   export type WorkspaceAuth = AgentWorkspaceAuth;
   export type WorkspaceRef = AgentWorkspaceRef;
   export type WorkspaceRequest = AgentWorkspaceRequest;
+  export type WorkflowAgents = AgentWorkflowAgents;
+  export type AgentsOf<W> = AgentAgentsOf<W>;
+  export type WorkflowInputOf<W> = AgentWorkflowInputOf<W>;
+  export type StateOf<W> = AgentStateOf<W>;
+  export type WorkflowEvent<I, A extends WorkflowAgents> = AgentWorkflowEvent<I, A>;
+  export type WorkflowNext<A extends WorkflowAgents> = AgentWorkflowNext<A>;
+  export type WorkflowStep<S, A extends WorkflowAgents> = AgentWorkflowStep<S, A>;
+  export type WorkflowRequest<W extends Workflow<any, any, any>> = AgentWorkflowRequest<W>;
+  export type WorkflowHandler<W extends Workflow<any, any, any>> = AgentWorkflowHandler<W>;
+  export type WorkflowStatus = AgentWorkflowStatus;
+  export type WorkflowRun<S> = AgentWorkflowRun<S>;
+  export type WorkflowClient<W extends Workflow<any, any, any>> = AgentWorkflowClient<W>;
 
   export interface Input {}
   export interface Output {}
@@ -111,6 +137,18 @@ export namespace Agent {
     readonly tags?: CommonService.Tags;
     readonly client!: Client<this>;
     readonly options!: LinkOptions;
+  }
+
+  export abstract class Workflow<I extends Input, S, A extends WorkflowAgents = WorkflowAgents> implements CommonService.Provider {
+    declare private readonly __state: S;
+    abstract readonly input: I;
+    abstract readonly agents: A;
+    abstract readonly handler: WorkflowHandler<Workflow<I, S, A>>;
+    readonly maxSteps?: number;
+    readonly variables?: LinkedVariables;
+    readonly services?: Record<string, unknown>;
+    readonly tags?: CommonService.Tags;
+    readonly client!: WorkflowClient<this>;
   }
 }
 

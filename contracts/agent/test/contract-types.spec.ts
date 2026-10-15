@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import { ok, equal, deepEqual } from 'node:assert/strict';
 import { Agent } from '@ez4/agent';
-import { ServiceType, isAgentService, createAgentService, registerTriggers } from '@ez4/agent/library';
+import { ServiceType, WorkflowServiceType, isAgentService, isAgentWorkflowService, createAgentService, createAgentWorkflowService, registerTriggers } from '@ez4/agent/library';
 
 const options: Agent.InvokeOptions = {
   id: 'run-1',
@@ -59,5 +59,52 @@ describe('agent contract types and scaffold', () => {
 
   it('assert :: registerTriggers runs without error', () => {
     registerTriggers();
+  });
+
+  it('assert :: workflow service type constant is @ez4/agent-workflow', () => {
+    equal(WorkflowServiceType, '@ez4/agent-workflow');
+  });
+
+  it('assert :: createAgentWorkflowService populates default structure', () => {
+    const workflow = createAgentWorkflowService('TestWorkflow', 'src/workflow.ts', 'Test description');
+    ok(isAgentWorkflowService(workflow));
+    equal(workflow.name, 'TestWorkflow');
+    equal(workflow.type, '@ez4/agent-workflow');
+    equal(workflow.file, 'src/workflow.ts');
+    equal(workflow.description, 'Test description');
+    deepEqual(workflow.agents, {});
+    deepEqual(workflow.variables, {});
+    deepEqual(workflow.services, {});
+  });
+
+  it('assert :: WorkflowNext enforces valid invoke agent aliases and complete types', () => {
+    type TestAgents = {
+      worker: Agent.Service<{ task: string }, { done: boolean }>;
+    };
+
+    const validInvoke: Agent.WorkflowNext<TestAgents> = {
+      invoke: 'worker',
+      input: { task: 'build' }
+    };
+    const validComplete: Agent.WorkflowNext<TestAgents> = {
+      complete: 'finished'
+    };
+
+    const invalidAlias: Agent.WorkflowNext<TestAgents> = {
+      // @ts-expect-error Unknown agent alias is rejected
+      invoke: 'unknown',
+      input: { task: 'build' }
+    };
+
+    const invalidInput: Agent.WorkflowNext<TestAgents> = {
+      invoke: 'worker',
+      // @ts-expect-error Wrong input type for worker is rejected
+      input: { task: 123 }
+    };
+
+    equal('invoke' in validInvoke, true);
+    equal('complete' in validComplete, true);
+    void invalidAlias;
+    void invalidInput;
   });
 });
