@@ -125,9 +125,6 @@ describe('workflow client', () => {
       sqsClient: sqs
     });
 
-    await rejects(
-      client.start({ issueId: 123 as unknown as string }),
-      /Workflow input validation failed/
-    );
+    await rejects(client.start({ issueId: 123 as unknown as string }), /Workflow input validation failed/);
   });
 });

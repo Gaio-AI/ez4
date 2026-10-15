@@ -8,10 +8,11 @@ import type { Agent } from '@ez4/agent';
 import { getWorkflowStateKey } from '../utils/names';
 
 export interface WorkflowClientParameters {
-  workflow: string;
-  startQueueUrl: string;
-  bucket: string;
-  inputSchema: ObjectSchema;
+  workflow?: string;
+  queueUrl?: string;
+  startQueueUrl?: string;
+  bucket?: string;
+  inputSchema?: ObjectSchema;
   s3Client?: S3Client;
   sqsClient?: SQSClient;
 }
@@ -21,11 +22,18 @@ export namespace WorkflowClient {
     const s3 = parameters.s3Client ?? new S3Client();
     const sqs = parameters.sqsClient ?? new SQSClient();
 
+    const queueUrl = parameters.queueUrl ?? parameters.startQueueUrl;
+    if (!queueUrl) {
+      throw new Error('Workflow client requires queueUrl or startQueueUrl.');
+    }
+
     return {
       async start(input: Agent.WorkflowInputOf<W>, options?: { runId?: string }): Promise<{ runId: string }> {
-        const errors = await validate(input, parameters.inputSchema);
-        if (errors && errors.length > 0) {
-          throw new Error(`Workflow input validation failed: ${JSON.stringify(getErrorDetails(errors))}`);
+        if (parameters.inputSchema) {
+          const errors = await validate(input, parameters.inputSchema);
+          if (errors && errors.length > 0) {
+            throw new Error(`Workflow input validation failed: ${JSON.stringify(getErrorDetails(errors))}`);
+          }
         }
 
         const runId = options?.runId ?? randomUUID();
@@ -37,16 +45,18 @@ export namespace WorkflowClient {
 
         await sqs.send(
           new SendMessageCommand({
-            QueueUrl: parameters.startQueueUrl,
+            QueueUrl: queueUrl,
             MessageBody: JSON.stringify(message)
           })
         );
 
         return { runId };
       },
-
       async status(runId: string): Promise<Agent.WorkflowRun<Agent.StateOf<W>> | undefined> {
         try {
+          if (!parameters.bucket || !parameters.workflow) {
+            throw new Error('Workflow status lookup requires bucket and workflow name.');
+          }
           const res = await s3.send(
             new GetObjectCommand({
               Bucket: parameters.bucket,

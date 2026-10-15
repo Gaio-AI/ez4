@@ -4,6 +4,7 @@ import { registerTriggers as registerAwsIdentityTriggers } from '@ez4/aws-identi
 import { registerTriggers as registerAwsFunctionTriggers } from '@ez4/aws-function';
 import { registerTriggers as registerAwsBucketTriggers } from '@ez4/aws-bucket';
 import { registerTriggers as registerAwsLogsTriggers } from '@ez4/aws-logs';
+import { registerTriggers as registerAwsQueueTriggers } from '@ez4/aws-queue';
 import { tryCreateTrigger } from '@ez4/project/library';
 
 import { registerAgentProviders } from '../providers';
@@ -18,6 +19,7 @@ export const registerTriggers = () => {
   registerAwsFunctionTriggers();
   registerAwsBucketTriggers();
   registerAwsLogsTriggers();
+  registerAwsQueueTriggers();
   registerAgentTriggers();
 
   tryCreateTrigger('@ez4/aws-agent', {

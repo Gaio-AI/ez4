@@ -1,13 +1,14 @@
 import type { ContextSource, DeployOptions, EventContext, ServiceMetadata } from '@ez4/project/library';
-import type { AgentService } from '@ez4/agent/library';
+import type { AgentService, AgentWorkflowService } from '@ez4/agent/library';
 import type { QueueState } from '@ez4/aws-queue';
 import type { EcsClusterState, EcsTaskDefState } from '@ez4/aws-ecs';
-import { isAgentService, InvalidReplyToError } from '@ez4/agent/library';
+import { isAgentService, isAgentWorkflowService, InvalidReplyToError } from '@ez4/agent/library';
 import { QueueServiceType } from '@ez4/aws-queue';
 import { getDefinitionName } from '@ez4/project/library';
 import { createBucketStateId } from '@ez4/aws-bucket';
 import { createEcsClusterStateId, createEcsTaskDefStateId } from '@ez4/aws-ecs';
-import { getAgentBucketName, getAgentClusterName } from '../utils/names';
+import { hashData } from '@ez4/utils';
+import { getAgentBucketName, getAgentClusterName, getWorkflowStartQueueName } from '../utils/names';
 export interface LinkedAgentEvent {
   service: ServiceMetadata;
   target?: ServiceMetadata;
@@ -17,6 +18,26 @@ export interface LinkedAgentEvent {
 
 export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | null => {
   const { service, options, context } = event;
+  if (isAgentWorkflowService(service)) {
+    const workflow = service as AgentWorkflowService;
+    const startQueueName = getWorkflowStartQueueName(workflow.name, options);
+    const startQueueId = hashData(QueueServiceType, startQueueName);
+    const queueUrl = getDefinitionName<QueueState>(startQueueId, 'queueUrl');
+
+    const clientParameters = {
+      queueUrl: `@{EZ4_RAW_EXPRESSION}:${queueUrl}`
+    };
+
+    const constructorParams = JSON.stringify(clientParameters).replace(/"@\{EZ4_RAW_EXPRESSION\}:(.*?)"/g, '$1');
+
+    return {
+      module: 'WorkflowClient',
+      from: '@ez4/aws-agent/client',
+      constructor: `@{EZ4_MODULE_IMPORT}.make(${constructorParams})`,
+      dependencyIds: [startQueueId],
+      connectionIds: [startQueueId]
+    };
+  }
 
   if (!isAgentService(service)) {
     return null;

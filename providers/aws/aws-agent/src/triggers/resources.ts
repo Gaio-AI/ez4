@@ -12,7 +12,8 @@ import type { AccessPointState, MountTargetState } from '@ez4/aws-efs';
 import { AccessPointServiceType, isMountTargetState, createFileSystemStateId, createAccessPointStateId } from '@ez4/aws-efs';
 import { prepareWorkspaceResources, type WorkspaceResources, AgentEfsNetworkTag, getWorkspaceFileSystemName } from '../workspace/resources';
 import { AgentNetworkTag } from '../network/discovery';
-import { isAgentService } from '@ez4/agent/library';
+import { isAgentService, isAgentWorkflowService } from '@ez4/agent/library';
+import { prepareWorkflowResources } from '../workflow/resources';
 import { createBucket, createBucketStateId } from '@ez4/aws-bucket';
 import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
 import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
@@ -69,8 +70,11 @@ const defaultPorts: AgentResourcePorts = {
 
 export const prepareAgentResources = async (event: PrepareResourceEvent, ports: AgentResourcePorts = defaultPorts): Promise<boolean> => {
   const { state, service, options, context } = event;
+  if (isAgentWorkflowService(service)) {
+    await prepareWorkflowResources(state, service, context, options, { identity: ports.identity });
+    return true;
+  }
   if (!isAgentService(service)) return false;
-
   const { region, accountId } = await ports.identity();
   const network = await discoverAgentNetwork(undefined, ports.network);
 
@@ -324,6 +328,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
 
 export const connectAgentResources = (event: ConnectResourceEvent): void => {
   const { state, service, options, context } = event;
+  if (isAgentWorkflowService(service)) return;
   if (!isAgentService(service)) return;
   const taskdef = context.getServiceState(service, options);
   linkEntryConnection(state, taskdef.entryId, createEcsClusterStateId(getAgentClusterName(options)));

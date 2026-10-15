@@ -47,6 +47,8 @@ export {
 
 export * from './workflow/runtime';
 export * from './workflow/client';
+export * from './workflow/template';
+export * from './workflow/resources';
 
 export * from './auth/providers';
 export * from './auth/login';
