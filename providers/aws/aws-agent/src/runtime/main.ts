@@ -266,5 +266,11 @@ const writeResult = async (
   result: Agent.Result<Agent.Service<any, any>>
 ): Promise<void> => {
   const resultKey = `results/${agentName}/${invocationId}.json`;
+
+  // The result goes to S3 for the caller; the log keeps the reason next to the task that failed.
+  if (result.status !== 'succeeded') {
+    console.error(`Agent ${agentName} invocation ${invocationId} ${result.status}: ${result.error?.code} ${result.error?.message}`);
+  }
+
   await storage.writeJson(resultKey, result);
 };
