@@ -7,6 +7,7 @@ import {
   CreateSecretCommand,
   DeleteSecretCommand,
   DescribeSecretCommand,
+  PutSecretValueCommand,
   ResourceNotFoundException
 } from '@aws-sdk/client-secrets-manager';
 import { getAwsClientOptions } from '@ez4/aws-common';
@@ -66,14 +67,22 @@ export const putSecretValue = async (
   logger?: OperationLogLine
 ): Promise<SecretResult> => {
   const secretString = typeof value === 'string' ? value : JSON.stringify(value);
-  return createSecretResource(
-    {
-      secretName,
-      getSecretValue: () => Promise.resolve(secretString),
-      tags
-    },
-    logger
+
+  const existing = await findSecret(secretName);
+  if (!existing) {
+    return createSecretResource({ secretName, getSecretValue: () => Promise.resolve(secretString), tags }, logger);
+  }
+
+  logger?.update('Updating Secrets Manager secret value');
+
+  await getSecretsManagerClient().send(
+    new PutSecretValueCommand({
+      SecretId: secretName,
+      SecretString: secretString
+    })
   );
+
+  return existing;
 };
 
 const serializeSecretValue = async (parameters: SecretParameters): Promise<string | undefined> => {

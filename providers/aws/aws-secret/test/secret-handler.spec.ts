@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import { ok, deepEqual } from 'node:assert/strict';
 import type { EntryStates, StepContext } from '@ez4/state';
 import type { SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
-import { createSecret, getSecretHandler, setSecretsManagerClient, type SecretState } from '../src/main';
+import { createSecret, getSecretHandler, putSecretValue, setSecretsManagerClient, type SecretState } from '../src/main';
 
 const fakeSecretState = (parameters: { secretName: string; retain?: boolean }): SecretState => ({
   entryId: 'secret-1',
@@ -57,6 +57,28 @@ describe('Secrets Manager secret handler', () => {
 
       deepEqual(sent, ['DescribeSecretCommand']);
       deepEqual(generated, 0);
+    } finally {
+      setSecretsManagerClient(null);
+    }
+  });
+
+  it('assert :: an explicit put replaces the value of an existing secret', async () => {
+    const sent: { name: string; input: unknown }[] = [];
+
+    setSecretsManagerClient({
+      send: async (command: { constructor: { name: string }; input: unknown }) => {
+        sent.push({ name: command.constructor.name, input: command.input });
+        return { ARN: 'arn:aws:secretsmanager:us-east-1:123:secret:claude-x' };
+      }
+    } as unknown as SecretsManagerClient);
+
+    try {
+      await putSecretValue('stg/agents/claude', { TOKEN: 'sk-2' });
+
+      deepEqual(sent.at(-1), {
+        name: 'PutSecretValueCommand',
+        input: { SecretId: 'stg/agents/claude', SecretString: '{"TOKEN":"sk-2"}' }
+      });
     } finally {
       setSecretsManagerClient(null);
     }
