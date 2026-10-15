@@ -1,5 +1,5 @@
 import type { DescribeSecretCommandOutput } from '@aws-sdk/client-secrets-manager';
-import type { OperationLogLine } from '@ez4/aws-common';
+import type { OperationLogLine, ResourceTags } from '@ez4/aws-common';
 import type { SecretParameters, SecretResult } from './types';
 
 import {
@@ -35,7 +35,7 @@ const isNotFound = (error: unknown): boolean => {
   return false;
 };
 
-export const findSecret = async (secretName: string, logger?: OperationLogLine): Promise<SecretResult | null> => {
+export const findSecret = async (secretName: string, logger?: OperationLogLine): Promise<SecretResult | undefined> => {
   logger?.update('Checking Secrets Manager secret');
 
   try {
@@ -51,13 +51,30 @@ export const findSecret = async (secretName: string, logger?: OperationLogLine):
       };
     }
 
-    return null;
+    return undefined;
   } catch (error) {
     if (isNotFound(error)) {
-      return null;
+      return undefined;
     }
     throw error;
   }
+};
+
+export const putSecretValue = async (
+  secretName: string,
+  value: Record<string, string> | string,
+  tags?: ResourceTags,
+  logger?: OperationLogLine
+): Promise<SecretResult> => {
+  const secretString = typeof value === 'string' ? value : JSON.stringify(value);
+  return createSecretResource(
+    {
+      secretName,
+      getSecretValue: () => Promise.resolve(secretString),
+      tags
+    },
+    logger
+  );
 };
 
 const serializeSecretValue = async (parameters: SecretParameters): Promise<string | undefined> => {
