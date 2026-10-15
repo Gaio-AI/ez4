@@ -9,7 +9,10 @@ const options: Agent.InvokeOptions = {
 };
 
 const resultWorkspace: Agent.Result<Agent.Service<{ task: string }, { done: boolean }>>['workspace'] = options.workspace;
-const prepareWorkspace: Agent.PrepareRequest<{ task: string }>['workspace'] = { dir: '/work', repos: { api: { path: '/work/api', base: 'a1' } } };
+const prepareWorkspace: Agent.PrepareRequest<{ task: string }>['workspace'] = {
+  dir: '/work',
+  repos: { api: { path: '/work/api', base: 'a1' } }
+};
 const finishWorkspace: Agent.FinishRequest<{ task: string }, { done: boolean }>['workspace'] = {
   ...prepareWorkspace!,
   refs: options.workspace!

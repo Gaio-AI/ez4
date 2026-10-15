@@ -42,7 +42,13 @@ export const getWorkspaceMetadata = (
       errors.push(new InvalidWorkspaceRepoError(agentName, url));
       continue;
     }
-    const name = explicitName ?? url.replace(/\/+$/, '').split('/').pop()!.replace(/\.git$/, '');
+    const name =
+      explicitName ??
+      url
+        .replace(/\/+$/, '')
+        .split('/')
+        .pop()!
+        .replace(/\.git$/, '');
     if (names.has(name)) {
       errors.push(new DuplicateWorkspaceRepoError(agentName, name));
       continue;
