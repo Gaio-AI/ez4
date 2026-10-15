@@ -66,17 +66,34 @@ export namespace Client {
             })
           );
         } catch (error) {
-          if (!options?.id || !error || typeof error !== 'object' || !('$metadata' in error) ||
-              !error.$metadata || typeof error.$metadata !== 'object' || !('httpStatusCode' in error.$metadata) ||
-              error.$metadata.httpStatusCode !== 412) throw error;
-          const existing = await s3.send(new GetObjectCommand({
-            Bucket: parameters.bucket,
-            Key: `invocations/${parameters.agentName}/${id}.json`
-          }));
+          if (
+            !options?.id ||
+            !error ||
+            typeof error !== 'object' ||
+            !('$metadata' in error) ||
+            !error.$metadata ||
+            typeof error.$metadata !== 'object' ||
+            !('httpStatusCode' in error.$metadata) ||
+            error.$metadata.httpStatusCode !== 412
+          )
+            throw error;
+          const existing = await s3.send(
+            new GetObjectCommand({
+              Bucket: parameters.bucket,
+              Key: `invocations/${parameters.agentName}/${id}.json`
+            })
+          );
           if (!existing.Body) throw new Error(`Invocation ${id} has no envelope`);
           const envelope: unknown = JSON.parse(await streamToString(existing.Body as Readable));
-          if (!envelope || typeof envelope !== 'object' || !('deadline' in envelope) || typeof envelope.deadline !== 'string' ||
-              !('cluster' in envelope) || typeof envelope.cluster !== 'string' || !('input' in envelope)) {
+          if (
+            !envelope ||
+            typeof envelope !== 'object' ||
+            !('deadline' in envelope) ||
+            typeof envelope.deadline !== 'string' ||
+            !('cluster' in envelope) ||
+            typeof envelope.cluster !== 'string' ||
+            !('input' in envelope)
+          ) {
             throw new Error(`Invocation ${id} has an invalid envelope`);
           }
           if ('taskArn' in envelope && typeof envelope.taskArn === 'string') return { id };

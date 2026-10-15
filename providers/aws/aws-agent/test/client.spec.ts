@@ -446,8 +446,15 @@ describe('client :: agent client', () => {
       }
     } as unknown as ECSClient;
     const client = Client.make<TestService>({
-      agentName: 'Worker', cluster: 'cluster', taskDefinition: 'task', bucket: 'bucket',
-      subnets: ['subnet-1'], securityGroups: ['sg-1'], inputSchema, s3Client: s3, ecsClient: ecs
+      agentName: 'Worker',
+      cluster: 'cluster',
+      taskDefinition: 'task',
+      bucket: 'bucket',
+      subnets: ['subnet-1'],
+      securityGroups: ['sg-1'],
+      inputSchema,
+      s3Client: s3,
+      ecsClient: ecs
     });
     await rejects(client.invoke({ task: 'original' }, { id: 'retry-1', correlation: 'first' }), /Connection lost/);
     const initial = stored.get('invocations/Worker/retry-1.json');
