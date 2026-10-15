@@ -475,4 +475,29 @@ describe('local scheduler timers', () => {
       ]);
     });
   });
+
+  // A disabled schedule exists on AWS but never fires, so the emulator does not fire it either.
+  describe('disabled', () => {
+    it('assert :: disabled scheduler never runs on its timer', async (t) => {
+      const warn = t.mock.method(Logger, 'warn', () => {});
+
+      const service = getCronService('disabledTimer', {
+        expression: 'rate(1 minute)',
+        disabled: true
+      });
+
+      deepEqual(await collectRuns(t, service, '2026-09-29T00:00:00Z', ONE_HOUR), []);
+
+      equal(warn.mock.callCount(), 1);
+    });
+
+    it('assert :: enabled scheduler runs on its timer', async (t) => {
+      const service = getCronService('enabledTimer', {
+        expression: 'rate(30 minutes)',
+        disabled: false
+      });
+
+      deepEqual(await collectRuns(t, service, '2026-09-29T00:00:00Z', ONE_HOUR), ['2026-09-29T00:30:00.000Z', '2026-09-29T01:00:00.000Z']);
+    });
+  });
 });

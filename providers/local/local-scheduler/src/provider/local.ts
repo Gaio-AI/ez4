@@ -38,6 +38,11 @@ export const registerLocalService = (service: CronService, options: ServeOptions
         return Logger.log(`⌚ Dynamic scheduler [${resourceName}] is ready`);
       }
 
+      // Deployed, a disabled schedule exists and never fires; it still runs when invoked by hand.
+      if (service.disabled) {
+        return Logger.warn(`Scheduler [${resourceName}] is disabled, it only runs when invoked`);
+      }
+
       processTimerEvent(service);
     },
     requestHandler: (request: EmulatorRequestEvent) => {
