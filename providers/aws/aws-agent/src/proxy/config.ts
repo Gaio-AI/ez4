@@ -96,12 +96,17 @@ export const buildNoProxyList = (region: string): string[] => {
   ];
 };
 
+// The proxy image runs Squid as a non-root user, so the generated files live under /tmp.
+export const PROXY_PASSWORDS_FILE = '/tmp/squid-passwords';
+
 export const generateSquidConfig = (options: SquidConfigOptions): string => {
   const { port = 3128, agents } = options;
   const lines: string[] = [
     `http_port ${port}`,
-    'auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/passwords',
+    `auth_param basic program /usr/lib/squid/basic_ncsa_auth ${PROXY_PASSWORDS_FILE}`,
     'auth_param basic realm EZ4 Agent Egress Gateway',
+    // Squid lowercases user names by default, which no longer match the agent names in the password file.
+    'auth_param basic casesensitive on',
     'acl auth_users proxy_auth REQUIRED',
     'acl SSL_ports port 443',
     'acl Safe_ports port 80',

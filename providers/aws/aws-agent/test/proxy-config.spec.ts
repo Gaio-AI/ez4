@@ -19,7 +19,7 @@ import {
   normalizeDomain,
   getAgentEgressDomains
 } from '../src/proxy/config';
-import { generateHtpasswd, generateAgentPassword } from '../src/proxy/auth';
+import { generateHtpasswd, generateAgentPassword, md5Crypt } from '../src/proxy/auth';
 import {
   createSecret,
   getSecretHandler,
@@ -46,7 +46,7 @@ describe('proxy :: configuration and auth', () => {
     });
 
     ok(config.includes('http_port 3128'));
-    ok(config.includes('auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/passwords'));
+    ok(config.includes('auth_param basic program /usr/lib/squid/basic_ncsa_auth /tmp/squid-passwords'));
     ok(config.includes('acl auth_users proxy_auth REQUIRED'));
     ok(config.includes('acl user_coder proxy_auth coder'));
     ok(config.includes('acl user_reviewer proxy_auth reviewer'));
@@ -126,9 +126,14 @@ describe('proxy :: configuration and auth', () => {
     const htpasswd = generateHtpasswd({
       'test-agent': password
     });
-    ok(htpasswd.startsWith('test-agent:'));
+    ok(htpasswd.startsWith('test-agent:$1$'));
     ok(!htpasswd.includes(password)); // Must be hashed!
-    ok(htpasswd.includes('{SHA}'));
+  });
+
+  it('hashes passwords exactly like crypt(3) MD5-crypt, which basic_ncsa_auth verifies', () => {
+    // Vectors produced by perl crypt() inside the pinned proxy image.
+    equal(md5Crypt('secret123', 'abcdefgh'), '$1$abcdefgh$TNzadvK3GJjNJPmFgcezl/');
+    equal(md5Crypt('0123456789abcdef'.repeat(4), 'Zz./9xYq'), '$1$Zz./9xYq$476VifBw7v.p9oNH7DCm91');
   });
 
   it('handles proxy credential secret StepHandler without leaking password to state', async () => {

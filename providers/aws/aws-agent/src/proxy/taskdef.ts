@@ -1,15 +1,17 @@
 import type { RegisterTaskDefinitionCommandInput } from '@aws-sdk/client-ecs';
 
-export const PROXY_IMAGE = 'public.ecr.aws/ubuntu/squid:latest';
+import { PROXY_PASSWORDS_FILE } from './config';
+
+// Pinned: the chiseled image ships no sed/chmod/env and names its binary squid-gnutls.
+export const PROXY_IMAGE = 'public.ecr.aws/ubuntu/squid@sha256:953acae243224f376552a4eca37030a7b0c314fadad5330e54cccf6ed6f6b916';
 
 export const PROXY_PORT = 3128;
 
 // Writes the generated config and the per-agent htpasswd lines (injected as secrets) before starting Squid in the foreground.
 export const PROXY_START_SCRIPT = [
-  'printf "%s" "$SQUID_CONF" > /etc/squid/squid.conf',
-  "env | sed -n 's/^SQUID_HTPASSWD_[0-9]*=//p' > /etc/squid/passwords",
-  'chmod 644 /etc/squid/passwords',
-  'exec squid -N -f /etc/squid/squid.conf'
+  'printf "%s" "$SQUID_CONF" > /tmp/squid.conf',
+  `awk 'BEGIN { for (name in ENVIRON) if (name ~ /^SQUID_HTPASSWD_[0-9]+$/) print ENVIRON[name] }' > ${PROXY_PASSWORDS_FILE}`,
+  'exec /usr/sbin/squid-gnutls -N -f /tmp/squid.conf'
 ].join(' && ');
 
 export type ProxyTaskDefinitionInput = {
