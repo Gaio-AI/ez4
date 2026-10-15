@@ -18,6 +18,7 @@ import { EventsRuleServiceType } from '../src/events/types';
 import { AgentNamespaceServiceType } from '../src/namespace/types';
 import { ProxyServiceServiceType, type ProxyServiceState } from '../src/proxy/ecs-types';
 import { ProxyCredentialServiceType, type ProxyCredentialState } from '../src/proxy/types';
+import { ProviderCredentialServiceType } from '../src/auth/types';
 import type { EcsTaskDefState } from '../src/taskdef/types';
 
 import { prepareAgentResources } from '../src/triggers/resources';
@@ -49,7 +50,24 @@ const ports = {
   },
   bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' }),
   identity: async () => ({ region: 'us-east-1', accountId: '123456789012' }),
-  dispatcherBundle: async () => '/tmp/dispatcher.mjs'
+  dispatcherBundle: async () => '/tmp/dispatcher.mjs',
+  credential: {
+    find: async () => ({ secretArn: 'arn:aws:secretsmanager:us-east-1:123:secret:ez4/agents/claude-AbCdEf' }),
+    store: async () => {
+      throw new Error('store not expected in resources.spec');
+    },
+    interactive: () => false,
+    force: () => false,
+    io: {
+      run: async () => {
+        throw new Error('io.run not expected in resources.spec');
+      },
+      prompt: async () => {
+        throw new Error('io.prompt not expected in resources.spec');
+      },
+      log: () => {}
+    }
+  }
 };
 
 const countType = (state: EntryStates, type: string) => Object.values(state).filter((entry) => entry?.type === type).length;
@@ -87,7 +105,14 @@ describe('agent resources wiring', () => {
     const dependencyTypes = taskdef.dependencies.map((id) => state[id]!.type).sort();
     deepEqual(
       dependencyTypes,
-      [EcrImageServiceType, LogGroupServiceType, RoleServiceType, RoleServiceType, ProxyCredentialServiceType].sort()
+      [
+        EcrImageServiceType,
+        LogGroupServiceType,
+        RoleServiceType,
+        RoleServiceType,
+        ProxyCredentialServiceType,
+        ProviderCredentialServiceType
+      ].sort()
     );
   });
 

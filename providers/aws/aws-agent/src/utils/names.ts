@@ -33,6 +33,9 @@ export const getAgentsNamespaceName = (options: DeployOptions) => `${getAgentsBa
 
 export const getAgentProxyUrl = (options: DeployOptions) => `http://proxy.${getAgentsNamespaceName(options)}:3128`;
 
+export const getProviderSecretName = (provider: string, options: DeployOptions) =>
+  `${toKebabCase(options.prefix ?? 'ez4')}/agents/${provider}`;
+
 /** IAM resource for a secret reference: `name`, `name:jsonKey`, or a secret ARN optionally followed by `:jsonKey:stage:version`. */
 export const getSecretResourceArn = (secretRef: string, region: string, accountId: string) => {
   if (secretRef.startsWith('arn:')) return secretRef.split(':').slice(0, 7).join(':');

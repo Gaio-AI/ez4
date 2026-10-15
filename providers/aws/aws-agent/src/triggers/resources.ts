@@ -1,4 +1,6 @@
 import type { AgentService } from '@ez4/agent/library';
+import type { Agent } from '@ez4/agent';
+import type { CredentialPorts } from '../auth/login';
 import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
 import type { ConnectResourceEvent, DeployOptions, PrepareResourceEvent } from '@ez4/project/library';
@@ -22,6 +24,9 @@ import { createProxyCredential, createProxyCredentialStateId } from '../proxy/cr
 import { createAgentNamespace, createAgentNamespaceStateId } from '../namespace/service';
 import { createProxyService, createProxyServiceStateId } from '../proxy/ecs-service';
 import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
+import { ensureProviderCredential, getDefaultCredentialPorts } from '../auth/login';
+import { ProviderAuths } from '../auth/providers';
+import { createProviderCredential, createProviderCredentialStateId } from '../auth/service';
 import { buildAgentExecutionRole } from '../role/execution';
 import { buildAgentTaskRole } from '../role/task';
 import { createEcsTaskDefinition } from '../taskdef/service';
@@ -33,7 +38,8 @@ import {
   getAgentsBaseName,
   getAgentsNamespaceName,
   getAgentProxyUrl,
-  getAgentProxySecretName
+  getAgentProxySecretName,
+  getProviderSecretName
 } from '../utils/names';
 import { buildDispatcherBundle, prepareDispatcher } from '../dispatch/resources';
 
@@ -42,6 +48,7 @@ export type AgentResourcePorts = {
   bundle: (agent: AgentService, options: DeployOptions) => Promise<{ file: string; hash: string }>;
   identity: () => Promise<{ region: string; accountId: string }>;
   dispatcherBundle: () => Promise<string>;
+  credential: CredentialPorts;
 };
 
 const defaultPorts: AgentResourcePorts = {
@@ -51,7 +58,8 @@ const defaultPorts: AgentResourcePorts = {
   identity: async () => {
     const [region, accountId] = await Promise.all([getRegion(), getAccountId()]);
     return { region, accountId };
-  }
+  },
+  credential: getDefaultCredentialPorts()
 };
 
 export const prepareAgentResources = async (event: PrepareResourceEvent, ports: AgentResourcePorts = defaultPorts): Promise<boolean> => {
@@ -72,6 +80,24 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   });
   const credential = credentials[agents.findIndex((agent) => agent.name === service.name)];
 
+  const provider = (service.provider ?? 'claude') as Agent.ProviderName;
+  const providerAuth = ProviderAuths[provider];
+  let providerCredentialEntryId: string | undefined;
+
+  if (providerAuth && !service.secrets?.[providerAuth.envName]) {
+    const secretName = getProviderSecretName(provider, options);
+    await ensureProviderCredential(provider, secretName, ports.credential, options.tags);
+    const providerSecretId = createProviderCredentialStateId(secretName);
+    const providerCredential =
+      state[providerSecretId] ??
+      createProviderCredential(state, {
+        secretName,
+        provider,
+        envName: providerAuth.envName
+      });
+    providerCredentialEntryId = providerCredential.entryId;
+  }
+
   const clusterName = getAgentClusterName(options);
   const bucketName = getAgentBucketName(options);
   const cluster = state[createEcsClusterStateId(clusterName)] ?? createEcsCluster(state, { clusterName, tags: options.tags });
@@ -82,6 +108,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     {},
     ...agents.map((agent) => agent.secrets ?? {}),
     service.secrets ?? {},
+    providerAuth ? { [providerAuth.envName]: getProviderSecretName(provider, options) } : {},
     ...agents.map((agent) => ({
       [`EZ4_PROXY_${toKebabCase(agent.name)}`]: getAgentProxySecretName(agent, options)
     }))
@@ -165,7 +192,14 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       proxyUrl: getAgentProxyUrl(options),
       tags: options.tags
     },
-    [image.entryId, logGroup.entryId, taskRole.entryId, executionRole.entryId, credential.entryId]
+    [
+      image.entryId,
+      logGroup.entryId,
+      taskRole.entryId,
+      executionRole.entryId,
+      credential.entryId,
+      ...(providerCredentialEntryId ? [providerCredentialEntryId] : [])
+    ]
   );
   linkEntryConnection(state, taskdef.entryId, cluster.entryId);
   linkEntryConnection(state, taskdef.entryId, bucket.entryId);

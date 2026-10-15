@@ -70,6 +70,16 @@ Ensure the user performing deployments has the permissions below:
 }
 ```
 
+#### Provider login
+
+Agents using an external model provider (such as `claude`) require authentication credentials to interact with the provider API.
+
+- **Stage secret reuse**: Credentials are stored in AWS Secrets Manager under `${prefix}/agents/${provider}` (e.g. `ez4/agents/claude`) as a JSON secret containing the provider's token environment variable (e.g. `CLAUDE_CODE_OAUTH_TOKEN`). This secret is shared across all projects and agents in the stage.
+- **Interactive prompt on first deploy**: When deploying in an interactive terminal and the secret does not exist, the CLI runs the provider's login command (e.g. `claude setup-token`) to open a browser OAuth session, prompts for the resulting token (masked), and stores it in Secrets Manager.
+- **CI / Non-interactive environments**: In automated or non-interactive environments (e.g. CI runs with `CI=true`), if the secret is missing, deployment fails fast with a `ProviderLoginRequiredError` naming the secret and environment variable. Create the secret manually or run an initial interactive deploy.
+- **Per-agent override**: An agent can override the stage-shared credential by declaring its own token in `secrets` (e.g. `secrets: { CLAUDE_CODE_OAUTH_TOKEN: 'my-custom-secret' }`). In this case, the provider login flow is bypassed for that agent.
+- **Forced re-authentication**: Setting the environment variable `EZ4_AGENT_LOGIN=force` forces re-running the interactive login and updating the stored Secrets Manager secret even if it already exists.
+
 ## License
 
 MIT License

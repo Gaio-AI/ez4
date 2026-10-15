@@ -14,6 +14,7 @@ export interface TaskDefOptions {
   noProxy?: string;
   region?: string;
   proxy?: { url: string; secretArn: string };
+  providerSecrets?: Array<{ name: string; secretArn: string }>;
 }
 
 export const createEcsTaskDefStateId = (agentName: string) => {
@@ -69,6 +70,16 @@ export const buildTaskDefinitionInput = (
     const arn = `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef}`;
     return { name, valueFrom: arn };
   });
+  if (options.providerSecrets) {
+    for (const { name, secretArn } of options.providerSecrets) {
+      if (!agent.secrets?.[name]) {
+        secrets.push({
+          name,
+          valueFrom: `${secretArn}:${name}::`
+        });
+      }
+    }
+  }
 
   if (options.proxy) {
     secrets.push({

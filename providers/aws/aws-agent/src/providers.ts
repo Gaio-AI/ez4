@@ -10,6 +10,8 @@ import { getEcsTaskDefHandler } from './taskdef/handler';
 import { EcsTaskDefServiceType } from './taskdef/types';
 import { getProxyCredentialHandler } from './proxy/credential';
 import { ProxyCredentialServiceType } from './proxy/types';
+import { getProviderCredentialHandler } from './auth/handler';
+import { ProviderCredentialServiceType } from './auth/types';
 import { getEventsRuleHandler } from './events/handler';
 import { EventsRuleServiceType } from './events/types';
 import { getAgentNamespaceHandler } from './namespace/handler';
@@ -23,6 +25,7 @@ export const registerAgentProviders = () => {
   tryRegisterProvider(EcsClusterServiceType, getEcsClusterHandler());
   tryRegisterProvider(EcsTaskDefServiceType, getEcsTaskDefHandler());
   tryRegisterProvider(ProxyCredentialServiceType, getProxyCredentialHandler());
+  tryRegisterProvider(ProviderCredentialServiceType, getProviderCredentialHandler());
   tryRegisterProvider(EventsRuleServiceType, getEventsRuleHandler());
   tryRegisterProvider(AgentNamespaceServiceType, getAgentNamespaceHandler());
   tryRegisterProvider(ProxyServiceServiceType, getProxyServiceHandler());

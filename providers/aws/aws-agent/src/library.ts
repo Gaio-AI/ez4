@@ -58,4 +58,11 @@ export * from './namespace/service';
 export * from './namespace/handler';
 export * from './namespace/client';
 
-export { getSecretResourceArn } from './utils/names';
+export { getSecretResourceArn, getProviderSecretName } from './utils/names';
+
+export * from './auth/types';
+export * from './auth/providers';
+export * from './auth/login';
+export * from './auth/service';
+export * from './auth/handler';
+export * from './auth/client';

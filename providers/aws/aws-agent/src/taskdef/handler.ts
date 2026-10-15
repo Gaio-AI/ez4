@@ -1,6 +1,7 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { RoleState } from '@ez4/aws-identity';
 import type { ProxyCredentialState } from '../proxy/types';
+import type { ProviderCredentialState } from '../auth/types';
 import type { EcrImageState } from '../image/state';
 import type { EcsTaskDefResult, EcsTaskDefState } from './types';
 
@@ -11,6 +12,7 @@ import { deepCompare } from '@ez4/utils';
 
 import { ProxyCredentialServiceType } from '../proxy/types';
 import { EcrImageServiceType } from '../image/state';
+import { ProviderCredentialServiceType } from '../auth/types';
 import { registerTaskDefinition, deregisterTaskDefinition, describeTaskDefinition } from './client';
 import { buildTaskDefinitionInput } from './service';
 import { EcsTaskDefServiceName } from './types';
@@ -53,12 +55,25 @@ const registerDefinition = (candidate: EcsTaskDefState, context: StepContext): P
   if (!executionRoleArn) throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'executionRoleArn');
 
   const proxySecretArn = context.getDependencies<ProxyCredentialState>(ProxyCredentialServiceType).at(0)?.result?.secretArn;
+  const providerSecrets: Array<{ name: string; secretArn: string }> = [];
+  const providerCredentials = context.getDependencies<ProviderCredentialState>(ProviderCredentialServiceType);
+  for (const cred of providerCredentials) {
+    const secretArn = cred.result?.secretArn;
+    if (!secretArn) {
+      throw new IncompleteResourceError(EcsTaskDefServiceName, candidate.entryId, 'providerSecretArn');
+    }
+    providerSecrets.push({
+      name: cred.parameters.envName,
+      secretArn
+    });
+  }
   const logGroupName = getLogGroupName(EcsTaskDefServiceName, candidate.entryId, context);
   const taskDefinition = buildTaskDefinitionInput(parameters.agent, imageUri, taskRoleArn, executionRoleArn, logGroupName, {
     baseName: parameters.baseName,
     bucketName: parameters.bucketName,
     region: parameters.region,
-    proxy: parameters.proxyUrl && proxySecretArn ? { url: parameters.proxyUrl, secretArn: proxySecretArn } : undefined
+    proxy: parameters.proxyUrl && proxySecretArn ? { url: parameters.proxyUrl, secretArn: proxySecretArn } : undefined,
+    providerSecrets
   });
   return OperationLogger.logExecution(EcsTaskDefServiceName, parameters.agentName, 'creation', async (logger) => {
     const result = await registerTaskDefinition(logger, { agentName: parameters.agentName, taskDefinition, tags: parameters.tags });
