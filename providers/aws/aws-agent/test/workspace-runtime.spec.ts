@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { defaultGit } from '../src/workspace/git';
-import { checkoutWorkspace, publishWorkspace, refreshCache, type WorkspaceRuntime } from '../src/workspace/runtime';
+import { checkoutWorkspace, publishWorkspace, refreshCache, withLock, type WorkspaceRuntime } from '../src/workspace/runtime';
 
 const git = defaultGit;
 
@@ -183,6 +183,28 @@ describe('workspace :: runtime', () => {
     await utimes(lock, new Date(Date.now() - 11 * 60_000), new Date(Date.now() - 11 * 60_000));
     await refreshCache(runtime, runtime.workspace.repos[0]);
     ok(!existsSync(lock));
+  });
+
+  it('assert :: drops the lock directory when recording the owner fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ws-lock-fail-'));
+    const lockPath = join(root, 'test.git.lock');
+    const writeError = new Error('simulated disk error');
+
+    await rejects(
+      () =>
+        withLock(
+          lockPath,
+          () => Date.now(),
+          async () => {},
+          async () => {
+            throw writeError;
+          }
+        ),
+      writeError
+    );
+
+    ok(!existsSync(lockPath));
+    await rm(root, { recursive: true, force: true });
   });
 
   it('does not let the old owner remove a replacement lock after takeover', async () => {

@@ -54,7 +54,12 @@ const getNowMs = (runtime: WorkspaceRuntime): number => {
   return Date.now();
 };
 
-const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Promise<T>): Promise<T> => {
+export const withLock = async <T>(
+  lockPath: string,
+  nowFn: () => number,
+  fn: () => Promise<T>,
+  writeOwner = writeFile
+): Promise<T> => {
   const timeoutMs = 5 * 60_000;
   const staleMs = 10 * 60_000;
   const start = Date.now();
@@ -64,8 +69,6 @@ const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Prom
   while (true) {
     try {
       await mkdir(lockPath);
-      await writeFile(ownerPath, owner);
-      break;
     } catch (err: unknown) {
       if (!err || typeof err !== 'object' || !('code' in err) || err.code !== 'EEXIST') throw err;
       try {
@@ -85,6 +88,15 @@ const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Prom
       const { promise, resolve } = Promise.withResolvers<void>();
       setTimeout(resolve, 2000);
       await promise;
+      continue;
+    }
+
+    try {
+      await writeOwner(ownerPath, owner);
+      break;
+    } catch (err) {
+      await rm(lockPath, { recursive: true, force: true });
+      throw err;
     }
   }
 
