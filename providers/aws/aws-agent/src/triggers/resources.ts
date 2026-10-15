@@ -22,15 +22,23 @@ import { linkEntryConnection } from '@ez4/state';
 import { hashData, toKebabCase } from '@ez4/utils';
 
 import { buildAgentBundle } from '../runtime/bundle';
-import { createEcsCluster, createEcsClusterStateId, createEcsTaskDefinition } from '@ez4/aws-ecs';
+import {
+  createEcsCluster,
+  createEcsClusterStateId,
+  createEcsService,
+  createEcsServiceStateId,
+  createEcsTaskDefinition,
+  EcsServiceServiceName
+} from '@ez4/aws-ecs';
 import { createEcrImage, createEcrRepository, EcrImageServiceType } from '@ez4/aws-ecr';
 import { computeImageTag, generateDockerfile } from '../image/dockerfile';
 import { buildTaskDefinitionInput } from '../agent/taskdef';
 import { discoverAgentNetwork } from '../network/discovery';
 import { createSecret, createSecretStateId, SecretServiceType } from '@ez4/aws-secret';
 import { generateAgentPassword, generateHtpasswd } from '../proxy/auth';
-import { createNamespace, createNamespaceStateId } from '@ez4/aws-cloudmap';
-import { createProxyService, createProxyServiceStateId } from '../proxy/ecs-service';
+import { createNamespace, createNamespaceStateId, NamespaceServiceType, type NamespaceState } from '@ez4/aws-cloudmap';
+import { IncompleteResourceError } from '@ez4/aws-common';
+import { buildProxyTaskDefinitionInput } from '../proxy/taskdef';
 import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
 import { ensureProviderCredential, getDefaultCredentialPorts } from '../auth/login';
 import { ProviderAuths } from '../auth/providers';
@@ -182,24 +190,48 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     state[createNamespaceStateId(namespaceName)] ??
     createNamespace(state, { namespaceName, vpcId: network.vpcId, serviceName: 'proxy', tags: options.tags });
   const proxyServiceName = `${getAgentsBaseName(options)}-proxy`;
-  if (!state[createProxyServiceStateId(proxyServiceName)]) {
+  if (!state[createEcsServiceStateId(proxyServiceName)]) {
     const proxyLogGroup = createLogGroup(state, { groupName: proxyServiceName, retention: 30, tags: options.tags });
-    createProxyService(
-      state,
-      {
-        serviceName: proxyServiceName,
-        baseName: getAgentsBaseName(options),
-        clusterName,
-        squidConfig: generateSquidConfig({
-          agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region) }))
-        }),
-        region,
-        subnetIds: network.subnetIds,
-        securityGroupIds: network.proxySecurityGroupIds,
-        tags: options.tags
+    const squidConfig = generateSquidConfig({
+      agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region) }))
+    });
+    const proxyEntryId = createEcsServiceStateId(proxyServiceName);
+    createEcsService(state, [namespace, proxyLogGroup, executionRole, cluster, ...credentials], {
+      serviceName: proxyServiceName,
+      clusterName,
+      subnetIds: network.subnetIds,
+      securityGroupIds: network.proxySecurityGroupIds,
+      hash: hashData(squidConfig, region, ...network.subnetIds, ...network.proxySecurityGroupIds),
+      tags: options.tags,
+      getTaskDefinition: (stepContext: StepContext) => {
+        const executionRoleArn = stepContext
+          .getDependencies<RoleState>(RoleServiceType)
+          .find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-execution-role'))?.result?.roleArn;
+        if (!executionRoleArn) {
+          throw new IncompleteResourceError(EcsServiceServiceName, proxyEntryId, 'executionRoleArn');
+        }
+        const credentialSecretArns = stepContext
+          .getDependencies<SecretState>(SecretServiceType)
+          .map((entry) => entry.result?.secretArn)
+          .filter((arn): arn is string => !!arn)
+          .sort();
+        return buildProxyTaskDefinitionInput({
+          baseName: getAgentsBaseName(options),
+          squidConfig,
+          credentialSecretArns,
+          executionRoleArn,
+          logGroupName: proxyServiceName,
+          region
+        });
       },
-      [namespace.entryId, proxyLogGroup.entryId, executionRole.entryId, cluster.entryId, ...credentials.map(({ entryId }) => entryId)]
-    );
+      getServiceRegistryArn: (stepContext: StepContext) => {
+        const registryArn = stepContext.getDependencies<NamespaceState>(NamespaceServiceType).at(0)?.result?.discoveryServiceArn;
+        if (!registryArn) {
+          throw new IncompleteResourceError(EcsServiceServiceName, proxyEntryId, 'registryArn');
+        }
+        return registryArn;
+      }
+    });
   }
   const linkedAgents = Object.values(service.services ?? {})
     .map(({ reference }) => reference)

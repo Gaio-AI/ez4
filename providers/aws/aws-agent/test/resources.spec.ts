@@ -16,14 +16,13 @@ import { LogGroupServiceType } from '@ez4/aws-logs';
 import { FunctionServiceType } from '@ez4/aws-function';
 import { EventsRuleServiceType } from '@ez4/aws-events';
 import { NamespaceServiceType } from '@ez4/aws-cloudmap';
-import { ProxyServiceServiceType, type ProxyServiceState } from '../src/proxy/ecs-types';
 import { SecretServiceType, type SecretState } from '@ez4/aws-secret';
-import type { EcsTaskDefState } from '@ez4/aws-ecs';
+import type { EcsServiceState, EcsTaskDefState } from '@ez4/aws-ecs';
 
 import { prepareAgentResources } from '../src/triggers/resources';
 import { getAgentBucketName, getAgentClusterName, getAgentKey } from '../src/utils/names';
 import { EcrImageServiceType, EcrRepositoryServiceType } from '@ez4/aws-ecr';
-import { EcsClusterServiceType, EcsTaskDefServiceType } from '@ez4/aws-ecs';
+import { EcsClusterServiceType, EcsServiceServiceType, EcsTaskDefServiceType } from '@ez4/aws-ecs';
 
 const options: DeployOptions = { prefix: 'ez4', projectName: 'lab', branchName: '', lockId: 'x' } as DeployOptions;
 
@@ -150,9 +149,9 @@ describe('agent resources wiring', () => {
     }
 
     equal(countType(state, NamespaceServiceType), 1);
-    equal(countType(state, ProxyServiceServiceType), 1);
+    equal(countType(state, EcsServiceServiceType), 1);
 
-    const proxyService = Object.values(state).find((entry): entry is ProxyServiceState => entry?.type === ProxyServiceServiceType)!;
+    const proxyService = Object.values(state).find((entry): entry is EcsServiceState => entry?.type === EcsServiceServiceType)!;
     const credentialEntries = Object.values(state).filter(
       (entry): entry is SecretState => isSecretState(entry) && (entry.parameters.description?.includes('proxy credentials') ?? false)
     );
@@ -162,7 +161,22 @@ describe('agent resources wiring', () => {
     }
 
     deepEqual(proxyService.parameters.securityGroupIds, ['sg-proxy']);
-    ok(proxyService.parameters.squidConfig.includes('api.anthropic.com'));
+
+    const deployed: Record<string, unknown[]> = {
+      [RoleServiceType]: [{ parameters: { roleName: 'ez4-lab-agents-execution-role' }, result: { roleArn: 'arn:exec' } }],
+      [SecretServiceType]: [{ result: { secretArn: 'arn:secret-b' } }, { result: { secretArn: 'arn:secret-a' } }],
+      [NamespaceServiceType]: [{ result: { discoveryServiceArn: 'arn:registry' } }]
+    };
+    const stepContext = { getDependencies: (type: string) => deployed[type] ?? [] } as unknown as StepContext;
+
+    const proxyTask = proxyService.parameters.getTaskDefinition(stepContext);
+    equal(proxyTask.executionRoleArn, 'arn:exec');
+    deepEqual(
+      proxyTask.containerDefinitions?.[0]?.secrets?.map(({ valueFrom }) => valueFrom),
+      ['arn:secret-a:htpasswd::', 'arn:secret-b:htpasswd::']
+    );
+    ok(JSON.stringify(proxyTask).includes('api.anthropic.com'));
+    equal(proxyService.parameters.getServiceRegistryArn(stepContext), 'arn:registry');
 
     const taskdefs = Object.values(state).filter((entry): entry is EcsTaskDefState => entry?.type === EcsTaskDefServiceType);
     equal(taskdefs.length, 2);

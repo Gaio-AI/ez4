@@ -29,10 +29,6 @@ export * from './proxy/types';
 export * from './proxy/auth';
 export * from './proxy/config';
 export * from './proxy/taskdef';
-export * from './proxy/ecs-types';
-export * from './proxy/ecs-service';
-export * from './proxy/ecs-handler';
-export * from './proxy/ecs-client';
 
 export {
   getSecretResourceArn,
