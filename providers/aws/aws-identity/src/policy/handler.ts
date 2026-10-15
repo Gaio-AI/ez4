@@ -136,11 +136,7 @@ export const resolvePolicyParameters = (parameters: PolicyParameters, context?: 
   };
 };
 
-export const hasPolicyDocumentChanges = (
-  candidate: PolicyParameters,
-  current: PolicyParameters,
-  result?: PolicyResult
-): boolean => {
+export const hasPolicyDocumentChanges = (candidate: PolicyParameters, current: PolicyParameters, result?: PolicyResult): boolean => {
   const previousDocument = result?.resolvedDocument ?? current.policyDocument;
   return !deepEqual(candidate.policyDocument, previousDocument);
 };
