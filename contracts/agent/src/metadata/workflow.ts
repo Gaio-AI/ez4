@@ -3,9 +3,20 @@ import { isModelProperty, isTypeCallback, isTypeFunction, isTypeObject, isTypeRe
 import { isObjectSchema } from '@ez4/schema';
 import { getObjectSchema } from '@ez4/schema/library';
 import {
-  DuplicateServiceError, getDeclarationDescription, getFunctionSignature, getLinkedServicesObject,
-  getLinkedVariablesObject, getModelMembers, getPropertyNumber, getPropertyObject, getReferenceType,
-  getServiceTags, hasHeritageType, isClassDeclaration, isModelDeclaration, isSameSourceFile
+  DuplicateServiceError,
+  getDeclarationDescription,
+  getFunctionSignature,
+  getLinkedServicesObject,
+  getLinkedVariablesObject,
+  getModelMembers,
+  getPropertyNumber,
+  getPropertyObject,
+  getReferenceType,
+  getServiceTags,
+  hasHeritageType,
+  isClassDeclaration,
+  isModelDeclaration,
+  isSameSourceFile
 } from '@ez4/common/library';
 import { IncompleteServiceError, InvalidMaxStepsError, UnknownWorkflowAgentError } from '../errors/service';
 import { isAgentServiceDeclaration } from './service';

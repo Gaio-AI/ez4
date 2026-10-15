@@ -4,7 +4,11 @@ import type { BasicAgent } from './output-basic-agent';
 declare class NotAnAgent {}
 
 // @ts-expect-error NotAnAgent does not satisfy WorkflowAgents constraint
-export declare class InvalidWorkflowAgent extends Agent.Workflow<{ issueId: string }, { round: number }, { worker: BasicAgent; ghost: NotAnAgent }> {
+export declare class InvalidWorkflowAgent extends Agent.Workflow<
+  { issueId: string },
+  { round: number },
+  { worker: BasicAgent; ghost: NotAnAgent }
+> {
   input: { issueId: string };
   agents: {
     worker: BasicAgent;
@@ -14,4 +18,6 @@ export declare class InvalidWorkflowAgent extends Agent.Workflow<{ issueId: stri
 }
 
 // @ts-expect-error NotAnAgent does not satisfy WorkflowAgents constraint
-export declare function reviewLoopStep(request: Agent.WorkflowRequest<InvalidWorkflowAgent>): Agent.WorkflowStep<{ round: number }, { worker: BasicAgent; ghost: NotAnAgent }>;
+export declare function reviewLoopStep(
+  request: Agent.WorkflowRequest<InvalidWorkflowAgent>
+): Agent.WorkflowStep<{ round: number }, { worker: BasicAgent; ghost: NotAnAgent }>;

@@ -10,4 +10,6 @@ export declare class InvalidWorkflowSteps extends Agent.Workflow<{ issueId: stri
   handler: typeof reviewLoopStep;
 }
 
-export declare function reviewLoopStep(request: Agent.WorkflowRequest<InvalidWorkflowSteps>): Agent.WorkflowStep<{ round: number }, { worker: BasicAgent }>;
+export declare function reviewLoopStep(
+  request: Agent.WorkflowRequest<InvalidWorkflowSteps>
+): Agent.WorkflowStep<{ round: number }, { worker: BasicAgent }>;

@@ -2,7 +2,9 @@ import type { Agent } from '@ez4/agent';
 import { AgentNotEmulatedError } from '../errors/stub';
 
 export type AgentStubClient = Agent.Client<Agent.Service<Agent.Input, Agent.Output>>;
-export type WorkflowStubClient = Agent.WorkflowClient<Agent.Workflow<Agent.Input, unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>>;
+export type WorkflowStubClient = Agent.WorkflowClient<
+  Agent.Workflow<Agent.Input, unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>
+>;
 
 export const createAgentStubClient = (agentName: string): AgentStubClient => {
   return {

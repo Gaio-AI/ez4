@@ -11,10 +11,15 @@ export type WorkflowEvent<I, A extends WorkflowAgents> =
   | { [K in keyof A & string]: { readonly type: 'result'; readonly agent: K; readonly result: Agent.Result<A[K]> } }[keyof A & string];
 
 export type WorkflowNext<A extends WorkflowAgents> =
-  | { [K in keyof A & string]: { readonly invoke: K; readonly input: Agent.InputOf<A[K]>; readonly workspace?: Agent.WorkspaceRef[] } }[keyof A & string]
+  | {
+      [K in keyof A & string]: { readonly invoke: K; readonly input: Agent.InputOf<A[K]>; readonly workspace?: Agent.WorkspaceRef[] };
+    }[keyof A & string]
   | { readonly complete: string; readonly reason?: string };
 
-export interface WorkflowStep<S, A extends WorkflowAgents> { readonly state: S; readonly next: WorkflowNext<A> }
+export interface WorkflowStep<S, A extends WorkflowAgents> {
+  readonly state: S;
+  readonly next: WorkflowNext<A>;
+}
 
 export interface WorkflowRequest<W extends Workflow<any, any, any>> {
   readonly runId: string;
@@ -22,8 +27,10 @@ export interface WorkflowRequest<W extends Workflow<any, any, any>> {
   readonly state: StateOf<W> | undefined;
   readonly event: WorkflowEvent<WorkflowInputOf<W>, AgentsOf<W>>;
 }
-export type WorkflowHandler<W extends Workflow<any, any, any>> =
-  (request: WorkflowRequest<W>, context: CommonService.Context<W>) => Promise<WorkflowStep<any, any>> | WorkflowStep<any, any>;
+export type WorkflowHandler<W extends Workflow<any, any, any>> = (
+  request: WorkflowRequest<W>,
+  context: CommonService.Context<W>
+) => Promise<WorkflowStep<any, any>> | WorkflowStep<any, any>;
 
 export type WorkflowStatus = 'running' | 'completed' | 'failed';
 

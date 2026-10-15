@@ -1,7 +1,15 @@
 import { describe, it } from 'node:test';
 import { ok, equal, deepEqual } from 'node:assert/strict';
 import { Agent } from '@ez4/agent';
-import { ServiceType, WorkflowServiceType, isAgentService, isAgentWorkflowService, createAgentService, createAgentWorkflowService, registerTriggers } from '@ez4/agent/library';
+import {
+  ServiceType,
+  WorkflowServiceType,
+  isAgentService,
+  isAgentWorkflowService,
+  createAgentService,
+  createAgentWorkflowService,
+  registerTriggers
+} from '@ez4/agent/library';
 
 const options: Agent.InvokeOptions = {
   id: 'run-1',

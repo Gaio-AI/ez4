@@ -25,15 +25,16 @@ export const isAgentWorkflowService = (service: ServiceMetadata): service is Age
   return service.type === WorkflowServiceType;
 };
 
-export const createAgentWorkflowService = (name: string, file?: string, description?: string) => ({
-  ...createServiceMetadata<AgentWorkflowService>(WorkflowServiceType, name),
-  ...(description && { description }),
-  ...(file && { file }),
-  variables: {},
-  services: {},
-  agents: {},
-  maxSteps: 10
-}) as AgentWorkflowService;
+export const createAgentWorkflowService = (name: string, file?: string, description?: string) =>
+  ({
+    ...createServiceMetadata<AgentWorkflowService>(WorkflowServiceType, name),
+    ...(description && { description }),
+    ...(file && { file }),
+    variables: {},
+    services: {},
+    agents: {},
+    maxSteps: 10
+  }) as AgentWorkflowService;
 
 export type AgentService = Omit<ServiceMetadata, 'variables' | 'services'> &
   Required<Pick<ServiceMetadata, 'variables' | 'services'>> & {
