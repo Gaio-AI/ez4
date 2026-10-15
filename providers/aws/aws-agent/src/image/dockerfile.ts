@@ -9,7 +9,9 @@ export const AGENT_IMAGE_PACKAGES = ['@anthropic-ai/claude-agent-sdk'];
 
 export const generateDockerfile = (agent: AgentService): string => {
   const base = agent.image?.base ?? 'public.ecr.aws/docker/library/node:24-bookworm-slim';
-  const aptPackages = (agent.image?.aptPackages ?? []).join(' ');
+  // Workspaces clone and push over HTTPS, which the slim base image cannot do on its own.
+  const workspacePackages = agent.workspace ? ['git', 'ca-certificates'] : [];
+  const aptPackages = [...new Set([...workspacePackages, ...(agent.image?.aptPackages ?? [])])].join(' ');
 
   const lines: string[] = [`FROM ${base}`, 'WORKDIR /app', 'ENV NODE_ENV=production'];
 

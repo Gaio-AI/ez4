@@ -30,6 +30,20 @@ describe('agent dockerfile generator', () => {
     ok(dockerfile.includes('ENTRYPOINT ["node", "/app/runtime.mjs"]'));
   });
 
+  it('assert :: an agent with a workspace gets git once, even when it also declares it', () => {
+    const withWorkspace = {
+      type: ServiceType,
+      name: 'WorkspaceAgent',
+      workspace: { repos: [{ url: 'https://github.com/org/repo.git' }] },
+      image: { aptPackages: ['git', 'jq'] }
+    } as unknown as AgentService;
+
+    ok(generateDockerfile(withWorkspace).includes('apt-get install -y --no-install-recommends git ca-certificates jq &&'));
+
+    const withoutWorkspace = { type: ServiceType, name: 'PlainAgent' } as unknown as AgentService;
+    ok(!generateDockerfile(withoutWorkspace).includes('apt-get'));
+  });
+
   it('assert :: computes deterministic tag from dockerfile and bundle hash', () => {
     const tag1 = computeImageTag('FROM public.ecr.aws/docker/library/node:24-bookworm-slim', 'hash123');
     const tag2 = computeImageTag('FROM public.ecr.aws/docker/library/node:24-bookworm-slim', 'hash123');
