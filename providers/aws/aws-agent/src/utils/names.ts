@@ -57,3 +57,6 @@ export const getWorkflowFunctionName = (workflow: string, options: DeployOptions
   `${getAgentsBaseName(options)}-${toKebabCase(workflow)}`;
 
 export const getWorkflowStateKey = (workflow: string, runId: string) => `workflows/${workflow}/${runId}.json`;
+
+// Prefixed so a workflow agent never collides with a linked service of the same name in the bundled context.
+export const getWorkflowAgentContextName = (alias: string) => `agent:${alias}`;

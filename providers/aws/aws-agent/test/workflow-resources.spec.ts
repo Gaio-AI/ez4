@@ -1,19 +1,19 @@
-import type { AgentWorkflowService } from '@ez4/agent/library';
-import type { DeployOptions, EventContext } from '@ez4/project/library';
+import type { AgentService, AgentWorkflowService } from '@ez4/agent/library';
+import type { DeployOptions, EventContext, MetadataReflection } from '@ez4/project/library';
 import type { EntryState, EntryStates } from '@ez4/state';
 import type { QueueState } from '@ez4/aws-queue';
 import { describe, it } from 'node:test';
-import { deepEqual, equal, ok } from 'node:assert/strict';
-import { createAgentWorkflowService } from '@ez4/agent/library';
+import { deepEqual, equal, ok, rejects } from 'node:assert/strict';
+import { createAgentService, createAgentWorkflowService } from '@ez4/agent/library';
 import { isQueueState, QueueServiceType } from '@ez4/aws-queue';
 import { isFunctionState, isMappingState } from '@ez4/aws-function';
 import { getDefinitionName } from '@ez4/project/library';
 import { hashData } from '@ez4/utils';
 import { SchemaType } from '@ez4/schema';
 import { buildWorkflowGrants, prepareWorkflowResources } from '../src/workflow/resources';
-import { getInvoker } from '../src/workflow/handler';
 import { prepareLinkedService } from '../src/triggers/client';
-import { getAgentBucketName, getWorkflowStartQueueName } from '../src/utils/names';
+import { getAgentBucketName, getWorkflowAgentContextName, getWorkflowResultsQueueName, getWorkflowStartQueueName } from '../src/utils/names';
+
 describe('workflow resources and grants', () => {
   const options: DeployOptions = {
     prefix: 'stg',
@@ -35,6 +35,13 @@ describe('workflow resources and grants', () => {
     }
   };
 
+  const workerFixture = {
+    ...createAgentService('Worker'),
+    inputSchema: { type: SchemaType.Object, properties: { message: { type: SchemaType.String } } }
+  } as AgentService;
+
+  const metadata: MetadataReflection = { Worker: workerFixture };
+
   const mockContext: EventContext = {
     role: null,
     getServiceState: () => {
@@ -48,7 +55,7 @@ describe('workflow resources and grants', () => {
 
   const prepareFor = async (workflow: AgentWorkflowService): Promise<EntryStates> => {
     const state: EntryStates = {};
-    await prepareWorkflowResources(state, workflow, mockContext, options, {
+    await prepareWorkflowResources(state, workflow, metadata, mockContext, options, {
       identity: async () => ({ region: 'us-east-1', accountId: '123' })
     });
     return state;
@@ -103,32 +110,28 @@ describe('workflow resources and grants', () => {
     ok(grants.some((g) => g.permissions.includes('s3:ListBucket') && g.resourceIds.includes(`arn:aws:s3:::${bucketName}`)));
   });
 
-  it('assert :: a camelCase agent alias resolves from generated workflow variables', async () => {
-    const state = await prepareFor({
-      ...workflowFixture,
-      agents: { reviewLoop: 'Worker' }
-    });
-    const workflowFunction = Object.values(state)
+  it('assert :: each agent alias is bundled as a client that replies to the workflow results queue', async () => {
+    const workflow: AgentWorkflowService = { ...workflowFixture, agents: { reviewLoop: 'Worker' } };
+    const state = await prepareFor(workflow);
+
+    const source = workflow.context?.[getWorkflowAgentContextName('reviewLoop')];
+    ok(source);
+    equal(source.module, 'Client');
+    equal(source.from, '@ez4/aws-agent/client');
+
+    // Resolved from deployed entries in code, never left as literal placeholders.
+    const resultsQueueName = getWorkflowResultsQueueName(workflow.name, options);
+    const resultsQueueId = Object.values(state)
       .filter((entry): entry is EntryState => !!entry)
-      .filter(isFunctionState)[0];
-    ok(workflowFunction);
-    const variables = await workflowFunction.parameters.getFunctionVariables();
-    const clientConfig = variables.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
-    ok(clientConfig);
-    const previous = process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
-    process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP = clientConfig;
-    try {
-      const invoke = getInvoker('ReviewLoop');
-      await invoke('reviewLoop', null, {}).then(
-        () => {
-          throw new Error('Unexpected successful agent invocation');
-        },
-        (error: Error) => ok(error.message.startsWith('Agent input validation failed:'), error.message)
-      );
-    } finally {
-      if (previous === undefined) delete process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
-      else process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP = previous;
-    }
+      .filter(isQueueState)
+      .find((queue) => queue.parameters.queueName === resultsQueueName)!.entryId;
+    ok(source.constructor.includes(`"replyTo":${getDefinitionName<QueueState>(resultsQueueId, 'queueUrl')}`));
+    ok(source.dependencyIds?.includes(resultsQueueId));
+    ok(source.constructor.includes(`"inputSchema":${JSON.stringify(workerFixture.inputSchema)}`));
+  });
+
+  it('assert :: a workflow agent missing from the project fails the deploy', async () => {
+    await rejects(prepareFor({ ...workflowFixture, agents: { ghost: 'Ghost' } }), /Agent 'Ghost' of workflow 'ReviewLoop'/);
   });
 
   it('assert :: prepareLinkedService returns WorkflowClient for workflow service', async () => {

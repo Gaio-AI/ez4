@@ -4,9 +4,8 @@ import type { RunWorkflowStepParameters, WorkflowMessage, WorkflowStore, Workflo
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { Client } from '../client';
 import { runWorkflowStep } from './runtime';
-import { getWorkflowStateKey } from '../utils/names';
+import { getWorkflowAgentContextName, getWorkflowStateKey } from '../utils/names';
 
 // __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
@@ -63,44 +62,6 @@ const createWorkflowStore = (bucket: string, workflow: string): WorkflowStore =>
   };
 };
 
-type AgentClientInstance = Agent.Client<Agent.Service<Agent.Input, Agent.Output>>;
-const agentClients = new Map<string, AgentClientInstance>();
-
-export const getInvoker = (workflow: string): WorkflowInvoker => {
-  if (agentClients.size === 0) {
-    for (const [key, value] of Object.entries(process.env)) {
-      if (key.startsWith('EZ4_WORKFLOW_AGENT_') && value) {
-        try {
-          const rawParams = JSON.parse(value);
-          const params = {
-            ...rawParams,
-            subnets: typeof rawParams.subnets === 'string' ? rawParams.subnets.split(',').filter(Boolean) : rawParams.subnets,
-            securityGroups:
-              typeof rawParams.securityGroups === 'string' ? rawParams.securityGroups.split(',').filter(Boolean) : rawParams.securityGroups
-          };
-          const client = Client.make(params);
-          agentClients.set(rawParams.alias, client);
-          if (params.agentName) {
-            agentClients.set(params.agentName.toLowerCase(), client);
-            agentClients.set(params.agentName, client);
-          }
-        } catch {
-          // ignore malformed env var
-        }
-      }
-    }
-  }
-
-  return async (agent: string, input: unknown, options?: Agent.InvokeOptions) => {
-    const client = agentClients.get(agent) ?? agentClients.get(agent.toLowerCase());
-    if (!client) {
-      throw new Error(`Agent client "${agent}" not configured in workflow "${workflow}".`);
-    }
-    const result = await client.invoke(input as Agent.Input, options);
-    return { id: result.id };
-  };
-};
-
 const parseWorkflowMessage = (body: string): WorkflowMessage => {
   const data = JSON.parse(body);
   if (data && typeof data === 'object') {
@@ -127,7 +88,14 @@ const parseWorkflowMessage = (body: string): WorkflowMessage => {
   throw new Error(`Invalid workflow message format: ${body}`);
 };
 
-export const handleWorkflowEvent = async (event: SQSEvent, handler: RunWorkflowStepParameters['handler']): Promise<void> => {
+/**
+ * Runs one workflow step per record; agent clients come from the bundled context, built at deploy from deployed entries.
+ */
+export const handleWorkflowEvent = async (
+  event: SQSEvent,
+  handler: RunWorkflowStepParameters['handler'],
+  context: Record<string, unknown>
+): Promise<void> => {
   const workflowName = process.env.EZ4_WORKFLOW_NAME ?? 'workflow';
   const bucket = process.env.EZ4_WORKFLOW_BUCKET;
   if (!bucket) {
@@ -136,7 +104,13 @@ export const handleWorkflowEvent = async (event: SQSEvent, handler: RunWorkflowS
   const maxSteps = process.env.EZ4_WORKFLOW_MAX_STEPS ? parseInt(process.env.EZ4_WORKFLOW_MAX_STEPS, 10) : 10;
 
   const store = createWorkflowStore(bucket, workflowName);
-  const invoke = getInvoker(workflowName);
+
+  // The bundled context throws for an alias the workflow did not declare.
+  const invoke: WorkflowInvoker = async (agent, input, options) => {
+    const client = context[getWorkflowAgentContextName(agent)] as Agent.Client<Agent.Service<Agent.Input, Agent.Output>>;
+    const { id } = await client.invoke(input as Agent.Input, options);
+    return { id };
+  };
 
   for (const record of event.Records) {
     const message = parseWorkflowMessage(record.body);

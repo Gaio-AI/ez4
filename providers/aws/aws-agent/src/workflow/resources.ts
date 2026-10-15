@@ -1,10 +1,8 @@
 import type { EntryState, EntryStates } from '@ez4/state';
-import type { AgentWorkflowService, AgentService } from '@ez4/agent/library';
-import type { DeployOptions, EventContext, IdentityGrant, LinkedVariables } from '@ez4/project/library';
+import type { AgentWorkflowService } from '@ez4/agent/library';
+import type { ContextSource, DeployOptions, EventContext, IdentityGrant, LinkedVariables, MetadataReflection } from '@ez4/project/library';
 import { ArchitectureType, RuntimeType } from '@ez4/project';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
-import type { QueueState } from '@ez4/aws-queue';
-import type { EcsClusterState, EcsTaskDefState } from '@ez4/aws-ecs';
 
 import {
   createPolicy,
@@ -15,18 +13,19 @@ import {
   getRegion,
   getAccountId
 } from '@ez4/aws-identity';
+import { isAgentService } from '@ez4/agent/library';
 import { createLogGroup } from '@ez4/aws-logs';
 import { createFunction } from '@ez4/aws-function';
 import { createQueue, createMapping } from '@ez4/aws-queue';
-import { createEcsClusterStateId, createEcsTaskDefStateId } from '@ez4/aws-ecs';
-import { getDefinitionName } from '@ez4/project/library';
+import { getDefinitionsObject } from '@ez4/project/library';
 import { getFunctionBundle } from '@ez4/aws-common';
-import { hashObject, toSnakeCase } from '@ez4/utils';
+import { hashObject } from '@ez4/utils';
 
 import { buildAgentInvokeGrants } from '../role/task';
+import { getAgentClientSource } from '../triggers/client';
 import {
   getAgentBucketName,
-  getAgentClusterName,
+  getWorkflowAgentContextName,
   getWorkflowFunctionName,
   getWorkflowResultsQueueName,
   getWorkflowStartQueueName
@@ -82,6 +81,7 @@ export const buildWorkflowGrants = (
 export const prepareWorkflowResources = async <E extends EntryState>(
   state: EntryStates<E>,
   workflow: AgentWorkflowService,
+  metadata: MetadataReflection,
   context: EventContext,
   options: DeployOptions,
   ports?: WorkflowResourcePorts
@@ -140,62 +140,35 @@ export const prepareWorkflowResources = async <E extends EntryState>(
     tags: options.tags
   });
 
-  const agentDependencies: string[] = [];
   const workflowVariables: LinkedVariables = {
     EZ4_WORKFLOW_NAME: workflow.name,
     EZ4_WORKFLOW_BUCKET: getAgentBucketName(options),
     EZ4_WORKFLOW_MAX_STEPS: String(workflow.maxSteps ?? 10)
   };
 
+  // Agent clients join the workflow's linked context, so the bundler resolves their entries and connect links them.
+  const agentContext: Record<string, ContextSource> = {};
+
   for (const [alias, agentName] of Object.entries(workflow.agents ?? {})) {
-    const clusterStateId = createEcsClusterStateId(getAgentClusterName(options));
-    const taskDefStateId = createEcsTaskDefStateId(agentName);
-    const resultsQueueId = resultsQueue.entryId;
+    const agent = Object.values(metadata)
+      .filter(isAgentService)
+      .find((service) => service.name === agentName);
 
-    if (state[clusterStateId]) {
-      agentDependencies.push(clusterStateId);
-    }
-    if (state[taskDefStateId]) {
-      agentDependencies.push(taskDefStateId);
-    }
-    const clusterArn = getDefinitionName<EcsClusterState>(clusterStateId, 'clusterArn');
-    const taskDefinitionArn = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'taskDefinitionArn');
-    const subnetIds = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'subnetIds');
-    const securityGroupIds = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'securityGroupIds');
-    const replyToUrl = getDefinitionName<QueueState>(resultsQueueId, 'queueUrl');
-
-    let agentService: AgentService | undefined;
-    if (context?.getServiceState) {
-      try {
-        agentService = context.getServiceState(agentName, options) as unknown as AgentService;
-      } catch {
-        // ignored
-      }
+    if (!agent) {
+      throw new Error(`Agent '${agentName}' of workflow '${workflow.name}' is not declared in the project.`);
     }
 
-    const clientParameters = {
-      alias,
-      agentName,
-      cluster: clusterArn,
-      taskDefinition: taskDefinitionArn,
-      bucket: getAgentBucketName(options),
-      subnets: subnetIds,
-      securityGroups: securityGroupIds,
-      replyTo: replyToUrl,
-      timeout: agentService?.resources?.timeout ?? 3600,
-      inputSchema: agentService?.inputSchema ?? { type: 'object' }
-    };
-
-    const envKey = `EZ4_WORKFLOW_AGENT_${toSnakeCase(alias).toUpperCase()}`;
-    workflowVariables[envKey] = JSON.stringify(clientParameters);
+    agentContext[getWorkflowAgentContextName(alias)] = getAgentClientSource(agent, options, resultsQueue.entryId);
   }
+
+  workflow.context = { ...workflow.context, ...agentContext };
 
   const templateFile = getWorkflowTemplateFile();
 
   const workflowFunction = createFunction(state, role, logGroup, {
     handlerName: 'workflowEntryPoint',
     sourceFile: workflow.handler?.file ?? templateFile,
-    dependencies: [startQueue.entryId, resultsQueue.entryId, ...agentDependencies],
+    dependencies: [startQueue.entryId, resultsQueue.entryId],
     functionName,
     description: workflow.description,
     runtime: RuntimeType.Node22,
@@ -207,11 +180,13 @@ export const prepareWorkflowResources = async <E extends EntryState>(
       ...options.tags
     },
     getFunctionVariables: () => workflowVariables,
-    getFunctionBundle: () => {
+    getFunctionBundle: (stepContext) => {
       return getFunctionBundle('@ez4/aws-agent', {
         resourceName: functionName,
         filePrefix: 'workflow',
         templateFile,
+        context: workflow.context,
+        define: getDefinitionsObject([...stepContext.getDependencies(), ...stepContext.getConnections()]),
         handler: {
           functionName: workflow.handler?.name ?? 'handle',
           sourceFile: workflow.handler?.file ?? templateFile

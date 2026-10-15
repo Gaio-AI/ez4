@@ -19,6 +19,7 @@ import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
 import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
 import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
 import { linkEntryConnection } from '@ez4/state';
+import { linkServiceContext } from '@ez4/project/library';
 import { hashData, toKebabCase } from '@ez4/utils';
 
 import { buildAgentBundle } from '../runtime/bundle';
@@ -77,9 +78,9 @@ const defaultPorts: AgentResourcePorts = {
 };
 
 export const prepareAgentResources = async (event: PrepareResourceEvent, ports: AgentResourcePorts = defaultPorts): Promise<boolean> => {
-  const { state, service, options, context } = event;
+  const { state, service, metadata, options, context } = event;
   if (isAgentWorkflowService(service)) {
-    await prepareWorkflowResources(state, service, context, options, { identity: ports.identity });
+    await prepareWorkflowResources(state, service, metadata, context, options, { identity: ports.identity });
     return true;
   }
   if (!isAgentService(service)) return false;
@@ -353,7 +354,10 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
 
 export const connectAgentResources = (event: ConnectResourceEvent): void => {
   const { state, service, options, context } = event;
-  if (isAgentWorkflowService(service)) return;
+  if (isAgentWorkflowService(service)) {
+    linkServiceContext(state, context.getServiceState(service, options).entryId, service.context ?? {});
+    return;
+  }
   if (!isAgentService(service)) return;
   const taskdef = context.getServiceState(service, options);
   linkEntryConnection(state, taskdef.entryId, createEcsClusterStateId(getAgentClusterName(options)));

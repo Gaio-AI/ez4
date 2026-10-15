@@ -48,34 +48,41 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
 
   const agent = service as AgentService;
   const replyToOption = agent.options?.replyTo;
-  let replyToQueueUrl: string | undefined;
-  const dependencyIds: string[] = [];
 
-  if (replyToOption) {
-    if (typeof replyToOption !== 'string') {
-      throw new InvalidReplyToError(replyToOption, agent.file);
-    }
-
-    let queueState: unknown;
-    try {
-      queueState = context.getServiceState(replyToOption, options);
-    } catch {
-      throw new InvalidReplyToError(replyToOption, agent.file);
-    }
-
-    if (!queueState || (queueState as QueueState).type !== QueueServiceType || !(queueState as QueueState).parameters?.fifoMode) {
-      throw new InvalidReplyToError(replyToOption, agent.file);
-    }
-
-    const queueEntryId = (queueState as QueueState).entryId;
-    dependencyIds.push(queueEntryId);
-
-    replyToQueueUrl = getDefinitionName<QueueState>(queueEntryId, 'queueUrl');
+  if (!replyToOption) {
+    return getAgentClientSource(agent, options);
   }
+
+  if (typeof replyToOption !== 'string') {
+    throw new InvalidReplyToError(replyToOption, agent.file);
+  }
+
+  let queueState: unknown;
+  try {
+    queueState = context.getServiceState(replyToOption, options);
+  } catch {
+    throw new InvalidReplyToError(replyToOption, agent.file);
+  }
+
+  if (!queueState || (queueState as QueueState).type !== QueueServiceType || !(queueState as QueueState).parameters?.fifoMode) {
+    throw new InvalidReplyToError(replyToOption, agent.file);
+  }
+
+  return getAgentClientSource(agent, options, (queueState as QueueState).entryId);
+};
+
+/**
+ * The agent client a function bundles, resolved from deployed entries; results go to the given FIFO queue, if any.
+ */
+export const getAgentClientSource = (agent: AgentService, options: DeployOptions, replyToQueueId?: string): ContextSource => {
   const clusterStateId = createEcsClusterStateId(getAgentClusterName(options));
   const taskDefStateId = createEcsTaskDefStateId(agent.name);
 
-  dependencyIds.push(taskDefStateId, clusterStateId, createBucketStateId(getAgentBucketName(options)));
+  const dependencyIds = [taskDefStateId, clusterStateId, createBucketStateId(getAgentBucketName(options))];
+
+  if (replyToQueueId) {
+    dependencyIds.unshift(replyToQueueId);
+  }
 
   const clusterArn = getDefinitionName<EcsClusterState>(clusterStateId, 'clusterArn');
   const taskDefinitionArn = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'taskDefinitionArn');
@@ -89,7 +96,7 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
     bucket: getAgentBucketName(options),
     subnets: `@{EZ4_RAW_EXPRESSION}:${subnetIds}.split(',')`,
     securityGroups: `@{EZ4_RAW_EXPRESSION}:${securityGroupIds}.split(',')`,
-    ...(replyToQueueUrl && { replyTo: `@{EZ4_RAW_EXPRESSION}:${replyToQueueUrl}` }),
+    ...(replyToQueueId && { replyTo: `@{EZ4_RAW_EXPRESSION}:${getDefinitionName<QueueState>(replyToQueueId, 'queueUrl')}` }),
     timeout: agent.resources?.timeout ?? 3600,
     inputSchema: agent.inputSchema ?? { type: 'object' }
   };
