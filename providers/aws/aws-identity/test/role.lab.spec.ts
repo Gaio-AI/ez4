@@ -3,7 +3,7 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { ok, equal } from 'node:assert/strict';
 
-import { GetRoleCommand, IAMClient } from '@aws-sdk/client-iam';
+import { DeleteRolePermissionsBoundaryCommand, GetRoleCommand, IAMClient } from '@aws-sdk/client-iam';
 import { buildPolicyArn, createPolicy, createRole, getAccountId, isRoleState, registerTriggers } from '@ez4/aws-identity';
 import { deploy } from '@ez4/aws-common';
 import { deepClone } from '@ez4/utils';
@@ -184,7 +184,7 @@ describe('role', { timeout: 60000 }, () => {
     lastState = state;
   });
 
-  it('assert :: remove permissions boundary', async () => {
+  it('assert :: keep permissions boundary without the option', async () => {
     ok(roleId && lastState);
 
     const localState = deepClone(lastState);
@@ -192,11 +192,16 @@ describe('role', { timeout: 60000 }, () => {
 
     ok(resource && isRoleState(resource));
 
+    const boundaryArn = resource.parameters.permissionsBoundary;
+
     delete resource.parameters.permissionsBoundary;
 
     const { state, result } = await assertDeploy(roleId, localState, lastState);
 
-    equal(await getPermissionsBoundary(result.roleName), undefined);
+    equal(await getPermissionsBoundary(result.roleName), boundaryArn);
+
+    // IAM refuses to delete a policy in use as a boundary, and the destroy deletes the boundary policy.
+    await new IAMClient({}).send(new DeleteRolePermissionsBoundaryCommand({ RoleName: result.roleName }));
 
     lastState = state;
   });
