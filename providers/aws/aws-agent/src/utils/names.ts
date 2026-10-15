@@ -20,8 +20,9 @@ export const getAgentBucketName = (options: DeployOptions) => {
 
 export const getAgentKey = (agent: Pick<AgentService, 'name'>) => agent.name;
 
+// Log group names go through toKebabCase, which would drop path separators; the agent's family name survives it.
 export const getAgentLogGroupName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
-  `/ez4/agents/${getAgentsBaseName(options)}/${toKebabCase(agent.name)}`;
+  `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}`;
 
 export const getAgentRepositoryName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
   `${getAgentsBaseName(options)}/${toKebabCase(agent.name)}`;
