@@ -6,8 +6,10 @@ import {
   DeleteServiceCommand,
   DescribeServicesCommand,
   RegisterTaskDefinitionCommand,
-  UpdateServiceCommand
+  UpdateServiceCommand,
+  waitUntilServicesInactive
 } from '@aws-sdk/client-ecs';
+import { getAwsClientWaiter } from '@ez4/aws-common';
 import { getEcsClient, getEcsTagList } from '../cluster/client';
 
 export const buildCreateServiceInput = (
@@ -75,15 +77,25 @@ export const upsertEcsService = async (
 
 export const deleteEcsService = async (logger: OperationLogLine, parameters: EcsServiceParameters): Promise<void> => {
   logger.update('Deleting ECS service');
-  for (const command of [
-    new UpdateServiceCommand({ cluster: parameters.clusterName, service: parameters.serviceName, desiredCount: 0 }),
-    new DeleteServiceCommand({ cluster: parameters.clusterName, service: parameters.serviceName, force: true })
-  ]) {
-    try {
-      await getEcsClient().send(command);
-    } catch (error: unknown) {
-      const name = error instanceof Error ? error.name : undefined;
-      if (name !== 'ServiceNotFoundException' && name !== 'ServiceNotActiveException') throw error;
+
+  const { clusterName, serviceName } = parameters;
+
+  try {
+    await getEcsClient().send(new UpdateServiceCommand({ cluster: clusterName, service: serviceName, desiredCount: 0 }));
+    await getEcsClient().send(new DeleteServiceCommand({ cluster: clusterName, service: serviceName, force: true }));
+  } catch (error: unknown) {
+    const name = error instanceof Error ? error.name : undefined;
+    if (name === 'ServiceNotFoundException' || name === 'ServiceNotActiveException') {
+      return;
     }
+    throw error;
   }
+
+  logger.update('Waiting for ECS service tasks to stop');
+
+  // The service stays draining until its tasks stop; only then can the cluster and its Cloud Map service go.
+  await waitUntilServicesInactive(
+    { ...getAwsClientWaiter(), client: getEcsClient() },
+    { cluster: clusterName, services: [serviceName] }
+  );
 };
