@@ -185,12 +185,14 @@ describe('agent resources wiring', () => {
     const event = { state, service: agent, metadata: { WorkspaceAgent: agent }, options, context: makeContext() } as PrepareResourceEvent;
     equal(await prepareAgentResources(event, ports), true);
 
-    const taskRole = Object.values(state).find(
-      (entry) => entry && isRoleState(entry) && entry.parameters.roleName.endsWith('-task-role')
-    )!;
+    const taskRole = Object.values(state).find((entry) => entry && isRoleState(entry) && entry.parameters.roleName.endsWith('-task-role'))!;
     const policy = state[taskRole.dependencies[0]] as {
       dependencies: string[];
-      parameters: { getPolicyDocument: (context: StepContext) => { Statement: { Resource: string[]; Condition?: { StringEquals: Record<string, string> } }[] } };
+      parameters: {
+        getPolicyDocument: (context: StepContext) => {
+          Statement: { Resource: string[]; Condition?: { StringEquals: Record<string, string> } }[];
+        };
+      };
     };
     const fileSystem = Object.values(state).find((entry) => entry?.type === 'aws:efs.filesystem')!;
     const accessPoint = Object.values(state).find((entry) => entry?.type === 'aws:efs.access-point')!;
@@ -200,11 +202,27 @@ describe('agent resources wiring', () => {
     const document = policy.parameters.getPolicyDocument({
       getDependencies: (type: string) =>
         type === fileSystem.type
-          ? [{ ...fileSystem, result: { fileSystemId: 'fs-own', fileSystemArn: 'arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-own' } }]
-          : [{ ...accessPoint, result: { accessPointId: 'fsap-own', accessPointArn: 'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own' } }]
+          ? [
+              {
+                ...fileSystem,
+                result: { fileSystemId: 'fs-own', fileSystemArn: 'arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-own' }
+              }
+            ]
+          : [
+              {
+                ...accessPoint,
+                result: {
+                  accessPointId: 'fsap-own',
+                  accessPointArn: 'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own'
+                }
+              }
+            ]
     } as unknown as StepContext);
     const grant = document.Statement.find((statement) => statement.Condition?.StringEquals?.['elasticfilesystem:AccessPointArn']);
     deepEqual(grant?.Resource, ['arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-own']);
-    equal(grant?.Condition?.StringEquals['elasticfilesystem:AccessPointArn'], 'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own');
+    equal(
+      grant?.Condition?.StringEquals['elasticfilesystem:AccessPointArn'],
+      'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own'
+    );
   });
 });

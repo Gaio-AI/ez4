@@ -135,12 +135,19 @@ export const buildAgentTaskRole = <E extends EntryState>(
     policyDocument: createPolicyDocument(grants),
     ...(workspaceArns && {
       getPolicyDocument: (context: StepContext) => {
-        const fileSystem = context.getDependencies<FileSystemState>(FileSystemServiceType).find((entry) => entry.entryId === workspaceArns.fileSystem.entryId);
-        const accessPoint = context.getDependencies<AccessPointState>(AccessPointServiceType).find((entry) => entry.entryId === workspaceArns.accessPoint.entryId);
+        const fileSystem = context
+          .getDependencies<FileSystemState>(FileSystemServiceType)
+          .find((entry) => entry.entryId === workspaceArns.fileSystem.entryId);
+        const accessPoint = context
+          .getDependencies<AccessPointState>(AccessPointServiceType)
+          .find((entry) => entry.entryId === workspaceArns.accessPoint.entryId);
         if (!fileSystem?.result?.fileSystemArn || !accessPoint?.result?.accessPointArn) {
           throw new Error('Workspace file system or access point ARN is unavailable');
         }
-        return createPolicyDocument([...grants, ...buildWorkspaceGrants(fileSystem.result.fileSystemArn, accessPoint.result.accessPointArn)]);
+        return createPolicyDocument([
+          ...grants,
+          ...buildWorkspaceGrants(fileSystem.result.fileSystemArn, accessPoint.result.accessPointArn)
+        ]);
       }
     }),
     tags: options.tags
