@@ -94,8 +94,5 @@ export const deleteEcsService = async (logger: OperationLogLine, parameters: Ecs
   logger.update('Waiting for ECS service tasks to stop');
 
   // The service stays draining until its tasks stop; only then can the cluster and its Cloud Map service go.
-  await waitUntilServicesInactive(
-    { ...getAwsClientWaiter(), client: getEcsClient() },
-    { cluster: clusterName, services: [serviceName] }
-  );
+  await waitUntilServicesInactive({ ...getAwsClientWaiter(), client: getEcsClient() }, { cluster: clusterName, services: [serviceName] });
 };
