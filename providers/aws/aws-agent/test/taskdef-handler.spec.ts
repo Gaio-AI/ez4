@@ -34,7 +34,8 @@ describe('agent ECS task definition builder', () => {
       {
         bucketName: 'ez4-stg-agents',
         baseName: getAgentsBaseName({ prefix: 'ez4', projectName: 'stg', branchName: '', lockId: 'x' } as DeployOptions),
-        noProxy: '169.254.169.254'
+        noProxy: '169.254.169.254',
+        variables: { LINEAR_API_KEY: 'lin-key' }
       }
     );
 
@@ -60,6 +61,8 @@ describe('agent ECS task definition builder', () => {
     equal(envMap['EZ4_AGENT_TIMEOUT'], '3600');
     equal(envMap['NO_PROXY'], '169.254.169.254');
     equal(envMap['EZ4_AGENT_ID'], undefined);
+    // Declared variables reach the hooks' `context.variables`, which reads the container environment.
+    equal(envMap['LINEAR_API_KEY'], 'lin-key');
 
     const secrets = container.secrets ?? [];
     const secretMap = Object.fromEntries(secrets.map((s) => [s.name, s.valueFrom]));

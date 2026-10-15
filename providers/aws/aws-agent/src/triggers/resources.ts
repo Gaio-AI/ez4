@@ -284,6 +284,9 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     }
   }
 
+  // Project and agent variables reach the agent's hooks (`context.variables`) through the container environment.
+  const variables = { ...options.variables, ...service.variables };
+
   const taskdef = createEcsTaskDefinition(
     state,
     [
@@ -304,6 +307,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       hash: hashObject({
         imageTag: image.parameters.imageTag,
         runtime: { resources: service.resources, secrets: service.secrets, workspace: service.workspace },
+        variables,
         region,
         proxyUrl: getAgentProxyUrl(options),
         providerSecret: providerAuth?.envName,
@@ -341,6 +345,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
           baseName: getAgentsBaseName(options),
           bucketName,
           region,
+          variables,
           proxy: {
             url: getAgentProxyUrl(options),
             secretArn: proxySecretArn

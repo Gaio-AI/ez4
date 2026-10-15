@@ -1,5 +1,6 @@
 import type { MountPoint, RegisterTaskDefinitionCommandInput, Volume } from '@aws-sdk/client-ecs';
 import type { AgentService } from '@ez4/agent/library';
+import type { LinkedVariables } from '@ez4/project/library';
 import type { StepContext } from '@ez4/state';
 import { buildEfsVolume } from '@ez4/aws-ecs';
 import { AccessPointServiceType } from '@ez4/aws-efs';
@@ -19,6 +20,7 @@ export interface TaskDefOptions {
   proxy?: { url: string; secretArn: string };
   providerSecrets?: Array<{ name: string; secretArn: string }>;
   workspace?: { fileSystemId: string; accessPointId: string };
+  variables?: LinkedVariables;
 }
 
 export const buildTaskDefinitionInput = (
@@ -112,6 +114,7 @@ export const buildTaskDefinitionInput = (
   const logGroupName = logGroupArn.includes(':log-group:') ? logGroupArn.split(':log-group:')[1] : logGroupArn;
 
   const environment = [
+    ...Object.entries(options.variables ?? {}).map(([name, value]) => ({ name, value })),
     { name: 'EZ4_AGENT_NAME', value: agent.name },
     { name: 'EZ4_AGENT_BUCKET', value: options.bucketName },
     { name: 'EZ4_AGENT_TIMEOUT', value: String(timeout) },

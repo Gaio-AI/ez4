@@ -145,6 +145,26 @@ describe('workflow resources and grants', () => {
     await rejects(prepareFor({ ...workflowFixture, agents: { ghost: 'Ghost' } }), /Agent 'Ghost' of workflow 'ReviewLoop'/);
   });
 
+  it('assert :: the workflow function gets the project and workflow variables', async () => {
+    const state: EntryStates = {};
+    await prepareWorkflowResources(
+      state,
+      { ...workflowFixture, variables: { LINEAR_API_KEY: 'lin-key' } },
+      metadata,
+      mockContext,
+      { ...options, variables: { STAGE: 'stg' } },
+      { identity: async () => ({ region: 'us-east-1', accountId: '123' }) }
+    );
+
+    const fn = Object.values(state).find((entry) => !!entry && isFunctionState(entry));
+    ok(fn && isFunctionState(fn));
+
+    const variables = await fn.parameters.getFunctionVariables();
+    equal(variables.LINEAR_API_KEY, 'lin-key');
+    equal(variables.STAGE, 'stg');
+    equal(variables.EZ4_WORKFLOW_NAME, 'ReviewLoop');
+  });
+
   it('assert :: prepareLinkedService returns WorkflowClient for workflow service', async () => {
     const source = prepareLinkedService({
       service: workflowFixture,

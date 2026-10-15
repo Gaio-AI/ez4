@@ -179,7 +179,8 @@ export const prepareWorkflowResources = async <E extends EntryState>(
       ...workflow.tags,
       ...options.tags
     },
-    getFunctionVariables: () => workflowVariables,
+    // Project and workflow variables reach the handler (`context.variables`) like any other function's.
+    getFunctionVariables: () => ({ ...options.variables, ...workflow.variables, ...workflowVariables }),
     getFunctionBundle: (stepContext) => {
       return getFunctionBundle('@ez4/aws-agent', {
         resourceName: functionName,
