@@ -137,34 +137,44 @@ describe('runtime :: claude provider', () => {
     deepEqual(response.output, { verdict: 'approved' });
   });
 
-  it('throws error when query result indicates failure', async () => {
-    const mockQueryRunner = async function* () {
-      yield {
-        type: 'result',
-        subtype: 'error_during_execution',
-        is_error: true,
-        duration_ms: 500
-      };
-    };
+  const failedResults = [
+    {
+      label: 'an error result',
+      message: { type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['tool crashed'] },
+      expected: /Claude agent execution failed \(error_during_execution\): tool crashed/
+    },
+    {
+      label: 'a finished turn flagged as an error',
+      message: { type: 'result', subtype: 'success', is_error: true, result: 'Invalid API key' },
+      expected: /Claude agent execution failed \(success\): Invalid API key/
+    }
+  ];
 
-    const provider = new ClaudeAgentProvider({
-      queryRunner: mockQueryRunner as unknown as SdkQueryFunction
+  for (const { label, message, expected } of failedResults) {
+    it(`assert :: ${label} fails with its reason`, async () => {
+      const mockQueryRunner = async function* () {
+        yield message;
+      };
+
+      const provider = new ClaudeAgentProvider({
+        queryRunner: mockQueryRunner as unknown as SdkQueryFunction
+      });
+      await rejects(
+        provider.run({
+          model: 'claude-3-7-sonnet-20250219',
+          instructions: 'Test',
+          prompt: 'test',
+          workdir: '/tmp',
+          tools: { mode: 'readonly' },
+          mcpServers: {},
+          outputSchema: {},
+          env: {},
+          signal: new AbortController().signal
+        }),
+        expected
+      );
     });
-    await rejects(
-      provider.run({
-        model: 'claude-3-7-sonnet-20250219',
-        instructions: 'Test',
-        prompt: 'test',
-        workdir: '/tmp',
-        tools: { mode: 'readonly' },
-        mcpServers: {},
-        outputSchema: {},
-        env: {},
-        signal: new AbortController().signal
-      }),
-      /Claude agent execution failed/
-    );
-  });
+  }
 
   it('propagates signal abort to abortController', async () => {
     let capturedAbortController: AbortController | undefined;

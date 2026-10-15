@@ -15,6 +15,8 @@ interface SdkResultMessage {
   subtype?: string;
   is_error?: boolean;
   structured_output?: unknown;
+  result?: string;
+  errors?: string[];
   usage?: SdkUsage;
 }
 
@@ -76,7 +78,9 @@ export class ClaudeAgentProvider implements AgentProvider {
     }
 
     if (!finalResult || finalResult.is_error || finalResult.subtype !== 'success') {
-      throw new Error(`Claude agent execution failed: ${finalResult?.subtype ?? 'unknown error'}`);
+      // A turn can finish (`success`) and still be an error (API or auth failure); its reason is the result text.
+      const reason = finalResult?.errors?.join('; ') || finalResult?.result || 'no result';
+      throw new Error(`Claude agent execution failed (${finalResult?.subtype ?? 'unknown'}): ${reason}`);
     }
 
     return {
