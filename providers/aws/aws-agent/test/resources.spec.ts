@@ -117,6 +117,21 @@ describe('agent resources wiring', () => {
     equal(Object.keys(state).length, 0);
   });
 
+  it('assert :: a new agent bundle changes the task definition hash, so deploy registers a new revision', async () => {
+    const agent = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
+
+    const prepareWith = async (bundleHash: string) => {
+      const state: EntryStates = {};
+      const context = makeContext();
+      const event = { state, service: agent, metadata: { EchoAgent: agent }, options, context } as PrepareResourceEvent;
+      await prepareAgentResources(event, { ...ports, bundle: async () => ({ file: '/tmp/echo.mjs', hash: bundleHash }) });
+      return (context.getServiceState('EchoAgent', options) as EcsTaskDefState).parameters.hash;
+    };
+
+    equal(await prepareWith('bundle-a'), await prepareWith('bundle-a'));
+    ok((await prepareWith('bundle-a')) !== (await prepareWith('bundle-b')));
+  });
+
   it('assert :: bucket keys use the agent name verbatim', () => {
     equal(getAgentKey({ ...createAgentService('EchoAgent') } as never), 'EchoAgent');
   });

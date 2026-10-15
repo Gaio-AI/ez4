@@ -20,7 +20,7 @@ import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
 import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
 import { linkEntryConnection } from '@ez4/state';
 import { linkServiceContext } from '@ez4/project/library';
-import { hashData, toKebabCase } from '@ez4/utils';
+import { hashData, hashObject, toKebabCase } from '@ez4/utils';
 
 import { buildAgentBundle } from '../runtime/bundle';
 import {
@@ -39,7 +39,7 @@ import { createSecret, createSecretStateId, SecretServiceType } from '@ez4/aws-s
 import { generateAgentPassword, generateHtpasswd } from '../proxy/auth';
 import { createNamespace, createNamespaceStateId, NamespaceServiceType, type NamespaceState } from '@ez4/aws-cloudmap';
 import { IncompleteResourceError } from '@ez4/aws-common';
-import { buildProxyTaskDefinitionInput } from '../proxy/taskdef';
+import { buildProxyTaskDefinitionInput, PROXY_IMAGE, PROXY_START_SCRIPT } from '../proxy/taskdef';
 import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
 import { ensureProviderCredential, getDefaultCredentialPorts } from '../auth/login';
 import { ProviderAuths } from '../auth/providers';
@@ -202,7 +202,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       clusterName,
       subnetIds: network.subnetIds,
       securityGroupIds: network.proxySecurityGroupIds,
-      hash: hashData(squidConfig, region, ...network.subnetIds, ...network.proxySecurityGroupIds),
+      hash: hashData(PROXY_IMAGE, PROXY_START_SCRIPT, squidConfig, region, ...network.subnetIds, ...network.proxySecurityGroupIds),
       tags: options.tags,
       getTaskDefinition: (stepContext: StepContext) => {
         const executionRoleArn = stepContext
@@ -300,6 +300,16 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       subnetIds: network.subnetIds,
       securityGroupIds: network.securityGroupIds,
       tags: options.tags,
+      // Everything the definition is built from that is known before deploy; a new image tag alone registers a revision.
+      hash: hashObject({
+        imageTag: image.parameters.imageTag,
+        runtime: { resources: service.resources, secrets: service.secrets, workspace: service.workspace },
+        region,
+        proxyUrl: getAgentProxyUrl(options),
+        providerSecret: providerAuth?.envName,
+        subnetIds: network.subnetIds,
+        securityGroupIds: network.securityGroupIds
+      }),
       getTaskDefinition: (stepContext: StepContext) => {
         const imageDep = stepContext.getDependencies<EcrImageState>(EcrImageServiceType).at(0);
         const imageUri = imageDep?.result?.imageUri ?? '';
