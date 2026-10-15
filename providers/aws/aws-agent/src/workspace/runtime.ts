@@ -91,7 +91,7 @@ const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Prom
   let heartbeat: Promise<void> = Promise.resolve();
   const interval = setInterval(() => {
     heartbeat = heartbeat.then(async () => {
-      if (await readFile(ownerPath, 'utf8').catch(() => '') !== owner) return;
+      if ((await readFile(ownerPath, 'utf8').catch(() => '')) !== owner) return;
       const date = new Date(nowFn());
       await utimes(ownerPath, date, date).catch(() => {});
     });
@@ -103,7 +103,7 @@ const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Prom
   } finally {
     clearInterval(interval);
     await heartbeat;
-    if (await readFile(ownerPath, 'utf8').catch(() => '') === owner) {
+    if ((await readFile(ownerPath, 'utf8').catch(() => '')) === owner) {
       await rm(lockPath, { recursive: true, force: true });
     }
   }
