@@ -3,6 +3,7 @@ import type { OperationLogLine } from '@ez4/aws-common';
 import type { FileSystemState } from '../filesystem/types';
 import type { MountTargetParameters, MountTargetResult, MountTargetState } from './types';
 import type { EfsClientPort } from '../filesystem/client';
+import { getEfsClient } from '../filesystem/client';
 
 import { CorruptedResourceError, IncompleteResourceError, OperationLogger } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
@@ -17,8 +18,9 @@ export type MountTargetHandlerOptions = {
 };
 
 export const getMountTargetHandler = (options?: MountTargetHandlerOptions): StepHandler<MountTargetState> => {
-  const createFn = options?.createResource ?? ((_, fsId, params) => createMountTargetResource(options?.client, fsId, params));
-  const deleteFn = options?.deleteResource ?? ((_, res) => deleteMountTargetResource(options?.client, res));
+  const createFn =
+    options?.createResource ?? ((_, fsId, params) => createMountTargetResource(options?.client ?? getEfsClient(), fsId, params));
+  const deleteFn = options?.deleteResource ?? ((_, res) => deleteMountTargetResource(options?.client ?? getEfsClient(), res));
 
   return {
     equals: equalsResource,

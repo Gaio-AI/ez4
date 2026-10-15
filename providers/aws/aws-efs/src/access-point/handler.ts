@@ -3,6 +3,7 @@ import type { OperationLogLine } from '@ez4/aws-common';
 import type { FileSystemState } from '../filesystem/types';
 import type { AccessPointParameters, AccessPointResult, AccessPointState } from './types';
 import type { EfsClientPort } from '../filesystem/client';
+import { getEfsClient } from '../filesystem/client';
 
 import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
@@ -17,8 +18,9 @@ export type AccessPointHandlerOptions = {
 };
 
 export const getAccessPointHandler = (options?: AccessPointHandlerOptions): StepHandler<AccessPointState> => {
-  const createFn = options?.createResource ?? ((_, fsId, params) => createAccessPointResource(options?.client, fsId, params));
-  const deleteFn = options?.deleteResource ?? ((_, res) => deleteAccessPointResource(options?.client, res));
+  const createFn =
+    options?.createResource ?? ((_, fsId, params) => createAccessPointResource(options?.client ?? getEfsClient(), fsId, params));
+  const deleteFn = options?.deleteResource ?? ((_, res) => deleteAccessPointResource(options?.client ?? getEfsClient(), res));
 
   return {
     equals: equalsResource,

@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import { equal, deepEqual, ok } from 'node:assert/strict';
 
 import { createAccessPointResource, deleteAccessPointResource } from '../src/access-point/client';
+import { setEfsClient } from '../src/filesystem/client';
 import { createAccessPoint, createAccessPointStateId } from '../src/access-point/service';
 import { getAccessPointHandler } from '../src/access-point/handler';
 import { FileSystemServiceType } from '../src/filesystem/types';
@@ -168,5 +169,48 @@ describe('AWS EFS Access Point', () => {
 
     await handler.delete(candidate, stepContext);
     equal(deletedId, 'ap-new');
+  });
+
+  it('assert :: handler create without options uses default client from setEfsClient', async () => {
+    let createdToken: string | undefined;
+    const fake = fakeEfs({
+      onCreateAccessPoint: (input) => {
+        createdToken = input.ClientToken;
+      }
+    });
+
+    setEfsClient(fake);
+    try {
+      const handler = getAccessPointHandler();
+      const fileSystem: FileSystemState = {
+        type: FileSystemServiceType,
+        entryId: 'fs-1',
+        dependencies: [],
+        parameters: { fileSystemName: 'test-fs' },
+        result: {
+          fileSystemId: 'fs-123',
+          fileSystemArn: 'arn:aws:elasticfilesystem:us-east-1:123:file-system/fs-123'
+        }
+      };
+      const stepContext = createStepContext([fileSystem]);
+      const candidate: AccessPointState = {
+        type: AccessPointServiceType,
+        entryId: 'ap-default',
+        dependencies: ['fs-1'],
+        parameters: {
+          accessPointName: 'ap-default-client',
+          path: '/workspace',
+          uid: 1000,
+          gid: 1000
+        }
+      };
+
+      await handler.create(candidate, stepContext);
+      equal(createdToken, 'ap-default-client');
+      equal(candidate.result?.accessPointId, 'fsap-fake123');
+      equal(candidate.result?.fileSystemId, 'fs-123');
+    } finally {
+      setEfsClient(null);
+    }
   });
 });

@@ -5,7 +5,7 @@ import type { EfsClientPort } from './client';
 
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
-import { createFileSystemResource, deleteFileSystemResource } from './client';
+import { createFileSystemResource, deleteFileSystemResource, getEfsClient } from './client';
 import { FileSystemServiceName } from './types';
 
 export type FileSystemHandlerOptions = {
@@ -15,8 +15,8 @@ export type FileSystemHandlerOptions = {
 };
 
 export const getFileSystemHandler = (options?: FileSystemHandlerOptions): StepHandler<FileSystemState> => {
-  const createFn = options?.createResource ?? ((_, params) => createFileSystemResource(options?.client, params));
-  const deleteFn = options?.deleteResource ?? ((_, res) => deleteFileSystemResource(options?.client, res));
+  const createFn = options?.createResource ?? ((_, params) => createFileSystemResource(options?.client ?? getEfsClient(), params));
+  const deleteFn = options?.deleteResource ?? ((_, res) => deleteFileSystemResource(options?.client ?? getEfsClient(), res));
 
   return {
     equals: equalsResource,

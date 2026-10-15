@@ -10,7 +10,6 @@ import type {
 import { CreateMountTargetCommand, DescribeMountTargetsCommand, DeleteMountTargetCommand } from '@aws-sdk/client-efs';
 
 import { Wait } from '@ez4/utils';
-import { getEfsClient } from '../filesystem/client';
 
 export const findMountTarget = async (client: EfsClientPort, fileSystemId: string, subnetId: string): Promise<MountTargetResult | null> => {
   try {
@@ -103,22 +102,11 @@ export const waitForMountTargetDeleted = async (client: EfsClientPort, mountTarg
   }
 };
 
-export async function createMountTargetResource(
-  client: EfsClientPort | undefined,
+export const createMountTargetResource = async (
+  client: EfsClientPort,
   fileSystemId: string,
   parameters: MountTargetParameters
-): Promise<MountTargetResult>;
-export async function createMountTargetResource(fileSystemId: string, parameters: MountTargetParameters): Promise<MountTargetResult>;
-export async function createMountTargetResource(
-  clientOrFsId: EfsClientPort | string | undefined,
-  fsIdOrParams: string | MountTargetParameters,
-  maybeParams?: MountTargetParameters
-): Promise<MountTargetResult> {
-  const isClient = typeof clientOrFsId === 'object' && clientOrFsId !== null && 'send' in clientOrFsId;
-  const client = (isClient ? clientOrFsId : undefined) ?? getEfsClient();
-  const fileSystemId = (isClient ? (fsIdOrParams as string) : (clientOrFsId as string))!;
-  const parameters = (isClient ? maybeParams : (fsIdOrParams as MountTargetParameters))!;
-
+): Promise<MountTargetResult> => {
   const existing = await findMountTarget(client, fileSystemId, parameters.subnetId);
   if (existing) {
     await waitForMountTargetAvailable(client, existing.mountTargetId);
@@ -141,18 +129,9 @@ export async function createMountTargetResource(
     mountTargetId,
     fileSystemId
   };
-}
+};
 
-export async function deleteMountTargetResource(client: EfsClientPort | undefined, result: MountTargetResult): Promise<void>;
-export async function deleteMountTargetResource(result: MountTargetResult): Promise<void>;
-export async function deleteMountTargetResource(
-  clientOrResult: EfsClientPort | MountTargetResult | undefined,
-  maybeResult?: MountTargetResult
-): Promise<void> {
-  const isClient = clientOrResult && typeof clientOrResult === 'object' && 'send' in clientOrResult;
-  const client = (isClient ? clientOrResult : undefined) ?? getEfsClient();
-  const result = (isClient ? maybeResult : (clientOrResult as MountTargetResult))!;
-
+export const deleteMountTargetResource = async (client: EfsClientPort, result: MountTargetResult): Promise<void> => {
   try {
     const input: DeleteMountTargetCommandInput = {
       MountTargetId: result.mountTargetId
@@ -168,4 +147,4 @@ export async function deleteMountTargetResource(
   }
 
   await waitForMountTargetDeleted(client, result.mountTargetId);
-}
+};

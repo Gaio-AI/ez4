@@ -12,13 +12,13 @@ import { getAwsClientOptions, getTagList } from '@ez4/aws-common';
 
 export type EfsClientPort = Pick<EFSClient, 'send'>;
 
-let clientInstance: EFSClient | null = null;
+let clientInstance: EfsClientPort | null = null;
 
 export const getEfsClient = (): EfsClientPort => {
   return (clientInstance ??= new EFSClient(getAwsClientOptions()));
 };
 
-export const setEfsClient = (client: EFSClient | null) => {
+export const setEfsClient = (client: EfsClientPort | null) => {
   clientInstance = client;
 };
 
@@ -49,19 +49,7 @@ export const findFileSystem = async (client: EfsClientPort, creationToken: strin
   return null;
 };
 
-export async function createFileSystemResource(
-  client: EfsClientPort | undefined,
-  parameters: FileSystemParameters
-): Promise<FileSystemResult>;
-export async function createFileSystemResource(parameters: FileSystemParameters): Promise<FileSystemResult>;
-export async function createFileSystemResource(
-  clientOrParams: EfsClientPort | FileSystemParameters | undefined,
-  maybeParams?: FileSystemParameters
-): Promise<FileSystemResult> {
-  const isClient = clientOrParams && 'send' in clientOrParams;
-  const client = (isClient ? clientOrParams : undefined) ?? getEfsClient();
-  const parameters = (isClient ? maybeParams : (clientOrParams as FileSystemParameters))!;
-
+export const createFileSystemResource = async (client: EfsClientPort, parameters: FileSystemParameters): Promise<FileSystemResult> => {
   const existing = await findFileSystem(client, parameters.fileSystemName);
   if (existing) {
     return existing;
@@ -85,18 +73,9 @@ export async function createFileSystemResource(
     fileSystemId: response.FileSystemId!,
     fileSystemArn: response.FileSystemArn!
   };
-}
+};
 
-export async function deleteFileSystemResource(client: EfsClientPort | undefined, result: FileSystemResult): Promise<void>;
-export async function deleteFileSystemResource(result: FileSystemResult): Promise<void>;
-export async function deleteFileSystemResource(
-  clientOrResult: EfsClientPort | FileSystemResult | undefined,
-  maybeResult?: FileSystemResult
-): Promise<void> {
-  const isClient = clientOrResult && 'send' in clientOrResult;
-  const client = (isClient ? clientOrResult : undefined) ?? getEfsClient();
-  const result = (isClient ? maybeResult : (clientOrResult as FileSystemResult))!;
-
+export const deleteFileSystemResource = async (client: EfsClientPort, result: FileSystemResult): Promise<void> => {
   try {
     const input: DeleteFileSystemCommandInput = {
       FileSystemId: result.fileSystemId
@@ -108,4 +87,4 @@ export async function deleteFileSystemResource(
     }
     throw error;
   }
-}
+};

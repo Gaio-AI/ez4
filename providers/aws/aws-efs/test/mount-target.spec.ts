@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import { equal, deepEqual, ok } from 'node:assert/strict';
 
 import { createMountTargetResource, deleteMountTargetResource } from '../src/mount-target/client';
+import { setEfsClient } from '../src/filesystem/client';
 import { createMountTarget, createMountTargetStateId, pickSubnetPerZone } from '../src/mount-target/service';
 import { getMountTargetHandler } from '../src/mount-target/handler';
 import { FileSystemServiceType } from '../src/filesystem/types';
@@ -130,5 +131,46 @@ describe('AWS EFS Mount Target', () => {
 
     await handler.delete(candidate, stepContext);
     equal(deletedId, 'mt-new');
+  });
+
+  it('assert :: handler create without options uses default client from setEfsClient', async () => {
+    let createdSubnet: string | undefined;
+    let createdFsId: string | undefined;
+    const fake = fakeEfs({
+      onCreateMountTarget: (input) => {
+        createdSubnet = input.SubnetId;
+        createdFsId = input.FileSystemId;
+      }
+    });
+
+    setEfsClient(fake);
+    try {
+      const handler = getMountTargetHandler();
+      const fileSystem: FileSystemState = {
+        type: FileSystemServiceType,
+        entryId: 'fs-1',
+        dependencies: [],
+        parameters: { fileSystemName: 'test-fs' },
+        result: {
+          fileSystemId: 'fs-123',
+          fileSystemArn: 'arn:aws:elasticfilesystem:us-east-1:123:file-system/fs-123'
+        }
+      };
+      const stepContext = createStepContext([fileSystem]);
+      const candidate: MountTargetState = {
+        type: MountTargetServiceType,
+        entryId: 'mt-default',
+        dependencies: ['fs-1'],
+        parameters: { subnetId: 'subnet-default-1', securityGroupIds: ['sg-1'] }
+      };
+
+      await handler.create(candidate, stepContext);
+      equal(createdSubnet, 'subnet-default-1');
+      equal(createdFsId, 'fs-123');
+      equal(candidate.result?.mountTargetId, 'fsmt-fake123');
+      equal(candidate.result?.fileSystemId, 'fs-123');
+    } finally {
+      setEfsClient(null);
+    }
   });
 });

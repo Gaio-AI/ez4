@@ -4,7 +4,7 @@ import type { FileSystemState } from '../src/filesystem/types';
 import { describe, it } from 'node:test';
 import { equal, deepEqual, ok } from 'node:assert/strict';
 
-import { createFileSystemResource, deleteFileSystemResource } from '../src/filesystem/client';
+import { createFileSystemResource, deleteFileSystemResource, setEfsClient } from '../src/filesystem/client';
 import { createFileSystem, createFileSystemStateId } from '../src/filesystem/service';
 import { getFileSystemHandler } from '../src/filesystem/handler';
 import { FileSystemServiceType } from '../src/filesystem/types';
@@ -138,5 +138,32 @@ describe('AWS EFS File System', () => {
 
     await handler.delete(candidate, stepContext);
     equal(deletedId, 'fs-new');
+  });
+
+  it('assert :: handler create without options uses default client from setEfsClient', async () => {
+    let createdToken: string | undefined;
+    const fake = fakeEfs({
+      onCreate: (input) => {
+        createdToken = input.CreationToken;
+      }
+    });
+
+    setEfsClient(fake);
+    try {
+      const handler = getFileSystemHandler();
+      const stepContext = createStepContext();
+      const candidate: FileSystemState = {
+        type: FileSystemServiceType,
+        entryId: 'e-default-fs',
+        dependencies: [],
+        parameters: { fileSystemName: 'fs-default-client' }
+      };
+
+      await handler.create(candidate, stepContext);
+      equal(createdToken, 'fs-default-client');
+      equal(candidate.result?.fileSystemId, 'fs-fake123');
+    } finally {
+      setEfsClient(null);
+    }
   });
 });

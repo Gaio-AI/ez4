@@ -10,7 +10,6 @@ import type {
 import { CreateAccessPointCommand, DescribeAccessPointsCommand, DeleteAccessPointCommand } from '@aws-sdk/client-efs';
 
 import { getTagList } from '@ez4/aws-common';
-import { getEfsClient } from '../filesystem/client';
 
 export const findAccessPoint = async (
   client: EfsClientPort,
@@ -52,22 +51,11 @@ export const findAccessPoint = async (
   return null;
 };
 
-export async function createAccessPointResource(
-  client: EfsClientPort | undefined,
+export const createAccessPointResource = async (
+  client: EfsClientPort,
   fileSystemId: string,
   parameters: AccessPointParameters
-): Promise<AccessPointResult>;
-export async function createAccessPointResource(fileSystemId: string, parameters: AccessPointParameters): Promise<AccessPointResult>;
-export async function createAccessPointResource(
-  clientOrFsId: EfsClientPort | string | undefined,
-  fsIdOrParams: string | AccessPointParameters,
-  maybeParams?: AccessPointParameters
-): Promise<AccessPointResult> {
-  const isClient = typeof clientOrFsId === 'object' && clientOrFsId !== null && 'send' in clientOrFsId;
-  const client = (isClient ? clientOrFsId : undefined) ?? getEfsClient();
-  const fileSystemId = (isClient ? (fsIdOrParams as string) : (clientOrFsId as string))!;
-  const parameters = (isClient ? maybeParams : (fsIdOrParams as AccessPointParameters))!;
-
+): Promise<AccessPointResult> => {
   const existing = await findAccessPoint(client, fileSystemId, parameters.accessPointName);
   if (existing) {
     return existing;
@@ -103,18 +91,9 @@ export async function createAccessPointResource(
     accessPointArn: response.AccessPointArn!,
     fileSystemId
   };
-}
+};
 
-export async function deleteAccessPointResource(client: EfsClientPort | undefined, result: AccessPointResult): Promise<void>;
-export async function deleteAccessPointResource(result: AccessPointResult): Promise<void>;
-export async function deleteAccessPointResource(
-  clientOrResult: EfsClientPort | AccessPointResult | undefined,
-  maybeResult?: AccessPointResult
-): Promise<void> {
-  const isClient = clientOrResult && typeof clientOrResult === 'object' && 'send' in clientOrResult;
-  const client = (isClient ? clientOrResult : undefined) ?? getEfsClient();
-  const result = (isClient ? maybeResult : (clientOrResult as AccessPointResult))!;
-
+export const deleteAccessPointResource = async (client: EfsClientPort, result: AccessPointResult): Promise<void> => {
   try {
     const input: DeleteAccessPointCommandInput = {
       AccessPointId: result.accessPointId
@@ -128,4 +107,4 @@ export async function deleteAccessPointResource(
     }
     throw error;
   }
-}
+};
