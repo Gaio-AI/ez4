@@ -6,7 +6,7 @@ import type { FileSystemState, AccessPointState } from '@ez4/aws-efs';
 import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
 import { FileSystemServiceType, AccessPointServiceType } from '@ez4/aws-efs';
-import { getAgentBucketName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
+import { getAgentBucketName, getAgentClusterName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
 import { toKebabCase } from '@ez4/utils';
 import { PRESET_POLICIES } from './presets';
 import { buildWorkspaceGrants } from '../workspace/resources';
@@ -29,6 +29,11 @@ export const buildAgentInvokeGrants = (
     {
       resourceIds: taskDefArns,
       permissions: ['ecs:RunTask']
+    },
+    // RunTask tags each task with its agent and invocation, which ECS authorizes as TagResource on the new task.
+    {
+      resourceIds: [`arn:aws:ecs:${region}:${accountId}:task/${getAgentClusterName(options)}/*`],
+      permissions: ['ecs:TagResource']
     },
     {
       resourceIds: [...taskRoleArns, executionRoleArn],

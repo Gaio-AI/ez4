@@ -12,7 +12,12 @@ import { hashData } from '@ez4/utils';
 import { SchemaType } from '@ez4/schema';
 import { buildWorkflowGrants, prepareWorkflowResources } from '../src/workflow/resources';
 import { prepareLinkedService } from '../src/triggers/client';
-import { getAgentBucketName, getWorkflowAgentContextName, getWorkflowResultsQueueName, getWorkflowStartQueueName } from '../src/utils/names';
+import {
+  getAgentBucketName,
+  getWorkflowAgentContextName,
+  getWorkflowResultsQueueName,
+  getWorkflowStartQueueName
+} from '../src/utils/names';
 
 describe('workflow resources and grants', () => {
   const options: DeployOptions = {
@@ -86,6 +91,8 @@ describe('workflow resources and grants', () => {
     const runTask = grants.find((g) => g.permissions.includes('ecs:RunTask'))!;
     ok(runTask);
     deepEqual(runTask.resourceIds, ['arn:aws:ecs:us-east-1:123:task-definition/stg-proj-main-agents-worker:*']);
+    const tagTask = grants.find((g) => g.permissions.includes('ecs:TagResource'))!;
+    deepEqual(tagTask.resourceIds, ['arn:aws:ecs:us-east-1:123:task/stg-proj-main-agents/*']);
     const passRole = grants.find((g) => g.permissions.includes('iam:PassRole'))!;
     ok(passRole);
     deepEqual(passRole.resourceIds.sort(), [
