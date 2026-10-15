@@ -173,4 +173,31 @@ describe('AWS EFS Mount Target', () => {
       setEfsClient(null);
     }
   });
+
+  it('assert :: deleteMountTargetResource waits until mount target is deleted', async () => {
+    let describeCalls = 0;
+    const client = fakeEfs({
+      onDescribeMountTargets: () => {
+        describeCalls++;
+        if (describeCalls > 1) {
+          return { MountTargets: [] };
+        }
+        return {
+          MountTargets: [
+            {
+              MountTargetId: 'mt-123',
+              LifeCycleState: 'deleting'
+            }
+          ]
+        };
+      }
+    });
+
+    await deleteMountTargetResource(client, {
+      mountTargetId: 'mt-123',
+      fileSystemId: 'fs-123'
+    });
+
+    ok(describeCalls >= 2);
+  });
 });

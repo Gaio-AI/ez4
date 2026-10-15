@@ -3,7 +3,8 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { ok, equal } from 'node:assert/strict';
 
-import { createFileSystem, createAccessPoint, registerTriggers } from '../src/main';
+import { createFileSystem, createAccessPoint, createMountTarget, registerTriggers } from '../src/main';
+import { getDefaultVpcId, getDefaultSubnetIds } from '@ez4/aws-vpc';
 
 import { deploy } from '@ez4/aws-common';
 
@@ -25,6 +26,21 @@ describe('efs lab test', { timeout: 120000 }, () => {
       uid: 1000,
       gid: 1000
     });
+    let subnetId: string | undefined;
+    try {
+      const vpcId = await getDefaultVpcId();
+      if (vpcId) {
+        const subnets = await getDefaultSubnetIds(vpcId);
+        subnetId = subnets?.[0];
+      }
+    } catch {}
+
+    const mtState = subnetId
+      ? createMountTarget(newState, fsState, {
+          subnetId,
+          securityGroupIds: []
+        })
+      : undefined;
 
     const { result: deployedState } = await deploy(newState, undefined);
 
@@ -34,7 +50,12 @@ describe('efs lab test', { timeout: 120000 }, () => {
     ok(deployedFs?.result);
     ok(deployedAp?.result);
 
-    const { result: destroyedState } = await deploy({}, deployedState);
+    if (mtState) {
+      const deployedMt = deployedState[mtState.entryId];
+      ok(deployedMt?.result);
+    }
+
+    const { result: destroyedState } = await deploy({}, deployedState, { force: true });
     equal(Object.keys(destroyedState).length, 0);
   });
 });

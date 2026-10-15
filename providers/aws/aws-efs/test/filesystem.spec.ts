@@ -166,4 +166,76 @@ describe('AWS EFS File System', () => {
       setEfsClient(null);
     }
   });
+
+  it('assert :: createFileSystemResource waits until file system is available', async () => {
+    let describeCalls = 0;
+    const client = fakeEfs({
+      onDescribe: (input) => {
+        if (input.FileSystemId) {
+          describeCalls++;
+          return {
+            FileSystems: [
+              {
+                FileSystemId: input.FileSystemId,
+                LifeCycleState: describeCalls > 1 ? 'available' : 'creating'
+              }
+            ]
+          };
+        }
+        return { FileSystems: [] };
+      }
+    });
+
+    const result = await createFileSystemResource(client, { fileSystemName: 'test-fs' });
+    equal(result.fileSystemId, 'fs-fake123');
+    ok(describeCalls >= 2);
+  });
+
+  it('assert :: createFileSystemResource throws when file system enters error state', async () => {
+    const client = fakeEfs({
+      onDescribe: (input) => {
+        if (input.FileSystemId) {
+          return {
+            FileSystems: [
+              {
+                FileSystemId: input.FileSystemId,
+                LifeCycleState: 'error'
+              }
+            ]
+          };
+        }
+        return { FileSystems: [] };
+      }
+    });
+
+    let error: Error | undefined;
+    try {
+      await createFileSystemResource(client, { fileSystemName: 'test-fs' });
+    } catch (err) {
+      error = err as Error;
+    }
+    ok(error);
+    ok(error.message.includes('entered error state'));
+  });
+
+  it('assert :: deleteFileSystemResource retries on FileSystemInUse', async () => {
+    let deleteAttempts = 0;
+    const client = fakeEfs({
+      onDelete: () => {
+        deleteAttempts++;
+        if (deleteAttempts < 2) {
+          const err = new Error('File system is in use');
+          err.name = 'FileSystemInUse';
+          throw err;
+        }
+      }
+    });
+
+    await deleteFileSystemResource(client, {
+      fileSystemId: 'fs-123',
+      fileSystemArn: 'arn:aws:elasticfilesystem:us-east-1:123:file-system/fs-123'
+    });
+
+    equal(deleteAttempts, 2);
+  });
 });

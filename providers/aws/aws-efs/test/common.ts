@@ -113,9 +113,28 @@ export const fakeEfs = (handlers: FakeEfsHandlers = {}): EfsClientPort => ({
 
     if (name === 'DescribeFileSystemsCommand') {
       const custom = handlers.onDescribe?.(input as DescribeFileSystemsCommandInput);
+      if (custom !== undefined && custom.FileSystems !== undefined) {
+        return {
+          $metadata: defaultMetadata,
+          FileSystems: custom.FileSystems as FileSystemDescription[]
+        };
+      }
+      const fsInput = input as DescribeFileSystemsCommandInput;
+      if (fsInput.FileSystemId) {
+        return {
+          $metadata: defaultMetadata,
+          FileSystems: [
+            {
+              FileSystemId: fsInput.FileSystemId,
+              FileSystemArn: `arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/${fsInput.FileSystemId}`,
+              LifeCycleState: 'available'
+            }
+          ]
+        };
+      }
       return {
         $metadata: defaultMetadata,
-        FileSystems: (custom?.FileSystems ?? []) as FileSystemDescription[]
+        FileSystems: []
       };
     }
     if (name === 'DescribeAccessPointsCommand') {
