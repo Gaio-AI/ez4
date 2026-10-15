@@ -79,11 +79,10 @@ const createWorkflowStore = (bucket: string, workflow: string): WorkflowStore =>
 type AgentClientInstance = Agent.Client<Agent.Service<Agent.Input, Agent.Output>>;
 const agentClients = new Map<string, AgentClientInstance>();
 
-const getInvoker = (workflow: string): WorkflowInvoker => {
+export const getInvoker = (workflow: string): WorkflowInvoker => {
   if (agentClients.size === 0) {
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith('EZ4_WORKFLOW_AGENT_') && value) {
-        const alias = key.slice('EZ4_WORKFLOW_AGENT_'.length).toLowerCase();
         try {
           const rawParams = JSON.parse(value);
           const params = {
@@ -93,7 +92,7 @@ const getInvoker = (workflow: string): WorkflowInvoker => {
               typeof rawParams.securityGroups === 'string' ? rawParams.securityGroups.split(',').filter(Boolean) : rawParams.securityGroups
           };
           const client = Client.make(params);
-          agentClients.set(alias, client);
+          agentClients.set(rawParams.alias, client);
           if (params.agentName) {
             agentClients.set(params.agentName.toLowerCase(), client);
             agentClients.set(params.agentName, client);

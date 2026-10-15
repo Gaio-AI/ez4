@@ -10,6 +10,7 @@ import { isFunctionState, isMappingState } from '@ez4/aws-function';
 import { getDefinitionName } from '@ez4/project/library';
 import { hashData } from '@ez4/utils';
 import { buildWorkflowGrants, prepareWorkflowResources } from '../src/workflow/resources';
+import { getInvoker } from '../src/workflow/template';
 import { prepareLinkedService } from '../src/triggers/client';
 import { getAgentBucketName, getWorkflowStartQueueName } from '../src/utils/names';
 describe('workflow resources and grants', () => {
@@ -94,6 +95,32 @@ describe('workflow resources and grants', () => {
       `arn:aws:s3:::${bucketName}/invocations/Worker/*`,
       `arn:aws:s3:::${bucketName}/workflows/ReviewLoop/*`
     ]);
+  });
+
+  it('assert :: a camelCase agent alias resolves from generated workflow variables', async () => {
+    const state = await prepareFor({
+      ...workflowFixture,
+      agents: { reviewLoop: 'Worker' }
+    });
+    const workflowFunction = Object.values(state).filter((entry): entry is EntryState => !!entry).filter(isFunctionState)[0];
+    ok(workflowFunction);
+    const variables = await workflowFunction.parameters.getFunctionVariables();
+    const clientConfig = variables.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
+    ok(clientConfig);
+    const previous = process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
+    process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP = clientConfig;
+    try {
+      const invoke = getInvoker('ReviewLoop');
+      await invoke('reviewLoop', null, {}).then(
+        () => {
+          throw new Error('Unexpected successful agent invocation');
+        },
+        (error: Error) => ok(error.message.startsWith('Agent input validation failed:'), error.message)
+      );
+    } finally {
+      if (previous === undefined) delete process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
+      else process.env.EZ4_WORKFLOW_AGENT_REVIEW_LOOP = previous;
+    }
   });
 
   it('assert :: prepareLinkedService returns WorkflowClient for workflow service', async () => {

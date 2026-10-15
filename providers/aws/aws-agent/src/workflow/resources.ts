@@ -166,6 +166,7 @@ export const prepareWorkflowResources = async <E extends EntryState>(
     }
 
     const clientParameters = {
+      alias,
       agentName,
       cluster: clusterArn,
       taskDefinition: taskDefinitionArn,

@@ -1,8 +1,8 @@
 import type { PolicyResourceEvent } from '@ez4/project/library';
-import { isAgentService, ServiceType } from '@ez4/agent/library';
+import { isAgentService, isAgentWorkflowService, ServiceType } from '@ez4/agent/library';
 import { createPolicy, tryGetPolicy, getRegion, getAccountId, createPolicyDocument } from '@ez4/aws-identity';
 import { getServiceName } from '@ez4/project/library';
-import { getAgentBucketName } from '../utils/names';
+import { getAgentBucketName, getWorkflowStartQueueName } from '../utils/names';
 import { buildAgentInvokeGrants } from '../role/task';
 
 export const buildExecutionPolicy = (event: PolicyResourceEvent, region: string, accountId: string) => {
@@ -14,6 +14,7 @@ export const buildExecutionPolicy = (event: PolicyResourceEvent, region: string,
   const agents = Object.values(metadata ?? {}).filter(isAgentService);
   const agentNames = agents.map((agent) => agent.name);
   const invokeGrants = buildAgentInvokeGrants(agentNames, region, accountId, options);
+  const workflows = Object.values(metadata ?? {}).filter(isAgentWorkflowService);
 
   return (
     tryGetPolicy(state, policyName) ??
@@ -21,6 +22,14 @@ export const buildExecutionPolicy = (event: PolicyResourceEvent, region: string,
       policyName,
       policyDocument: createPolicyDocument([
         ...invokeGrants,
+        ...workflows.map((workflow) => ({
+          resourceIds: [`arn:aws:sqs:${region}:${accountId}:${getWorkflowStartQueueName(workflow.name, options)}`],
+          permissions: ['sqs:SendMessage']
+        })),
+        ...workflows.map((workflow) => ({
+          resourceIds: [`arn:aws:s3:::${bucketName}/workflows/${workflow.name}/*`],
+          permissions: ['s3:GetObject']
+        })),
         {
           resourceIds: [`arn:aws:s3:::${bucketName}/invocations/*`],
           permissions: ['s3:PutObject']

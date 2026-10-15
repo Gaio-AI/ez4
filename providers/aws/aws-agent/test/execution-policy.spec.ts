@@ -4,10 +4,11 @@ import type { DeployOptions, PolicyResourceEvent } from '@ez4/project/library';
 import type { EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { deepEqual, equal, ok } from 'node:assert/strict';
-import { createAgentService, ServiceType } from '@ez4/agent/library';
+import { createAgentService, createAgentWorkflowService, ServiceType } from '@ez4/agent/library';
 import { isPolicyState } from '@ez4/aws-identity';
 import { buildAgentExecutionRole } from '../src/role/execution';
 import { buildExecutionPolicy } from '../src/triggers/policy';
+import { getAgentBucketName } from '../src/utils/names';
 describe('agent execution policy isolation', () => {
   const region = 'us-east-1';
   const accountId = '123456789012';
@@ -108,5 +109,37 @@ describe('agent execution policy isolation', () => {
       `arn:aws:iam::${accountId}:role/ez4-test-stg-agents-execution-role`,
       `arn:aws:iam::${accountId}:role/ez4-test-stg-agents-reviewer-task-role`
     ]);
+  });
+
+  it('assert :: workflow callers can enqueue starts and read workflow objects without agent invoke grants', () => {
+    const options: DeployOptions = { prefix: 'ez4', projectName: 'test', branchName: 'stg', lockId: 'test-lock' };
+    const event: PolicyResourceEvent = {
+      state: {},
+      serviceType: ServiceType,
+      metadata: { ReviewLoop: createAgentWorkflowService('ReviewLoop') },
+      options
+    };
+    const policyState = buildExecutionPolicy(event, region, accountId);
+    ok(policyState);
+    ok(isPolicyState(policyState));
+
+    const statements = policyState.parameters.policyDocument.Statement;
+    const send = statements.find((statement) => [statement.Action].flat().includes('sqs:SendMessage'));
+    ok(send);
+    deepEqual(send.Resource, ['arn:aws:sqs:us-east-1:123456789012:ez4-test-stg-agents-review-loop-start']);
+    const read = statements.find(
+      (statement) =>
+        [statement.Action].flat().includes('s3:GetObject') &&
+        [statement.Resource].flat().includes(`arn:aws:s3:::${getAgentBucketName(options)}/workflows/ReviewLoop/*`)
+    );
+    ok(read);
+    equal(
+      statements.some((statement) => [statement.Action].flat().includes('ecs:RunTask')),
+      false
+    );
+    equal(
+      statements.some((statement) => [statement.Action].flat().includes('iam:PassRole')),
+      false
+    );
   });
 });
