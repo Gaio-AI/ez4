@@ -54,12 +54,7 @@ const getNowMs = (runtime: WorkspaceRuntime): number => {
   return Date.now();
 };
 
-export const withLock = async <T>(
-  lockPath: string,
-  nowFn: () => number,
-  fn: () => Promise<T>,
-  writeOwner = writeFile
-): Promise<T> => {
+export const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Promise<T>, writeOwner = writeFile): Promise<T> => {
   const timeoutMs = 5 * 60_000;
   const staleMs = 10 * 60_000;
   const start = Date.now();
