@@ -1,0 +1,62 @@
+{
+  "name": "@ez4/aws-efs",
+  "description": "EZ4: Self-managed AWS EFS provider",
+  "version": "1.10.1",
+  "author": "Silas B.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "ez4",
+    "efs",
+    "filesystem",
+    "aws"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sbalmt/ez4.git",
+    "directory": "providers/aws/aws-efs"
+  },
+  "engines": {
+    "node": ">=22.7"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "require": "./dist/main.cjs",
+      "import": "./dist/main.mjs"
+    },
+    "./library": {
+      "types": "./dist/library.d.ts",
+      "require": "./dist/library.cjs",
+      "import": "./dist/library.mjs"
+    }
+  },
+  "sideEffects": [
+    "./dist/main.cjs",
+    "./dist/main.mjs",
+    "./dist/library.cjs",
+    "./dist/library.mjs"
+  ],
+  "workspaces": [
+    "foundation/*",
+    "contracts/*",
+    "providers/aws/*"
+  ],
+  "scripts": {
+    "lint": "eslint --cache",
+    "clean": "rm -rf dist/* *.tsbuildinfo .eslintcache",
+    "build": "tsc -p tsconfig.pack.json && node tools/bundler.mjs",
+    "test": "npm run build && tsc -p tsconfig.test.json --noEmit && ez4 test -e ../../../local.env",
+    "test:offline": "npm run build && tsc -p tsconfig.test.json --noEmit && AWS_ENDPOINT_URL=http://127.0.0.1:9 AWS_ACCESS_KEY_ID=offline AWS_SECRET_ACCESS_KEY=offline AWS_SESSION_TOKEN= AWS_REGION=us-east-1 AWS_PROFILE= AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null ez4 test -- '!.lab.spec'",
+    "local:publish": "npm run build && npm run clean:registry && npm publish --registry http://localhost:4873 --@ez4:registry=http://localhost:4873/",
+    "clean:registry": "rm -rf ../../../.registry/@ez4/aws-efs",
+    "live:publish": "npm run build && npm publish --access public"
+  },
+  "dependencies": {
+    "@aws-sdk/client-efs": "^3.1151.0",
+    "@ez4/aws-common": "^1.10.0",
+    "@ez4/project": "^1.10.0",
+    "@ez4/state": "^1.10.0",
+    "@ez4/utils": "^1.10.0"
+  }
+}

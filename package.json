@@ -53,6 +53,7 @@
     "providers/aws/aws-common",
     "providers/aws/aws-agent",
     "providers/aws/aws-cloudmap",
+    "providers/aws/aws-efs",
     "providers/aws/aws-events",
     "providers/aws/aws-secret",
     "providers/aws/aws-ecr",

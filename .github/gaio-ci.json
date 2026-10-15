@@ -78,6 +78,7 @@
         "@ez4/aws-dynamodb",
         "@ez4/aws-ecr",
         "@ez4/aws-ecs",
+        "@ez4/aws-efs",
         "@ez4/aws-events",
         "@ez4/aws-function",
         "@ez4/aws-gateway",
