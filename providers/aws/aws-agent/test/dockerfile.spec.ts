@@ -12,7 +12,7 @@ describe('agent dockerfile generator', () => {
       image: {
         base: 'public.ecr.aws/docker/library/node:24-bookworm-slim',
         aptPackages: ['git', 'procps'],
-        npmPackages: ['@anthropic-ai/claude-agent-sdk']
+        npmPackages: ['@anthropic-ai/claude-agent-sdk', 'typescript']
       },
       variables: {},
       services: {}
@@ -22,7 +22,7 @@ describe('agent dockerfile generator', () => {
 
     ok(dockerfile.includes('FROM public.ecr.aws/docker/library/node:24-bookworm-slim'));
     ok(dockerfile.includes('apt-get update && apt-get install -y --no-install-recommends git procps'));
-    ok(dockerfile.includes('npm install --omit=dev --prefix /app @anthropic-ai/claude-agent-sdk @aws-sdk/client-s3'));
+    ok(dockerfile.includes('RUN npm install --omit=dev --prefix /app @anthropic-ai/claude-agent-sdk typescript\n'));
     ok(!dockerfile.includes('npm install -g'));
     ok(dockerfile.includes('COPY --chown=1000:1000 runtime.mjs /app/runtime.mjs'));
     ok(dockerfile.includes('RUN id -u 1000 >/dev/null 2>&1 || useradd -u 1000 -m -s /bin/bash ez4'));

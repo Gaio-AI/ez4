@@ -10,6 +10,8 @@ import { getFunctionBundle } from '@ez4/aws-common';
 import { getServiceName } from '@ez4/project/library';
 import { toKebabCase } from '@ez4/utils';
 
+import { AGENT_IMAGE_PACKAGES } from '../image/dockerfile';
+
 // __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
 
@@ -43,7 +45,8 @@ export const buildAgentBundle = async (agent: AgentService, options: DeployOptio
     handlers,
     context: agent.context,
     define: { __EZ4_AGENT: JSON.stringify(getAgentEntryDefinition(agent)) },
-    target: 'node24'
+    target: 'node24',
+    external: AGENT_IMAGE_PACKAGES
   });
   const hash = createHash('sha256')
     .update(await readFile(file))

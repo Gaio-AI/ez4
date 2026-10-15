@@ -1,10 +1,15 @@
 import type { AgentService } from '@ez4/agent/library';
 import { createHash } from 'node:crypto';
 
+/**
+ * Installed in the image and left out of the agent bundle; everything else, the AWS SDK included, is bundled.
+ * The Claude SDK stays installed because it spawns the CLI shipped next to its own module.
+ */
+export const AGENT_IMAGE_PACKAGES = ['@anthropic-ai/claude-agent-sdk'];
+
 export const generateDockerfile = (agent: AgentService): string => {
   const base = agent.image?.base ?? 'public.ecr.aws/docker/library/node:24-bookworm-slim';
   const aptPackages = (agent.image?.aptPackages ?? []).join(' ');
-  const npmPackages = (agent.image?.npmPackages ?? []).join(' ');
 
   const lines: string[] = [`FROM ${base}`, 'WORKDIR /app', 'ENV NODE_ENV=production'];
 
@@ -12,9 +17,9 @@ export const generateDockerfile = (agent: AgentService): string => {
     lines.push(`RUN apt-get update && apt-get install -y --no-install-recommends ${aptPackages} && rm -rf /var/lib/apt/lists/*`);
   }
 
-  lines.push(
-    `RUN npm install --omit=dev --prefix /app @anthropic-ai/claude-agent-sdk @aws-sdk/client-s3${npmPackages ? ` ${npmPackages}` : ''}`
-  );
+  const npmPackages = new Set([...AGENT_IMAGE_PACKAGES, ...(agent.image?.npmPackages ?? [])]);
+
+  lines.push(`RUN npm install --omit=dev --prefix /app ${[...npmPackages].join(' ')}`);
 
   lines.push(
     // node images already ship uid/gid 1000 (`node`); create it only on bases that lack it.

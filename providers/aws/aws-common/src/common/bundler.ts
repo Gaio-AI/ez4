@@ -38,6 +38,10 @@ export type BundlerOptions = {
   define?: Record<string, string>;
   debug?: boolean;
   target?: string;
+  /**
+   * Packages left out of the bundle, for the runtime to provide; the AWS SDK by default, which Lambda ships.
+   */
+  external?: string[];
 };
 
 /**
@@ -193,7 +197,7 @@ export const buildFunctionBundle = async (provider: string, options: BundlerOpti
     platform: 'node',
     packages: 'bundle',
     format: 'esm',
-    external: ['@aws-sdk/*'],
+    external: options.external ?? ['@aws-sdk/*'],
     keepNames: true,
     bundle: true,
     target,
