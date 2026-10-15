@@ -19,6 +19,13 @@ export class InvalidWorkspaceRepoError extends Error {
   }
 }
 
+export class InvalidWorkspaceRepoNameError extends Error {
+  constructor(agent: string, name: string) {
+    super(`Invalid workspace repository name '${name}' in agent '${agent}'`);
+    this.name = 'InvalidWorkspaceRepoNameError';
+  }
+}
+
 export class DuplicateWorkspaceRepoError extends Error {
   constructor(agent: string, name: string) {
     super(`Duplicate workspace repository name '${name}' in agent '${agent}'`);

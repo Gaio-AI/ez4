@@ -99,6 +99,24 @@ const commitToRemote = async (remoteDir: string, repo: string, filename: string)
   await rm(workDir, { recursive: true, force: true });
 };
 
+describe('workspace :: unsafe names', () => {
+  it('rejects invalid repo, agent, and invocation names before filesystem or git use', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ws-unsafe-'));
+    let gitCalls = 0;
+    const runtime: WorkspaceRuntime = {
+      root,
+      workspace: { repos: [{ name: '../outside', url: 'https://github.com/acme/api.git', branch: 'main' }] },
+      git: async () => { gitCalls++; throw new Error('git must not run'); }
+    };
+    await rejects(refreshCache(runtime, runtime.workspace.repos[0]), /Invalid workspace repository name/);
+    await rejects(checkoutWorkspace(runtime, join(root, 'work')), /Invalid workspace repository name/);
+    await rejects(publishWorkspace(runtime, { dir: root, repos: { '../outside': { path: root, base: 'base' } } }, 'Agent', 'id'), /Invalid workspace repository name/);
+    await rejects(publishWorkspace(runtime, { dir: root, repos: { api: { path: root, base: 'base' } } }, '../Agent', 'id'), /Invalid workspace agent name/);
+    await rejects(publishWorkspace(runtime, { dir: root, repos: { api: { path: root, base: 'base' } } }, 'Agent', '../id'), /Invalid workspace invocation id/);
+    deepEqual(gitCalls, 0);
+  });
+});
+
 describe('workspace :: runtime', () => {
   it('assert :: published refs survive a cache refresh', async () => {
     const { runtime, workdir, remote } = await setupWorkspace({ repos: ['api'] });

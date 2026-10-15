@@ -109,7 +109,16 @@ const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Prom
   }
 };
 
+const assertWorkspaceName = (kind: 'repository' | 'agent' | 'invocation id', name: string): void => {
+  if (!/^[A-Za-z0-9._-]+$/.test(name) || name === '.' || name === '..') {
+    throw new Error(`Invalid workspace ${kind} name '${name}'`);
+  }
+};
+
 const touchLease = async (root: string, repo: string, agent: string, id: string, nowMs: number): Promise<void> => {
+  assertWorkspaceName('repository', repo);
+  assertWorkspaceName('agent', agent);
+  assertWorkspaceName('invocation id', id);
   const leaseFile = join(root, 'leases', repo, agent, id);
   await mkdir(dirname(leaseFile), { recursive: true });
   const date = new Date(nowMs);
@@ -122,6 +131,7 @@ const touchLease = async (root: string, repo: string, agent: string, id: string,
 };
 
 export const refreshCache = async (runtime: WorkspaceRuntime, repo: WorkspaceRepoMeta): Promise<string> => {
+  assertWorkspaceName('repository', repo.name);
   const git = runtime.git ?? defaultGit;
   const reposDir = join(runtime.root, 'repos');
   const cachePath = join(reposDir, `${repo.name}.git`);
@@ -176,6 +186,7 @@ export const refreshCache = async (runtime: WorkspaceRuntime, repo: WorkspaceRep
           if (!match) continue;
           const agent = match[1];
           const id = match[2];
+          if (!/^[A-Za-z0-9._-]+$/.test(agent) || agent === '.' || agent === '..' || !/^[A-Za-z0-9._-]+$/.test(id) || id === '.' || id === '..') continue;
           const leaseFile = join(runtime.root, 'leases', repo.name, agent, id);
 
           let prune = false;
@@ -205,6 +216,14 @@ export const checkoutWorkspace = async (
   workdir: string,
   refs?: Agent.WorkspaceRef[]
 ): Promise<Agent.WorkspaceRequest> => {
+  for (const repo of runtime.workspace.repos) assertWorkspaceName('repository', repo.name);
+  for (const ref of refs ?? []) {
+    assertWorkspaceName('repository', ref.repo);
+    const match = ref.ref.match(/^refs\/ez4\/([^/]+)\/(.+)$/);
+    if (!match) throw new Error(`Invalid workspace ref '${ref.ref}'`);
+    assertWorkspaceName('agent', match[1]);
+    assertWorkspaceName('invocation id', match[2]);
+  }
   const git = runtime.git ?? defaultGit;
   const token = runtime.token ? await runtime.token() : undefined;
   const nowMs = getNowMs(runtime);
@@ -276,6 +295,9 @@ export const publishWorkspace = async (
   agent: string,
   id: string
 ): Promise<Agent.WorkspaceRef[]> => {
+  assertWorkspaceName('agent', agent);
+  assertWorkspaceName('invocation id', id);
+  for (const repoName of Object.keys(request.repos)) assertWorkspaceName('repository', repoName);
   const git = runtime.git ?? defaultGit;
   const token = runtime.token ? await runtime.token() : undefined;
   const nowMs = getNowMs(runtime);

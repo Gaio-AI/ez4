@@ -2,7 +2,7 @@ import type { ModelProperty, TypeClass } from '@ez4/reflection';
 import { isModelProperty, isTypeObject, isTypeTuple } from '@ez4/reflection';
 import { getPropertyObject, getPropertyString } from '@ez4/common/library';
 import type { AgentService } from './types';
-import { DuplicateWorkspaceRepoError, IncompleteServiceError, InvalidWorkspaceRepoError } from '../errors/service';
+import { DuplicateWorkspaceRepoError, IncompleteServiceError, InvalidWorkspaceRepoError, InvalidWorkspaceRepoNameError } from '../errors/service';
 
 const objectMembers = (property: ModelProperty): Record<string, ModelProperty> | undefined => {
   const object = getPropertyObject(property);
@@ -49,6 +49,10 @@ export const getWorkspaceMetadata = (
         .split('/')
         .pop()!
         .replace(/\.git$/, '');
+    if (!/^[A-Za-z0-9._-]+$/.test(name) || name === '.' || name === '..') {
+      errors.push(new InvalidWorkspaceRepoNameError(agentName, name));
+      continue;
+    }
     if (names.has(name)) {
       errors.push(new DuplicateWorkspaceRepoError(agentName, name));
       continue;
