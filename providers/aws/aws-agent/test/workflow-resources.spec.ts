@@ -2,6 +2,8 @@ import type { AgentService, AgentWorkflowService } from '@ez4/agent/library';
 import type { DeployOptions, EventContext, MetadataReflection } from '@ez4/project/library';
 import type { EntryState, EntryStates } from '@ez4/state';
 import type { QueueState } from '@ez4/aws-queue';
+import type { EcsTaskDefState } from '@ez4/aws-ecs';
+import { createEcsTaskDefStateId } from '@ez4/aws-ecs';
 import { describe, it } from 'node:test';
 import { deepEqual, equal, ok, rejects } from 'node:assert/strict';
 import { createAgentService, createAgentWorkflowService } from '@ez4/agent/library';
@@ -135,6 +137,8 @@ describe('workflow resources and grants', () => {
     ok(source.constructor.includes(`"replyTo":${getDefinitionName<QueueState>(resultsQueueId, 'queueUrl')}`));
     ok(source.dependencyIds?.includes(resultsQueueId));
     ok(source.constructor.includes(`"inputSchema":${JSON.stringify(workerFixture.inputSchema)}`));
+    // A revision ARN would pin the function to the revision deployed when it was bundled.
+    ok(source.constructor.includes(`"taskDefinition":${getDefinitionName<EcsTaskDefState>(createEcsTaskDefStateId('Worker'), 'family')}`));
   });
 
   it('assert :: a workflow agent missing from the project fails the deploy', async () => {

@@ -85,14 +85,15 @@ export const getAgentClientSource = (agent: AgentService, options: DeployOptions
   }
 
   const clusterArn = getDefinitionName<EcsClusterState>(clusterStateId, 'clusterArn');
-  const taskDefinitionArn = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'taskDefinitionArn');
+  // The family, not a revision ARN: RunTask takes its latest revision, so callers bundled earlier never run a stale one.
+  const taskDefinitionFamily = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'family');
   const subnetIds = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'subnetIds');
   const securityGroupIds = getDefinitionName<EcsTaskDefState>(taskDefStateId, 'securityGroupIds');
 
   const clientParameters = {
     agentName: agent.name,
     cluster: `@{EZ4_RAW_EXPRESSION}:${clusterArn}`,
-    taskDefinition: `@{EZ4_RAW_EXPRESSION}:${taskDefinitionArn}`,
+    taskDefinition: `@{EZ4_RAW_EXPRESSION}:${taskDefinitionFamily}`,
     bucket: getAgentBucketName(options),
     subnets: `@{EZ4_RAW_EXPRESSION}:${subnetIds}.split(',')`,
     securityGroups: `@{EZ4_RAW_EXPRESSION}:${securityGroupIds}.split(',')`,
