@@ -1,11 +1,11 @@
 import { TypeError } from '@ez4/common/library';
 
-export class UnknownPresetError extends TypeError {
+export class UnknownPermissionError extends TypeError {
   constructor(
-    public preset: string,
+    public permission: string,
     fileName?: string
   ) {
-    super(`Unknown agent permissions preset '${preset}'.`, fileName);
+    super(`Unknown agent permission '${permission}', expected an AgentPermission member.`, fileName);
   }
 }
 

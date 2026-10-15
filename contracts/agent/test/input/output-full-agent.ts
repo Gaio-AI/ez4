@@ -1,4 +1,4 @@
-import type { Agent } from '@ez4/agent';
+import type { Agent, AgentPermission } from '@ez4/agent';
 
 export interface FullInput {
   task: string;
@@ -43,12 +43,11 @@ export declare class FullAgent extends Agent.Service<FullInput, FullOutput> {
     timeout: 1800;
   };
   permissions: {
-    presets: ['logs-read'];
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['/{prefix}-api/*', '/aws/lambda/{prefix}-{project}-*'] }];
     statements: [
       {
-        effect: 'allow';
         actions: ['s3:GetObject'];
-        resources: ['arn:aws:s3:::my-bucket/*'];
+        resources: ['arn:aws:s3:::{prefix}-bucket/*'];
       }
     ];
   };

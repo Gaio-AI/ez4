@@ -8,7 +8,7 @@ import { createRole, createPolicy, createPolicyDocument, createRoleDocument, cre
 import { FileSystemServiceType, AccessPointServiceType } from '@ez4/aws-efs';
 import { getAgentBucketName, getAgentClusterName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
 import { toKebabCase } from '@ez4/utils';
-import { PRESET_POLICIES } from './presets';
+import { buildPermissionGrants } from './permissions';
 import { buildWorkspaceGrants } from '../workspace/resources';
 
 export const buildAgentInvokeGrants = (
@@ -96,24 +96,8 @@ export const buildTaskRoleGrants = (
     grants.push(...buildAgentInvokeGrants(linkedAgents, region, accountId, options));
   }
 
-  // Presets
-  if (agent.permissions?.presets) {
-    for (const preset of agent.permissions.presets) {
-      const presetGrant = PRESET_POLICIES[preset];
-      if (presetGrant) {
-        grants.push(presetGrant);
-      }
-    }
-  }
-
-  // Statements
-  if (agent.permissions?.statements) {
-    for (const statement of agent.permissions.statements) {
-      grants.push({
-        resourceIds: [...statement.resources],
-        permissions: [...statement.actions]
-      });
-    }
+  if (agent.permissions) {
+    grants.push(...buildPermissionGrants(agent.permissions, options, region, accountId));
   }
 
   return grants;

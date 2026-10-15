@@ -41,7 +41,7 @@
       "name": "prepareAgent",
       "file": "test/input/output-full-agent.ts",
       "position": [
-        62,
+        61,
         1
       ]
     },
@@ -49,7 +49,7 @@
       "name": "finishAgent",
       "file": "test/input/output-full-agent.ts",
       "position": [
-        66,
+        65,
         1
       ]
     },
@@ -60,17 +60,22 @@
       "timeout": 1800
     },
     "permissions": {
-      "presets": [
-        "logs-read"
+      "grants": [
+        {
+          "permission": "logs-read",
+          "resources": [
+            "/{prefix}-api/*",
+            "/aws/lambda/{prefix}-{project}-*"
+          ]
+        }
       ],
       "statements": [
         {
-          "effect": "allow",
           "actions": [
             "s3:GetObject"
           ],
           "resources": [
-            "arn:aws:s3:::my-bucket/*"
+            "arn:aws:s3:::{prefix}-bucket/*"
           ]
         }
       ]

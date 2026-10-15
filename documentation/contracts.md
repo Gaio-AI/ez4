@@ -94,7 +94,7 @@ The Agent contract allows declaring autonomous LLM-powered services running on A
 ### Service Definition
 
 ```typescript
-import { Agent } from '@ez4/agent';
+import { Agent, AgentPermission } from '@ez4/agent';
 
 export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
   provider: 'claude';
@@ -110,7 +110,7 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   };
   egress: ['api.github.com'];
   permissions: {
-    presets: ['logs-read'];
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['/{prefix}-api/*'] }];
   };
   resources: {
     cpu: 1024;

@@ -19,6 +19,7 @@ import {
   normalizeDomain,
   getAgentEgressDomains
 } from '../src/proxy/config';
+import { AgentPermission } from '@ez4/agent';
 import { generateHtpasswd, generateAgentPassword, md5Crypt } from '../src/proxy/auth';
 import {
   createSecret,
@@ -65,10 +66,15 @@ describe('proxy :: configuration and auth', () => {
     throws(() => normalizeDomain('example.com/path'), /Invalid/);
   });
 
-  it('resolves agent domains combining declared domains and AWS endpoints from presets', () => {
+  it('resolves agent domains combining declared egress and AWS endpoints of granted permissions', () => {
     const input: AgentDomainInput = {
-      domains: ['api.linear.app'],
-      presets: ['logs-read', 'ecs-read']
+      egress: ['api.linear.app'],
+      permissions: {
+        grants: [
+          { permission: AgentPermission.LogsRead, resources: ['/{prefix}-api/*'] },
+          { permission: AgentPermission.EcsRead, resources: ['*'] }
+        ]
+      }
     };
     const domains = resolveAgentAllowedDomains(input, 'us-east-1');
 
@@ -80,20 +86,22 @@ describe('proxy :: configuration and auth', () => {
   it('resolves agent domains from statements action prefixes as <service>.<region>.amazonaws.com', () => {
     const input: AgentDomainInput = {
       egress: ['github.com'],
-      statements: [
-        {
-          actions: ['sts:AssumeRole', 'sts:GetCallerIdentity'],
-          resources: ['*']
-        },
-        {
-          actions: ['lambda:InvokeFunction'],
-          resources: ['*']
-        },
-        {
-          actions: ['cloudformation:DescribeStacks'],
-          resources: ['*']
-        }
-      ]
+      permissions: {
+        statements: [
+          {
+            actions: ['sts:AssumeRole', 'sts:GetCallerIdentity'],
+            resources: ['*']
+          },
+          {
+            actions: ['lambda:InvokeFunction'],
+            resources: ['*']
+          },
+          {
+            actions: ['cloudformation:DescribeStacks'],
+            resources: ['*']
+          }
+        ]
+      }
     };
     const domains = resolveAgentAllowedDomains(input, 'us-east-1');
 

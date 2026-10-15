@@ -22,7 +22,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - Workflow state: `workflows/<Workflow>/<runId>.json` storing step transitions and execution history.
 
 - **IAM Roles & Security**:
-  - Per-agent task role grants artifact reads only for its own prefix and linked agents' prefixes, plus least-privilege permission presets (`logs-read`, `lambda-read`, `ecs-read`, `cloudformation-read`) or custom statements.
+  - Per-agent task role grants artifact reads only for its own prefix and linked agents' prefixes, plus `AgentPermission` grants scoped to the resource names they declare (`{prefix}`/`{project}` resolved per deploy) and custom statements.
   - Execution role used by ECS to pull images and inject secrets from AWS Secrets Manager.
 
 - **Shared Git Workspaces**:
@@ -42,7 +42,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - Outbound traffic is restricted through an internal Squid proxy (`public.ecr.aws/ubuntu/squid`) deployed as an ECS service in the agents cluster.
   - Registered under Cloud Map private DNS namespace `<base>.local` with endpoint `http://proxy.<base>.local:3128` (where `<base>` = `${prefix}-${projectName}[-${branch}]-agents`).
   - Per-agent basic authentication password is saved in AWS Secrets Manager (`<base>-<agent>-proxy`); the proxy receives only the htpasswd hash.
-  - Allowlist enforces domains declared in `egress`, provider domains (`api.anthropic.com`), AWS endpoints derived from permission presets, and runtime ECS and STS endpoints.
+  - Allowlist enforces domains declared in `egress`, provider domains (`api.anthropic.com`), AWS endpoints of granted permissions and statement actions, and runtime ECS and STS endpoints.
   - `NO_PROXY` bypasses the proxy for AWS S3, ECS/EC2 metadata endpoints, and configured VPC interface endpoints. DynamoDB requests use the proxy.
 
 - **Modular Provider Architecture**:

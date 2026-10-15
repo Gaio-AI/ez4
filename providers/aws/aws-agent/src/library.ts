@@ -1,6 +1,6 @@
 export * from './image/dockerfile';
 
-export * from './role/presets';
+export * from './role/permissions';
 export * from './role/task';
 export * from './role/execution';
 export * from './triggers/policy';

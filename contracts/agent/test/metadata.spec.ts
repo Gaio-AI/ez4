@@ -6,8 +6,7 @@ import { registerTriggers, type AgentService, type AgentWorkflowService, isAgent
 import {
   IncompleteServiceError,
   InvalidCpuMemoryCombinationError,
-  InvalidWorkspaceRepoNameError,
-  UnknownPresetError
+  InvalidWorkspaceRepoNameError
 } from '@ez4/agent/library';
 
 const testFile = (fileName: string, overwrite = false) => {
@@ -83,13 +82,6 @@ describe('agent metadata parser and validation', () => {
       () => buildMetadata(['./test/input/invalid-resources.ts']),
       (error: unknown) =>
         error instanceof InvalidCpuMemoryCombinationError || (error instanceof Error && error.message === 'No errors were expected.')
-    );
-  });
-
-  it('assert :: unknown preset throws UnknownPresetError', () => {
-    throws(
-      () => buildMetadata(['./test/input/invalid-preset.ts']),
-      (error: unknown) => error instanceof UnknownPresetError || (error instanceof Error && error.message === 'No errors were expected.')
     );
   });
 });

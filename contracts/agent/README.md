@@ -16,7 +16,7 @@ Agents run isolated containerized workloads driven by an LLM provider (such as C
 
 ```ts
 import type { Service } from '@ez4/common';
-import type { Agent } from '@ez4/agent';
+import type { Agent, AgentPermission } from '@ez4/agent';
 
 export interface ReviewInput {
   pullRequest: number;
@@ -43,7 +43,7 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   egress: ['api.github.com'];
 
   permissions: {
-    presets: ['logs-read'];
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['/{prefix}-api/*'] }];
   };
 
   resources: {
@@ -56,6 +56,21 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   finish: typeof finishReview;
 }
 ```
+
+#### Permissions
+
+`grants` give an agent read access to AWS resources by name, with one `AgentPermission` member each: `LogsRead` (log groups), `LambdaRead` (functions), `EcsRead` (clusters) and `CloudFormationRead` (stacks). `*` in a name matches anything. `{prefix}` and `{project}` resolve to the deploy prefix and project name, the same ones EZ4 builds its resource names from, so `/{prefix}-api/*` reads `/stg-api/*` in a `stg` deploy and `/prd-api/*` in a `prd` one.
+
+`statements` allow any other IAM actions on full resource ARNs, which accept the same placeholders:
+
+```ts
+permissions: {
+  grants: [{ permission: AgentPermission.LogsRead; resources: ['/aws/lambda/{prefix}-{project}-*'] }];
+  statements: [{ actions: ['s3:GetObject']; resources: ['arn:aws:s3:::{prefix}-reports/*'] }];
+};
+```
+
+The egress proxy lets the agent reach the endpoint of each granted service (`logs.<region>.amazonaws.com`, ...). A log group grant cannot hide group names: listing log groups is not scoped by IAM, reading their events is.
 
 #### Git workspaces
 

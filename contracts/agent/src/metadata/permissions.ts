@@ -1,17 +1,19 @@
 import type { ModelProperty, TypeClass } from '@ez4/reflection';
-import { isModelProperty, isTypeObject, isTypeTuple } from '@ez4/reflection';
-import { getPropertyStringIn, getPropertyStringList } from '@ez4/common/library';
 import type { Agent } from '../services/contract';
 import type { AgentService } from './types';
-import { UnknownPresetError } from '../errors/permissions';
+
+import { isModelProperty, isTypeObject, isTypeTuple } from '@ez4/reflection';
+import { getPropertyString, getPropertyStringIn, getPropertyStringList } from '@ez4/common/library';
+import { AgentPermission } from '../services/permissions';
+import { UnknownPermissionError } from '../errors/permissions';
 import { IncompleteServiceError } from '../errors/service';
 
-const VALID_PRESETS: Record<string, true> = {
-  'logs-read': true,
-  'lambda-read': true,
-  'ecs-read': true,
-  'cloudformation-read': true
-};
+const AGENT_PERMISSIONS = [
+  AgentPermission.LogsRead,
+  AgentPermission.LambdaRead,
+  AgentPermission.EcsRead,
+  AgentPermission.CloudFormationRead
+];
 
 export const validatePermissions = (
   members: Record<string, ModelProperty>,
@@ -20,69 +22,101 @@ export const validatePermissions = (
   errorList: Error[]
 ) => {
   const member = members.permissions;
-  if (!member || !isTypeObject(member.value)) {
+  if (!member || !isTypeObject(member.value) || !Array.isArray(member.value.members)) {
     return;
   }
 
-  const permMembers = member.value.members;
-  if (!Array.isArray(permMembers)) {
-    return;
-  }
+  const permissions = Object.fromEntries(member.value.members.filter(isModelProperty).map((field) => [field.name, field]));
 
-  const permMap: Record<string, ModelProperty> = {};
-  for (const m of permMembers) {
-    if (m && typeof m === 'object' && 'name' in m && typeof m.name === 'string') {
-      permMap[m.name] = m as ModelProperty;
-    }
-  }
-
-  const presets = permMap.presets ? getPropertyStringList(permMap.presets) : undefined;
-  if (presets) {
-    for (const preset of presets) {
-      if (!VALID_PRESETS[preset]) {
-        errorList.push(new UnknownPresetError(preset, declaration.file));
-      }
-    }
-    service.permissions = {
-      ...service.permissions,
-      presets: presets as Agent.Preset[]
-    };
-  }
-
-  if (permMap.statements) {
-    const value = permMap.statements.value;
-    const statements: Agent.Statement[] = [];
-    let valid = false;
-    if (isTypeTuple(value)) {
-      valid = true;
-      for (const element of value.elements) {
-        if (!isTypeObject(element) || !Array.isArray(element.members) || !element.members.every(isModelProperty)) {
-          valid = false;
-          break;
-        }
-        const fields = Object.fromEntries(element.members.map((field) => [field.name, field]));
-        const actions = fields.actions && getPropertyStringList(fields.actions);
-        const resources = fields.resources && getPropertyStringList(fields.resources);
-        const effect = fields.effect && getPropertyStringIn(fields.effect, ['allow', 'deny']);
-        if (
-          !actions ||
-          !resources ||
-          (fields.effect && !effect) ||
-          !isTypeTuple(fields.actions.value) ||
-          !isTypeTuple(fields.resources.value) ||
-          actions.length !== fields.actions.value.elements.length ||
-          resources.length !== fields.resources.value.elements.length
-        ) {
-          valid = false;
-          break;
-        }
-        statements.push({ ...(effect && { effect }), actions, resources });
-      }
-    }
-    if (!valid) {
-      errorList.push(new IncompleteServiceError([`${declaration.name}.permissions.statements`], declaration.file));
+  if (permissions.grants) {
+    const grants = readGrants(permissions.grants, declaration, errorList);
+    if (grants) {
+      service.permissions = { ...service.permissions, grants };
     } else {
-      service.permissions = { ...service.permissions, statements };
+      errorList.push(new IncompleteServiceError([`${declaration.name}.permissions.grants`], declaration.file));
     }
   }
+
+  if (permissions.statements) {
+    const statements = readStatements(permissions.statements);
+    if (statements) {
+      service.permissions = { ...service.permissions, statements };
+    } else {
+      errorList.push(new IncompleteServiceError([`${declaration.name}.permissions.statements`], declaration.file));
+    }
+  }
+};
+
+const readGrants = (member: ModelProperty, declaration: TypeClass, errorList: Error[]): Agent.Grant[] | undefined => {
+  const entries = getObjectEntries(member);
+  if (!entries) {
+    return undefined;
+  }
+
+  const grants: Agent.Grant[] = [];
+
+  for (const fields of entries) {
+    const resources = getLiteralStrings(fields.resources);
+    if (!fields.permission || !resources) {
+      return undefined;
+    }
+
+    const permission = getPropertyStringIn(fields.permission, AGENT_PERMISSIONS);
+    if (!permission) {
+      errorList.push(new UnknownPermissionError(getPropertyString(fields.permission) ?? 'unknown', declaration.file));
+      continue;
+    }
+
+    grants.push({ permission, resources });
+  }
+
+  return grants;
+};
+
+const readStatements = (member: ModelProperty): Agent.Statement[] | undefined => {
+  const entries = getObjectEntries(member);
+  if (!entries) {
+    return undefined;
+  }
+
+  const statements: Agent.Statement[] = [];
+
+  for (const fields of entries) {
+    const actions = getLiteralStrings(fields.actions);
+    const resources = getLiteralStrings(fields.resources);
+    if (!actions || !resources) {
+      return undefined;
+    }
+
+    statements.push({ actions, resources });
+  }
+
+  return statements;
+};
+
+/** Fields of each object in a tuple member, or undefined when any element is not an object. */
+const getObjectEntries = (member: ModelProperty) => {
+  if (!isTypeTuple(member.value)) {
+    return undefined;
+  }
+
+  const entries: Record<string, ModelProperty>[] = [];
+
+  for (const element of member.value.elements) {
+    if (!isTypeObject(element) || !Array.isArray(element.members) || !element.members.every(isModelProperty)) {
+      return undefined;
+    }
+    entries.push(Object.fromEntries(element.members.map((field) => [field.name, field])));
+  }
+
+  return entries;
+};
+
+/** A tuple of string literals, or undefined when the member is missing or any element is not a literal. */
+const getLiteralStrings = (member: ModelProperty | undefined) => {
+  const values = member && getPropertyStringList(member);
+  if (!values || !isTypeTuple(member.value) || values.length !== member.value.elements.length) {
+    return undefined;
+  }
+  return values;
 };

@@ -3,9 +3,11 @@ import type { AgentService } from '@ez4/agent/library';
 import type { DeployOptions } from '@ez4/project/library';
 import type { EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
-import { ok, equal } from 'node:assert/strict';
+import { ok, equal, deepEqual, throws } from 'node:assert/strict';
+import { AgentPermission } from '@ez4/agent';
 import { createAgentService } from '@ez4/agent/library';
 import { buildAgentTaskRole, buildTaskRoleGrants } from '../src/role/task';
+import { buildPermissionGrants } from '../src/role/permissions';
 import { buildAgentExecutionRole } from '../src/role/execution';
 import { RoleServiceType } from '@ez4/aws-identity';
 import { getAgentBucketName } from '../src/utils/names';
@@ -26,7 +28,7 @@ describe('agent task and execution roles', () => {
     const agent: AgentService = {
       ...createAgentService('CodeAgent'),
       permissions: {
-        presets: ['logs-read', 'lambda-read'],
+        grants: [{ permission: AgentPermission.LogsRead, resources: ['/{prefix}-api/*'] }],
         statements: [
           {
             actions: ['s3:GetObject'],
@@ -137,5 +139,44 @@ describe('agent task and execution roles', () => {
     ok(passRole);
     ok(passRole.resourceIds.includes(`arn:aws:iam::${accountId}:role/ez4-test-stg-agents-reviewer-task-role`));
     ok(passRole.resourceIds.includes(`arn:aws:iam::${accountId}:role/ez4-test-stg-agents-execution-role`));
+  });
+
+  it('assert :: a logs grant reads only the log groups its templates name in the deployed environment', () => {
+    const grants = buildPermissionGrants(
+      { grants: [{ permission: AgentPermission.LogsRead, resources: ['/{prefix}-api/*', '/aws/lambda/{prefix}-{project}-*'] }] },
+      { ...options, prefix: 'prd', projectName: 'Gaio Api' },
+      region,
+      accountId
+    );
+
+    const events = grants.find((grant) => grant.permissions.includes('logs:FilterLogEvents'));
+    deepEqual(events?.resourceIds, [
+      `arn:aws:logs:${region}:${accountId}:log-group:/prd-api/*`,
+      `arn:aws:logs:${region}:${accountId}:log-group:/prd-api/*:*`,
+      `arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/prd-gaio-api-*`,
+      `arn:aws:logs:${region}:${accountId}:log-group:/aws/lambda/prd-gaio-api-*:*`
+    ]);
+
+    // Only actions IAM cannot scope by log group get a wildcard resource.
+    const unscoped = grants.filter((grant) => grant.resourceIds.includes('*')).flatMap((grant) => grant.permissions);
+    deepEqual(unscoped, ['logs:GetQueryResults', 'logs:StopQuery']);
+  });
+
+  it('assert :: statement resources resolve deploy placeholders and keep IAM policy variables', () => {
+    const [grant] = buildPermissionGrants(
+      { statements: [{ actions: ['s3:GetObject'], resources: ['arn:aws:s3:::{prefix}-reports/${aws:PrincipalTag/team}/*'] }] },
+      { ...options, prefix: 'stg' },
+      region,
+      accountId
+    );
+
+    deepEqual(grant.resourceIds, ['arn:aws:s3:::stg-reports/${aws:PrincipalTag/team}/*']);
+  });
+
+  it('assert :: an unknown placeholder fails the deploy naming it', () => {
+    throws(
+      () => buildPermissionGrants({ grants: [{ permission: AgentPermission.LogsRead, resources: ['/{stage}-api/*'] }] }, options, region, accountId),
+      /Unknown placeholder '\{stage\}'/
+    );
   });
 });

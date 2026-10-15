@@ -1,22 +1,13 @@
 import type { Agent } from '@ez4/agent';
 import type { SquidConfigOptions } from './types';
 import type { AgentService } from '@ez4/agent/library';
+import { PERMISSION_SERVICES } from '../role/permissions';
 import { getWorkspaceDomains } from '../workspace/resources';
 
 export interface AgentDomainInput {
-  domains?: string[];
   egress?: string[];
-  presets?: Agent.Preset[];
-  statements?: Agent.Statement[];
   permissions?: Agent.Permissions;
 }
-
-const PRESET_SERVICE_MAP: Record<string, string> = {
-  'logs-read': 'logs',
-  'ecs-read': 'ecs',
-  'lambda-read': 'lambda',
-  'cloudformation-read': 'cloudformation'
-};
 
 export const normalizeDomain = (domain: string): string => {
   const trimmed = domain.trim();
@@ -35,22 +26,16 @@ export const normalizeDomain = (domain: string): string => {
 export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: string): string[] => {
   const domains = new Set<string>();
 
-  const declared = [...(agent.domains ?? []), ...(agent.egress ?? [])];
-  for (const domain of declared) {
+  for (const domain of agent.egress ?? []) {
     domains.add(normalizeDomain(domain));
   }
 
-  const presets = [...(agent.presets ?? []), ...(agent.permissions?.presets ?? [])];
-  for (const preset of presets) {
-    const service = PRESET_SERVICE_MAP[preset];
-    if (service) {
-      domains.add(`${service}.${region}.amazonaws.com`);
-    }
+  for (const { permission } of agent.permissions?.grants ?? []) {
+    domains.add(`${PERMISSION_SERVICES[permission]}.${region}.amazonaws.com`);
   }
 
-  const statements = [...(agent.statements ?? []), ...(agent.permissions?.statements ?? [])];
-  for (const statement of statements) {
-    for (const action of statement.actions ?? []) {
+  for (const statement of agent.permissions?.statements ?? []) {
+    for (const action of statement.actions) {
       const [servicePrefix] = action.split(':');
       if (servicePrefix && servicePrefix !== '*' && servicePrefix.toLowerCase() !== 's3') {
         domains.add(`${servicePrefix.toLowerCase()}.${region}.amazonaws.com`);
@@ -60,6 +45,7 @@ export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: stri
 
   return Array.from(domains).sort();
 };
+
 const PROVIDER_DOMAINS: Record<string, string[]> = { claude: ['api.anthropic.com'] };
 
 /** Domains an agent may reach through the proxy: runtime AWS APIs, declared egress, permissions, and its LLM provider. */

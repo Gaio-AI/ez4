@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import {
   IncompleteServiceError,
   InvalidCpuMemoryCombinationError,
-  UnknownPresetError,
+  UnknownPermissionError,
   InvalidWorkspaceRepoError,
   DuplicateWorkspaceRepoError,
   UnknownWorkflowAgentError,
@@ -40,9 +40,10 @@ describe('agent metadata errors', () => {
     ok(error instanceof InvalidCpuMemoryCombinationError);
   });
 
-  it('assert :: unknown preset', () => {
-    const [error] = parseFile('invalid-preset', 1);
-    ok(error instanceof UnknownPresetError);
+  it('assert :: unknown permission', () => {
+    const [error] = parseFile('invalid-permission', 1);
+    ok(error instanceof UnknownPermissionError);
+    deepEqual(error.permission, 'logs-write');
   });
 
   it('assert :: non-https workspace repo is rejected naming agent and url', () => {

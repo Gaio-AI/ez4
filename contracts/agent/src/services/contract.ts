@@ -31,6 +31,7 @@ import type {
   WorkflowRun as AgentWorkflowRun,
   WorkflowClient as AgentWorkflowClient
 } from './workflow';
+import type { AgentPermission } from './permissions';
 
 export interface LinkOptions extends Record<string, unknown> {
   readonly replyTo?: string;
@@ -38,7 +39,6 @@ export interface LinkOptions extends Record<string, unknown> {
 
 export namespace Agent {
   export type ProviderName = 'claude';
-  export type Preset = 'logs-read' | 'lambda-read' | 'ecs-read' | 'cloudformation-read';
   export type Status = ResultStatus;
   export type ErrorCode = ResultErrorCode;
   export type Workspace = AgentWorkspace;
@@ -72,16 +72,31 @@ export namespace Agent {
     | { readonly command: string; readonly args?: string[]; readonly env?: Record<string, string> }
     | { readonly url: string; readonly headers?: Record<string, string> };
 
+  /**
+   * Read access to AWS resources by name.
+   */
+  export interface Grant {
+    readonly permission: AgentPermission;
+
+    /**
+     * Names of the resources (log groups, functions, clusters or stacks) it applies to, where `*` matches anything.
+     * `{prefix}` and `{project}` resolve to the deploy prefix and project name, so `/{prefix}-api/*` follows the
+     * environment being deployed.
+     */
+    readonly resources: string[];
+  }
+
+  /**
+   * Allowed IAM actions; resource ARNs accept the same `{prefix}` and `{project}` placeholders as grants.
+   */
   export interface Statement {
-    readonly effect?: 'allow' | 'deny';
     readonly actions: string[];
     readonly resources: string[];
   }
 
   export interface Permissions {
-    readonly presets?: Preset[];
+    readonly grants?: Grant[];
     readonly statements?: Statement[];
-    readonly managedPolicies?: string[];
   }
 
   export interface Image {
