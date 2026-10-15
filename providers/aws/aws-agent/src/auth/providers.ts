@@ -32,8 +32,9 @@ export const ProviderAuths: Record<Agent.ProviderName, ProviderAuth> = {
       if (exitCode !== 0) {
         throw new Error(`Claude CLI setup-token exited with code ${exitCode}`);
       }
-      const answer = await io.prompt('Paste the token printed above: ');
-      const token = answer.trim();
+      const answer = await io.prompt('Paste the token printed above, then press Enter on an empty line: ');
+      // The token wraps across lines in the terminal; a paste keeps those breaks.
+      const token = answer.replace(/\s+/g, '');
       if (!ProviderAuths.claude.pattern.test(token)) {
         throw new Error(`Invalid token format for claude: expected pattern ${ProviderAuths.claude.pattern}`);
       }

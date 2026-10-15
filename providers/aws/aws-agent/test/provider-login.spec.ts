@@ -96,7 +96,8 @@ describe('provider login stored per stage and reused', () => {
           runArgs = { command, args };
           return 0;
         },
-        prompt: async () => 'sk-ant-oat01-abc123456789',
+        // The terminal wraps the printed token, so the paste carries a line break.
+        prompt: async () => 'sk-ant-oat01-abc12\n3456789',
         log: () => {}
       }
     };

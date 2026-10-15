@@ -53,11 +53,20 @@ export const defaultLoginIO: LoginIO = {
       output: mutableStdout,
       terminal: true
     });
-    rl.question(question, (answer) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(answer);
+    // A long value wraps in the terminal, so its paste can span several lines: read until an empty line.
+    const lines: string[] = [];
+    rl.on('line', (line) => {
+      if (line.trim()) {
+        lines.push(line);
+      } else {
+        rl.close();
+      }
     });
+    rl.on('close', () => {
+      process.stdout.write('\n');
+      resolve(lines.join('\n'));
+    });
+    process.stdout.write(question);
     muted = true;
     return promise;
   },
