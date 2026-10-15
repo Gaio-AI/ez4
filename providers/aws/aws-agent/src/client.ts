@@ -34,10 +34,29 @@ export namespace Client {
           throw new Error(`Agent input validation failed: ${JSON.stringify(getErrorDetails(errors))}`);
         }
 
-        const id = randomUUID();
+        const id = options?.id ?? randomUUID();
+        if (options?.id) {
+          try {
+            const existing = await s3.send(
+              new GetObjectCommand({
+                Bucket: parameters.bucket,
+                Key: `invocations/${parameters.agentName}/${id}.json`
+              })
+            );
+            if (existing.Body) {
+              const content = await streamToString(existing.Body as Readable);
+              const envelope: unknown = JSON.parse(content);
+              if (envelope && typeof envelope === 'object' && 'taskArn' in envelope && typeof envelope.taskArn === 'string') {
+                return { id };
+              }
+            }
+          } catch {
+            // Invocation not yet written or unreadable; proceed with standard invoke
+          }
+        }
+
         const now = Date.now();
         const deadline = new Date(now + (timeout + 300) * 1000).toISOString();
-
         const invocationPayload: {
           input: Agent.InputOf<S>;
           correlation?: string;
@@ -45,12 +64,14 @@ export namespace Client {
           deadline: string;
           cluster: string;
           taskArn?: string;
+          workspace?: Agent.WorkspaceRef[];
         } = {
           input,
           correlation: options?.correlation,
           replyTo: parameters.replyTo,
           deadline,
-          cluster: parameters.cluster
+          cluster: parameters.cluster,
+          workspace: options?.workspace
         };
 
         await s3.send(
@@ -64,6 +85,7 @@ export namespace Client {
 
         const runTaskResult = await ecs.send(
           new RunTaskCommand({
+            clientToken: id,
             cluster: parameters.cluster,
             taskDefinition: parameters.taskDefinition,
             launchType: 'FARGATE',
@@ -168,6 +190,11 @@ export namespace Client {
 }
 
 async function streamToString(stream: Readable): Promise<string> {
+  const candidate: unknown = stream;
+  if (candidate && typeof candidate === 'object' && 'transformToString' in candidate && typeof candidate.transformToString === 'function') {
+    const transformToString = candidate.transformToString as (encoding?: string) => Promise<string>;
+    return transformToString('utf-8');
+  }
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));

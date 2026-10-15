@@ -333,6 +333,84 @@ describe('client :: agent client', () => {
 
     equal(called, false);
   });
+
+  it('assert :: invoke with an existing id and taskArn does not run a second task', async () => {
+    let runTaskCalls = 0;
+    const ecs = {
+      send: async (cmd: unknown) => {
+        if (cmd instanceof RunTaskCommand) {
+          runTaskCalls++;
+        }
+        return { tasks: [{ taskArn: 'arn:aws:ecs:us-east-1:123:task/abc' }] };
+      }
+    } as unknown as ECSClient;
+    const store = new Map<string, string>([
+      ['invocations/Worker/id-1.json', JSON.stringify({ input: {}, taskArn: 'arn:task', deadline: 'x', cluster: 'c' })]
+    ]);
+    const s3 = {
+      send: async (cmd: unknown) => {
+        if (cmd instanceof GetObjectCommand) {
+          const key = cmd.input.Key ?? '';
+          const content = store.get(key);
+          if (!content) {
+            const err = new Error('NoSuchKey');
+            err.name = 'NoSuchKey';
+            throw err;
+          }
+          return {
+            Body: {
+              transformToString: async () => content,
+              [Symbol.asyncIterator]: async function* () {
+                yield Buffer.from(content);
+              }
+            }
+          };
+        }
+        return {};
+      }
+    } as unknown as S3Client;
+    const client = Client.make({
+      agentName: 'Worker',
+      cluster: 'arn:aws:ecs:us-east-1:123:cluster/test-cluster',
+      taskDefinition: 'arn:aws:ecs:us-east-1:123:task-definition/worker:1',
+      bucket: 'ez4-agents-bucket',
+      subnets: ['subnet-1'],
+      securityGroups: ['sg-agents'],
+      inputSchema: { type: SchemaType.Object, properties: {} },
+      s3Client: s3,
+      ecsClient: ecs
+    });
+    deepEqual(await client.invoke({}, { id: 'id-1' }), { id: 'id-1' });
+    deepEqual(runTaskCalls, 0);
+  });
+
+  it('assert :: RunTask is idempotent by invocation id', async () => {
+    let lastRunTaskInput: RunTaskCommandInput | undefined;
+    const ecs = {
+      send: async (cmd: unknown) => {
+        if (cmd instanceof RunTaskCommand) {
+          lastRunTaskInput = cmd.input;
+        }
+        return { tasks: [{ taskArn: 'arn:aws:ecs:us-east-1:123:task/abc' }] };
+      }
+    } as unknown as ECSClient;
+    const s3 = {
+      send: async () => ({})
+    } as unknown as S3Client;
+    const client = Client.make({
+      agentName: 'Worker',
+      cluster: 'arn:aws:ecs:us-east-1:123:cluster/test-cluster',
+      taskDefinition: 'arn:aws:ecs:us-east-1:123:task-definition/worker:1',
+      bucket: 'ez4-agents-bucket',
+      subnets: ['subnet-1'],
+      securityGroups: ['sg-agents'],
+      inputSchema: { type: SchemaType.Object, properties: {} },
+      s3Client: s3,
+      ecsClient: ecs
+    });
+    await client.invoke({}, { id: 'id-9' });
+    deepEqual(lastRunTaskInput?.clientToken, 'id-9');
+  });
 });
 
 describe('client :: prepareLinkedService', () => {
