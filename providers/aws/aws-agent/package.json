@@ -76,6 +76,7 @@
     "@ez4/aws-function": "^1.7.0",
     "@ez4/aws-identity": "^1.7.0",
     "@ez4/aws-logs": "^1.7.0",
+    "@ez4/aws-queue": "^1.7.0",
     "@ez4/aws-vpc": "^1.7.0",
     "@ez4/common": "^1.7.0",
     "@ez4/project": "^1.7.0",

@@ -1,27 +1,24 @@
-import type { ContextSource, DeployOptions, EventContext, ServiceMetadata, MetadataReflection } from '@ez4/project/library';
+import type { ContextSource, DeployOptions, EventContext, ServiceMetadata } from '@ez4/project/library';
 import type { AgentService } from '@ez4/agent/library';
-import type { QueueService } from '@ez4/queue/library';
 import type { QueueState } from '@ez4/aws-queue';
 import type { EcsClusterState } from '../cluster/types';
 import type { EcsTaskDefState } from '../taskdef/types';
 import { isAgentService, InvalidReplyToError } from '@ez4/agent/library';
-import { isQueueService } from '@ez4/queue/library';
+import { QueueServiceType } from '@ez4/aws-queue';
 import { getDefinitionName } from '@ez4/project/library';
 import { createBucketStateId } from '@ez4/aws-bucket';
 import { createEcsClusterStateId } from '../cluster/service';
 import { createEcsTaskDefStateId } from '../taskdef/service';
 import { getAgentBucketName, getAgentClusterName } from '../utils/names';
-
 export interface LinkedAgentEvent {
   service: ServiceMetadata;
   target?: ServiceMetadata;
   options: DeployOptions;
   context: EventContext;
-  metadata?: MetadataReflection;
 }
 
 export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | null => {
-  const { service, options, context, metadata } = event;
+  const { service, options, context } = event;
 
   if (!isAgentService(service)) {
     return null;
@@ -37,23 +34,22 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
       throw new InvalidReplyToError(replyToOption, agent.file);
     }
 
-    const referencedService = metadata?.[replyToOption];
-    if (!referencedService || !isQueueService(referencedService)) {
+    let queueState: unknown;
+    try {
+      queueState = context.getServiceState(replyToOption, options);
+    } catch {
       throw new InvalidReplyToError(replyToOption, agent.file);
     }
 
-    const queueService = referencedService as QueueService;
-    if (!queueService.fifoMode) {
+    if (!queueState || (queueState as QueueState).type !== QueueServiceType || !(queueState as QueueState).parameters?.fifoMode) {
       throw new InvalidReplyToError(replyToOption, agent.file);
     }
 
-    const queueState = context.getServiceState(replyToOption, options);
-    const queueEntryId = queueState.entryId;
+    const queueEntryId = (queueState as QueueState).entryId;
     dependencyIds.push(queueEntryId);
 
     replyToQueueUrl = getDefinitionName<QueueState>(queueEntryId, 'queueUrl');
   }
-
   const clusterStateId = createEcsClusterStateId(getAgentClusterName(options));
   const taskDefStateId = createEcsTaskDefStateId(agent.name);
 

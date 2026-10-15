@@ -11,7 +11,6 @@ import type { Agent } from '@ez4/agent';
 import { prepareLinkedService } from '../src/triggers/client';
 import { InvalidReplyToError } from '@ez4/agent/library';
 import type { EventContext, DeployOptions, ServiceMetadata } from '@ez4/project/library';
-import type { QueueService } from '@ez4/queue/library';
 import { QueueServiceType } from '@ez4/aws-queue';
 import { createEcsClusterStateId } from '../src/cluster/service';
 import { createEcsTaskDefStateId } from '../src/taskdef/service';
@@ -259,12 +258,27 @@ describe('client :: prepareLinkedService', () => {
           entryId: 'entry-queue-valid',
           dependencies: [],
           parameters: {
-            queueName: 'valid-queue.fifo'
+            queueName: 'valid-queue.fifo',
+            fifoMode: true
           },
           result: {
             queueUrl: 'https://sqs.us-east-1.amazonaws.com/123/valid-queue.fifo'
           }
         };
+      }
+      if (name === 'StandardQueue') {
+        return {
+          type: QueueServiceType,
+          entryId: 'entry-queue-standard',
+          dependencies: [],
+          parameters: {
+            queueName: 'standard-queue',
+            fifoMode: false
+          }
+        };
+      }
+      if (name === 'MissingQueue') {
+        throw new Error('Service not found');
       }
       return {
         type: 'mock',
@@ -307,17 +321,6 @@ describe('client :: prepareLinkedService', () => {
   });
 
   it('prepares linked service with valid FIFO replyTo queue', async () => {
-    const validFifoQueue = {
-      type: '@ez4/queue',
-      name: 'ValidQueue',
-      context: {},
-      variables: {},
-      services: {},
-      fifoMode: {
-        groupId: 'test-group'
-      }
-    } as unknown as QueueService;
-
     const linkedAgent = {
       ...dummyAgentService,
       options: {
@@ -329,10 +332,7 @@ describe('client :: prepareLinkedService', () => {
       service: linkedAgent,
       target: linkedAgent,
       options,
-      context: mockContext,
-      metadata: {
-        ValidQueue: validFifoQueue
-      }
+      context: mockContext
     });
 
     ok(source);
@@ -341,14 +341,6 @@ describe('client :: prepareLinkedService', () => {
   });
 
   it('rejects replyTo if service is not a FIFO queue', async () => {
-    const standardQueue = {
-      type: '@ez4/queue',
-      name: 'StandardQueue',
-      context: {},
-      variables: {},
-      services: {}
-    } as unknown as QueueService;
-
     const linkedAgent = {
       ...dummyAgentService,
       options: {
@@ -362,10 +354,7 @@ describe('client :: prepareLinkedService', () => {
           service: linkedAgent,
           target: linkedAgent,
           options,
-          context: mockContext,
-          metadata: {
-            StandardQueue: standardQueue
-          }
+          context: mockContext
         });
       },
       (err: Error) => {
@@ -389,8 +378,7 @@ describe('client :: prepareLinkedService', () => {
           service: linkedAgent,
           target: linkedAgent,
           options,
-          context: mockContext,
-          metadata: {}
+          context: mockContext
         });
       },
       (err: Error) => {
