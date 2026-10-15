@@ -3,11 +3,7 @@ import { deepEqual, throws } from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { buildMetadata } from '@ez4/project/library';
 import { registerTriggers, type AgentService, type AgentWorkflowService, isAgentWorkflowService } from '@ez4/agent/library';
-import {
-  IncompleteServiceError,
-  InvalidCpuMemoryCombinationError,
-  InvalidWorkspaceRepoNameError
-} from '@ez4/agent/library';
+import { IncompleteServiceError, InvalidCpuMemoryCombinationError, InvalidWorkspaceRepoNameError } from '@ez4/agent/library';
 
 const testFile = (fileName: string, overwrite = false) => {
   const sourceFile = `./test/input/output-${fileName}.ts`;

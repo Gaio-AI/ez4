@@ -175,7 +175,13 @@ describe('agent task and execution roles', () => {
 
   it('assert :: an unknown placeholder fails the deploy naming it', () => {
     throws(
-      () => buildPermissionGrants({ grants: [{ permission: AgentPermission.LogsRead, resources: ['/{stage}-api/*'] }] }, options, region, accountId),
+      () =>
+        buildPermissionGrants(
+          { grants: [{ permission: AgentPermission.LogsRead, resources: ['/{stage}-api/*'] }] },
+          options,
+          region,
+          accountId
+        ),
       /Unknown placeholder '\{stage\}'/
     );
   });
