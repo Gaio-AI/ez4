@@ -43,11 +43,11 @@ export declare class FullAgent extends Agent.Service<FullInput, FullOutput> {
     timeout: 1800;
   };
   permissions: {
-    grants: [{ permission: AgentPermission.LogsRead; resources: ['/{prefix}-api/*', '/aws/lambda/{prefix}-{project}-*'] }];
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['api-*', 'billing-worker'] }];
     statements: [
       {
         actions: ['s3:GetObject'];
-        resources: ['arn:aws:s3:::{prefix}-bucket/*'];
+        resources: ['arn:aws:s3:::my-bucket/*'];
       }
     ];
   };

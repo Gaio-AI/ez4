@@ -64,8 +64,8 @@
         {
           "permission": "logs-read",
           "resources": [
-            "/{prefix}-api/*",
-            "/aws/lambda/{prefix}-{project}-*"
+            "api-*",
+            "billing-worker"
           ]
         }
       ],
@@ -75,7 +75,7 @@
             "s3:GetObject"
           ],
           "resources": [
-            "arn:aws:s3:::{prefix}-bucket/*"
+            "arn:aws:s3:::my-bucket/*"
           ]
         }
       ]

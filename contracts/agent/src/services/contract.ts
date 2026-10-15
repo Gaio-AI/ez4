@@ -79,15 +79,14 @@ export namespace Agent {
     readonly permission: AgentPermission;
 
     /**
-     * Names of the resources (log groups, functions, clusters or stacks) it applies to, where `*` matches anything.
-     * `{prefix}` and `{project}` resolve to the deploy prefix and project name, so `/{prefix}-api/*` follows the
-     * environment being deployed.
+     * Names of the resources (log groups, functions, clusters or stacks) it applies to, without the deploy prefix,
+     * where `*` matches anything: `api-*` reads `stg-api-*` in a `stg` deploy and `prd-api-*` in a `prd` one.
      */
     readonly resources: string[];
   }
 
   /**
-   * Allowed IAM actions; resource ARNs accept the same `{prefix}` and `{project}` placeholders as grants.
+   * Allowed IAM actions on full resource ARNs.
    */
   export interface Statement {
     readonly actions: string[];

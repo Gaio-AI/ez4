@@ -71,7 +71,7 @@ describe('proxy :: configuration and auth', () => {
       egress: ['api.linear.app'],
       permissions: {
         grants: [
-          { permission: AgentPermission.LogsRead, resources: ['/{prefix}-api/*'] },
+          { permission: AgentPermission.LogsRead, resources: ['api-*'] },
           { permission: AgentPermission.EcsRead, resources: ['*'] }
         ]
       }

@@ -8,6 +8,6 @@ export declare class InvalidPermissionAgent extends Agent.Service<{ prompt: stri
   output: { result: string };
   // @ts-expect-error Invalid permission for test
   permissions: {
-    grants: [{ permission: 'logs-write'; resources: ['/{prefix}-api/*'] }];
+    grants: [{ permission: 'logs-write'; resources: ['api-*'] }];
   };
 }

@@ -43,7 +43,7 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   egress: ['api.github.com'];
 
   permissions: {
-    grants: [{ permission: AgentPermission.LogsRead; resources: ['/{prefix}-api/*'] }];
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['api-*'] }];
   };
 
   resources: {
@@ -59,14 +59,14 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
 
 #### Permissions
 
-`grants` give an agent read access to AWS resources by name, with one `AgentPermission` member each: `LogsRead` (log groups), `LambdaRead` (functions), `EcsRead` (clusters) and `CloudFormationRead` (stacks). `*` in a name matches anything. `{prefix}` and `{project}` resolve to the deploy prefix and project name, the same ones EZ4 builds its resource names from, so `/{prefix}-api/*` reads `/stg-api/*` in a `stg` deploy and `/prd-api/*` in a `prd` one.
+`grants` give an agent read access to AWS resources by name, with one `AgentPermission` member each: `LogsRead` (log groups), `LambdaRead` (functions), `EcsRead` (clusters) and `CloudFormationRead` (stacks). Names leave out the deploy prefix, which EZ4 adds as it does to every resource it names (`<prefix>-<project>-...`), and `*` matches anything: `api-*` reads `stg-api-*` in a `stg` deploy and `prd-api-*` in a `prd` one, including the log groups of the `api` project's functions.
 
-`statements` allow any other IAM actions on full resource ARNs, which accept the same placeholders:
+`statements` allow any other IAM actions on full resource ARNs, for resources EZ4 does not name:
 
 ```ts
 permissions: {
-  grants: [{ permission: AgentPermission.LogsRead; resources: ['/aws/lambda/{prefix}-{project}-*'] }];
-  statements: [{ actions: ['s3:GetObject']; resources: ['arn:aws:s3:::{prefix}-reports/*'] }];
+  grants: [{ permission: AgentPermission.LogsRead; resources: ['api-*', 'billing-worker'] }];
+  statements: [{ actions: ['s3:GetObject']; resources: ['arn:aws:s3:::reports-bucket/*'] }];
 };
 ```
 

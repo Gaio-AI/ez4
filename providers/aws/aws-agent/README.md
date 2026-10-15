@@ -22,7 +22,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - Workflow state: `workflows/<Workflow>/<runId>.json` storing step transitions and execution history.
 
 - **IAM Roles & Security**:
-  - Per-agent task role grants artifact reads only for its own prefix and linked agents' prefixes, plus `AgentPermission` grants scoped to the resource names they declare (`{prefix}`/`{project}` resolved per deploy) and custom statements.
+  - Per-agent task role grants artifact reads only for its own prefix and linked agents' prefixes, plus `AgentPermission` grants scoped to the resource names they declare, prefixed with the deploy prefix and custom statements.
   - Execution role used by ECS to pull images and inject secrets from AWS Secrets Manager.
 
 - **Shared Git Workspaces**:

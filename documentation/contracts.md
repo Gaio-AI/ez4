@@ -110,7 +110,7 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   };
   egress: ['api.github.com'];
   permissions: {
-    grants: [{ permission: AgentPermission.LogsRead; resources: ['/{prefix}-api/*'] }];
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['api-*'] }];
   };
   resources: {
     cpu: 1024;

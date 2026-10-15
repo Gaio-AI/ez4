@@ -84,25 +84,6 @@ export const PERMISSION_SERVICES: Record<AgentPermission, string> = {
   [AgentPermission.CloudFormationRead]: 'cloudformation'
 };
 
-const RESOURCE_PLACEHOLDERS: Record<string, (options: DeployOptions) => string> = {
-  prefix: (options) => toKebabCase(options.prefix),
-  project: (options) => toKebabCase(options.projectName)
-};
-
-/**
- * Resolves `{prefix}` and `{project}` in a permission resource with the names of the deploy, the same ones ez4 gives
- * its resources, so one declaration follows every environment. IAM policy variables (`${aws:...}`) are left alone.
- */
-export const resolvePermissionResource = (resource: string, options: DeployOptions) => {
-  return resource.replace(/(?<!\$)\{(\w+)\}/g, (_match, key: string) => {
-    const getValue = RESOURCE_PLACEHOLDERS[key];
-    if (!getValue) {
-      throw new Error(`Unknown placeholder '{${key}}' in agent permission resource '${resource}', expected {prefix} or {project}.`);
-    }
-    return getValue(options);
-  });
-};
-
 export const buildPermissionGrants = (
   permissions: Agent.Permissions,
   options: DeployOptions,
@@ -111,8 +92,11 @@ export const buildPermissionGrants = (
 ): IdentityGrant[] => {
   const grants: IdentityGrant[] = [];
 
+  // ez4 names every resource `<prefix>-<project>-...`: grants name them without the prefix, which follows the deploy.
+  const prefix = toKebabCase(options.prefix);
+
   for (const { permission, resources } of permissions.grants ?? []) {
-    const names = resources.map((resource) => resolvePermissionResource(resource, options));
+    const names = resources.map((resource) => `${prefix}-${resource}`);
 
     for (const { permissions: actions, getArns } of PERMISSION_POLICIES[permission]) {
       const resourceIds = getArns ? [...new Set(names.flatMap((name) => getArns(name, region, accountId)))] : ['*'];
@@ -121,10 +105,7 @@ export const buildPermissionGrants = (
   }
 
   for (const { actions, resources } of permissions.statements ?? []) {
-    grants.push({
-      resourceIds: resources.map((resource) => resolvePermissionResource(resource, options)),
-      permissions: [...actions]
-    });
+    grants.push({ resourceIds: [...resources], permissions: [...actions] });
   }
 
   return grants;
