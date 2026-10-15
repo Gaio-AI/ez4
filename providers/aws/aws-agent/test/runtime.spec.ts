@@ -454,4 +454,47 @@ describe('runtime :: execution lifecycle', () => {
     equal(result.status, 'succeeded');
     equal(result.workspace, undefined);
   });
+
+  it('assert :: the provider gets the output schema as JSON Schema, without ez4 schema keywords', async () => {
+    const memory = new Map<string, string>();
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string): Promise<T> => JSON.parse(memory.get(key) ?? 'null') as T,
+      writeJson: async <T>(key: string, value: T): Promise<void> => {
+        memory.set(key, JSON.stringify(value));
+      },
+      putBuffer: async (): Promise<void> => {},
+      getBuffer: async (): Promise<Uint8Array | undefined> => undefined
+    };
+
+    await storage.writeJson('invocations/test-agent/inv-schema.json', { input: { task: 'hello' } });
+
+    let receivedSchema: unknown;
+    const exitCode = await runAgentRuntime({
+      agentName: 'test-agent',
+      invocationId: 'inv-schema',
+      inputSchema,
+      // Reflected schemas carry ez4-only keywords (identity), which strict JSON Schema validators reject.
+      outputSchema: { ...outputSchema, identity: 1 },
+      storage,
+      provider: {
+        run: async (req: AgentProviderRequest): Promise<AgentProviderResponse> => {
+          receivedSchema = req.outputSchema;
+          return { output: { result: 'done' } };
+        }
+      },
+      tools: { mode: 'edit' },
+      mcpServers: {},
+      instructions: 'Do work',
+      model: 'test-model',
+      timeoutSeconds: 30
+    });
+
+    equal(exitCode, 0);
+    deepEqual(receivedSchema, {
+      type: 'object',
+      properties: { result: { type: 'string' } },
+      required: ['result'],
+      additionalProperties: false
+    });
+  });
 });

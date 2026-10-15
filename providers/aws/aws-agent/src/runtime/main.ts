@@ -3,6 +3,7 @@ import type { ObjectSchema } from '@ez4/schema';
 import type { Service as CommonService } from '@ez4/common';
 import type { AgentStorage } from './storage';
 import type { AgentProvider } from './types';
+import { getJsonSchema } from '@ez4/agent/utils';
 import { validate, createValidatorContext, getErrorDetails } from '@ez4/validator';
 import { createArtifactsClient } from './artifacts';
 import { createTimeoutTimer } from './timer';
@@ -130,7 +131,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
         workdir: effectiveWorkdir,
         tools,
         mcpServers,
-        outputSchema,
+        outputSchema: getJsonSchema(outputSchema),
         env,
         signal: timer.signal
       });
