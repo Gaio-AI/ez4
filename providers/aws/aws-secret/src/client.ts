@@ -7,7 +7,6 @@ import {
   CreateSecretCommand,
   DeleteSecretCommand,
   DescribeSecretCommand,
-  PutSecretValueCommand,
   ResourceNotFoundException
 } from '@aws-sdk/client-secrets-manager';
 import { getAwsClientOptions } from '@ez4/aws-common';
@@ -92,20 +91,15 @@ export const createSecretResource = async (parameters: SecretParameters, logger?
   logger?.update('Creating Secrets Manager secret');
 
   const { secretName, description, tags } = parameters;
-  const secretString = await serializeSecretValue(parameters);
 
+  // The value is only the initial one: a generated credential must not rotate on every update, since whatever
+  // read it at start (a running proxy, an agent task) would no longer match it.
   const existing = await findSecret(secretName);
   if (existing) {
-    if (secretString !== undefined) {
-      await getSecretsManagerClient().send(
-        new PutSecretValueCommand({
-          SecretId: secretName,
-          SecretString: secretString
-        })
-      );
-    }
     return existing;
   }
+
+  const secretString = await serializeSecretValue(parameters);
 
   const response = await getSecretsManagerClient().send(
     new CreateSecretCommand({
