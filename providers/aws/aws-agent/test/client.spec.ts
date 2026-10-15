@@ -226,6 +226,42 @@ describe('client :: agent client', () => {
     equal(missing, undefined);
   });
 
+  it('persists a failed result and rejects when ECS cannot start a task', async () => {
+    for (const response of [{ failures: [{ reason: 'RESOURCE:MEMORY' }], tasks: [] }, { tasks: [] }]) {
+      const writes: { key: string; body: unknown }[] = [];
+      const client = Client.make<TestService>({
+        agentName: 'worker-agent',
+        cluster: 'cluster',
+        taskDefinition: 'taskdef',
+        bucket: 'bucket',
+        subnets: ['s1'],
+        securityGroups: ['sg1'],
+        inputSchema,
+        s3Client: {
+          send: async (command: unknown) => {
+            if (command instanceof PutObjectCommand) {
+              writes.push({ key: command.input.Key!, body: JSON.parse(Buffer.from(command.input.Body as Uint8Array).toString()) });
+            }
+            return {};
+          }
+        } as unknown as S3Client,
+        ecsClient: { send: async () => response } as unknown as ECSClient
+      });
+
+      const reason = response.failures?.[0]?.reason ?? 'Task failed to start';
+      await rejects(client.invoke({ task: 'work' }, { correlation: 'trace' }), new RegExp(`worker-agent.*${reason}`));
+      equal(writes.length, 2);
+      const invocation = writes[0].body as { correlation: string };
+      const result = writes[1].body as Agent.Result<TestService>;
+      equal(invocation.correlation, 'trace');
+      equal(writes[1].key, `results/worker-agent/${result.id}.json`);
+      equal(result.agent, 'worker-agent');
+      equal(result.status, 'failed');
+      deepEqual(result.error, { code: 'task_stopped', message: reason });
+      equal(result.correlation, 'trace');
+    }
+  });
+
   it('rejects invalid input schema before calling AWS services', async () => {
     let called = false;
     const client = Client.make<TestService>({

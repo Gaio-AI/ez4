@@ -126,13 +126,31 @@ describe('dispatcher decisions', () => {
     equal(storage.get(markerKey), 'another delivery');
   });
 
-  it('stores a stopped result without dispatching when replyTo is absent', async () => {
-    const { storage, messages, ports } = makePorts();
-    storage.set(invocationKey, JSON.stringify({ correlation: 'trace' }));
+  it('marks a stopped result without replyTo so a later sweep does not retry it', async () => {
+    const { storage, messages, stopped, ports } = makePorts();
+    storage.set(invocationKey, JSON.stringify({ correlation: 'trace', deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn' }));
 
     await dispatchDecision(stoppedEvent, ports);
+    const result = storage.get(resultKey);
+    ok(storage.has(markerKey));
+    equal(JSON.parse(result!).status, 'failed');
+    await dispatchDecision({ source: 'aws.events' }, ports);
 
-    equal(JSON.parse(storage.get(resultKey)!).status, 'failed');
-    equal(messages.length, 0);
+    equal(storage.get(resultKey), result);
+    deepEqual(stopped, []);
+    deepEqual(messages, []);
+  });
+
+  it('does not time out an overdue invocation that already has a result', async () => {
+    const { storage, messages, stopped, ports } = makePorts();
+    storage.set(invocationKey, JSON.stringify({ deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn' }));
+    const result = JSON.stringify({ id, agent, status: 'succeeded', finishedAt: now.toISOString() });
+    storage.set(resultKey, result);
+
+    await dispatchDecision({ source: 'aws.events' }, ports);
+
+    equal(storage.get(resultKey), result);
+    deepEqual(stopped, []);
+    deepEqual(messages, []);
   });
 });

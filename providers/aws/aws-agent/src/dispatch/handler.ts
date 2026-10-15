@@ -33,8 +33,8 @@ const readInvocation = async (ports: DispatchPorts, agent: string, id: string) =
 };
 
 const dispatchResult = async (ports: DispatchPorts, agent: string, id: string, invocation: Invocation, result: Result) => {
-  if (!invocation.replyTo) return;
   if (!(await ports.putConditional(markerKey(agent, id), (ports.now?.() ?? new Date()).toISOString()))) return;
+  if (!invocation.replyTo) return;
   await ports.send(invocation.replyTo, JSON.stringify(result), id, agent);
 };
 
@@ -85,11 +85,7 @@ export const dispatchScheduledSweep = async (ports: DispatchPorts): Promise<void
     const invocation = await readInvocation(ports, agent, id);
     if (!invocation?.deadline || Date.parse(invocation.deadline) > now) continue;
     if (await ports.get(markerKey(agent, id))) continue;
-    const existing = await ports.get(resultKey(agent, id));
-    if (existing) {
-      await dispatchResult(ports, agent, id, invocation, JSON.parse(existing) as Result);
-      continue;
-    }
+    if (await ports.get(resultKey(agent, id))) continue;
     if (invocation.taskArn && invocation.cluster && ports.stopTask) {
       await ports.stopTask(invocation.cluster, invocation.taskArn);
     }

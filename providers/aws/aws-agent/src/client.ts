@@ -93,17 +93,35 @@ export namespace Client {
         );
 
         const taskArn = runTaskResult.tasks?.[0]?.taskArn;
-        if (taskArn) {
-          invocationPayload.taskArn = taskArn;
+        if (runTaskResult.failures?.length || !taskArn) {
+          const reasons = runTaskResult.failures?.map((failure) => failure.reason).filter(Boolean).join(', ') || 'Task failed to start';
+          const failedResult: Agent.Result<S> = {
+            id,
+            agent: parameters.agentName,
+            status: 'failed',
+            error: { code: 'task_stopped', message: reasons },
+            correlation: options?.correlation,
+            finishedAt: new Date().toISOString()
+          };
           await s3.send(
             new PutObjectCommand({
               Bucket: parameters.bucket,
-              Key: `invocations/${parameters.agentName}/${id}.json`,
-              Body: Buffer.from(JSON.stringify(invocationPayload), 'utf-8'),
+              Key: `results/${parameters.agentName}/${id}.json`,
+              Body: Buffer.from(JSON.stringify(failedResult), 'utf-8'),
               ContentType: 'application/json'
             })
           );
+          throw new Error(`Failed to run ECS task for agent "${parameters.agentName}": ${reasons}`);
         }
+        invocationPayload.taskArn = taskArn;
+        await s3.send(
+          new PutObjectCommand({
+            Bucket: parameters.bucket,
+            Key: `invocations/${parameters.agentName}/${id}.json`,
+            Body: Buffer.from(JSON.stringify(invocationPayload), 'utf-8'),
+            ContentType: 'application/json'
+          })
+        );
 
         return { id };
       },
