@@ -34,7 +34,8 @@ export * from './proxy/ecs-service';
 export * from './proxy/ecs-handler';
 export * from './proxy/ecs-client';
 
-export { getSecretResourceArn, getProviderSecretName, getAgentTaskRoleName } from './utils/names';
+export { getSecretResourceArn, getProviderSecretName, getAgentTaskRoleName, getWorkspaceFileSystemName } from './utils/names';
 
 export * from './auth/providers';
 export * from './auth/login';
+export * from './workspace/resources';

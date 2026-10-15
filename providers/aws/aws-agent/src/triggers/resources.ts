@@ -8,6 +8,20 @@ import type { NetworkLookup } from '../network/discovery';
 import type { StepContext } from '@ez4/state';
 import type { EcrImageState } from '@ez4/aws-ecr';
 import type { SecretState } from '@ez4/aws-secret';
+import type { AccessPointState, MountTargetState } from '@ez4/aws-efs';
+import {
+  AccessPointServiceType,
+  isMountTargetState,
+  createFileSystemStateId,
+  createAccessPointStateId
+} from '@ez4/aws-efs';
+import {
+  prepareWorkspaceResources,
+  type WorkspaceResources,
+  AgentEfsNetworkTag,
+  getWorkspaceFileSystemName
+} from '../workspace/resources';
+import { AgentNetworkTag } from '../network/discovery';
 import { isAgentService } from '@ez4/agent/library';
 import { createBucket, createBucketStateId } from '@ez4/aws-bucket';
 import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
@@ -118,10 +132,49 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   const bucket = state[createBucketStateId(bucketName)] ?? createBucket(state, { bucketName, tags: options.tags });
   const executionRoleName = `${getAgentsBaseName(options)}-execution-role`;
   const executionRoleId = hashData(RoleServiceType, executionRoleName);
+  const workspaceSecrets: Record<string, string> = {};
+  for (const agent of agents) {
+    const auth = agent.workspace?.auth;
+    if (auth && 'githubApp' in auth && auth.githubApp) {
+      workspaceSecrets['EZ4_WORKSPACE_GITHUB_APP'] = String(auth.githubApp);
+    } else if (auth && 'token' in auth && auth.token) {
+      workspaceSecrets['EZ4_WORKSPACE_TOKEN'] = String(auth.token);
+    }
+  }
+
+  let workspaceResources: WorkspaceResources | undefined;
+  if (agents.some((agent) => !!agent.workspace)) {
+    const efsSecurityGroupIds = ports.network.findSecurityGroupsByTag
+      ? await ports.network.findSecurityGroupsByTag(AgentEfsNetworkTag, network.vpcId)
+      : ports.network.getTaggedSecurityGroupIds
+        ? await ports.network.getTaggedSecurityGroupIds(network.vpcId, AgentEfsNetworkTag)
+        : [];
+
+    let subnets: Array<{ subnetId: string; availabilityZone: string }>;
+    if (ports.network.findSubnetsByTag) {
+      const foundSubnets = await ports.network.findSubnetsByTag(AgentNetworkTag, network.vpcId);
+      subnets = foundSubnets.map((s, idx) => ({
+        subnetId: s.subnetId,
+        availabilityZone: s.availabilityZone ?? `az-${idx}`
+      }));
+    } else {
+      subnets = network.subnetIds.map((subnetId, idx) => ({
+        subnetId,
+        availabilityZone: `az-${idx}`
+      }));
+    }
+
+    workspaceResources = prepareWorkspaceResources(state, agents, options, {
+      subnets,
+      efsSecurityGroupIds: efsSecurityGroupIds ?? []
+    });
+  }
+
   const executionSecrets = Object.assign(
     {},
     ...agents.map((agent) => agent.secrets ?? {}),
     service.secrets ?? {},
+    workspaceSecrets,
     providerAuth ? { [providerAuth.envName]: getProviderSecretName(provider, options) } : {},
     ...agents.map((agent) => ({
       [`EZ4_PROXY_${toKebabCase(agent.name)}`]: getAgentProxySecretName(agent, options)
@@ -130,7 +183,6 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   const executionRole =
     (state[executionRoleId] as RoleState | undefined) ??
     buildAgentExecutionRole(state, { ...service, secrets: executionSecrets }, options, region, accountId);
-
   const namespaceName = getAgentsNamespaceName(options);
   const namespace =
     state[createNamespaceStateId(namespaceName)] ??
@@ -158,7 +210,14 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   const linkedAgents = Object.values(service.services ?? {})
     .map(({ reference }) => reference)
     .filter((name) => !!name && isAgentService(event.metadata[name] ?? {}));
-  const taskRole = buildAgentTaskRole(state, service, options, accountId, linkedAgents);
+  const workspaceArns =
+    service.workspace && workspaceResources
+      ? {
+          fileSystemArn: `arn:aws:elasticfilesystem:${region}:${accountId}:file-system/*`,
+          accessPointArn: `arn:aws:elasticfilesystem:${region}:${accountId}:access-point/*`
+        }
+      : undefined;
+  const taskRole = buildAgentTaskRole(state, service, options, accountId, linkedAgents, workspaceArns);
   const logGroup = createLogGroup(state, { groupName: getAgentLogGroupName(service, options), retention: 30, tags: options.tags });
   const dispatcherGroupName = `${getAgentsBaseName(options)}-dispatcher`;
   const dispatcherGroupId = hashData(LogGroupServiceType, dispatcherGroupName);
@@ -193,6 +252,18 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     imageTag: computeImageTag(dockerfile, bundle.hash)
   });
 
+  const workspaceDependencies: string[] = [];
+  if (service.workspace && workspaceResources) {
+    workspaceDependencies.push(workspaceResources.accessPoint.entryId);
+    const fsEntryId = workspaceResources.fileSystem.entryId;
+    const mountTargets = Object.values(state).filter(
+      (e): e is MountTargetState => !!e && isMountTargetState(e) && e.dependencies.includes(fsEntryId)
+    );
+    for (const mt of mountTargets) {
+      workspaceDependencies.push(mt.entryId);
+    }
+  }
+
   const taskdef = createEcsTaskDefinition(
     state,
     [
@@ -201,7 +272,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       taskRole.entryId,
       executionRole.entryId,
       credential.entryId,
-      ...(providerCredentialEntryId ? [providerCredentialEntryId] : [])
+      ...(providerCredentialEntryId ? [providerCredentialEntryId] : []),
+      ...workspaceDependencies
     ],
     {
       family: service.name,
@@ -228,6 +300,13 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
             providerSecrets.push({ name: providerAuth.envName, secretArn: providerCred.result.secretArn });
           }
         }
+        const apDep = stepContext.getDependencies<AccessPointState>(AccessPointServiceType).at(0);
+        const workspaceEfs = apDep?.result
+          ? {
+              fileSystemId: apDep.result.fileSystemId,
+              accessPointId: apDep.result.accessPointId
+            }
+          : undefined;
         return buildTaskDefinitionInput(service, imageUri, taskRoleArn, executionRoleArn, logGroupArn, {
           baseName: getAgentsBaseName(options),
           bucketName,
@@ -236,6 +315,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
             url: getAgentProxyUrl(options),
             secretArn: proxySecretArn
           },
+          ...(workspaceEfs ? { workspace: workspaceEfs } : {}),
           ...(providerSecrets.length > 0 ? { providerSecrets } : {})
         });
       }
@@ -243,6 +323,10 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   );
   linkEntryConnection(state, taskdef.entryId, cluster.entryId);
   linkEntryConnection(state, taskdef.entryId, bucket.entryId);
+  if (service.workspace && workspaceResources) {
+    linkEntryConnection(state, taskdef.entryId, workspaceResources.fileSystem.entryId);
+    linkEntryConnection(state, taskdef.entryId, workspaceResources.accessPoint.entryId);
+  }
 
   context.setServiceState(service, options, taskdef);
   return true;
@@ -254,4 +338,14 @@ export const connectAgentResources = (event: ConnectResourceEvent): void => {
   const taskdef = context.getServiceState(service, options);
   linkEntryConnection(state, taskdef.entryId, createEcsClusterStateId(getAgentClusterName(options)));
   linkEntryConnection(state, taskdef.entryId, createBucketStateId(getAgentBucketName(options)));
+  if (service.workspace) {
+    const fileSystemStateId = createFileSystemStateId(getWorkspaceFileSystemName(options));
+    if (state[fileSystemStateId]) {
+      linkEntryConnection(state, taskdef.entryId, fileSystemStateId);
+    }
+    const accessPointStateId = createAccessPointStateId(fileSystemStateId, getWorkspaceFileSystemName(options));
+    if (state[accessPointStateId]) {
+      linkEntryConnection(state, taskdef.entryId, accessPointStateId);
+    }
+  }
 };

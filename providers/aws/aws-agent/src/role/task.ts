@@ -6,13 +6,15 @@ import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
 import { getAgentBucketName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
 import { PRESET_POLICIES } from './presets';
+import { buildWorkspaceGrants } from '../workspace/resources';
 
 export const buildAgentTaskRole = <E extends EntryState>(
   state: EntryStates<E>,
   agent: AgentService,
   options: DeployOptions,
   accountId: string,
-  linkedAgents: string[] = []
+  linkedAgents: string[] = [],
+  workspaceArns?: { fileSystemArn: string; accessPointArn: string }
 ): RoleState => {
   const servicePrefix = getServiceName(agent, options);
   const roleName = getAgentTaskRoleName(agent, options);
@@ -42,6 +44,12 @@ export const buildAgentTaskRole = <E extends EntryState>(
       permissions: ['ecs:DescribeTasks']
     }
   ];
+
+  if (agent.workspace) {
+    const fileSystemArn = workspaceArns?.fileSystemArn ?? `arn:aws:elasticfilesystem:*:${accountId}:file-system/*`;
+    const accessPointArn = workspaceArns?.accessPointArn ?? `arn:aws:elasticfilesystem:*:${accountId}:access-point/*`;
+    grants.push(...buildWorkspaceGrants(fileSystemArn, accessPointArn));
+  }
 
   for (const linked of linkedAgents) {
     grants.push(

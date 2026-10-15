@@ -74,6 +74,7 @@
     "@ez4/aws-common": "^1.10.0",
     "@ez4/aws-ecr": "^1.10.0",
     "@ez4/aws-ecs": "^1.10.0",
+    "@ez4/aws-efs": "^1.10.0",
     "@ez4/aws-cloudmap": "^1.10.0",
     "@ez4/aws-events": "^1.10.0",
     "@ez4/aws-secret": "^1.10.0",

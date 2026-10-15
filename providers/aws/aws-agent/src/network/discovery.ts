@@ -1,4 +1,4 @@
-import type { VpcTag } from '@ez4/aws-vpc';
+import type { VpcTag, SubnetInfo } from '@ez4/aws-vpc';
 
 import { getDefaultVpcId, findSubnetsByTag, findSecurityGroupsByTag, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
 import { MissingAgentNetworkError } from './errors';
@@ -11,6 +11,10 @@ export const AgentProxyNetworkTag: VpcTag = {
   key: 'ez4:agents-proxy',
   value: 'true'
 };
+export const AgentEfsNetworkTag: VpcTag = {
+  key: 'ez4:agents-efs',
+  value: 'true'
+};
 
 export interface AgentNetworkConfig {
   vpcId: string;
@@ -21,7 +25,7 @@ export interface AgentNetworkConfig {
 
 export type NetworkLookup = {
   getDefaultVpcId: () => Promise<string | undefined>;
-  findSubnetsByTag?: (tag: VpcTag, vpcId?: string) => Promise<Array<{ subnetId: string }>>;
+  findSubnetsByTag?: (tag: VpcTag, vpcId?: string) => Promise<SubnetInfo[]>;
   findSecurityGroupsByTag?: (tag: VpcTag, vpcId?: string) => Promise<string[]>;
   getTaggedSubnetIds?: (vpcId: string, tag: VpcTag) => Promise<string[]>;
   getTaggedSecurityGroupIds?: (vpcId: string, tag: VpcTag) => Promise<string[]>;

@@ -1,12 +1,15 @@
-import type { RegisterTaskDefinitionCommandInput } from '@aws-sdk/client-ecs';
+import type { MountPoint, RegisterTaskDefinitionCommandInput, Volume } from '@aws-sdk/client-ecs';
 import type { AgentService } from '@ez4/agent/library';
 import type { StepContext } from '@ez4/state';
+import { buildEfsVolume } from '@ez4/aws-ecs';
+import { AccessPointServiceType } from '@ez4/aws-efs';
 import { toKebabCase } from '@ez4/utils';
 import { buildNoProxyList } from '../proxy/config';
+import { WORKSPACE_MOUNT_PATH, WORKSPACE_VOLUME_NAME } from '../workspace/resources';
 
 export const AGENT_CONTAINER_NAME = 'agent';
 
-export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets'>;
+export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets' | 'workspace'>;
 
 export interface TaskDefOptions {
   baseName: string;
@@ -15,6 +18,7 @@ export interface TaskDefOptions {
   region?: string;
   proxy?: { url: string; secretArn: string };
   providerSecrets?: Array<{ name: string; secretArn: string }>;
+  workspace?: { fileSystemId: string; accessPointId: string };
 }
 
 export const buildTaskDefinitionInput = (
@@ -80,6 +84,31 @@ export const buildTaskDefinitionInput = (
     });
   }
 
+  if (agent.workspace?.auth) {
+    const auth = agent.workspace.auth;
+    if ('githubApp' in auth && auth.githubApp) {
+      const secretRef = String(auth.githubApp);
+      const arn = secretRef.startsWith('arn:')
+        ? secretRef
+        : secretRef.includes(':')
+          ? `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef.split(':')[0]}:${secretRef.split(':')[1]}::`
+          : `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef}`;
+      if (!secrets.some((s) => s.name === 'EZ4_WORKSPACE_GITHUB_APP')) {
+        secrets.push({ name: 'EZ4_WORKSPACE_GITHUB_APP', valueFrom: arn });
+      }
+    } else if ('token' in auth && auth.token) {
+      const secretRef = String(auth.token);
+      const arn = secretRef.startsWith('arn:')
+        ? secretRef
+        : secretRef.includes(':')
+          ? `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef.split(':')[0]}:${secretRef.split(':')[1]}::`
+          : `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef}`;
+      if (!secrets.some((s) => s.name === 'EZ4_WORKSPACE_TOKEN')) {
+        secrets.push({ name: 'EZ4_WORKSPACE_TOKEN', valueFrom: arn });
+      }
+    }
+  }
+
   const logGroupName = logGroupArn.includes(':log-group:') ? logGroupArn.split(':log-group:')[1] : logGroupArn;
 
   const environment = [
@@ -93,6 +122,24 @@ export const buildTaskDefinitionInput = (
     environment.push({ name: 'EZ4_AGENT_PROXY_URL', value: options.proxy.url });
   }
 
+  if (agent.workspace) {
+    environment.push({
+      name: 'EZ4_AGENT_WORKSPACE',
+      value: JSON.stringify(agent.workspace)
+    });
+  }
+
+  const volumes: Volume[] = [];
+  const mountPoints: MountPoint[] = [];
+
+  if (agent.workspace && options.workspace) {
+    volumes.push(buildEfsVolume(WORKSPACE_VOLUME_NAME, options.workspace.fileSystemId, options.workspace.accessPointId));
+    mountPoints.push({
+      sourceVolume: WORKSPACE_VOLUME_NAME,
+      containerPath: WORKSPACE_MOUNT_PATH,
+      readOnly: false
+    });
+  }
   return {
     family: `${options.baseName}-${toKebabCase(agent.name)}`,
     networkMode: 'awsvpc',
@@ -118,6 +165,7 @@ export const buildTaskDefinitionInput = (
         },
         environment,
         secrets: secrets.length > 0 ? secrets : undefined,
+        mountPoints: mountPoints.length > 0 ? mountPoints : undefined,
         logConfiguration: {
           logDriver: 'awslogs',
           options: {
@@ -127,20 +175,49 @@ export const buildTaskDefinitionInput = (
           }
         }
       }
-    ]
+    ],
+    volumes: volumes.length > 0 ? volumes : undefined
   };
 };
 
 export const buildAgentTaskDefinition = (
   agent: AgentRuntimeFields,
-  imageUriOrContext: string | StepContext,
+  imageUriOrContext: string | StepContext | { fileSystemId: string; accessPointId: string } | unknown,
   taskRoleArn?: string,
   executionRoleArn?: string,
   logGroupArn?: string,
   options?: TaskDefOptions
 ): RegisterTaskDefinitionCommandInput => {
+  let workspaceEfs: { fileSystemId: string; accessPointId: string } | undefined;
+  if (typeof imageUriOrContext === 'object' && imageUriOrContext !== null) {
+    const ctx = imageUriOrContext as Record<string, unknown>;
+    if (typeof ctx.getDependencies === 'function') {
+      const apDeps = (ctx.getDependencies as (type: string) => unknown[])(AccessPointServiceType);
+      const ap = apDeps?.[0] as { result?: { fileSystemId: string; accessPointId: string } } | undefined;
+      if (ap?.result?.fileSystemId && ap?.result?.accessPointId) {
+        workspaceEfs = {
+          fileSystemId: ap.result.fileSystemId,
+          accessPointId: ap.result.accessPointId
+        };
+      }
+    }
+    if (!workspaceEfs && typeof ctx.fileSystemId === 'string' && typeof ctx.accessPointId === 'string') {
+      workspaceEfs = {
+        fileSystemId: ctx.fileSystemId,
+        accessPointId: ctx.accessPointId
+      };
+    }
+  }
+
+  const effectiveOptions: TaskDefOptions = {
+    baseName: options?.baseName ?? toKebabCase(agent.name),
+    bucketName: options?.bucketName ?? '',
+    ...options,
+    ...(workspaceEfs || options?.workspace ? { workspace: options?.workspace ?? workspaceEfs } : {})
+  };
+
   if (typeof imageUriOrContext === 'string' && taskRoleArn && executionRoleArn && logGroupArn && options) {
-    return buildTaskDefinitionInput(agent, imageUriOrContext, taskRoleArn, executionRoleArn, logGroupArn, options);
+    return buildTaskDefinitionInput(agent, imageUriOrContext, taskRoleArn, executionRoleArn, logGroupArn, effectiveOptions);
   }
   return buildTaskDefinitionInput(
     agent,
@@ -148,6 +225,6 @@ export const buildAgentTaskDefinition = (
     taskRoleArn ?? '',
     executionRoleArn ?? '',
     logGroupArn ?? '',
-    options ?? { baseName: toKebabCase(agent.name), bucketName: '' }
+    effectiveOptions
   );
 };

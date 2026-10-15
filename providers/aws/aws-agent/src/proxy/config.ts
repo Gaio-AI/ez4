@@ -1,6 +1,7 @@
 import type { Agent } from '@ez4/agent';
 import type { SquidConfigOptions } from './types';
 import type { AgentService } from '@ez4/agent/library';
+import { getWorkspaceDomains } from '../workspace/resources';
 
 export interface AgentDomainInput {
   domains?: string[];
@@ -62,12 +63,20 @@ export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: stri
 const PROVIDER_DOMAINS: Record<string, string[]> = { claude: ['api.anthropic.com'] };
 
 /** Domains an agent may reach through the proxy: runtime AWS APIs, declared egress, permissions, and its LLM provider. */
-export const getAgentEgressDomains = (agent: Pick<AgentService, 'egress' | 'permissions' | 'provider'>, region: string): string[] => {
+export const getAgentEgressDomains = (
+  agent: Pick<AgentService, 'egress' | 'permissions' | 'provider' | 'workspace'>,
+  region: string
+): string[] => {
   const domains = new Set(resolveAgentAllowedDomains({ egress: agent.egress, permissions: agent.permissions }, region));
   domains.add(`ecs.${region}.amazonaws.com`);
   domains.add(`sts.${region}.amazonaws.com`);
   domains.add('sts.amazonaws.com');
   for (const domain of PROVIDER_DOMAINS[agent.provider ?? ''] ?? []) domains.add(domain);
+  if (agent.workspace) {
+    for (const domain of getWorkspaceDomains(agent.workspace)) {
+      domains.add(domain);
+    }
+  }
   return Array.from(domains).sort();
 };
 
