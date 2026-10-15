@@ -14,10 +14,7 @@ export class ProviderLoginRequiredError extends Error {
     public readonly secretName: string,
     public readonly envName: string
   ) {
-    super(
-      `Provider credential required: secret "${secretName}" (key "${envName}") is missing. ` +
-        `Run deploy interactively with EZ4_AGENT_LOGIN=force or create the secret manually.`
-    );
+    super(`Secret "${secretName}" (key "${envName}") is missing. Run the deploy from an interactive terminal to log in, or create the secret with that key.`);
     this.name = 'ProviderLoginRequiredError';
   }
 }
@@ -35,7 +32,7 @@ export const defaultLoginIO: LoginIO = {
     const { promise, resolve, reject } = Promise.withResolvers<number>();
     const child = spawn(command, args, { stdio: 'inherit' });
     child.on('error', reject);
-    child.on('close', (code) => resolve(code ?? 0));
+    child.on('close', (code, signal) => resolve(signal ? 1 : (code ?? 1)));
     return promise;
   },
   prompt: (question: string): Promise<string> => {

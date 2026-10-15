@@ -15,6 +15,7 @@ import {
   ensureProviderCredential,
   ProviderLoginRequiredError,
   resetProviderCredentialCache,
+  defaultLoginIO,
   type CredentialPorts
 } from '../src/auth/login';
 import { ProviderCredentialServiceType } from '../src/auth/types';
@@ -124,10 +125,15 @@ describe('provider login stored per stage and reused', () => {
       ok(err instanceof ProviderLoginRequiredError);
       equal(err.secretName, 'ez4/agents/claude');
       equal(err.envName, 'CLAUDE_CODE_OAUTH_TOKEN');
-      ok(err.message.includes('ez4/agents/claude'));
-      ok(err.message.includes('CLAUDE_CODE_OAUTH_TOKEN'));
+      equal(err.message, 'Secret "ez4/agents/claude" (key "CLAUDE_CODE_OAUTH_TOKEN") is missing. Run the deploy from an interactive terminal to log in, or create the secret with that key.');
       return true;
     });
+  });
+
+  it('assert :: default login runner treats signal termination and missing exit code as failure', async () => {
+    equal(await defaultLoginIO.run(process.execPath, ['-e', 'process.exit(0)']), 0);
+    equal(await defaultLoginIO.run(process.execPath, ['-e', 'process.exit(3)']), 3);
+    equal(await defaultLoginIO.run(process.execPath, ['-e', 'process.kill(process.pid, "SIGTERM")']), 1);
   });
 
   it('assert :: invalid pasted token -> rejects, nothing stored', async () => {
