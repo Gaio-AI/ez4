@@ -178,6 +178,9 @@ describe('dispatcher decisions', () => {
     equal(storage.get(resultKey), result);
     ok(storage.has(markerKey));
     deepEqual(stopped, []);
-    deepEqual(messages.map((message) => message.body), [result]);
+    deepEqual(
+      messages.map((message) => message.body),
+      [result]
+    );
   });
 });
