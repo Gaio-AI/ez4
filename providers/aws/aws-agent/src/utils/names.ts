@@ -46,3 +46,14 @@ export const getSecretResourceArn = (secretRef: string, region: string, accountI
   const [secretName] = secretRef.split(':');
   return `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretName}-*`;
 };
+
+export const getWorkflowStartQueueName = (workflow: string, options: DeployOptions) =>
+  `${getAgentsBaseName(options)}-${toKebabCase(workflow)}-start`;
+
+export const getWorkflowResultsQueueName = (workflow: string, options: DeployOptions) =>
+  `${getAgentsBaseName(options)}-${toKebabCase(workflow)}-results.fifo`;
+
+export const getWorkflowFunctionName = (workflow: string, options: DeployOptions) =>
+  `${getAgentsBaseName(options)}-${toKebabCase(workflow)}`;
+
+export const getWorkflowStateKey = (workflow: string, runId: string) => `workflows/${workflow}/${runId}.json`;
