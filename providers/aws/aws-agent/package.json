@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-agent",
   "description": "EZ4: Self-managed AWS agent provider",
-  "version": "1.7.0",
+  "version": "1.10.1",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -70,23 +70,23 @@
     "@aws-sdk/client-secrets-manager": "^3.1127.0",
     "@aws-sdk/client-servicediscovery": "^3.1151.0",
     "@aws-sdk/client-sqs": "^3.1151.0",
-    "@ez4/agent": "^1.7.0",
-    "@ez4/aws-common": "^1.7.0",
-    "@ez4/aws-bucket": "^1.7.0",
-    "@ez4/aws-function": "^1.7.0",
-    "@ez4/aws-identity": "^1.7.0",
-    "@ez4/aws-logs": "^1.7.0",
-    "@ez4/aws-queue": "^1.7.0",
-    "@ez4/aws-vpc": "^1.7.0",
-    "@ez4/common": "^1.7.0",
-    "@ez4/project": "^1.7.0",
-    "@ez4/queue": "^1.7.0",
-    "@ez4/schema": "^1.7.0",
-    "@ez4/state": "^1.7.0",
-    "@ez4/utils": "^1.7.0",
-    "@ez4/validator": "^1.7.0"
+    "@ez4/agent": "^1.10.0",
+    "@ez4/aws-common": "^1.10.0",
+    "@ez4/aws-bucket": "^1.10.0",
+    "@ez4/aws-function": "^1.10.0",
+    "@ez4/aws-identity": "^1.10.0",
+    "@ez4/aws-logs": "^1.10.0",
+    "@ez4/aws-queue": "^1.10.0",
+    "@ez4/aws-vpc": "^1.10.0",
+    "@ez4/common": "^1.10.0",
+    "@ez4/project": "^1.10.0",
+    "@ez4/queue": "^1.10.0",
+    "@ez4/schema": "^1.10.0",
+    "@ez4/state": "^1.10.0",
+    "@ez4/utils": "^1.10.0",
+    "@ez4/validator": "^1.10.0"
   },
   "devDependencies": {
-    "@ez4/scheduler": "^1.7.0"
+    "@ez4/scheduler": "^1.10.0"
   }
 }
