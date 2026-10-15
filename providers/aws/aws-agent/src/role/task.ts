@@ -5,22 +5,45 @@ import type { RoleState, PolicyState } from '@ez4/aws-identity';
 import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
 import { getAgentBucketName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
+import { toKebabCase } from '@ez4/utils';
 import { PRESET_POLICIES } from './presets';
 import { buildWorkspaceGrants } from '../workspace/resources';
 
-export const buildAgentTaskRole = <E extends EntryState>(
-  state: EntryStates<E>,
+export const buildAgentInvokeGrants = (
+  agentNames: string[],
+  region: string,
+  accountId: string,
+  options: DeployOptions
+): IdentityGrant[] => {
+  if (agentNames.length === 0) {
+    return [];
+  }
+  const baseName = getAgentsBaseName(options);
+  const taskDefArns = agentNames.map((name) => `arn:aws:ecs:${region}:${accountId}:task-definition/${baseName}-${toKebabCase(name)}:*`);
+  const taskRoleArns = agentNames.map((name) => `arn:aws:iam::${accountId}:role/${getAgentTaskRoleName({ name }, options)}`);
+  const executionRoleArn = `arn:aws:iam::${accountId}:role/${baseName}-execution-role`;
+
+  return [
+    {
+      resourceIds: taskDefArns,
+      permissions: ['ecs:RunTask']
+    },
+    {
+      resourceIds: [...taskRoleArns, executionRoleArn],
+      permissions: ['iam:PassRole']
+    }
+  ];
+};
+
+export const buildTaskRoleGrants = (
   agent: AgentService,
+  linkedAgents: string[],
+  bucketName: string,
   options: DeployOptions,
   accountId: string,
-  linkedAgents: string[] = [],
-  workspaceArns?: { fileSystemArn: string; accessPointArn: string }
-): RoleState => {
-  const servicePrefix = getServiceName(agent, options);
-  const roleName = getAgentTaskRoleName(agent, options);
-  const policyName = `${servicePrefix}-task-policy`;
-
-  const bucketName = getAgentBucketName(options);
+  workspaceArns?: { fileSystemArn: string; accessPointArn: string },
+  region: string = '*'
+): IdentityGrant[] => {
   const agentKey = getAgentKey(agent);
 
   const grants: IdentityGrant[] = [
@@ -65,17 +88,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
   }
 
   if (linkedAgents.length > 0) {
-    const baseName = getAgentsBaseName(options);
-    grants.push(
-      {
-        resourceIds: [`arn:aws:ecs:*:${accountId}:task-definition/${baseName}-*`],
-        permissions: ['ecs:RunTask']
-      },
-      {
-        resourceIds: [`arn:aws:iam::${accountId}:role/${baseName}-*`],
-        permissions: ['iam:PassRole']
-      }
-    );
+    grants.push(...buildAgentInvokeGrants(linkedAgents, region, accountId, options));
   }
 
   // Presets
@@ -97,6 +110,25 @@ export const buildAgentTaskRole = <E extends EntryState>(
       });
     }
   }
+
+  return grants;
+};
+
+export const buildAgentTaskRole = <E extends EntryState>(
+  state: EntryStates<E>,
+  agent: AgentService,
+  options: DeployOptions,
+  accountId: string,
+  linkedAgents: string[] = [],
+  workspaceArns?: { fileSystemArn: string; accessPointArn: string }
+): RoleState => {
+  const servicePrefix = getServiceName(agent, options);
+  const roleName = getAgentTaskRoleName(agent, options);
+  const policyName = `${servicePrefix}-task-policy`;
+
+  const bucketName = getAgentBucketName(options);
+
+  const grants = buildTaskRoleGrants(agent, linkedAgents, bucketName, options, accountId, workspaceArns);
 
   const policyState = createPolicy(state, {
     policyName,

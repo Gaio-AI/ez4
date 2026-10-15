@@ -5,10 +5,10 @@ import type { EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { ok, equal } from 'node:assert/strict';
 import { createAgentService } from '@ez4/agent/library';
-import { buildAgentTaskRole } from '../src/role/task';
+import { buildAgentTaskRole, buildTaskRoleGrants } from '../src/role/task';
 import { buildAgentExecutionRole } from '../src/role/execution';
 import { RoleServiceType } from '@ez4/aws-identity';
-import { getAgentBucketName, getAgentsBaseName } from '../src/utils/names';
+import { getAgentBucketName } from '../src/utils/names';
 
 describe('agent task and execution roles', () => {
   const options: DeployOptions = {
@@ -105,6 +105,11 @@ describe('agent task and execution roles', () => {
     ok(resources.includes(`arn:aws:s3:::${bucket}/invocations/ReviewAgent/*`));
     ok(actions.includes('ecs:RunTask'));
     ok(actions.includes('iam:PassRole'));
+    ok(resources.includes(`arn:aws:ecs:*:${accountId}:task-definition/ez4-test-stg-agents-review-agent:*`));
+    ok(resources.includes(`arn:aws:iam::${accountId}:role/ez4-test-stg-agents-review-agent-task-role`));
+    ok(resources.includes(`arn:aws:iam::${accountId}:role/ez4-test-stg-agents-execution-role`));
+    ok(!resources.some((r) => r.includes('task-definition/ez4-test-stg-agents-*')));
+    ok(!resources.some((r) => r.includes('role/ez4-test-stg-agents-*')));
   });
 
   it('does not grant an unlinked agent access to other agents artifacts', () => {
@@ -121,13 +126,16 @@ describe('agent task and execution roles', () => {
     ok(!resources.includes(`arn:aws:s3:::${bucket}/artifacts/*`));
   });
 
-  it('assert :: task role name matches the PassRole resource pattern (glob -> regex)', () => {
-    const state: EntryStates = {};
-    const agent: AgentService = createAgentService('CodeAgent');
-    const role = buildAgentTaskRole(state, agent, options, accountId, ['ReviewAgent']);
-    const passRolePattern = `arn:aws:iam::${accountId}:role/${getAgentsBaseName(options)}-*`;
-    const passRoleRegex = new RegExp(`^${passRolePattern.replace(/\*/g, '.*')}$`);
-    const taskRoleArn = `arn:aws:iam::${accountId}:role/${role.parameters.roleName}`;
-    ok(passRoleRegex.test(taskRoleArn));
+  it('assert :: linked agent grants name exact task definitions', () => {
+    const callerAgent = createAgentService('CallerAgent');
+    const grants = buildTaskRoleGrants(callerAgent, ['Reviewer'], 'bucket', options, accountId);
+    ok(!JSON.stringify(grants).includes('agents-*'));
+    const runTask = grants.find((g) => g.permissions.includes('ecs:RunTask'))!;
+    ok(runTask);
+    equal(runTask.resourceIds[0], `arn:aws:ecs:*:${accountId}:task-definition/ez4-test-stg-agents-reviewer:*`);
+    const passRole = grants.find((g) => g.permissions.includes('iam:PassRole'))!;
+    ok(passRole);
+    ok(passRole.resourceIds.includes(`arn:aws:iam::${accountId}:role/ez4-test-stg-agents-reviewer-task-role`));
+    ok(passRole.resourceIds.includes(`arn:aws:iam::${accountId}:role/ez4-test-stg-agents-execution-role`));
   });
 });

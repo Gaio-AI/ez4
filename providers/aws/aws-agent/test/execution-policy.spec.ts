@@ -74,4 +74,39 @@ describe('agent execution policy isolation', () => {
       'arn:aws:secretsmanager:us-east-1:1:secret:x-AbCdEf'
     ]);
   });
+
+  it('assert :: caller policy grants name exact task definitions for declared agents', () => {
+    const state: EntryStates = {};
+    const reviewer = createAgentService('Reviewer');
+    const event: PolicyResourceEvent = {
+      state,
+      serviceType: ServiceType,
+      metadata: { Reviewer: reviewer },
+      options: { prefix: 'ez4', projectName: 'test', branchName: 'stg', lockId: 'test-lock' }
+    };
+
+    const policyState = buildExecutionPolicy(event, region, accountId);
+    ok(policyState);
+    ok(isPolicyState(policyState));
+
+    const statements = policyState.parameters.policyDocument.Statement;
+    ok(!JSON.stringify(statements).includes('agents-*'));
+
+    const runTask = statements.find((stmt) => {
+      const actions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+      return actions.includes('ecs:RunTask');
+    });
+    ok(runTask);
+    deepEqual(runTask.Resource, [`arn:aws:ecs:${region}:${accountId}:task-definition/ez4-test-stg-agents-reviewer:*`]);
+
+    const passRole = statements.find((stmt) => {
+      const actions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+      return actions.includes('iam:PassRole');
+    });
+    ok(passRole);
+    deepEqual([passRole.Resource].flat().sort(), [
+      `arn:aws:iam::${accountId}:role/ez4-test-stg-agents-execution-role`,
+      `arn:aws:iam::${accountId}:role/ez4-test-stg-agents-reviewer-task-role`
+    ]);
+  });
 });
