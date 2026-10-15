@@ -34,3 +34,28 @@ export const getTaggedSubnetIds = async (vpcId: string, tag: VpcTag) => {
 
   return (response.Subnets ?? []).map((subnet) => subnet.SubnetId!).sort();
 };
+
+/**
+ * Whether every given subnet has an IPv6 block: a function only sends IPv6 traffic when all of its subnets are
+ * dual-stack.
+ */
+export const areDualStackSubnets = async (subnetIds: string[]) => {
+  if (!subnetIds.length) {
+    return false;
+  }
+
+  const response = await getEC2Client().send(
+    new DescribeSubnetsCommand({
+      SubnetIds: subnetIds
+    })
+  );
+
+  const subnets = response.Subnets ?? [];
+
+  return (
+    subnets.length === subnetIds.length &&
+    subnets.every(({ Ipv6CidrBlockAssociationSet = [] }) => {
+      return Ipv6CidrBlockAssociationSet.some(({ Ipv6CidrBlockState }) => Ipv6CidrBlockState?.State === 'associated');
+    })
+  );
+};

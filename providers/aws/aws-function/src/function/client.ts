@@ -144,10 +144,7 @@ export const createFunction = async (logger: OperationLogLine, request: CreateRe
         Description: description && getSafeDescription(description),
         Runtime: getFunctionRuntime(runtime),
         PackageType: 'Zip',
-        VpcConfig: {
-          SecurityGroupIds: vpcConfig?.securityGroupIds ?? [],
-          SubnetIds: vpcConfig?.subnetIds ?? []
-        },
+        VpcConfig: getVpcConfigInput(vpcConfig),
         LoggingConfig: {
           LogGroup: logGroup,
           ApplicationLogLevel: getLogLevel(logLevel ?? FunctionDefaults.LogLevel),
@@ -332,10 +329,7 @@ export const updateConfiguration = async (logger: OperationLogLine, functionName
       ...(handlerName && {
         Handler: getSourceHandlerName(handlerName)
       }),
-      VpcConfig: {
-        SecurityGroupIds: vpcConfig?.securityGroupIds ?? [],
-        SubnetIds: vpcConfig?.subnetIds ?? []
-      },
+      VpcConfig: getVpcConfigInput(vpcConfig),
       LoggingConfig: {
         LogGroup: logGroup,
         ApplicationLogLevel: getLogLevel(logLevel ?? FunctionDefaults.LogLevel),
@@ -454,4 +448,15 @@ const getSourceZipFile = (sourceFile: string, additionalFiles?: string[]) => {
 
 const getSourceHandlerName = (handlerName: string) => {
   return `main.${handlerName}`;
+};
+
+const getVpcConfigInput = (vpcConfig: FunctionVpcConfig | undefined) => {
+  const subnetIds = vpcConfig?.subnetIds ?? [];
+
+  return {
+    SecurityGroupIds: vpcConfig?.securityGroupIds ?? [],
+    SubnetIds: subnetIds,
+    // Lambda keeps the last value it was given, so a function back on IPv4-only subnets is told explicitly.
+    ...(subnetIds.length ? { Ipv6AllowedForDualStack: !!vpcConfig?.ipv6AllowedForDualStack } : {})
+  };
 };

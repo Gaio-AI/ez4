@@ -14,7 +14,7 @@ import { createRole } from '@ez4/aws-identity';
 
 type Network = {
   vpcId: string;
-  subnets: { id: string; tags?: Record<string, string> }[];
+  subnets: { id: string; tags?: Record<string, string>; ipv6?: boolean }[];
   securityGroups: { id: string; name: string; tags?: Record<string, string> }[];
 };
 
@@ -83,8 +83,8 @@ const matches = (filters: Filter[], resource: { vpcId: string; name?: string; ta
   });
 };
 
-mock.method(EC2Client.prototype, 'send', async (command: { input: { Filters: Filter[] } }) => {
-  const filters = command.input.Filters;
+mock.method(EC2Client.prototype, 'send', async (command: { input: { Filters?: Filter[]; SubnetIds?: string[] } }) => {
+  const { Filters: filters = [], SubnetIds: subnetIds } = command.input;
 
   switch (command.constructor.name) {
     case 'DescribeVpcsCommand':
@@ -93,8 +93,13 @@ mock.method(EC2Client.prototype, 'send', async (command: { input: { Filters: Fil
     case 'DescribeSubnetsCommand':
       return {
         Subnets: network.subnets
-          .filter((subnet) => matches(filters, { ...subnet, vpcId: network.vpcId }))
-          .map((subnet) => ({ SubnetId: subnet.id }))
+          .filter((subnet) => (subnetIds ? subnetIds.includes(subnet.id) : matches(filters, { ...subnet, vpcId: network.vpcId })))
+          .map((subnet) => ({
+            SubnetId: subnet.id,
+            Ipv6CidrBlockAssociationSet: subnet.ipv6
+              ? [{ Ipv6CidrBlock: '2600:1f18:0:1::/64', Ipv6CidrBlockState: { State: 'associated' } }]
+              : []
+          }))
       };
 
     case 'DescribeSecurityGroupsCommand':
