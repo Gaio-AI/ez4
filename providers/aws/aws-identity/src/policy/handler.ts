@@ -23,10 +23,28 @@ const equalsResource = (candidate: PolicyState, current: PolicyState) => {
 };
 
 const previewResource = (candidate: PolicyState, current: PolicyState) => {
+  const currentDocument = current.result?.resolvedDocument ?? current.parameters.policyDocument;
   const target = { ...candidate.parameters, getPolicyDocument: undefined, dependencies: candidate.dependencies };
-  const source = { ...current.parameters, getPolicyDocument: undefined, dependencies: current.dependencies };
+  const source = {
+    ...current.parameters,
+    policyDocument: currentDocument,
+    getPolicyDocument: undefined,
+    dependencies: current.dependencies
+  };
 
   const changes = deepCompare(target, source);
+
+  if (candidate.parameters.getPolicyDocument) {
+    const hasDocChange = !!changes?.update?.policyDocument;
+    return {
+      name: target.policyName,
+      counts: (changes?.counts ?? 0) + (hasDocChange ? 0 : 1),
+      update: {
+        ...changes?.update,
+        policyDocument: true
+      }
+    };
+  }
 
   if (!changes.counts) {
     return undefined;
@@ -75,7 +93,7 @@ const createResource = (candidate: PolicyState, context: StepContext): Promise<P
 };
 
 const updateResource = (candidate: PolicyState, current: PolicyState, context: StepContext) => {
-  const { result } = candidate;
+  const result = candidate.result ?? current.result;
   const parameters = resolvePolicyParameters(candidate.parameters, context);
   const { policyName } = parameters;
 
@@ -110,9 +128,21 @@ const deleteResource = async (current: PolicyState) => {
   }
 };
 
-const resolvePolicyParameters = (parameters: PolicyParameters, context: StepContext): PolicyParameters => {
+export const resolvePolicyParameters = (parameters: PolicyParameters, context?: StepContext): PolicyParameters => {
   const { getPolicyDocument, ...request } = parameters;
-  return { ...request, policyDocument: getPolicyDocument?.(context) ?? request.policyDocument };
+  return {
+    ...request,
+    policyDocument: (context && getPolicyDocument?.(context)) ?? request.policyDocument
+  };
+};
+
+export const hasPolicyDocumentChanges = (
+  candidate: PolicyParameters,
+  current: PolicyParameters,
+  result?: PolicyResult
+): boolean => {
+  const previousDocument = result?.resolvedDocument ?? current.policyDocument;
+  return !deepEqual(candidate.policyDocument, previousDocument);
 };
 
 const checkDocumentUpdates = async (
@@ -121,18 +151,18 @@ const checkDocumentUpdates = async (
   candidate: PolicyParameters,
   current: PolicyParameters
 ) => {
-  const hasChanges = result.resolvedDocument
-    ? !deepEqual(candidate.policyDocument, result.resolvedDocument)
-    : !deepEqual(candidate, current, { exclude: { policyName: true, tags: true, getPolicyDocument: true } });
+  const hasChanges = hasPolicyDocumentChanges(candidate, current, result);
 
   if (hasChanges) {
     const updated = await createVersion(logger, result, candidate.policyDocument);
     return { ...updated, resolvedDocument: candidate.policyDocument };
   }
 
-  return result;
+  return {
+    ...result,
+    resolvedDocument: candidate.policyDocument
+  };
 };
-
 const checkTagUpdates = async (logger: OperationLogLine, policyArn: Arn, candidate: PolicyParameters, current: PolicyParameters) => {
   await applyTagUpdates(
     candidate.tags,
