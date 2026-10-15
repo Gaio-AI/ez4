@@ -21,12 +21,10 @@
   "dependencies": {
     "@ez4/agent": "^1.10.0",
     "@ez4/aws-agent": "^1.10.0",
-    "@ez4/aws-queue": "^1.10.0",
     "@ez4/aws-scheduler": "^1.10.0",
     "@ez4/common": "^1.10.0",
     "@ez4/local-agent": "^1.10.0",
     "@ez4/project": "^1.10.0",
-    "@ez4/queue": "^1.10.0",
     "@ez4/scheduler": "^1.10.0"
   }
 }
