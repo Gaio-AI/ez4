@@ -177,13 +177,30 @@ describe('role permissions boundary', () => {
     equal(commands[0]!.input.PermissionsBoundary, otherBoundaryArn);
   });
 
-  it('assert :: remove the boundary', async () => {
+  it('assert :: no boundary option leaves the boundary', async () => {
     const { state } = await deployRole({ permissionsBoundary: boundaryArn });
 
-    const { commands } = await deployRole({}, state);
+    const { preview, commands } = await deployRole({}, state);
 
-    deepEqual(getNames(commands), ['DeleteRolePermissionsBoundaryCommand']);
-    deepEqual(commands[0]!.input, { RoleName: roleName });
+    equal(preview, undefined);
+    deepEqual(getNames(commands), []);
+  });
+
+  it('assert :: no boundary option leaves the boundary of an imported role', async () => {
+    const { commands } = await deployRole({}, undefined, { boundary: boundaryArn });
+
+    deepEqual(getNames(commands), ['AttachRolePolicyCommand']);
+  });
+
+  // Deploys from code with and without the option, one after the other, don't flap the role.
+  it('assert :: the option back after a deploy without it plans nothing', async () => {
+    const { state: withBoundary } = await deployRole({ permissionsBoundary: boundaryArn });
+    const { state } = await deployRole({}, withBoundary);
+
+    const { preview, commands } = await deployRole({ permissionsBoundary: boundaryArn }, state);
+
+    equal(preview, undefined);
+    deepEqual(getNames(commands), []);
   });
 
   it('assert :: unchanged boundary plans nothing', async () => {

@@ -8,7 +8,6 @@ import {
   DeleteRoleCommand,
   UpdateAssumeRolePolicyCommand,
   PutRolePermissionsBoundaryCommand,
-  DeleteRolePermissionsBoundaryCommand,
   AttachRolePolicyCommand,
   DetachRolePolicyCommand,
   TagRoleCommand,
@@ -111,23 +110,13 @@ export const updateAssumeRole = async (logger: OperationLogLine, roleName: strin
   );
 };
 
-export const updatePermissionsBoundary = async (logger: OperationLogLine, roleName: string, permissionsBoundary: Arn | undefined) => {
+export const putPermissionsBoundary = async (logger: OperationLogLine, roleName: string, permissionsBoundary: Arn) => {
   logger.update(`Updating IAM permissions boundary`);
 
-  if (permissionsBoundary) {
-    await getIAMClient().send(
-      new PutRolePermissionsBoundaryCommand({
-        RoleName: roleName,
-        PermissionsBoundary: permissionsBoundary
-      })
-    );
-
-    return;
-  }
-
   await getIAMClient().send(
-    new DeleteRolePermissionsBoundaryCommand({
-      RoleName: roleName
+    new PutRolePermissionsBoundaryCommand({
+      RoleName: roleName,
+      PermissionsBoundary: permissionsBoundary
     })
   );
 };

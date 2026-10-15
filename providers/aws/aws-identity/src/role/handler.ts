@@ -15,7 +15,7 @@ import {
   tagRole,
   untagRole,
   updateAssumeRole,
-  updatePermissionsBoundary,
+  putPermissionsBoundary,
   updateRole
 } from './client';
 import { PolicyServiceType } from '../policy/types';
@@ -37,6 +37,11 @@ const equalsResource = (candidate: RoleState, current: RoleState) => {
 const previewResource = (candidate: RoleState, current: RoleState) => {
   const target = { ...candidate.parameters, dependencies: candidate.dependencies };
   const source = { ...current.parameters, dependencies: current.dependencies };
+
+  // A deploy without the option leaves the role's boundary as it is, so its absence is no change.
+  if (!target.permissionsBoundary) {
+    delete source.permissionsBoundary;
+  }
 
   const changes = deepCompare(target, source);
 
@@ -66,8 +71,8 @@ const createResource = (candidate: RoleState, context: StepContext): Promise<Rol
     const response = importedRole ?? (await createRole(logger, parameters));
 
     // A role that already exists keeps the boundary it has until set here, before any policy is attached.
-    if (importedRole && importedRole.permissionsBoundary !== parameters.permissionsBoundary) {
-      await updatePermissionsBoundary(logger, response.roleName, parameters.permissionsBoundary);
+    if (importedRole && parameters.permissionsBoundary && importedRole.permissionsBoundary !== parameters.permissionsBoundary) {
+      await putPermissionsBoundary(logger, response.roleName, parameters.permissionsBoundary);
     }
 
     const policies = context.getDependencies<PolicyState>(PolicyServiceType);
@@ -142,10 +147,13 @@ const checkGeneralUpdates = async (logger: OperationLogLine, roleName: string, c
 };
 
 // Goes before the policy and trust updates: a deployer may be allowed to change a role only while it holds
-// the boundary.
+// the boundary. Without the option the boundary stays: a deploy from code that predates the option would
+// otherwise take it off, which is what a boundary is there to keep deployers from doing.
 const checkBoundaryUpdates = async (logger: OperationLogLine, roleName: string, candidate: RoleParameters, current: RoleParameters) => {
-  if (candidate.permissionsBoundary !== current.permissionsBoundary) {
-    await updatePermissionsBoundary(logger, roleName, candidate.permissionsBoundary);
+  const { permissionsBoundary } = candidate;
+
+  if (permissionsBoundary && permissionsBoundary !== current.permissionsBoundary) {
+    await putPermissionsBoundary(logger, roleName, permissionsBoundary);
   }
 };
 
