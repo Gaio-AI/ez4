@@ -250,16 +250,55 @@ describe('client :: agent client', () => {
 
       const reason = response.failures?.[0]?.reason ?? 'Task failed to start';
       await rejects(client.invoke({ task: 'work' }, { correlation: 'trace' }), new RegExp(`worker-agent.*${reason}`));
-      equal(writes.length, 2);
-      const invocation = writes[0].body as { correlation: string };
+      equal(writes.length, 3);
+      const invocation = writes[0].body as StoredInvocation;
       const result = writes[1].body as Agent.Result<TestService>;
+      const failedInvocation = writes[2].body as StoredInvocation;
       equal(invocation.correlation, 'trace');
       equal(writes[1].key, `results/worker-agent/${result.id}.json`);
+      equal(writes[2].key, `invocations/worker-agent/${result.id}.json`);
+      equal(failedInvocation.taskArn, undefined);
+      equal(failedInvocation.deadline, new Date(Date.parse(invocation.deadline) - (3600 + 300) * 1000).toISOString());
       equal(result.agent, 'worker-agent');
       equal(result.status, 'failed');
       deepEqual(result.error, { code: 'task_stopped', message: reason });
       equal(result.correlation, 'trace');
     }
+  });
+
+  it('returns the id and leaves a sweep-ready failure when RunTask fails with a reply queue', async () => {
+    const writes: { key: string; body: unknown }[] = [];
+    const client = Client.make<TestService>({
+      agentName: 'worker-agent',
+      cluster: 'cluster',
+      taskDefinition: 'taskdef',
+      bucket: 'bucket',
+      subnets: ['s1'],
+      securityGroups: ['sg1'],
+      replyTo: 'https://sqs.us-east-1.amazonaws.com/123/results.fifo',
+      inputSchema,
+      s3Client: {
+        send: async (command: unknown) => {
+          if (command instanceof PutObjectCommand) {
+            writes.push({ key: command.input.Key!, body: JSON.parse(Buffer.from(command.input.Body as Uint8Array).toString()) });
+          }
+          return {};
+        }
+      } as unknown as S3Client,
+      ecsClient: { send: async () => ({ failures: [{ reason: 'RESOURCE:MEMORY' }], tasks: [] }) } as unknown as ECSClient
+    });
+
+    const { id } = await client.invoke({ task: 'work' }, { correlation: 'trace' });
+    equal(writes.length, 3);
+    const result = writes[1].body as Agent.Result<TestService>;
+    const invocation = writes[2].body as StoredInvocation;
+    equal(writes[1].key, `results/worker-agent/${id}.json`);
+    equal(writes[2].key, `invocations/worker-agent/${id}.json`);
+    equal(result.status, 'failed');
+    deepEqual(result.error, { code: 'task_stopped', message: 'RESOURCE:MEMORY' });
+    equal(invocation.replyTo, 'https://sqs.us-east-1.amazonaws.com/123/results.fifo');
+    equal(invocation.taskArn, undefined);
+    equal(invocation.deadline, new Date(Date.parse((writes[0].body as StoredInvocation).deadline) - (3600 + 300) * 1000).toISOString());
   });
 
   it('rejects invalid input schema before calling AWS services', async () => {

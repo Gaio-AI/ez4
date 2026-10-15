@@ -115,6 +115,16 @@ export namespace Client {
               ContentType: 'application/json'
             })
           );
+          invocationPayload.deadline = new Date(now).toISOString();
+          await s3.send(
+            new PutObjectCommand({
+              Bucket: parameters.bucket,
+              Key: `invocations/${parameters.agentName}/${id}.json`,
+              Body: Buffer.from(JSON.stringify(invocationPayload), 'utf-8'),
+              ContentType: 'application/json'
+            })
+          );
+          if (parameters.replyTo) return { id };
           throw new Error(`Failed to run ECS task for agent "${parameters.agentName}": ${reasons}`);
         }
         invocationPayload.taskArn = taskArn;
