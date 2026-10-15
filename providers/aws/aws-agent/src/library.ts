@@ -58,7 +58,7 @@ export * from './namespace/service';
 export * from './namespace/handler';
 export * from './namespace/client';
 
-export { getSecretResourceArn, getProviderSecretName } from './utils/names';
+export { getSecretResourceArn, getProviderSecretName, getAgentTaskRoleName } from './utils/names';
 
 export * from './auth/types';
 export * from './auth/providers';

@@ -8,7 +8,7 @@ import { createAgentService } from '@ez4/agent/library';
 import { buildAgentTaskRole } from '../src/role/task';
 import { buildAgentExecutionRole } from '../src/role/execution';
 import { RoleServiceType } from '@ez4/aws-identity';
-import { getAgentBucketName } from '../src/utils/names';
+import { getAgentBucketName, getAgentsBaseName } from '../src/utils/names';
 
 describe('agent task and execution roles', () => {
   const options: DeployOptions = {
@@ -39,7 +39,7 @@ describe('agent task and execution roles', () => {
     const role = buildAgentTaskRole(state, agent, options, accountId);
     ok(role);
     equal(role.type, RoleServiceType);
-    equal(role.parameters.roleName, 'ez4-test-stg-code-agent-task-role');
+    equal(role.parameters.roleName, 'ez4-test-stg-agents-code-agent-task-role');
 
     const trustStatement = role.parameters.roleDocument.Statement[0];
     ok(trustStatement);
@@ -103,5 +103,15 @@ describe('agent task and execution roles', () => {
     ok(resources.includes(`arn:aws:s3:::${bucket}/invocations/ReviewAgent/*`));
     ok(actions.includes('ecs:RunTask'));
     ok(actions.includes('iam:PassRole'));
+  });
+
+  it('assert :: task role name matches the PassRole resource pattern (glob -> regex)', () => {
+    const state: EntryStates = {};
+    const agent: AgentService = createAgentService('CodeAgent');
+    const role = buildAgentTaskRole(state, agent, options, accountId, ['ReviewAgent']);
+    const passRolePattern = `arn:aws:iam::${accountId}:role/${getAgentsBaseName(options)}-*`;
+    const passRoleRegex = new RegExp(`^${passRolePattern.replace(/\*/g, '.*')}$`);
+    const taskRoleArn = `arn:aws:iam::${accountId}:role/${role.parameters.roleName}`;
+    ok(passRoleRegex.test(taskRoleArn));
   });
 });

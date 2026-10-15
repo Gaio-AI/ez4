@@ -5,6 +5,7 @@ import { ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 import { validate, getErrorDetails } from '@ez4/validator';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
+import { AGENT_CONTAINER_NAME } from './taskdef/service';
 
 export interface ClientParameters {
   agentName: string;
@@ -76,7 +77,7 @@ export namespace Client {
             overrides: {
               containerOverrides: [
                 {
-                  name: parameters.agentName,
+                  name: AGENT_CONTAINER_NAME,
                   environment: [
                     { name: 'EZ4_AGENT_ID', value: id },
                     { name: 'EZ4_AGENT_NAME', value: parameters.agentName }

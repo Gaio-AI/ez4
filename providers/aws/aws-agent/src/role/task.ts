@@ -4,7 +4,7 @@ import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
 import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
-import { getAgentBucketName, getAgentKey, getAgentsBaseName } from '../utils/names';
+import { getAgentBucketName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
 import { PRESET_POLICIES } from './presets';
 
 export const buildAgentTaskRole = <E extends EntryState>(
@@ -15,7 +15,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
   linkedAgents: string[] = []
 ): RoleState => {
   const servicePrefix = getServiceName(agent, options);
-  const roleName = `${servicePrefix}-task-role`;
+  const roleName = getAgentTaskRoleName(agent, options);
   const policyName = `${servicePrefix}-task-policy`;
 
   const bucketName = getAgentBucketName(options);

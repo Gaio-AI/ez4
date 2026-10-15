@@ -8,6 +8,8 @@ import { hashData, toKebabCase } from '@ez4/utils';
 import { buildNoProxyList } from '../proxy/config';
 import { EcsTaskDefServiceType } from './types';
 
+export const AGENT_CONTAINER_NAME = 'agent';
+
 export interface TaskDefOptions {
   baseName: string;
   bucketName: string;
@@ -114,7 +116,7 @@ export const buildTaskDefinitionInput = (
     },
     containerDefinitions: [
       {
-        name: 'agent',
+        name: AGENT_CONTAINER_NAME,
         image: imageUri,
         user: '1000',
         essential: true,

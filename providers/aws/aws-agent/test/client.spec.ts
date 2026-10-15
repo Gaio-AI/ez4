@@ -13,7 +13,7 @@ import { InvalidReplyToError } from '@ez4/agent/library';
 import type { EventContext, DeployOptions, ServiceMetadata } from '@ez4/project/library';
 import { QueueServiceType } from '@ez4/aws-queue';
 import { createEcsClusterStateId } from '../src/cluster/service';
-import { createEcsTaskDefStateId } from '../src/taskdef/service';
+import { createEcsTaskDefStateId, AGENT_CONTAINER_NAME } from '../src/taskdef/service';
 import { createBucketStateId } from '@ez4/aws-bucket';
 import { getAgentBucketName, getAgentClusterName } from '../src/utils/names';
 import { getDefinitionName } from '@ez4/project/library';
@@ -108,9 +108,38 @@ describe('client :: agent client', () => {
     deepEqual(runTaskInput.networkConfiguration?.awsvpcConfiguration?.securityGroups, ['sg-agents']);
 
     const containerOverride = runTaskInput.overrides?.containerOverrides?.[0];
+    equal(containerOverride?.name, AGENT_CONTAINER_NAME);
     const envOverrides = containerOverride?.environment;
     ok(envOverrides?.find((e: { name?: string; value?: string }) => e.name === 'EZ4_AGENT_ID' && e.value === response.id));
     ok(envOverrides?.find((e: { name?: string; value?: string }) => e.name === 'EZ4_AGENT_NAME' && e.value === 'worker-agent'));
+  });
+
+  it('client RunTask input override name equals the taskdef container name', async () => {
+    let runTaskInput: RunTaskCommandInput | undefined;
+    const mockEcs = {
+      send: async (cmd: unknown) => {
+        if (cmd instanceof RunTaskCommand) {
+          runTaskInput = cmd.input;
+          return { tasks: [{ taskArn: 'arn:aws:ecs:us-east-1:123:task/abc' }] };
+        }
+        return {};
+      }
+    } as unknown as ECSClient;
+
+    const client = Client.make({
+      agentName: 'worker-agent',
+      cluster: 'test-cluster',
+      taskDefinition: 'task-def',
+      bucket: 'test-bucket',
+      subnets: ['subnet-1'],
+      securityGroups: ['sg-1'],
+      inputSchema: { type: SchemaType.Object, properties: {} },
+      s3Client: { send: async () => ({}) } as unknown as S3Client,
+      ecsClient: mockEcs
+    });
+
+    await client.invoke({});
+    equal(runTaskInput?.overrides?.containerOverrides?.[0]?.name, AGENT_CONTAINER_NAME);
   });
 
   it('calculates deadline with custom timeout', async () => {
