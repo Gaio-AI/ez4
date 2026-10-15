@@ -1,14 +1,12 @@
-import type { EntryState, EntryStates } from '@ez4/state';
-import type { AgentRuntimeFields } from './types';
 import type { RegisterTaskDefinitionCommandInput } from '@aws-sdk/client-ecs';
-import type { EcsTaskDefParameters, EcsTaskDefState } from './types';
-
-import { attachEntry } from '@ez4/state';
-import { hashData, toKebabCase } from '@ez4/utils';
+import type { AgentService } from '@ez4/agent/library';
+import type { StepContext } from '@ez4/state';
+import { toKebabCase } from '@ez4/utils';
 import { buildNoProxyList } from '../proxy/config';
-import { EcsTaskDefServiceType } from './types';
 
 export const AGENT_CONTAINER_NAME = 'agent';
+
+export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets'>;
 
 export interface TaskDefOptions {
   baseName: string;
@@ -18,10 +16,6 @@ export interface TaskDefOptions {
   proxy?: { url: string; secretArn: string };
   providerSecrets?: Array<{ name: string; secretArn: string }>;
 }
-
-export const createEcsTaskDefStateId = (agentName: string) => {
-  return hashData(EcsTaskDefServiceType, toKebabCase(agentName));
-};
 
 export const buildTaskDefinitionInput = (
   agent: AgentRuntimeFields,
@@ -37,19 +31,13 @@ export const buildTaskDefinitionInput = (
   const timeout = agent.resources?.timeout ?? 3600;
 
   // Derive region and account from taskRoleArn or executionRoleArn or options
-  // arn:aws:iam::<account>:role/...
-  // arn:aws:logs:<region>:<account>:log-group:...
   let region = options.region ?? 'us-east-1';
   let accountId = '';
 
   const logParts = logGroupArn.split(':');
   if (logParts.length >= 6) {
-    if (logParts[3]) {
-      region = logParts[3];
-    }
-    if (logParts[4]) {
-      accountId = logParts[4];
-    }
+    region = logParts[3] || region;
+    accountId = logParts[4] || accountId;
   }
 
   if (!accountId) {
@@ -59,7 +47,8 @@ export const buildTaskDefinitionInput = (
     }
   }
 
-  const secrets = Object.entries(agent.secrets ?? {}).map(([name, secretRef]) => {
+  const secrets = Object.entries(agent.secrets ?? {}).map(([name, value]) => {
+    const secretRef = String(value);
     if (secretRef.startsWith('arn:')) {
       return { name, valueFrom: secretRef };
     }
@@ -72,6 +61,7 @@ export const buildTaskDefinitionInput = (
     const arn = `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef}`;
     return { name, valueFrom: arn };
   });
+
   if (options.providerSecrets) {
     for (const { name, secretArn } of options.providerSecrets) {
       if (!agent.secrets?.[name]) {
@@ -141,17 +131,23 @@ export const buildTaskDefinitionInput = (
   };
 };
 
-export const createEcsTaskDefinition = <E extends EntryState>(
-  state: EntryStates<E>,
-  parameters: EcsTaskDefParameters,
-  dependencies: string[] = []
-): EcsTaskDefState => {
-  const entryId = createEcsTaskDefStateId(parameters.agentName);
-
-  return attachEntry<E | EcsTaskDefState, EcsTaskDefState>(state, {
-    type: EcsTaskDefServiceType,
-    entryId,
-    dependencies,
-    parameters
-  });
+export const buildAgentTaskDefinition = (
+  agent: AgentRuntimeFields,
+  imageUriOrContext: string | StepContext,
+  taskRoleArn?: string,
+  executionRoleArn?: string,
+  logGroupArn?: string,
+  options?: TaskDefOptions
+): RegisterTaskDefinitionCommandInput => {
+  if (typeof imageUriOrContext === 'string' && taskRoleArn && executionRoleArn && logGroupArn && options) {
+    return buildTaskDefinitionInput(agent, imageUriOrContext, taskRoleArn, executionRoleArn, logGroupArn, options);
+  }
+  return buildTaskDefinitionInput(
+    agent,
+    typeof imageUriOrContext === 'string' ? imageUriOrContext : '',
+    taskRoleArn ?? '',
+    executionRoleArn ?? '',
+    logGroupArn ?? '',
+    options ?? { baseName: toKebabCase(agent.name), bucketName: '' }
+  );
 };

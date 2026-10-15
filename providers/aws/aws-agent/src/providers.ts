@@ -1,13 +1,7 @@
 import { tryRegisterProvider } from '@ez4/aws-common';
+import { registerTriggers as registerEcrTriggers } from '@ez4/aws-ecr';
+import { registerTriggers as registerEcsTriggers } from '@ez4/aws-ecs';
 
-import { getEcsClusterHandler } from './cluster/handler';
-import { EcsClusterServiceType } from './cluster/types';
-import { getEcrRepositoryHandler } from './image/handler';
-import { getEcrImageHandler } from './image/image-handler';
-import { EcrImageServiceType } from './image/state';
-import { EcrRepositoryServiceType } from './image/types';
-import { getEcsTaskDefHandler } from './taskdef/handler';
-import { EcsTaskDefServiceType } from './taskdef/types';
 import { getProxyCredentialHandler } from './proxy/credential';
 import { ProxyCredentialServiceType } from './proxy/types';
 import { getProviderCredentialHandler } from './auth/handler';
@@ -20,10 +14,8 @@ import { getProxyServiceHandler } from './proxy/ecs-handler';
 import { ProxyServiceServiceType } from './proxy/ecs-types';
 
 export const registerAgentProviders = () => {
-  tryRegisterProvider(EcrRepositoryServiceType, getEcrRepositoryHandler());
-  tryRegisterProvider(EcrImageServiceType, getEcrImageHandler());
-  tryRegisterProvider(EcsClusterServiceType, getEcsClusterHandler());
-  tryRegisterProvider(EcsTaskDefServiceType, getEcsTaskDefHandler());
+  registerEcrTriggers();
+  registerEcsTriggers();
   tryRegisterProvider(ProxyCredentialServiceType, getProxyCredentialHandler());
   tryRegisterProvider(ProviderCredentialServiceType, getProviderCredentialHandler());
   tryRegisterProvider(EventsRuleServiceType, getEventsRuleHandler());

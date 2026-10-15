@@ -1,14 +1,12 @@
 import type { ContextSource, DeployOptions, EventContext, ServiceMetadata } from '@ez4/project/library';
 import type { AgentService } from '@ez4/agent/library';
 import type { QueueState } from '@ez4/aws-queue';
-import type { EcsClusterState } from '../cluster/types';
-import type { EcsTaskDefState } from '../taskdef/types';
+import type { EcsClusterState, EcsTaskDefState } from '@ez4/aws-ecs';
 import { isAgentService, InvalidReplyToError } from '@ez4/agent/library';
 import { QueueServiceType } from '@ez4/aws-queue';
 import { getDefinitionName } from '@ez4/project/library';
 import { createBucketStateId } from '@ez4/aws-bucket';
-import { createEcsClusterStateId } from '../cluster/service';
-import { createEcsTaskDefStateId } from '../taskdef/service';
+import { createEcsClusterStateId, createEcsTaskDefStateId } from '@ez4/aws-ecs';
 import { getAgentBucketName, getAgentClusterName } from '../utils/names';
 export interface LinkedAgentEvent {
   service: ServiceMetadata;

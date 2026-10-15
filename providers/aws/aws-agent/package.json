@@ -72,6 +72,8 @@
     "@aws-sdk/client-sqs": "^3.1151.0",
     "@ez4/agent": "^1.10.0",
     "@ez4/aws-common": "^1.10.0",
+    "@ez4/aws-ecr": "^1.10.0",
+    "@ez4/aws-ecs": "^1.10.0",
     "@ez4/aws-bucket": "^1.10.0",
     "@ez4/aws-function": "^1.10.0",
     "@ez4/aws-identity": "^1.10.0",

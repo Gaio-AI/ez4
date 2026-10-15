@@ -19,14 +19,12 @@ import { AgentNamespaceServiceType } from '../src/namespace/types';
 import { ProxyServiceServiceType, type ProxyServiceState } from '../src/proxy/ecs-types';
 import { ProxyCredentialServiceType, type ProxyCredentialState } from '../src/proxy/types';
 import { ProviderCredentialServiceType } from '../src/auth/types';
-import type { EcsTaskDefState } from '../src/taskdef/types';
+import type { EcsTaskDefState } from '@ez4/aws-ecs';
 
 import { prepareAgentResources } from '../src/triggers/resources';
 import { getAgentBucketName, getAgentClusterName, getAgentKey } from '../src/utils/names';
-import { EcrImageServiceType } from '../src/image/state';
-import { EcrRepositoryServiceType } from '../src/image/types';
-import { EcsClusterServiceType } from '../src/cluster/types';
-import { EcsTaskDefServiceType } from '../src/taskdef/types';
+import { EcrImageServiceType, EcrRepositoryServiceType } from '@ez4/aws-ecr';
+import { EcsClusterServiceType, EcsTaskDefServiceType } from '@ez4/aws-ecs';
 
 const options: DeployOptions = { prefix: 'ez4', projectName: 'lab', branchName: '', lockId: 'x' } as DeployOptions;
 

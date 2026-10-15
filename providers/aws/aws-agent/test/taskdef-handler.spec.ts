@@ -1,12 +1,10 @@
 import type { AgentService } from '@ez4/agent/library';
-import type { StepOptions } from '@ez4/state';
-import type { EcsTaskDefState } from '../src/taskdef/types';
+import type { EcsTaskDefState } from '@ez4/aws-ecs';
 import { describe, it } from 'node:test';
 import { ok, equal, deepEqual } from 'node:assert/strict';
 import { ServiceType } from '@ez4/agent/library';
-import { buildTaskDefinitionInput, createEcsTaskDefinition, createEcsTaskDefStateId } from '../src/taskdef/service';
-import { getEcsTaskDefHandler } from '../src/taskdef/handler';
-import { EcsTaskDefServiceType } from '../src/taskdef/types';
+import { buildTaskDefinitionInput } from '../src/agent/taskdef';
+import { createEcsTaskDefinition, createEcsTaskDefStateId, EcsTaskDefServiceType } from '@ez4/aws-ecs';
 import { getAgentsBaseName } from '../src/utils/names';
 import type { DeployOptions } from '@ez4/project/library';
 
@@ -134,109 +132,21 @@ describe('agent ECS task definition builder', () => {
   it('assert :: creates task definition state entry with correct parameters and ID', () => {
     const states: Record<string, EcsTaskDefState> = {};
 
-    const state = createEcsTaskDefinition(
-      states,
-      {
-        agentName: 'TestAgent',
-        baseName: 'ez4-stg-agents',
-        agent: { name: 'TestAgent' },
-        bucketName: 'agent-bucket',
-        region: 'us-east-1',
-        subnetIds: ['subnet-1'],
-        securityGroupIds: ['sg-1']
-      },
-      ['dep1']
-    );
+    const state = createEcsTaskDefinition(states, ['dep1'], {
+      family: 'TestAgent',
+      agentName: 'TestAgent',
+      baseName: 'ez4-stg-agents',
+      agent: { name: 'TestAgent' },
+      bucketName: 'agent-bucket',
+      region: 'us-east-1',
+      subnetIds: ['subnet-1'],
+      securityGroupIds: ['sg-1']
+    });
 
     equal(state.type, EcsTaskDefServiceType);
     equal(state.parameters.agentName, 'TestAgent');
     equal(state.entryId, createEcsTaskDefStateId('TestAgent'));
     deepEqual(state.dependencies, ['dep1']);
     ok(states[state.entryId] !== undefined);
-  });
-
-  it('assert :: handler equals compares taskDefinitionArn', () => {
-    const handler = getEcsTaskDefHandler();
-
-    const candidate: EcsTaskDefState = {
-      type: EcsTaskDefServiceType,
-      entryId: 'entry1',
-      dependencies: [],
-      parameters: {
-        agentName: 'TestAgent',
-        baseName: 'ez4-stg-agents',
-        agent: { name: 'TestAgent' },
-        bucketName: 'agent-bucket',
-        region: 'us-east-1',
-        subnetIds: ['subnet-1'],
-        securityGroupIds: ['sg-1']
-      },
-      result: {
-        family: 'ez4-testagent',
-        revision: 1,
-        taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/ez4-testagent:1',
-        subnetIds: ['subnet-1'],
-        securityGroupIds: ['sg-1']
-      }
-    };
-
-    const currentSame: EcsTaskDefState = {
-      ...candidate
-    };
-
-    const currentDiff: EcsTaskDefState = {
-      ...candidate,
-      result: {
-        ...candidate.result!,
-        taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/ez4-testagent:2'
-      }
-    };
-
-    ok(handler.equals(candidate, currentSame));
-    ok(!handler.equals(candidate, currentDiff));
-  });
-
-  it('assert :: handler preview detects changes', async () => {
-    const handler = getEcsTaskDefHandler();
-    const options = {} as StepOptions;
-    const candidate: EcsTaskDefState = {
-      type: EcsTaskDefServiceType,
-      entryId: 'entry1',
-      dependencies: [],
-      parameters: {
-        agentName: 'TestAgent',
-        baseName: 'ez4-stg-agents',
-        agent: { name: 'TestAgent', resources: { cpu: 2048 } },
-        bucketName: 'agent-bucket',
-        region: 'us-east-1',
-        subnetIds: ['subnet-1'],
-        securityGroupIds: ['sg-1']
-      }
-    };
-
-    const currentSame: EcsTaskDefState = {
-      ...candidate
-    };
-
-    const currentDiff: EcsTaskDefState = {
-      type: EcsTaskDefServiceType,
-      entryId: 'entry1',
-      dependencies: [],
-      parameters: {
-        agentName: 'TestAgent',
-        baseName: 'ez4-stg-agents',
-        agent: { name: 'TestAgent', resources: { cpu: 1024 } },
-        bucketName: 'agent-bucket',
-        region: 'us-east-1',
-        subnetIds: ['subnet-1'],
-        securityGroupIds: ['sg-1']
-      }
-    };
-
-    equal(await handler.preview(candidate, currentSame, options), undefined);
-
-    const changes = await handler.preview(candidate, currentDiff, options);
-    ok(changes !== undefined);
-    equal(changes.counts, 1);
   });
 });

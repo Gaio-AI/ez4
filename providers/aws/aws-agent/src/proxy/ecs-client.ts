@@ -10,7 +10,7 @@ import {
   UpdateServiceCommand
 } from '@aws-sdk/client-ecs';
 
-import { getEcsClient, getEcsTagList } from '../cluster/client';
+import { getEcsClient, getEcsTagList } from '@ez4/aws-ecs';
 
 export const buildCreateServiceInput = (
   parameters: ProxyServiceParameters,
@@ -58,7 +58,9 @@ export const upsertProxyService = async (
     })
   );
 
-  const activeService = describeResponse.services?.find((s) => s.serviceName === parameters.serviceName && s.status === 'ACTIVE');
+  const activeService = describeResponse.services?.find(
+    (s: { serviceName?: string; status?: string }) => s.serviceName === parameters.serviceName && s.status === 'ACTIVE'
+  );
 
   let serviceArn: string;
 

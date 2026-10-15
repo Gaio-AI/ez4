@@ -1,7 +1,7 @@
 import type { DeployOptions, EventContext, PrepareResourceEvent, ServiceMetadata } from '@ez4/project/library';
 import type { EntryState, EntryStates } from '@ez4/state';
 import type { AgentService } from '@ez4/agent/library';
-import type { EcsTaskDefState } from '../src/taskdef/types';
+import type { EcsTaskDefState } from '@ez4/aws-ecs';
 
 import { describe, it, beforeEach } from 'node:test';
 import { equal, deepEqual, rejects, ok } from 'node:assert/strict';
@@ -262,7 +262,12 @@ describe('provider login stored per stage and reused', () => {
     equal(providerCreds.length, 0);
 
     const taskdef = context.getServiceState('CustomSecretAgent', options) as EcsTaskDefState;
-    equal(taskdef.parameters.agent.secrets?.['CLAUDE_CODE_OAUTH_TOKEN'], 'my-custom-oauth-token-secret');
+    const savedAgent = taskdef.parameters.agent;
+    const secrets =
+      savedAgent && typeof savedAgent === 'object' && 'secrets' in savedAgent
+        ? (savedAgent.secrets as Record<string, string> | undefined)
+        : undefined;
+    equal(secrets?.['CLAUDE_CODE_OAUTH_TOKEN'], 'my-custom-oauth-token-secret');
   });
 
   it('assert :: force with existing secret -> login runs and store called', async () => {

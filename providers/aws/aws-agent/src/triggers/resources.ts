@@ -15,9 +15,8 @@ import { linkEntryConnection } from '@ez4/state';
 import { hashData, toKebabCase } from '@ez4/utils';
 
 import { buildAgentBundle } from '../runtime/bundle';
-import { createEcsCluster, createEcsClusterStateId } from '../cluster/service';
-import { createAgentImage } from '../image/state';
-import { createEcrRepository } from '../image/service';
+import { createEcsCluster, createEcsClusterStateId, createEcsTaskDefinition } from '@ez4/aws-ecs';
+import { createAgentImage, createEcrRepository } from '@ez4/aws-ecr';
 import { computeImageTag, generateDockerfile } from '../image/dockerfile';
 import { discoverAgentNetwork } from '../network/discovery';
 import { createProxyCredential, createProxyCredentialStateId } from '../proxy/credential';
@@ -29,7 +28,6 @@ import { ProviderAuths } from '../auth/providers';
 import { createProviderCredential, createProviderCredentialStateId } from '../auth/service';
 import { buildAgentExecutionRole } from '../role/execution';
 import { buildAgentTaskRole } from '../role/task';
-import { createEcsTaskDefinition } from '../taskdef/service';
 import {
   getAgentBucketName,
   getAgentClusterName,
@@ -181,7 +179,16 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
 
   const taskdef = createEcsTaskDefinition(
     state,
+    [
+      image.entryId,
+      logGroup.entryId,
+      taskRole.entryId,
+      executionRole.entryId,
+      credential.entryId,
+      ...(providerCredentialEntryId ? [providerCredentialEntryId] : [])
+    ],
     {
+      family: service.name,
       agentName: service.name,
       baseName: getAgentsBaseName(options),
       agent: { name: service.name, resources: service.resources, secrets: service.secrets },
@@ -191,15 +198,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       securityGroupIds: network.securityGroupIds,
       proxyUrl: getAgentProxyUrl(options),
       tags: options.tags
-    },
-    [
-      image.entryId,
-      logGroup.entryId,
-      taskRole.entryId,
-      executionRole.entryId,
-      credential.entryId,
-      ...(providerCredentialEntryId ? [providerCredentialEntryId] : [])
-    ]
+    }
   );
   linkEntryConnection(state, taskdef.entryId, cluster.entryId);
   linkEntryConnection(state, taskdef.entryId, bucket.entryId);

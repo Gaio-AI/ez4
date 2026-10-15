@@ -5,7 +5,7 @@ import { ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 import { validate, getErrorDetails } from '@ez4/validator';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
-import { AGENT_CONTAINER_NAME } from './taskdef/service';
+import { AGENT_CONTAINER_NAME } from './agent/taskdef';
 
 export interface ClientParameters {
   agentName: string;
