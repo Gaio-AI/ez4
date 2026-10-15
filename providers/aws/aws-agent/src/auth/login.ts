@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import { Writable } from 'node:stream';
 
-import { findProviderSecret, storeProviderSecret } from './client';
+import { findSecret, putSecretValue } from '@ez4/aws-secret';
 import { ProviderAuths } from './providers';
 
 export class ProviderLoginRequiredError extends Error {
@@ -66,8 +66,8 @@ export const defaultLoginIO: LoginIO = {
   }
 };
 export const getDefaultCredentialPorts = (): CredentialPorts => ({
-  find: (secretName) => findProviderSecret(secretName),
-  store: (secretName, value, tags) => storeProviderSecret(secretName, value, tags),
+  find: (secretName) => findSecret(secretName),
+  store: (secretName, value, tags) => putSecretValue(secretName, value, tags),
   interactive: () => !!process.stdin.isTTY && !!process.stdout.isTTY && process.env.CI !== 'true',
   force: () => process.env.EZ4_AGENT_LOGIN === 'force',
   io: defaultLoginIO

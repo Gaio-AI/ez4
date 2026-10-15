@@ -14,11 +14,10 @@ import { RoleServiceType } from '@ez4/aws-identity';
 import { BucketServiceType } from '@ez4/aws-bucket';
 import { LogGroupServiceType } from '@ez4/aws-logs';
 import { FunctionServiceType } from '@ez4/aws-function';
-import { EventsRuleServiceType } from '../src/events/types';
-import { AgentNamespaceServiceType } from '../src/namespace/types';
+import { EventsRuleServiceType } from '@ez4/aws-events';
+import { NamespaceServiceType } from '@ez4/aws-cloudmap';
 import { ProxyServiceServiceType, type ProxyServiceState } from '../src/proxy/ecs-types';
-import { ProxyCredentialServiceType, type ProxyCredentialState } from '../src/proxy/types';
-import { ProviderCredentialServiceType } from '../src/auth/types';
+import { SecretServiceType, type SecretState } from '@ez4/aws-secret';
 import type { EcsTaskDefState } from '@ez4/aws-ecs';
 
 import { prepareAgentResources } from '../src/triggers/resources';
@@ -70,6 +69,10 @@ const ports = {
 
 const countType = (state: EntryStates, type: string) => Object.values(state).filter((entry) => entry?.type === type).length;
 
+const isSecretState = (entry: EntryState | undefined): entry is SecretState => {
+  return entry?.type === SecretServiceType;
+};
+
 describe('agent resources wiring', () => {
   it('assert :: one cluster, bucket and execution role per project; per-agent entries', async () => {
     const state: EntryStates = {};
@@ -108,8 +111,8 @@ describe('agent resources wiring', () => {
         LogGroupServiceType,
         RoleServiceType,
         RoleServiceType,
-        ProxyCredentialServiceType,
-        ProviderCredentialServiceType
+        SecretServiceType,
+        SecretServiceType
       ].sort()
     );
   });
@@ -153,12 +156,13 @@ describe('agent resources wiring', () => {
       equal(await prepareAgentResources(event, ports), true);
     }
 
-    equal(countType(state, AgentNamespaceServiceType), 1);
+    equal(countType(state, NamespaceServiceType), 1);
     equal(countType(state, ProxyServiceServiceType), 1);
 
     const proxyService = Object.values(state).find((entry): entry is ProxyServiceState => entry?.type === ProxyServiceServiceType)!;
     const credentialEntries = Object.values(state).filter(
-      (entry): entry is ProxyCredentialState => entry?.type === ProxyCredentialServiceType
+      (entry): entry is SecretState =>
+        isSecretState(entry) && (entry.parameters.description?.includes('proxy credentials') ?? false)
     );
     equal(credentialEntries.length, 2);
     for (const cred of credentialEntries) {

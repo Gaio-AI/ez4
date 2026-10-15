@@ -9,7 +9,7 @@ import { createFunction } from '@ez4/aws-function';
 import { createPolicy, createPolicyDocument, createRole, createRoleDocument, createRoleStatement } from '@ez4/aws-identity';
 import { ArchitectureType, RuntimeType } from '@ez4/project';
 
-import { createEventsRule, createEventsRuleStateId } from '../events/service';
+import { createEventsRule, createEventsRuleStateId } from '@ez4/aws-events';
 import { getAgentsBaseName } from '../utils/names';
 
 // __MODULE_PATH is defined by the package bundler.

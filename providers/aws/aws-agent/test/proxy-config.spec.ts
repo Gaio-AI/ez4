@@ -1,6 +1,5 @@
 import type { EntryStates, StepContext, StepOptions } from '@ez4/state';
 import type { AgentDomainInput } from '../src/proxy/config';
-import type { ProxyCredentialResult, ProxyCredentialState } from '../src/proxy/types';
 
 import { describe, it } from 'node:test';
 import { equal, ok, throws } from 'node:assert/strict';
@@ -21,9 +20,14 @@ import {
   getAgentEgressDomains
 } from '../src/proxy/config';
 import { generateHtpasswd, generateAgentPassword } from '../src/proxy/auth';
-import { createProxyCredential, getProxyCredentialHandler } from '../src/proxy/credential';
-import { setSecretsManagerClient } from '../src/proxy/client';
-import { ProxyCredentialServiceType } from '../src/proxy/types';
+import {
+  createSecret,
+  getSecretHandler,
+  setSecretsManagerClient,
+  SecretServiceType,
+  type SecretResult,
+  type SecretState
+} from '@ez4/aws-secret';
 
 describe('proxy :: configuration and auth', () => {
   it('generates squid.conf with authentication and allowlists per agent user', () => {
@@ -129,15 +133,22 @@ describe('proxy :: configuration and auth', () => {
 
   it('handles proxy credential secret StepHandler without leaking password to state', async () => {
     const state: EntryStates = {};
-    const credentialState = createProxyCredential(state, {
+    const credentialState = createSecret(state, {
       secretName: 'ez4-test-coder-proxy',
-      agentName: 'coder',
+      description: 'EZ4 egress proxy credentials for agent coder',
+      getSecretValue: async () => {
+        const password = generateAgentPassword();
+        return {
+          username: 'coder',
+          password,
+          htpasswd: generateHtpasswd({ coder: password }).trim()
+        };
+      },
       tags: { project: 'test' }
     });
 
-    equal(credentialState.type, ProxyCredentialServiceType);
+    equal(credentialState.type, SecretServiceType);
     equal(credentialState.parameters.secretName, 'ez4-test-coder-proxy');
-    equal(credentialState.parameters.agentName, 'coder');
     // Ensure no password exists on parameters
     ok(!('password' in (credentialState.parameters as Record<string, unknown>)));
 
@@ -177,12 +188,10 @@ describe('proxy :: configuration and auth', () => {
     setSecretsManagerClient(mockClient);
 
     const mockContext = {} as StepContext;
-    const handler = getProxyCredentialHandler();
-    const result = (await handler.create(credentialState, mockContext)) as ProxyCredentialResult;
+    const handler = getSecretHandler();
+    const result = (await handler.create(credentialState, mockContext)) as SecretResult;
 
     ok(result !== undefined);
-    equal(result.secretName, 'ez4-test-coder-proxy');
-    equal(result.agentName, 'coder');
     ok(result.secretArn.includes('ez4-test-coder-proxy'));
     // Ensure no password in result
     ok(!('password' in (result as Record<string, unknown>)));
@@ -197,7 +206,7 @@ describe('proxy :: configuration and auth', () => {
     equal(parsedSecret.password.length >= 32, true);
 
     // Test handler.equals
-    const candidateState: ProxyCredentialState = {
+    const candidateState: SecretState = {
       ...credentialState,
       result
     };

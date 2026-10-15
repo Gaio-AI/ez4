@@ -1,6 +1,6 @@
 import type { VpcTag } from '@ez4/aws-vpc';
 
-import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
+import { getDefaultVpcId, findSubnetsByTag, findSecurityGroupsByTag, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
 import { MissingAgentNetworkError } from './errors';
 
 export const AgentNetworkTag: VpcTag = {
@@ -21,12 +21,16 @@ export interface AgentNetworkConfig {
 
 export type NetworkLookup = {
   getDefaultVpcId: () => Promise<string | undefined>;
-  getTaggedSubnetIds: (vpcId: string, tag: VpcTag) => Promise<string[]>;
-  getTaggedSecurityGroupIds: (vpcId: string, tag: VpcTag) => Promise<string[]>;
+  findSubnetsByTag?: (tag: VpcTag, vpcId?: string) => Promise<Array<{ subnetId: string }>>;
+  findSecurityGroupsByTag?: (tag: VpcTag, vpcId?: string) => Promise<string[]>;
+  getTaggedSubnetIds?: (vpcId: string, tag: VpcTag) => Promise<string[]>;
+  getTaggedSecurityGroupIds?: (vpcId: string, tag: VpcTag) => Promise<string[]>;
 };
 
 const defaultLookup: NetworkLookup = {
   getDefaultVpcId,
+  findSubnetsByTag,
+  findSecurityGroupsByTag,
   getTaggedSubnetIds,
   getTaggedSecurityGroupIds
 };
@@ -35,13 +39,28 @@ export const discoverAgentNetwork = async (vpcId?: string, lookup: NetworkLookup
   const resolvedVpcId = vpcId ?? (await lookup.getDefaultVpcId());
 
   if (!resolvedVpcId) {
-    throw new MissingAgentNetworkError('no VPC found or specified');
+    throw new MissingAgentNetworkError("no VPC found or specified with tag 'ez4:agents=true'");
   }
 
+  const querySubnets = async (tag: VpcTag) => {
+    if (lookup.findSubnetsByTag) {
+      const subnets = await lookup.findSubnetsByTag(tag, resolvedVpcId);
+      return subnets.map((subnet) => subnet.subnetId);
+    }
+    return lookup.getTaggedSubnetIds!(resolvedVpcId, tag);
+  };
+
+  const querySecurityGroups = async (tag: VpcTag) => {
+    if (lookup.findSecurityGroupsByTag) {
+      return lookup.findSecurityGroupsByTag(tag, resolvedVpcId);
+    }
+    return lookup.getTaggedSecurityGroupIds!(resolvedVpcId, tag);
+  };
+
   const [subnetIds, securityGroupIds, proxySecurityGroupIds] = await Promise.all([
-    lookup.getTaggedSubnetIds(resolvedVpcId, AgentNetworkTag),
-    lookup.getTaggedSecurityGroupIds(resolvedVpcId, AgentNetworkTag),
-    lookup.getTaggedSecurityGroupIds(resolvedVpcId, AgentProxyNetworkTag)
+    querySubnets(AgentNetworkTag),
+    querySecurityGroups(AgentNetworkTag),
+    querySecurityGroups(AgentProxyNetworkTag)
   ]);
 
   if (!subnetIds || subnetIds.length === 0) {

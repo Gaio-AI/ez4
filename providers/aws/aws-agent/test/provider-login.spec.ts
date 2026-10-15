@@ -18,7 +18,7 @@ import {
   defaultLoginIO,
   type CredentialPorts
 } from '../src/auth/login';
-import { ProviderCredentialServiceType } from '../src/auth/types';
+import { SecretServiceType, type SecretState } from '@ez4/aws-secret';
 import { prepareAgentResources } from '../src/triggers/resources';
 import { buildTaskDefinitionInput } from '../src/agent/taskdef';
 
@@ -36,6 +36,10 @@ const makeContext = (): EventContext => {
       states.set(`${opt.projectName}:${name}`, state);
     }
   } as unknown as EventContext;
+};
+
+const isSecretState = (entry: EntryState | undefined): entry is SecretState => {
+  return entry?.type === SecretServiceType;
 };
 const baseNetwork = {
   getDefaultVpcId: async () => 'vpc-1',
@@ -202,7 +206,9 @@ describe('provider login stored per stage and reused', () => {
     equal(loginRuns, 1);
     equal(storeCalls, 1);
 
-    const providerCreds = Object.values(state).filter((entry) => entry?.type === ProviderCredentialServiceType);
+    const providerCreds = Object.values(state).filter(
+      (entry): entry is SecretState => isSecretState(entry) && entry.parameters.secretName === 'ez4/agents/claude'
+    );
     equal(providerCreds.length, 1);
     const providerCredEntryId = providerCreds[0]!.entryId;
 
@@ -258,7 +264,9 @@ describe('provider login stored per stage and reused', () => {
     equal(findCalled, false);
     equal(storeCalled, false);
 
-    const providerCreds = Object.values(state).filter((entry) => entry?.type === ProviderCredentialServiceType);
+    const providerCreds = Object.values(state).filter(
+      (entry): entry is SecretState => isSecretState(entry) && entry.parameters.secretName === 'ez4/agents/claude'
+    );
     equal(providerCreds.length, 0);
 
     const taskdef = context.getServiceState('CustomSecretAgent', options) as EcsTaskDefState;

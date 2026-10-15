@@ -118,7 +118,7 @@ export const refreshCache = async (runtime: WorkspaceRuntime, repo: WorkspaceRep
 
   await mkdir(reposDir, { recursive: true });
 
-  return await withLock(
+  return withLock(
     lockPath,
     () => getNowMs(runtime),
     async () => {

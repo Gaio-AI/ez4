@@ -71,7 +71,7 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
       });
   } else if (env.EZ4_WORKSPACE_TOKEN) {
     const secretToken = env.EZ4_WORKSPACE_TOKEN;
-    token = async () => secretToken;
+    token = () => Promise.resolve(secretToken);
   }
 
   return {

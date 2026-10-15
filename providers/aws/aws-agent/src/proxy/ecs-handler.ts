@@ -1,7 +1,7 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { RoleState } from '@ez4/aws-identity';
-import type { ProxyCredentialState } from './types';
-import type { AgentNamespaceState } from '../namespace/types';
+import type { SecretState } from '@ez4/aws-secret';
+import type { NamespaceState } from '@ez4/aws-cloudmap';
 import type { ProxyServiceResult, ProxyServiceState } from './ecs-types';
 
 import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
@@ -9,8 +9,8 @@ import { RoleServiceType } from '@ez4/aws-identity';
 import { getLogGroupName } from '@ez4/aws-logs';
 import { deepCompare } from '@ez4/utils';
 
-import { ProxyCredentialServiceType } from './types';
-import { AgentNamespaceServiceType } from '../namespace/types';
+import { SecretServiceType } from '@ez4/aws-secret';
+import { NamespaceServiceType } from '@ez4/aws-cloudmap';
 import { ProxyServiceServiceName } from './ecs-types';
 import { buildProxyTaskDefinitionInput } from './taskdef';
 import { upsertProxyService, deleteProxyService } from './ecs-client';
@@ -59,12 +59,12 @@ const deploy = (candidate: ProxyServiceState, context: StepContext): Promise<Pro
   const executionRoleArn = roles.find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-execution-role'))?.result?.roleArn;
 
   const credentialArns = context
-    .getDependencies<ProxyCredentialState>(ProxyCredentialServiceType)
+    .getDependencies<SecretState>(SecretServiceType)
     .map((entry) => entry.result?.secretArn)
     .filter((arn): arn is string => !!arn)
     .sort();
 
-  const registryArn = context.getDependencies<AgentNamespaceState>(AgentNamespaceServiceType).at(0)?.result?.discoveryServiceArn;
+  const registryArn = context.getDependencies<NamespaceState>(NamespaceServiceType).at(0)?.result?.discoveryServiceArn;
 
   const logGroupName = getLogGroupName(ProxyServiceServiceName, candidate.entryId, context);
 
