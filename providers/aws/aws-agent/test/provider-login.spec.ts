@@ -125,7 +125,10 @@ describe('provider login stored per stage and reused', () => {
       ok(err instanceof ProviderLoginRequiredError);
       equal(err.secretName, 'ez4/agents/claude');
       equal(err.envName, 'CLAUDE_CODE_OAUTH_TOKEN');
-      equal(err.message, 'Secret "ez4/agents/claude" (key "CLAUDE_CODE_OAUTH_TOKEN") is missing. Run the deploy from an interactive terminal to log in, or create the secret with that key.');
+      equal(
+        err.message,
+        'Secret "ez4/agents/claude" (key "CLAUDE_CODE_OAUTH_TOKEN") is missing. Run the deploy from an interactive terminal to log in, or create the secret with that key.'
+      );
       return true;
     });
   });

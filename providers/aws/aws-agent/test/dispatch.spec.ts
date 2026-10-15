@@ -128,7 +128,10 @@ describe('dispatcher decisions', () => {
 
   it('marks a stopped result without replyTo so a later sweep does not retry it', async () => {
     const { storage, messages, stopped, ports } = makePorts();
-    storage.set(invocationKey, JSON.stringify({ correlation: 'trace', deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn' }));
+    storage.set(
+      invocationKey,
+      JSON.stringify({ correlation: 'trace', deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn' })
+    );
 
     await dispatchDecision(stoppedEvent, ports);
     const result = storage.get(resultKey);

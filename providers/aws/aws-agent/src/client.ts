@@ -94,7 +94,11 @@ export namespace Client {
 
         const taskArn = runTaskResult.tasks?.[0]?.taskArn;
         if (runTaskResult.failures?.length || !taskArn) {
-          const reasons = runTaskResult.failures?.map((failure) => failure.reason).filter(Boolean).join(', ') || 'Task failed to start';
+          const reasons =
+            runTaskResult.failures
+              ?.map((failure) => failure.reason)
+              .filter(Boolean)
+              .join(', ') || 'Task failed to start';
           const failedResult: Agent.Result<S> = {
             id,
             agent: parameters.agentName,

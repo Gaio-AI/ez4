@@ -14,7 +14,9 @@ export class ProviderLoginRequiredError extends Error {
     public readonly secretName: string,
     public readonly envName: string
   ) {
-    super(`Secret "${secretName}" (key "${envName}") is missing. Run the deploy from an interactive terminal to log in, or create the secret with that key.`);
+    super(
+      `Secret "${secretName}" (key "${envName}") is missing. Run the deploy from an interactive terminal to log in, or create the secret with that key.`
+    );
     this.name = 'ProviderLoginRequiredError';
   }
 }
