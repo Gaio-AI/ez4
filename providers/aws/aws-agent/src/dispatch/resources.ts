@@ -32,6 +32,7 @@ export const buildTaskStoppedPattern = (clusterArn: string) =>
 
 export const buildDispatcherGrants = (region: string, accountId: string, bucketName: string, clusterName: string): IdentityGrant[] => [
   { permissions: ['s3:GetObject', 's3:PutObject'], resourceIds: [`arn:aws:s3:::${bucketName}/*`] },
+  { permissions: ['s3:ListBucket'], resourceIds: [`arn:aws:s3:::${bucketName}`] },
   { permissions: ['sqs:SendMessage'], resourceIds: [`arn:aws:sqs:${region}:${accountId}:*.fifo`] },
   { permissions: ['ecs:StopTask'], resourceIds: [`arn:aws:ecs:${region}:${accountId}:task/${clusterName}/*`] },
   { permissions: ['logs:CreateLogStream', 'logs:PutLogEvents'], resourceIds: [`arn:aws:logs:${region}:${accountId}:log-group:*`] }

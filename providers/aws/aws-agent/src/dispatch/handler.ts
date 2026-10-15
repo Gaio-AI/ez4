@@ -33,9 +33,10 @@ const readInvocation = async (ports: DispatchPorts, agent: string, id: string) =
 };
 
 const dispatchResult = async (ports: DispatchPorts, agent: string, id: string, invocation: Invocation, result: Result) => {
-  if (!(await ports.putConditional(markerKey(agent, id), (ports.now?.() ?? new Date()).toISOString()))) return;
-  if (!invocation.replyTo) return;
-  await ports.send(invocation.replyTo, JSON.stringify(result), id, agent);
+  const key = markerKey(agent, id);
+  if (await ports.get(key)) return;
+  if (invocation.replyTo) await ports.send(invocation.replyTo, JSON.stringify(result), id, agent);
+  await ports.putConditional(key, (ports.now?.() ?? new Date()).toISOString());
 };
 
 export const dispatchTaskStopped = async (event: unknown, ports: DispatchPorts): Promise<void> => {
@@ -85,7 +86,11 @@ export const dispatchScheduledSweep = async (ports: DispatchPorts): Promise<void
     const invocation = await readInvocation(ports, agent, id);
     if (!invocation?.deadline || Date.parse(invocation.deadline) > now) continue;
     if (await ports.get(markerKey(agent, id))) continue;
-    if (await ports.get(resultKey(agent, id))) continue;
+    const storedResult = await ports.get(resultKey(agent, id));
+    if (storedResult) {
+      await dispatchResult(ports, agent, id, invocation, JSON.parse(storedResult) as Result);
+      continue;
+    }
     if (invocation.taskArn && invocation.cluster && ports.stopTask) {
       await ports.stopTask(invocation.cluster, invocation.taskArn);
     }

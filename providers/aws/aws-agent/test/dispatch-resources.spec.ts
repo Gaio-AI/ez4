@@ -16,6 +16,7 @@ describe('dispatch resources', () => {
     const grants = buildDispatcherGrants('us-east-1', '123', 'b', 'c');
     const resourceIds = grants.flatMap((grant) => grant.resourceIds);
 
+    ok(grants.some((grant) => grant.permissions.includes('s3:ListBucket') && grant.resourceIds.includes('arn:aws:s3:::b')));
     ok(resourceIds.includes('arn:aws:sqs:us-east-1:123:*.fifo'));
     ok(resourceIds.includes('arn:aws:ecs:us-east-1:123:task/c/*'));
   });

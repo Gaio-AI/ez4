@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { deepEqual, equal, ok } from 'node:assert/strict';
+import { deepEqual, equal, ok, rejects } from 'node:assert/strict';
 import type { Agent } from '@ez4/agent';
 import { dispatchDecision, type DispatchPorts } from '../src/dispatch/handler';
 
@@ -79,6 +79,26 @@ describe('dispatcher decisions', () => {
     deepEqual(messages[0], { queueUrl, body: JSON.stringify(result), id, agentName: agent });
   });
 
+  it('retries a failed send before writing the marker and sends only once after success', async () => {
+    const { storage, messages, ports } = makePorts();
+    storage.set(invocationKey, JSON.stringify({ replyTo: queueUrl }));
+    storage.set(resultKey, JSON.stringify({ id, agent, status: 'succeeded', finishedAt: now.toISOString() }));
+    const send = ports.send;
+    let attempts = 0;
+    ports.send = async (...args) => {
+      if (++attempts === 1) throw new Error('SQS unavailable');
+      await send(...args);
+    };
+
+    await rejects(dispatchDecision(stoppedEvent, ports), /SQS unavailable/);
+    equal(storage.has(markerKey), false);
+    await dispatchDecision(stoppedEvent, ports);
+    ok(storage.has(markerKey));
+    await dispatchDecision(stoppedEvent, ports);
+    equal(attempts, 2);
+    equal(messages.length, 1);
+  });
+
   it('records and delivers a failed task_stopped result for a task without output', async () => {
     const { storage, messages, ports } = makePorts();
     storage.set(invocationKey, JSON.stringify({ replyTo: queueUrl, correlation: 'trace' }));
@@ -144,16 +164,20 @@ describe('dispatcher decisions', () => {
     deepEqual(messages, []);
   });
 
-  it('does not time out an overdue invocation that already has a result', async () => {
+  it('dispatches an overdue stored result without timing out or stopping its task', async () => {
     const { storage, messages, stopped, ports } = makePorts();
-    storage.set(invocationKey, JSON.stringify({ deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn' }));
+    storage.set(
+      invocationKey,
+      JSON.stringify({ replyTo: queueUrl, deadline: '2026-10-14T11:59:59.000Z', cluster: 'cluster-1', taskArn: 'task-arn' })
+    );
     const result = JSON.stringify({ id, agent, status: 'succeeded', finishedAt: now.toISOString() });
     storage.set(resultKey, result);
 
     await dispatchDecision({ source: 'aws.events' }, ports);
 
     equal(storage.get(resultKey), result);
+    ok(storage.has(markerKey));
     deepEqual(stopped, []);
-    deepEqual(messages, []);
+    deepEqual(messages.map((message) => message.body), [result]);
   });
 });
