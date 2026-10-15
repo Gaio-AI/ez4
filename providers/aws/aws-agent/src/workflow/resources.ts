@@ -32,6 +32,10 @@ import {
   getWorkflowStartQueueName
 } from '../utils/names';
 import { getWorkflowTemplateFile } from './handler';
+
+// SQS rejects a mapping whose queue visibility timeout is shorter than the function timeout.
+const WORKFLOW_FUNCTION_TIMEOUT = 60;
+
 export type WorkflowResourcePorts = {
   identity?: () => Promise<{ region: string; accountId: string }>;
 };
@@ -83,6 +87,7 @@ export const prepareWorkflowResources = async <E extends EntryState>(
   const startQueueName = getWorkflowStartQueueName(workflow.name, options);
   const startQueue = createQueue(state, undefined, {
     queueName: startQueueName,
+    timeout: WORKFLOW_FUNCTION_TIMEOUT,
     fifoMode: false,
     tags: {
       ...workflow.tags,
@@ -94,6 +99,7 @@ export const prepareWorkflowResources = async <E extends EntryState>(
   const resultsQueue = createQueue(state, undefined, {
     queueName: resultsQueueName.replace(/\.fifo$/, ''),
     fifoMode: true,
+    timeout: WORKFLOW_FUNCTION_TIMEOUT,
     tags: {
       ...workflow.tags,
       ...options.tags
@@ -192,7 +198,7 @@ export const prepareWorkflowResources = async <E extends EntryState>(
     description: workflow.description,
     runtime: RuntimeType.Node22,
     architecture: ArchitectureType.Arm,
-    timeout: 60,
+    timeout: WORKFLOW_FUNCTION_TIMEOUT,
     memory: 256,
     tags: {
       ...workflow.tags,

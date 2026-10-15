@@ -69,6 +69,9 @@ describe('workflow resources and grants', () => {
     equal(functions.length, 1);
     const fn = functions[0];
     equal(fn.parameters.functionName, 'stg-proj-main-agents-review-loop');
+    for (const queue of entries.filter(isQueueState)) {
+      ok((queue.parameters.timeout ?? 30) >= fn.parameters.timeout!, `${queue.parameters.queueName} visibility shorter than the function`);
+    }
   });
 
   it('assert :: workflow role runs only its declared agents', async () => {
