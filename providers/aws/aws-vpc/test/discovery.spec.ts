@@ -12,7 +12,11 @@ const fakeEc2Sg = (groups: Array<{ GroupId: string }>): Ec2ClientPort => ({
 
 describe('VPC tag discovery', () => {
   it('assert :: subnets are returned with their availability zone', async () => {
-    const subnets = await findSubnetsByTag({ key: 'ez4:agents', value: 'true' }, 'vpc-1', fakeEc2([{ SubnetId: 's-1', AvailabilityZone: 'us-east-1b' }]));
+    const subnets = await findSubnetsByTag(
+      { key: 'ez4:agents', value: 'true' },
+      'vpc-1',
+      fakeEc2([{ SubnetId: 's-1', AvailabilityZone: 'us-east-1b' }])
+    );
     deepEqual(subnets, [{ subnetId: 's-1', availabilityZone: 'us-east-1b' }]);
   });
 
