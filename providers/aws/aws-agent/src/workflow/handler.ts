@@ -1,6 +1,6 @@
-import type { SQSEvent, Context } from 'aws-lambda';
+import type { SQSEvent } from 'aws-lambda';
 import type { Agent } from '@ez4/agent';
-import type { WorkflowMessage, WorkflowStore, WorkflowInvoker } from './runtime';
+import type { RunWorkflowStepParameters, WorkflowMessage, WorkflowStore, WorkflowInvoker } from './runtime';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -8,23 +8,10 @@ import { Client } from '../client';
 import { runWorkflowStep } from './runtime';
 import { getWorkflowStateKey } from '../utils/names';
 
+// __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
-type GenericWorkflow = Agent.Workflow<Agent.Input, unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>;
 
-declare function handle(
-  request: Agent.WorkflowRequest<GenericWorkflow>,
-  context: object
-):
-  | Promise<Agent.WorkflowStep<unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>>
-  | Agent.WorkflowStep<unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>;
-declare const __EZ4_CONTEXT: object;
-
-export const getWorkflowTemplateFile = () => {
-  if (typeof __MODULE_PATH !== 'undefined') {
-    return join(__MODULE_PATH, '../src/workflow/template.ts');
-  }
-  return join(import.meta.dirname, 'template.ts');
-};
+export const getWorkflowTemplateFile = () => join(__MODULE_PATH, '../lib/workflow.ts');
 
 const s3 = new S3Client({});
 
@@ -140,7 +127,7 @@ const parseWorkflowMessage = (body: string): WorkflowMessage => {
   throw new Error(`Invalid workflow message format: ${body}`);
 };
 
-export async function workflowEntryPoint(event: SQSEvent, _context: Context): Promise<void> {
+export const handleWorkflowEvent = async (event: SQSEvent, handler: RunWorkflowStepParameters['handler']): Promise<void> => {
   const workflowName = process.env.EZ4_WORKFLOW_NAME ?? 'workflow';
   const bucket = process.env.EZ4_WORKFLOW_BUCKET;
   if (!bucket) {
@@ -157,11 +144,11 @@ export async function workflowEntryPoint(event: SQSEvent, _context: Context): Pr
       workflow: workflowName,
       maxSteps,
       message,
-      handler: (req) => handle(req, typeof __EZ4_CONTEXT !== 'undefined' ? __EZ4_CONTEXT : {}),
+      handler,
       store,
       invoke,
       newId: () => randomUUID(),
       now: () => new Date()
     });
   }
-}
+};

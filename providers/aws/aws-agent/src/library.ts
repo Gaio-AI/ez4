@@ -42,8 +42,7 @@ export {
 } from './utils/names';
 
 export * from './workflow/runtime';
-export * from './workflow/client';
-export * from './workflow/template';
+export * from './workflow/handler';
 export * from './workflow/resources';
 
 export * from './auth/providers';

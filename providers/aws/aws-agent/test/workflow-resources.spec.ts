@@ -9,8 +9,9 @@ import { isQueueState, QueueServiceType } from '@ez4/aws-queue';
 import { isFunctionState, isMappingState } from '@ez4/aws-function';
 import { getDefinitionName } from '@ez4/project/library';
 import { hashData } from '@ez4/utils';
+import { SchemaType } from '@ez4/schema';
 import { buildWorkflowGrants, prepareWorkflowResources } from '../src/workflow/resources';
-import { getInvoker } from '../src/workflow/template';
+import { getInvoker } from '../src/workflow/handler';
 import { prepareLinkedService } from '../src/triggers/client';
 import { getAgentBucketName, getWorkflowStartQueueName } from '../src/utils/names';
 describe('workflow resources and grants', () => {
@@ -23,6 +24,7 @@ describe('workflow resources and grants', () => {
 
   const workflowFixture: AgentWorkflowService = {
     ...createAgentWorkflowService('ReviewLoop'),
+    inputSchema: { type: SchemaType.Object, properties: {} },
     agents: {
       worker: 'Worker'
     },
@@ -139,6 +141,9 @@ describe('workflow resources and grants', () => {
     const startQueueName = getWorkflowStartQueueName(workflowFixture.name, options);
     const startQueueId = hashData(QueueServiceType, startQueueName);
     ok(source.constructor.includes(getDefinitionName<QueueState>(startQueueId, 'queueUrl')));
+    ok(source.constructor.includes(`"workflow":"${workflowFixture.name}"`));
+    ok(source.constructor.includes(`"bucket":"${getAgentBucketName(options)}"`));
+    ok(source.constructor.includes(`"inputSchema":${JSON.stringify(workflowFixture.inputSchema)}`));
     equal(source.dependencyIds?.length, 1);
   });
 });

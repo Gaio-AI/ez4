@@ -22,10 +22,13 @@ export const prepareLinkedService = (event: LinkedAgentEvent): ContextSource | n
     const workflow = service as AgentWorkflowService;
     const startQueueName = getWorkflowStartQueueName(workflow.name, options);
     const startQueueId = hashData(QueueServiceType, startQueueName);
-    const queueUrl = getDefinitionName<QueueState>(startQueueId, 'queueUrl');
+    const startQueueUrl = getDefinitionName<QueueState>(startQueueId, 'queueUrl');
 
     const clientParameters = {
-      queueUrl: `@{EZ4_RAW_EXPRESSION}:${queueUrl}`
+      workflow: workflow.name,
+      startQueueUrl: `@{EZ4_RAW_EXPRESSION}:${startQueueUrl}`,
+      bucket: getAgentBucketName(options),
+      inputSchema: workflow.inputSchema
     };
 
     const constructorParams = JSON.stringify(clientParameters).replace(/"@\{EZ4_RAW_EXPRESSION\}:(.*?)"/g, '$1');

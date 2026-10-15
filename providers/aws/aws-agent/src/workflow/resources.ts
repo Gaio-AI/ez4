@@ -31,7 +31,7 @@ import {
   getWorkflowResultsQueueName,
   getWorkflowStartQueueName
 } from '../utils/names';
-import { getWorkflowTemplateFile } from './template';
+import { getWorkflowTemplateFile } from './handler';
 export type WorkflowResourcePorts = {
   identity?: () => Promise<{ region: string; accountId: string }>;
 };
