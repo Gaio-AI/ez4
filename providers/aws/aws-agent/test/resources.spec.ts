@@ -1,4 +1,4 @@
-import type { DeployOptions, EventContext, PrepareResourceEvent } from '@ez4/project/library';
+import type { ConnectResourceEvent, DeployOptions, EventContext, PrepareResourceEvent } from '@ez4/project/library';
 import type { EntryState, EntryStates, StepContext } from '@ez4/state';
 
 import { describe, it } from 'node:test';
@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 // The package bundler defines __MODULE_PATH; source imports in tests need it set.
 (globalThis as { __MODULE_PATH?: string }).__MODULE_PATH = join(import.meta.dirname, '../dist');
-import { createAgentService } from '@ez4/agent/library';
+import { createAgentService, type AgentService } from '@ez4/agent/library';
 import { createCronService } from '@ez4/scheduler/library';
 import { RoleServiceType, isRoleState } from '@ez4/aws-identity';
 import { BucketServiceType } from '@ez4/aws-bucket';
@@ -19,7 +19,7 @@ import { NamespaceServiceType } from '@ez4/aws-cloudmap';
 import { SecretServiceType, type SecretState } from '@ez4/aws-secret';
 import type { EcsServiceState, EcsTaskDefState } from '@ez4/aws-ecs';
 
-import { prepareAgentResources } from '../src/triggers/resources';
+import { connectAgentResources, prepareAgentResources } from '../src/triggers/resources';
 import { getAgentBucketName, getAgentClusterName, getAgentKey } from '../src/utils/names';
 import { EcrImageServiceType, EcrRepositoryServiceType } from '@ez4/aws-ecr';
 import { EcsClusterServiceType, EcsServiceServiceType, EcsTaskDefServiceType } from '@ez4/aws-ecs';
@@ -85,6 +85,9 @@ describe('agent resources wiring', () => {
       const event = { state, service, metadata, options, context } as PrepareResourceEvent;
       equal(await prepareAgentResources(event, ports), true);
     }
+    for (const service of [first, second]) {
+      await connectAgentResources({ state, service, options, context } as ConnectResourceEvent, ports);
+    }
     equal(countType(state, EcsClusterServiceType), 1);
     equal(countType(state, BucketServiceType), 1);
     equal(countType(state, EcrRepositoryServiceType), 2);
@@ -117,19 +120,49 @@ describe('agent resources wiring', () => {
     equal(Object.keys(state).length, 0);
   });
 
-  it('assert :: a new agent bundle changes the task definition hash, so deploy registers a new revision', async () => {
-    const agent = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
-
-    const prepareWith = async (bundleHash: string) => {
+  it('assert :: a new agent bundle or variable changes the task definition hash, so deploy registers a new revision', async () => {
+    const deployWith = async (bundleHash: string, variables: Record<string, string>) => {
+      const agent = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i', variables } as never;
       const state: EntryStates = {};
       const context = makeContext();
-      const event = { state, service: agent, metadata: { EchoAgent: agent }, options, context } as PrepareResourceEvent;
-      await prepareAgentResources(event, { ...ports, bundle: async () => ({ file: '/tmp/echo.mjs', hash: bundleHash }) });
+      const bundle = async () => ({ file: '/tmp/echo.mjs', hash: bundleHash });
+      await prepareAgentResources({ state, service: agent, metadata: { EchoAgent: agent }, options, context } as PrepareResourceEvent, {
+        ...ports,
+        bundle
+      });
+      await connectAgentResources({ state, service: agent, options, context } as ConnectResourceEvent, { bundle });
       return (context.getServiceState('EchoAgent', options) as EcsTaskDefState).parameters.hash;
     };
 
-    equal(await prepareWith('bundle-a'), await prepareWith('bundle-a'));
-    ok((await prepareWith('bundle-a')) !== (await prepareWith('bundle-b')));
+    equal(await deployWith('bundle-a', { TAG: 'a' }), await deployWith('bundle-a', { TAG: 'a' }));
+    ok((await deployWith('bundle-a', { TAG: 'a' })) !== (await deployWith('bundle-b', { TAG: 'a' })));
+    ok((await deployWith('bundle-a', { TAG: 'a' })) !== (await deployWith('bundle-a', { TAG: 'b' })));
+  });
+
+  it('assert :: the agent bundle and task variables include what linked services add after prepare', async () => {
+    const agent = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i', variables: {} } as AgentService;
+    const state: EntryStates = {};
+    const context = makeContext();
+    await prepareAgentResources({ state, service: agent, metadata: { EchoAgent: agent }, options, context } as PrepareResourceEvent, ports);
+
+    // What deploy's prepareLinkedServices does between prepare and connect.
+    agent.context = { variables: { module: 'Environment', from: '@ez4/common', constructor: 'VariablesClient' } } as never;
+    agent.variables = { LINKED_TAG: 'linked' };
+
+    let bundledContext: AgentService['context'] = {};
+    await connectAgentResources({ state, service: agent, options, context } as ConnectResourceEvent, {
+      bundle: async (bundled) => {
+        bundledContext = bundled.context;
+        return { file: '/tmp/echo.mjs', hash: 'bundlehash' };
+      }
+    });
+    ok(bundledContext.variables);
+
+    const taskdef = context.getServiceState('EchoAgent', options) as EcsTaskDefState;
+    ok(taskdef.dependencies.some((id) => state[id]?.type === EcrImageServiceType));
+    const input = taskdef.parameters.getTaskDefinition({ getDependencies: () => [] } as unknown as StepContext);
+    const environment = input.containerDefinitions?.[0]?.environment ?? [];
+    ok(environment.some(({ name, value }) => name === 'LINKED_TAG' && value === 'linked'));
   });
 
   it('assert :: bucket keys use the agent name verbatim', () => {

@@ -6,7 +6,8 @@ import type { RoleState } from '@ez4/aws-identity';
 import type { ConnectResourceEvent, DeployOptions, PrepareResourceEvent } from '@ez4/project/library';
 import type { NetworkLookup } from '../network/discovery';
 import type { StepContext } from '@ez4/state';
-import type { EcrImageState } from '@ez4/aws-ecr';
+import type { EcrImageState, EcrRepositoryState } from '@ez4/aws-ecr';
+import type { EcsTaskDefState } from '@ez4/aws-ecs';
 import type { SecretState } from '@ez4/aws-secret';
 import type { AccessPointState, MountTargetState } from '@ez4/aws-efs';
 import { AccessPointServiceType, isMountTargetState, createFileSystemStateId, createAccessPointStateId } from '@ez4/aws-efs';
@@ -18,7 +19,7 @@ import { createBucket, createBucketStateId } from '@ez4/aws-bucket';
 import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
 import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
 import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
-import { linkEntryConnection } from '@ez4/state';
+import { linkEntryConnection, linkEntryDependency } from '@ez4/state';
 import { linkServiceContext } from '@ez4/project/library';
 import { hashData, hashObject, toKebabCase } from '@ez4/utils';
 
@@ -31,7 +32,7 @@ import {
   createEcsTaskDefinition,
   EcsServiceServiceName
 } from '@ez4/aws-ecs';
-import { createEcrImage, createEcrRepository, EcrImageServiceType } from '@ez4/aws-ecr';
+import { createEcrImage, createEcrRepository, createEcrRepositoryStateId, EcrImageServiceType } from '@ez4/aws-ecr';
 import { computeImageTag, generateDockerfile } from '../image/dockerfile';
 import { buildTaskDefinitionInput } from '../agent/taskdef';
 import { discoverAgentNetwork } from '../network/discovery';
@@ -256,20 +257,11 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     logGroup: dispatcherLogGroup,
     bundle: ports.dispatcherBundle
   });
-  const repository = createEcrRepository(state, {
+  // The agent bundle and its image come in connect, once the linked services filled the agent's `context` and `variables`.
+  createEcrRepository(state, {
     repositoryName: getAgentRepositoryName(service, options),
     scanOnPush: true,
     tags: options.tags
-  });
-
-  const bundle = await ports.bundle(service, options);
-  const dockerfile = generateDockerfile(service);
-  const image = createEcrImage(state, repository, {
-    imageName: service.name,
-    dockerfile,
-    bundleFile: bundle.file,
-    bundleHash: bundle.hash,
-    imageTag: computeImageTag(dockerfile, bundle.hash)
   });
 
   const workspaceDependencies: string[] = [];
@@ -284,13 +276,9 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     }
   }
 
-  // Project and agent variables reach the agent's hooks (`context.variables`) through the container environment.
-  const variables = { ...options.variables, ...service.variables };
-
   const taskdef = createEcsTaskDefinition(
     state,
     [
-      image.entryId,
       logGroup.entryId,
       taskRole.entryId,
       executionRole.entryId,
@@ -303,11 +291,9 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       subnetIds: network.subnetIds,
       securityGroupIds: network.securityGroupIds,
       tags: options.tags,
-      // Everything the definition is built from that is known before deploy; a new image tag alone registers a revision.
+      // Everything known before linked services resolve; connect folds in the image tag and the variables.
       hash: hashObject({
-        imageTag: image.parameters.imageTag,
         runtime: { resources: service.resources, secrets: service.secrets, workspace: service.workspace },
-        variables,
         region,
         proxyUrl: getAgentProxyUrl(options),
         providerSecret: providerAuth?.envName,
@@ -345,7 +331,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
           baseName: getAgentsBaseName(options),
           bucketName,
           region,
-          variables,
+          // Project, agent and linked-service variables reach the hooks' `context.variables` through the container environment.
+          variables: { ...options.variables, ...service.variables },
           proxy: {
             url: getAgentProxyUrl(options),
             secretArn: proxySecretArn
@@ -367,14 +354,35 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   return true;
 };
 
-export const connectAgentResources = (event: ConnectResourceEvent): void => {
+export const connectAgentResources = async (event: ConnectResourceEvent, ports: Pick<AgentResourcePorts, 'bundle'> = defaultPorts) => {
   const { state, service, options, context } = event;
   if (isAgentWorkflowService(service)) {
     linkServiceContext(state, context.getServiceState(service, options).entryId, service.context ?? {});
     return;
   }
   if (!isAgentService(service)) return;
-  const taskdef = context.getServiceState(service, options);
+  const taskdef = context.getServiceState(service, options) as EcsTaskDefState;
+  linkServiceContext(state, taskdef.entryId, service.context ?? {});
+
+  // The hooks bundle the clients of the agent's linked services, filled in only after prepare.
+  const bundle = await ports.bundle(service, options);
+  const dockerfile = generateDockerfile(service);
+  const repository = state[createEcrRepositoryStateId(getAgentRepositoryName(service, options))] as EcrRepositoryState;
+  const image = createEcrImage(state, repository, {
+    imageName: service.name,
+    dockerfile,
+    bundleFile: bundle.file,
+    bundleHash: bundle.hash,
+    imageTag: computeImageTag(dockerfile, bundle.hash)
+  });
+  linkEntryDependency(state, taskdef.entryId, image.entryId);
+  // A new image tag or variable registers a new revision.
+  taskdef.parameters.hash = hashObject({
+    definition: taskdef.parameters.hash,
+    imageTag: image.parameters.imageTag,
+    variables: { ...options.variables, ...service.variables }
+  });
+
   linkEntryConnection(state, taskdef.entryId, createEcsClusterStateId(getAgentClusterName(options)));
   linkEntryConnection(state, taskdef.entryId, createBucketStateId(getAgentBucketName(options)));
   if (service.workspace) {
