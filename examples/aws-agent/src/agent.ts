@@ -1,4 +1,4 @@
-import { Agent } from '@ez4/agent';
+import { Agent, AgentPermission } from '@ez4/agent';
 
 export interface EchoInput {
   message: string;
@@ -42,4 +42,52 @@ export function echoStep(request: Agent.WorkflowRequest<EchoFlow>): Agent.Workfl
   }
 
   return { state: { echoes: 1 }, next: { complete: request.event.result.status } };
+}
+
+export interface LogsInput {
+  logGroups: string[];
+}
+
+export interface LogsOutput {
+  messages: string[];
+  denied: string[];
+}
+
+export declare class LogsAgent extends Agent.Service<LogsInput, LogsOutput> {
+  provider: 'claude';
+  model: 'claude-sonnet-4-5';
+  instructions: 'For each log group in the input, run `aws logs tail <group> --since 1d --format short`. Return the text of every event you read in messages, without its timestamp, and every log group whose command failed with an access error in denied.';
+  input: LogsInput;
+  output: LogsOutput;
+  tools: {
+    mode: 'readonly';
+    allowed: ['Bash(aws logs tail:*)'];
+  };
+  image: {
+    aptPackages: ['awscli'];
+  };
+  permissions: {
+    // Log groups named `<prefix>-aws-agent-app-*`: the deploy prefix is applied by ez4.
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['aws-agent-app-*'] }];
+  };
+  resources: {
+    cpu: 1024;
+    memory: 2048;
+    timeout: 300;
+  };
+}
+
+export declare class LogsFlow extends Agent.Workflow<LogsInput, { reads: number }, { logs: LogsAgent }> {
+  input: LogsInput;
+  agents: { logs: LogsAgent };
+  maxSteps: 2;
+  handler: typeof logsStep;
+}
+
+export function logsStep(request: Agent.WorkflowRequest<LogsFlow>): Agent.WorkflowStep<{ reads: number }, { logs: LogsAgent }> {
+  if (request.event.type === 'start') {
+    return { state: { reads: 0 }, next: { invoke: 'logs', input: request.event.input } };
+  }
+
+  return { state: { reads: 1 }, next: { complete: request.event.result.status } };
 }
