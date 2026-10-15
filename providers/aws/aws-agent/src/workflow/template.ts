@@ -14,7 +14,9 @@ type GenericWorkflow = Agent.Workflow<Agent.Input, unknown, Record<string, Agent
 declare function handle(
   request: Agent.WorkflowRequest<GenericWorkflow>,
   context: object
-): Promise<Agent.WorkflowStep<unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>> | Agent.WorkflowStep<unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>;
+):
+  | Promise<Agent.WorkflowStep<unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>>
+  | Agent.WorkflowStep<unknown, Record<string, Agent.Service<Agent.Input, Agent.Output>>>;
 declare const __EZ4_CONTEXT: object;
 
 export const getWorkflowTemplateFile = () => {
@@ -86,14 +88,9 @@ const getInvoker = (workflow: string): WorkflowInvoker => {
           const rawParams = JSON.parse(value);
           const params = {
             ...rawParams,
-            subnets:
-              typeof rawParams.subnets === 'string'
-                ? rawParams.subnets.split(',').filter(Boolean)
-                : rawParams.subnets,
+            subnets: typeof rawParams.subnets === 'string' ? rawParams.subnets.split(',').filter(Boolean) : rawParams.subnets,
             securityGroups:
-              typeof rawParams.securityGroups === 'string'
-                ? rawParams.securityGroups.split(',').filter(Boolean)
-                : rawParams.securityGroups
+              typeof rawParams.securityGroups === 'string' ? rawParams.securityGroups.split(',').filter(Boolean) : rawParams.securityGroups
           };
           const client = Client.make(params);
           agentClients.set(alias, client);

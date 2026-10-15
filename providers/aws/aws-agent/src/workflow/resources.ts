@@ -6,7 +6,15 @@ import type { RoleState, PolicyState } from '@ez4/aws-identity';
 import type { QueueState } from '@ez4/aws-queue';
 import type { EcsClusterState, EcsTaskDefState } from '@ez4/aws-ecs';
 
-import { createPolicy, createRole, createPolicyDocument, createRoleDocument, createRoleStatement, getRegion, getAccountId } from '@ez4/aws-identity';
+import {
+  createPolicy,
+  createRole,
+  createPolicyDocument,
+  createRoleDocument,
+  createRoleStatement,
+  getRegion,
+  getAccountId
+} from '@ez4/aws-identity';
 import { createLogGroup } from '@ez4/aws-logs';
 import { createFunction } from '@ez4/aws-function';
 import { createQueue, createMapping } from '@ez4/aws-queue';
@@ -113,11 +121,7 @@ export const prepareWorkflowResources = async <E extends EntryState>(
   const role = createRole(state, [policy], {
     roleName: `${functionName}-role`,
     roleDocument: createRoleDocument([
-      createRoleStatement(
-        { permissions: ['sts:AssumeRole'], resourceIds: [] },
-        [{ account: 'lambda.amazonaws.com' }],
-        accountId
-      )
+      createRoleStatement({ permissions: ['sts:AssumeRole'], resourceIds: [] }, [{ account: 'lambda.amazonaws.com' }], accountId)
     ]),
     tags: options.tags
   }) as RoleState;
