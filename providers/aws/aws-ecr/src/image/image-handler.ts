@@ -2,7 +2,7 @@ import type { StepContext, StepHandler } from '@ez4/state';
 import type { EcrRepositoryState } from '../repository/types';
 import type { EcrImageResult, EcrImageState } from './state';
 
-import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { CorruptedResourceError, IncompleteResourceError, OperationLogger } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
 import { buildAndPushImage } from './build';
@@ -13,7 +13,8 @@ import { EcrImageServiceName } from './state';
 export const getEcrImageHandler = (): StepHandler<EcrImageState> => ({
   equals: equalsResource,
   create: createResource,
-  replace: replaceResource,
+  // A new tag is a new push; the previous image goes with the repository lifecycle.
+  replace: (candidate, _current, context) => createResource(candidate, context),
   preview: previewResource,
   update: updateResource,
   delete: deleteResource
@@ -43,14 +44,6 @@ const previewResource = (candidate: EcrImageState, current: EcrImageState) => {
     ...changes,
     name: target.imageName
   };
-};
-
-const replaceResource = async (candidate: EcrImageState, current: EcrImageState, context: StepContext) => {
-  if (current.result) {
-    throw new ReplaceResourceError(EcrImageServiceName, candidate.entryId, current.entryId);
-  }
-
-  return createResource(candidate, context);
 };
 
 const createResource = (candidate: EcrImageState, context: StepContext): Promise<EcrImageResult> => {
