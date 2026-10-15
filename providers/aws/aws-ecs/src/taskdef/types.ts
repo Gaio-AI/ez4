@@ -1,23 +1,18 @@
+import type { RegisterTaskDefinitionCommandInput } from '@aws-sdk/client-ecs';
 import type { ResourceTags } from '@ez4/aws-common';
-import type { EntryState } from '@ez4/state';
-import type { AgentService } from '@ez4/agent/library';
+import type { EntryState, StepContext } from '@ez4/state';
 
 export const EcsTaskDefServiceName = 'AWS:ECS/TaskDefinition';
-
 export const EcsTaskDefServiceType = 'aws:ecs.taskdef';
 
-export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets'>;
-
 export type EcsTaskDefParameters = {
-  agentName: string;
-  baseName: string;
-  agent: AgentRuntimeFields;
-  bucketName: string;
-  region: string;
+  family: string;
+  getTaskDefinition: (context: StepContext) => RegisterTaskDefinitionCommandInput;
+  hash: string;
   subnetIds: string[];
   securityGroupIds: string[];
-  proxyUrl?: string;
   tags?: ResourceTags;
+  [key: string]: unknown;
 };
 
 export type EcsTaskDefResult = {

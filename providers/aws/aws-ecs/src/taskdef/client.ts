@@ -9,7 +9,7 @@ import { getEcsClient, getEcsTagList } from '../cluster/client';
 
 export const registerTaskDefinition = async (
   logger: OperationLogLine,
-  parameters: { agentName: string; taskDefinition: RegisterTaskDefinitionCommandInput; tags?: ResourceTags }
+  parameters: { family: string; taskDefinition: RegisterTaskDefinitionCommandInput; tags?: ResourceTags }
 ): Promise<Omit<EcsTaskDefResult, 'subnetIds' | 'securityGroupIds'>> => {
   logger.update('Registering ECS task definition');
 
@@ -25,7 +25,7 @@ export const registerTaskDefinition = async (
   const def = response.taskDefinition;
 
   if (!def?.taskDefinitionArn || !def?.family || def.revision === undefined) {
-    throw new Error(`Failed to register task definition for ${parameters.agentName}`);
+    throw new Error(`Failed to register task definition for ${parameters.family}`);
   }
 
   return {
