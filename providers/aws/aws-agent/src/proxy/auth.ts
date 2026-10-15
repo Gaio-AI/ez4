@@ -39,14 +39,7 @@ export const md5Crypt = (password: string, salt: string): string => {
   }
 
   // Byte groups in the order crypt(3) emits them; the last group holds a single byte.
-  const groups = [
-    [0, 6, 12],
-    [1, 7, 13],
-    [2, 8, 14],
-    [3, 9, 15],
-    [4, 10, 5],
-    [11]
-  ];
+  const groups = [[0, 6, 12], [1, 7, 13], [2, 8, 14], [3, 9, 15], [4, 10, 5], [11]];
 
   let hash = '';
 
