@@ -6,12 +6,14 @@ import type { AgentProvider } from './types';
 import { validate, createValidatorContext, getErrorDetails } from '@ez4/validator';
 import { createArtifactsClient } from './artifacts';
 import { createTimeoutTimer } from './timer';
+import { checkoutWorkspace, publishWorkspace, type WorkspaceRuntime } from '../workspace/runtime';
 
 export interface InvocationEnvelope {
   input: unknown;
   correlation?: string;
   replyTo?: string;
   deadline?: string;
+  workspace?: Agent.WorkspaceRef[];
 }
 
 export interface RunAgentRuntimeParameters {
@@ -31,6 +33,7 @@ export interface RunAgentRuntimeParameters {
   context?: object;
   workdir?: string;
   env?: Record<string, string>;
+  workspace?: WorkspaceRuntime;
 }
 
 export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Promise<number> => {
@@ -50,7 +53,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     timeoutSeconds,
     context = {},
     workdir = process.cwd(),
-    env = {}
+    env = {},
+    workspace
   } = parameters;
 
   const timer = createTimeoutTimer(timeoutSeconds);
@@ -79,6 +83,11 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     const artifacts = createArtifactsClient(storage, agentName, invocationId);
     let effectivePrompt = typeof envelope.input === 'string' ? envelope.input : JSON.stringify(envelope.input);
     let effectiveWorkdir = workdir;
+    let workspaceRequest: Agent.WorkspaceRequest | undefined;
+
+    if (workspace) {
+      workspaceRequest = await checkoutWorkspace(workspace, effectiveWorkdir, envelope.workspace);
+    }
 
     if (prepare) {
       try {
@@ -87,7 +96,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
             id: invocationId,
             input: envelope.input,
             workdir: effectiveWorkdir,
-            artifacts
+            artifacts,
+            workspace: workspaceRequest
           },
           context as CommonService.Context<Agent.Service<any, any>>
         );
@@ -162,6 +172,11 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     }
 
     let effectiveOutput = providerResponse.output;
+    let workspaceRefs: Agent.WorkspaceRef[] | undefined;
+
+    if (workspace && workspaceRequest && tools.mode === 'edit') {
+      workspaceRefs = await publishWorkspace(workspace, workspaceRequest, agentName, invocationId);
+    }
 
     if (finish) {
       try {
@@ -171,7 +186,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
             input: envelope.input,
             output: providerResponse.output,
             workdir: effectiveWorkdir,
-            artifacts
+            artifacts,
+            workspace: workspaceRequest ? { ...workspaceRequest, refs: workspaceRefs ?? [] } : undefined
           },
           context as CommonService.Context<Agent.Service<any, any>>
         );
@@ -209,6 +225,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       agent: agentName,
       status: 'succeeded',
       output: effectiveOutput,
+      workspace: workspaceRefs,
       correlation,
       finishedAt: new Date().toISOString()
     });

@@ -5,7 +5,8 @@ import type { AgentProvider } from './types';
 import { runAgentRuntime } from './main';
 import { createS3Storage } from './storage';
 import { AgentProviders } from './providers/index';
-
+import { WORKSPACE_MOUNT_PATH, type WorkspaceRuntime } from '../workspace/runtime';
+import { mintInstallationToken } from '../workspace/github';
 export type AgentEntryDefinition = {
   name: string;
   provider: Agent.ProviderName;
@@ -53,16 +54,44 @@ export const readAgentEnvironment = (env: Record<string, string | undefined>) =>
   timeoutSeconds: Number(required(env, 'EZ4_AGENT_TIMEOUT'))
 });
 
+export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>): WorkspaceRuntime | undefined => {
+  if (!env.EZ4_AGENT_WORKSPACE) {
+    return undefined;
+  }
+  const workspaceMeta = JSON.parse(env.EZ4_AGENT_WORKSPACE);
+  let token: (() => Promise<string | undefined>) | undefined;
+
+  if (env.EZ4_WORKSPACE_GITHUB_APP) {
+    const { GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY } = JSON.parse(env.EZ4_WORKSPACE_GITHUB_APP);
+    token = () =>
+      mintInstallationToken({
+        appId: GITHUB_APP_ID,
+        installationId: GITHUB_APP_INSTALLATION_ID,
+        privateKeyPem: GITHUB_APP_PRIVATE_KEY
+      });
+  } else if (env.EZ4_WORKSPACE_TOKEN) {
+    const secretToken = env.EZ4_WORKSPACE_TOKEN;
+    token = async () => secretToken;
+  }
+
+  return {
+    root: WORKSPACE_MOUNT_PATH,
+    workspace: workspaceMeta,
+    token
+  };
+};
+
 export const startAgent = async (
   definition: AgentEntryDefinition,
   handlers: Function[],
   context: object,
   env: Record<string, string | undefined> = process.env,
-  ports: { storage?: AgentStorage; provider?: AgentProvider } = {}
+  ports: { storage?: AgentStorage; provider?: AgentProvider; workspace?: WorkspaceRuntime } = {}
 ): Promise<number> => {
   applyProxyEnvironment(env);
   const { agentName, invocationId, bucketName, timeoutSeconds } = readAgentEnvironment(env);
   const hook = (index: number) => (index >= 0 ? handlers[index] : undefined);
+  const workspace = ports.workspace ?? resolveWorkspaceRuntime(env);
   return runAgentRuntime({
     agentName,
     invocationId,
@@ -77,6 +106,7 @@ export const startAgent = async (
     outputSchema: definition.outputSchema,
     prepare: hook(definition.hooks.prepare) as never,
     finish: hook(definition.hooks.finish) as never,
-    context
+    context,
+    workspace
   });
 };

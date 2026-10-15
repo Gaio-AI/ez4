@@ -1,11 +1,15 @@
 import { describe, it } from 'node:test';
 import { equal, deepEqual, ok } from 'node:assert/strict';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runAgentRuntime } from '../src/runtime/main';
 import type { AgentStorage } from '../src/runtime/storage';
 import type { AgentProvider, AgentProviderRequest, AgentProviderResponse } from '../src/runtime/types';
+import { defaultGit } from '../src/workspace/git';
+import type { WorkspaceRuntime } from '../src/workspace/runtime';
 import { SchemaType, type ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
-
 describe('runtime :: execution lifecycle', () => {
   type TestAgentService = Agent.Service<{ task: string }, { result: string }>;
 
@@ -291,5 +295,163 @@ describe('runtime :: execution lifecycle', () => {
     equal(result.status, 'timed_out');
     equal(result.error?.code, 'timeout');
     equal(result.correlation, 'corr-timeout');
+  });
+
+  it('assert :: finish receives workspace.refs and Result.workspace equals them', async () => {
+    const memory = new Map<string, string>();
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string) => {
+        const val = memory.get(key);
+        if (!val) throw new Error(`Not found: ${key}`);
+        return JSON.parse(val) as T;
+      },
+      writeJson: async <T>(key: string, data: T) => {
+        memory.set(key, JSON.stringify(data));
+      },
+      getBuffer: async () => undefined,
+      putBuffer: async () => {}
+    };
+
+    const invocationId = 'inv-ws-1';
+    const agentName = 'test-agent';
+    await storage.writeJson(`invocations/${agentName}/${invocationId}.json`, {
+      input: { task: 'edit repo' }
+    });
+
+    const remoteDir = await mkdtemp(join(tmpdir(), 'remotes-'));
+    const rootDir = await mkdtemp(join(tmpdir(), 'ws-root-'));
+    const workdir = await mkdtemp(join(tmpdir(), 'wd-'));
+    const remotePath = join(remoteDir, 'api.git');
+    await mkdir(remotePath, { recursive: true });
+    await defaultGit(['init', '--bare', remotePath], { cwd: remoteDir });
+
+    const seedDir = await mkdtemp(join(tmpdir(), 'seed-'));
+    await defaultGit(['init', '-b', 'main', seedDir], { cwd: seedDir });
+    await writeFile(join(seedDir, 'README.md'), '# api\n');
+    await defaultGit(['add', '.'], { cwd: seedDir });
+    await defaultGit(['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'], { cwd: seedDir });
+    await defaultGit(['push', remotePath, 'main'], { cwd: seedDir });
+    await rm(seedDir, { recursive: true, force: true });
+
+    const workspace: WorkspaceRuntime = {
+      root: rootDir,
+      workspace: {
+        repos: [{ name: 'api', url: `file://${remotePath}`, branch: 'main' }]
+      }
+    };
+
+    let finishWorkspaceRefs: Agent.WorkspaceRef[] | undefined;
+    const fakeProvider: AgentProvider = {
+      run: async (req) => {
+        await writeFile(join(req.workdir, 'api', 'newfile.txt'), 'hello');
+        return { output: { result: 'done' } };
+      }
+    };
+
+    const exitCode = await runAgentRuntime({
+      agentName,
+      invocationId,
+      inputSchema,
+      outputSchema,
+      storage,
+      provider: fakeProvider,
+      tools: { mode: 'edit' },
+      mcpServers: {},
+      instructions: 'test',
+      model: 'test',
+      timeoutSeconds: 30,
+      workdir,
+      workspace,
+      finish: async (req) => {
+        finishWorkspaceRefs = req.workspace?.refs;
+        return req.output as { result: string };
+      }
+    });
+
+    equal(exitCode, 0);
+    ok(finishWorkspaceRefs && finishWorkspaceRefs.length > 0);
+    equal(finishWorkspaceRefs[0].changed, true);
+
+    const result = await storage.readJson<Agent.Result<TestAgentService>>(`results/${agentName}/${invocationId}.json`);
+    equal(result.status, 'succeeded');
+    deepEqual(result.workspace, finishWorkspaceRefs);
+  });
+
+  it('assert :: a readonly agent publishes nothing', async () => {
+    const memory = new Map<string, string>();
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string) => {
+        const val = memory.get(key);
+        if (!val) throw new Error(`Not found: ${key}`);
+        return JSON.parse(val) as T;
+      },
+      writeJson: async <T>(key: string, data: T) => {
+        memory.set(key, JSON.stringify(data));
+      },
+      getBuffer: async () => undefined,
+      putBuffer: async () => {}
+    };
+
+    const invocationId = 'inv-ws-2';
+    const agentName = 'test-agent';
+    await storage.writeJson(`invocations/${agentName}/${invocationId}.json`, {
+      input: { task: 'read repo' }
+    });
+
+    const remoteDir = await mkdtemp(join(tmpdir(), 'remotes-'));
+    const rootDir = await mkdtemp(join(tmpdir(), 'ws-root-'));
+    const workdir = await mkdtemp(join(tmpdir(), 'wd-'));
+    const remotePath = join(remoteDir, 'api.git');
+    await mkdir(remotePath, { recursive: true });
+    await defaultGit(['init', '--bare', remotePath], { cwd: remoteDir });
+
+    const seedDir = await mkdtemp(join(tmpdir(), 'seed-'));
+    await defaultGit(['init', '-b', 'main', seedDir], { cwd: seedDir });
+    await writeFile(join(seedDir, 'README.md'), '# api\n');
+    await defaultGit(['add', '.'], { cwd: seedDir });
+    await defaultGit(['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'], { cwd: seedDir });
+    await defaultGit(['push', remotePath, 'main'], { cwd: seedDir });
+    await rm(seedDir, { recursive: true, force: true });
+
+    const workspace: WorkspaceRuntime = {
+      root: rootDir,
+      workspace: {
+        repos: [{ name: 'api', url: `file://${remotePath}`, branch: 'main' }]
+      }
+    };
+
+    let finishWorkspaceRefs: Agent.WorkspaceRef[] | undefined;
+    const fakeProvider: AgentProvider = {
+      run: async () => {
+        return { output: { result: 'done' } };
+      }
+    };
+
+    const exitCode = await runAgentRuntime({
+      agentName,
+      invocationId,
+      inputSchema,
+      outputSchema,
+      storage,
+      provider: fakeProvider,
+      tools: { mode: 'readonly' },
+      mcpServers: {},
+      instructions: 'test',
+      model: 'test',
+      timeoutSeconds: 30,
+      workdir,
+      workspace,
+      finish: async (req) => {
+        finishWorkspaceRefs = req.workspace?.refs;
+        return req.output as { result: string };
+      }
+    });
+
+    equal(exitCode, 0);
+    equal(finishWorkspaceRefs?.length ?? 0, 0);
+
+    const result = await storage.readJson<Agent.Result<TestAgentService>>(`results/${agentName}/${invocationId}.json`);
+    equal(result.status, 'succeeded');
+    equal(result.workspace, undefined);
   });
 });

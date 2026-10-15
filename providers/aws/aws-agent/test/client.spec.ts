@@ -26,6 +26,7 @@ interface StoredInvocation {
   deadline: string;
   cluster: string;
   taskArn?: string;
+  workspace?: Agent.WorkspaceRef[];
 }
 
 describe('client :: agent client', () => {
@@ -410,6 +411,39 @@ describe('client :: agent client', () => {
     });
     await client.invoke({}, { id: 'id-9' });
     deepEqual(lastRunTaskInput?.clientToken, 'id-9');
+  });
+
+  it('assert :: options.workspace is stored in the invocation envelope', async () => {
+    let storedInvocation: StoredInvocation | undefined;
+    const s3 = {
+      send: async (cmd: unknown) => {
+        if (cmd instanceof PutObjectCommand && typeof cmd.input.Body === 'object') {
+          const bodyStr = cmd.input.Body.toString('utf-8');
+          storedInvocation = JSON.parse(bodyStr);
+        }
+        return {};
+      }
+    } as unknown as S3Client;
+    const ecs = {
+      send: async () => ({ tasks: [{ taskArn: 'arn:aws:ecs:us-east-1:123:task/abc' }] })
+    } as unknown as ECSClient;
+
+    const client = Client.make({
+      agentName: 'Worker',
+      cluster: 'arn:aws:ecs:us-east-1:123:cluster/test-cluster',
+      taskDefinition: 'arn:aws:ecs:us-east-1:123:task-definition/worker:1',
+      bucket: 'ez4-agents-bucket',
+      subnets: ['subnet-1'],
+      securityGroups: ['sg-agents'],
+      inputSchema: { type: SchemaType.Object, properties: {} },
+      s3Client: s3,
+      ecsClient: ecs
+    });
+
+    const workspaceRefs: Agent.WorkspaceRef[] = [{ repo: 'api', base: 'sha1', head: 'sha2', ref: 'refs/ez4/Agent/inv-1', changed: true }];
+
+    await client.invoke({}, { id: 'inv-ws-1', workspace: workspaceRefs });
+    deepEqual(storedInvocation?.workspace, workspaceRefs);
   });
 });
 
