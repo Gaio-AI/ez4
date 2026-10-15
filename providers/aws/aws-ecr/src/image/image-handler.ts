@@ -1,13 +1,13 @@
 import type { StepContext, StepHandler } from '@ez4/state';
-import type { EcrRepositoryState } from './types';
+import type { EcrRepositoryState } from '../repository/types';
 import type { EcrImageResult, EcrImageState } from './state';
 
 import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
 import { buildAndPushImage } from './build';
-import { checkImageExists } from './client';
-import { EcrRepositoryServiceType } from './types';
+import { checkImageExists } from '../repository/client';
+import { EcrRepositoryServiceType } from '../repository/types';
 import { EcrImageServiceName } from './state';
 
 export const getEcrImageHandler = (): StepHandler<EcrImageState> => ({
@@ -24,10 +24,10 @@ const equalsResource = (candidate: EcrImageState, current: EcrImageState) => {
 };
 
 const previewResource = (candidate: EcrImageState, current: EcrImageState) => {
-  const { agentName, dockerfile, bundleHash, imageTag } = candidate.parameters;
-  const target = { agentName, dockerfile, bundleHash, imageTag };
+  const { imageName, dockerfile, bundleHash, imageTag } = candidate.parameters;
+  const target = { imageName, dockerfile, bundleHash, imageTag };
   const source = {
-    agentName: current.parameters.agentName,
+    imageName: current.parameters.imageName,
     dockerfile: current.parameters.dockerfile,
     bundleHash: current.parameters.bundleHash,
     imageTag: current.parameters.imageTag
@@ -41,7 +41,7 @@ const previewResource = (candidate: EcrImageState, current: EcrImageState) => {
 
   return {
     ...changes,
-    name: target.agentName
+    name: target.imageName
   };
 };
 
@@ -56,7 +56,7 @@ const replaceResource = async (candidate: EcrImageState, current: EcrImageState,
 const createResource = (candidate: EcrImageState, context: StepContext): Promise<EcrImageResult> => {
   const parameters = candidate.parameters;
 
-  return OperationLogger.logExecution(EcrImageServiceName, parameters.agentName, 'creation', async () => {
+  return OperationLogger.logExecution(EcrImageServiceName, parameters.imageName, 'creation', async () => {
     const repository = context.getDependencies<EcrRepositoryState>(EcrRepositoryServiceType).at(0);
     const repositoryUri = repository?.result?.repositoryUri;
 
@@ -68,7 +68,7 @@ const createResource = (candidate: EcrImageState, context: StepContext): Promise
 
     if (!(await checkImageExists(repositoryName, parameters.imageTag))) {
       await buildAndPushImage({
-        agentName: parameters.agentName,
+        agentName: parameters.imageName,
         repositoryUri,
         dockerfile: parameters.dockerfile,
         bundleHash: parameters.bundleHash,
@@ -84,11 +84,11 @@ const createResource = (candidate: EcrImageState, context: StepContext): Promise
 
 const updateResource = async (candidate: EcrImageState, _current: EcrImageState, context: StepContext): Promise<EcrImageResult | void> => {
   const { result, parameters } = candidate;
-  const { agentName } = parameters;
+  const { imageName } = parameters;
 
-  return OperationLogger.logExecution(EcrImageServiceName, agentName, 'updates', async () => {
+  return OperationLogger.logExecution(EcrImageServiceName, imageName, 'updates', async () => {
     if (!result) {
-      throw new CorruptedResourceError(EcrImageServiceName, agentName);
+      throw new CorruptedResourceError(EcrImageServiceName, imageName);
     }
 
     const repository = context.getDependencies<EcrRepositoryState>(EcrRepositoryServiceType).at(0);
@@ -102,7 +102,7 @@ const updateResource = async (candidate: EcrImageState, _current: EcrImageState,
 
     if (!(await checkImageExists(repositoryName, parameters.imageTag))) {
       await buildAndPushImage({
-        agentName: parameters.agentName,
+        agentName: parameters.imageName,
         repositoryUri,
         dockerfile: parameters.dockerfile,
         bundleHash: parameters.bundleHash,

@@ -1,5 +1,5 @@
 import type { EntryState, EntryStates } from '@ez4/state';
-import type { EcrRepositoryState } from './types';
+import type { EcrRepositoryState } from '../repository/types';
 
 import { attachEntry } from '@ez4/state';
 import { hashData, toKebabCase } from '@ez4/utils';
@@ -9,7 +9,17 @@ export const EcrImageServiceName = 'AWS:ECR/Image';
 export const EcrImageServiceType = 'aws:ecr.image';
 
 export type EcrImageParameters = {
-  agentName: string;
+  imageName: string;
+  agentName?: string;
+  dockerfile: string;
+  bundleFile: string;
+  bundleHash: string;
+  imageTag: string;
+};
+
+export type EcrImageInput = {
+  imageName?: string;
+  agentName?: string;
   dockerfile: string;
   bundleFile: string;
   bundleHash: string;
@@ -26,25 +36,30 @@ export type EcrImageState = EntryState & {
   result?: EcrImageResult;
 };
 
-export const createEcrImageStateId = (agentName: string) => {
-  return hashData(EcrImageServiceType, toKebabCase(agentName));
+export const createEcrImageStateId = (imageName: string) => {
+  return hashData(EcrImageServiceType, toKebabCase(imageName));
 };
 
 export const isEcrImageState = (entry: EntryState): entry is EcrImageState => {
   return entry.type === EcrImageServiceType;
 };
 
-export const createAgentImage = <E extends EntryState>(
+export const createEcrImage = <E extends EntryState>(
   state: EntryStates<E>,
   repository: EcrRepositoryState,
-  parameters: EcrImageParameters
+  parameters: EcrImageInput
 ): EcrImageState => {
-  const entryId = createEcrImageStateId(parameters.agentName);
+  const imageName = parameters.imageName ?? parameters.agentName ?? 'image';
+  const entryId = createEcrImageStateId(imageName);
 
   return attachEntry<E | EcrImageState, EcrImageState>(state, {
     type: EcrImageServiceType,
     entryId,
     dependencies: [repository.entryId],
-    parameters
+    parameters: {
+      ...parameters,
+      imageName
+    }
   });
 };
+export const createAgentImage = createEcrImage;

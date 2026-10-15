@@ -52,6 +52,8 @@
     "providers/docs/docs-topology",
     "providers/aws/aws-common",
     "providers/aws/aws-agent",
+    "providers/aws/aws-ecr",
+    "providers/aws/aws-ecs",
     "providers/aws/aws-identity",
     "providers/aws/aws-logs",
     "providers/aws/aws-vpc",

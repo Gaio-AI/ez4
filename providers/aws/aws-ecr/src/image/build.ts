@@ -6,7 +6,7 @@ import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { MissingDockerCliError } from './errors';
-import { checkImageExists, fetchAuthorizationToken } from './client';
+import { checkImageExists, fetchAuthorizationToken } from '../repository/client';
 import { computeImageTag } from './dockerfile';
 
 export const isDockerAvailable = (): boolean => {

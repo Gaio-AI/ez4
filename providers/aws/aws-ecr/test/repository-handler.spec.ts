@@ -1,10 +1,10 @@
 import type { StepOptions } from '@ez4/state';
-import type { EcrRepositoryState } from '../src/image/types';
+import type { EcrRepositoryState } from '../src/repository/types';
 import { describe, it } from 'node:test';
 import { ok, equal } from 'node:assert/strict';
-import { createEcrRepository, createEcrRepositoryStateId } from '../src/image/service';
-import { getEcrRepositoryHandler } from '../src/image/handler';
-import { EcrRepositoryServiceType } from '../src/image/types';
+import { createEcrRepository, createEcrRepositoryStateId } from '../src/repository/service';
+import { getEcrRepositoryHandler } from '../src/repository/handler';
+import { EcrRepositoryServiceType } from '../src/repository/types';
 
 describe('ECR repository step handler', () => {
   it('assert :: creates repository state entry with correct parameters and ID', () => {
