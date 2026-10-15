@@ -5,8 +5,5 @@
     "moduleResolution": "bundler",
     "module": "preserve"
   },
-  "include": [
-    "./src",
-    "./test"
-  ]
+  "include": ["./src", "./test"]
 }

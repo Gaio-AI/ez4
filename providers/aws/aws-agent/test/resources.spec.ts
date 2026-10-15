@@ -106,14 +106,7 @@ describe('agent resources wiring', () => {
     const dependencyTypes = taskdef.dependencies.map((id) => state[id]!.type).sort();
     deepEqual(
       dependencyTypes,
-      [
-        EcrImageServiceType,
-        LogGroupServiceType,
-        RoleServiceType,
-        RoleServiceType,
-        SecretServiceType,
-        SecretServiceType
-      ].sort()
+      [EcrImageServiceType, LogGroupServiceType, RoleServiceType, RoleServiceType, SecretServiceType, SecretServiceType].sort()
     );
   });
 
@@ -161,8 +154,7 @@ describe('agent resources wiring', () => {
 
     const proxyService = Object.values(state).find((entry): entry is ProxyServiceState => entry?.type === ProxyServiceServiceType)!;
     const credentialEntries = Object.values(state).filter(
-      (entry): entry is SecretState =>
-        isSecretState(entry) && (entry.parameters.description?.includes('proxy credentials') ?? false)
+      (entry): entry is SecretState => isSecretState(entry) && (entry.parameters.description?.includes('proxy credentials') ?? false)
     );
     equal(credentialEntries.length, 2);
     for (const cred of credentialEntries) {
