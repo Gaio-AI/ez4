@@ -24,6 +24,10 @@ export declare class FullAgent extends Agent.Service<FullInput, FullOutput> {
       command: 'npx';
       args: ['-y', '@modelcontextprotocol/server-github'];
     };
+    remote: {
+      url: 'https://mcp.example.com';
+      headers: { Authorization: 'Bearer token' };
+    };
   };
   prepare: typeof prepareAgent;
   finish: typeof finishAgent;
@@ -51,6 +55,7 @@ export declare class FullAgent extends Agent.Service<FullInput, FullOutput> {
   egress: ['api.github.com', '.anthropic.com'];
   secrets: {
     GITHUB_TOKEN: 'github/token';
+    API_KEY: 'my-secret:KEY';
   };
 }
 

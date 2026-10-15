@@ -41,7 +41,7 @@
       "name": "prepareAgent",
       "file": "test/input/output-full-agent.ts",
       "position": [
-        57,
+        62,
         1
       ]
     },
@@ -49,7 +49,7 @@
       "name": "finishAgent",
       "file": "test/input/output-full-agent.ts",
       "position": [
-        61,
+        66,
         1
       ]
     },
@@ -62,7 +62,62 @@
     "permissions": {
       "presets": [
         "logs-read"
+      ],
+      "statements": [
+        {
+          "effect": "allow",
+          "actions": [
+            "s3:GetObject"
+          ],
+          "resources": [
+            "arn:aws:s3:::my-bucket/*"
+          ]
+        }
       ]
+    },
+    "tools": {
+      "mode": "edit",
+      "allowed": [
+        "Read",
+        "Grep",
+        "Glob"
+      ],
+      "disallowed": [
+        "AskUserQuestion"
+      ]
+    },
+    "image": {
+      "base": "public.ecr.aws/docker/library/node:24-bookworm-slim",
+      "aptPackages": [
+        "curl",
+        "git"
+      ],
+      "npmPackages": [
+        "typescript"
+      ]
+    },
+    "egress": [
+      "api.github.com",
+      ".anthropic.com"
+    ],
+    "secrets": {
+      "GITHUB_TOKEN": "github/token",
+      "API_KEY": "my-secret:KEY"
+    },
+    "mcpServers": {
+      "github": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-github"
+        ]
+      },
+      "remote": {
+        "url": "https://mcp.example.com",
+        "headers": {
+          "Authorization": "Bearer token"
+        }
+      }
     }
   }
 }

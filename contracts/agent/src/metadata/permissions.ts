@@ -1,9 +1,10 @@
 import type { ModelProperty, TypeClass } from '@ez4/reflection';
-import { isTypeObject } from '@ez4/reflection';
-import { getPropertyStringList } from '@ez4/common/library';
+import { isModelProperty, isTypeObject, isTypeTuple } from '@ez4/reflection';
+import { getPropertyStringIn, getPropertyStringList } from '@ez4/common/library';
 import type { Agent } from '../services/contract';
 import type { AgentService } from './types';
 import { UnknownPresetError } from '../errors/permissions';
+import { IncompleteServiceError } from '../errors/service';
 
 const VALID_PRESETS: Record<string, true> = {
   'logs-read': true,
@@ -46,5 +47,42 @@ export const validatePermissions = (
       ...service.permissions,
       presets: presets as Agent.Preset[]
     };
+  }
+
+  if (permMap.statements) {
+    const value = permMap.statements.value;
+    const statements: Agent.Statement[] = [];
+    let valid = false;
+    if (isTypeTuple(value)) {
+      valid = true;
+      for (const element of value.elements) {
+        if (!isTypeObject(element) || !Array.isArray(element.members) || !element.members.every(isModelProperty)) {
+          valid = false;
+          break;
+        }
+        const fields = Object.fromEntries(element.members.map((field) => [field.name, field]));
+        const actions = fields.actions && getPropertyStringList(fields.actions);
+        const resources = fields.resources && getPropertyStringList(fields.resources);
+        const effect = fields.effect && getPropertyStringIn(fields.effect, ['allow', 'deny']);
+        if (
+          !actions ||
+          !resources ||
+          (fields.effect && !effect) ||
+          !isTypeTuple(fields.actions.value) ||
+          !isTypeTuple(fields.resources.value) ||
+          actions.length !== fields.actions.value.elements.length ||
+          resources.length !== fields.resources.value.elements.length
+        ) {
+          valid = false;
+          break;
+        }
+        statements.push({ ...(effect && { effect }), actions, resources });
+      }
+    }
+    if (!valid) {
+      errorList.push(new IncompleteServiceError([`${declaration.name}.permissions.statements`], declaration.file));
+    } else {
+      service.permissions = { ...service.permissions, statements };
+    }
   }
 };
