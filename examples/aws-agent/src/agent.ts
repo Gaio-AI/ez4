@@ -1,3 +1,4 @@
+import type { Environment, Service } from '@ez4/common';
 import { Agent, AgentPermission } from '@ez4/agent';
 
 export interface EchoInput {
@@ -27,6 +28,15 @@ export declare class EchoAgent extends Agent.Service<EchoInput, EchoOutput> {
     memory: 2048;
     timeout: 300;
   };
+  prepare: typeof prepareEcho;
+  variables: { ECHO_AGENT_TAG: 'agent-variable' };
+  services: { variables: Environment.ServiceVariables };
+}
+
+// Agent variables reach the hooks through the context, like any other ez4 handler.
+export async function prepareEcho(request: Agent.PrepareRequest<EchoInput>, context: Service.Context<EchoAgent>): Promise<Agent.PrepareResult> {
+  await request.artifacts.put('agent-tag.txt', context.variables.ECHO_AGENT_TAG);
+  return { prompt: JSON.stringify(request.input) };
 }
 
 export declare class EchoFlow extends Agent.Workflow<{ text: string }, { echoes: number }, { echo: EchoAgent }> {
@@ -34,11 +44,17 @@ export declare class EchoFlow extends Agent.Workflow<{ text: string }, { echoes:
   agents: { echo: EchoAgent };
   maxSteps: 2;
   handler: typeof echoStep;
+  variables: { ECHO_PREFIX: 'workflow-variable' };
+  services: { variables: Environment.ServiceVariables };
 }
 
-export function echoStep(request: Agent.WorkflowRequest<EchoFlow>): Agent.WorkflowStep<{ echoes: number }, { echo: EchoAgent }> {
+export function echoStep(
+  request: Agent.WorkflowRequest<EchoFlow>,
+  context: Service.Context<EchoFlow>
+): Agent.WorkflowStep<{ echoes: number }, { echo: EchoAgent }> {
   if (request.event.type === 'start') {
-    return { state: { echoes: 0 }, next: { invoke: 'echo', input: { message: request.event.input.text } } };
+    const message = `${context.variables.ECHO_PREFIX}: ${request.event.input.text}`;
+    return { state: { echoes: 0 }, next: { invoke: 'echo', input: { message } } };
   }
 
   return { state: { echoes: 1 }, next: { complete: request.event.result.status } };
