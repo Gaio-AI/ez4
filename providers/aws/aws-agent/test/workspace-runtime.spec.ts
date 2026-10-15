@@ -155,6 +155,40 @@ describe('workspace :: runtime', () => {
     ok(!existsSync(lock));
   });
 
+  it('does not let the old owner remove a replacement lock after takeover', async () => {
+    const { runtime } = await setupWorkspace({ repos: ['api'] });
+    const lock = join(runtime.root, 'repos/api.git.lock');
+    const originalGit = runtime.git ?? git;
+    const { promise: entered, resolve: enteredFetch } = Promise.withResolvers<void>();
+    const { promise: held, resolve: releaseFetch } = Promise.withResolvers<void>();
+    runtime.git = async (args, opts) => {
+      if (args[0] === 'fetch') {
+        enteredFetch();
+        await held;
+      }
+      return originalGit(args, opts);
+    };
+    const first = refreshCache(runtime, runtime.workspace.repos[0]);
+    await entered;
+    const ownerFile = join(lock, 'owner');
+    const oldOwner = await readFile(ownerFile, 'utf8');
+    await utimes(ownerFile, new Date(Date.now() - 11 * 60_000), new Date(Date.now() - 11 * 60_000));
+    const second = refreshCache(runtime, runtime.workspace.repos[0]);
+    let replacement!: string;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      replacement = await readFile(ownerFile, 'utf8').catch(() => '');
+      if (replacement && replacement !== oldOwner) break;
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, 100);
+      await promise;
+    }
+    notEqual(replacement, oldOwner);
+    releaseFetch();
+    await first;
+    deepEqual(await readFile(ownerFile, 'utf8'), replacement);
+    await second;
+  });
+
   it('assert :: refs whose lease is older than 14 days are pruned, leased refs survive', async () => {
     const { runtime } = await setupWorkspace({
       repos: ['api'],

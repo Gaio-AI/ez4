@@ -1,4 +1,4 @@
-import { mkdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { Agent } from '@ez4/agent';
@@ -56,43 +56,56 @@ const getNowMs = (runtime: WorkspaceRuntime): number => {
 
 const withLock = async <T>(lockPath: string, nowFn: () => number, fn: () => Promise<T>): Promise<T> => {
   const timeoutMs = 5 * 60_000;
+  const staleMs = 10 * 60_000;
   const start = Date.now();
+  const ownerPath = join(lockPath, 'owner');
+  const owner = randomUUID();
 
   while (true) {
     try {
       await mkdir(lockPath);
+      await writeFile(ownerPath, owner);
       break;
     } catch (err: unknown) {
-      const error = err as { code?: string };
-      if (error?.code === 'EEXIST') {
-        try {
-          const stats = await stat(lockPath);
-          const nowMs = nowFn();
-          if (nowMs - stats.mtimeMs > 10 * 60_000) {
-            await rm(lockPath, { recursive: true, force: true });
-            continue;
-          }
-        } catch {
+      if (!err || typeof err !== 'object' || !('code' in err) || err.code !== 'EEXIST') throw err;
+      try {
+        const stats = await stat(ownerPath).catch(async (error: unknown) => {
+          if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return stat(lockPath);
+          throw error;
+        });
+        if (nowFn() - stats.mtimeMs > staleMs) {
+          await rm(lockPath, { recursive: true, force: true });
           continue;
         }
-
-        if (Date.now() - start >= timeoutMs) {
-          throw new Error(`Lock timeout on ${lockPath}`);
-        }
-
-        const { promise, resolve } = Promise.withResolvers<void>();
-        setTimeout(resolve, 2000);
-        await promise;
-      } else {
-        throw err;
+      } catch (error) {
+        if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') throw error;
       }
+
+      if (Date.now() - start >= timeoutMs) throw new Error(`Lock timeout on ${lockPath}`);
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, 2000);
+      await promise;
     }
   }
+
+  let heartbeat: Promise<void> = Promise.resolve();
+  const interval = setInterval(() => {
+    heartbeat = heartbeat.then(async () => {
+      if (await readFile(ownerPath, 'utf8').catch(() => '') !== owner) return;
+      const date = new Date(nowFn());
+      await utimes(ownerPath, date, date).catch(() => {});
+    });
+  }, 30_000);
+  interval.unref();
 
   try {
     return await fn();
   } finally {
-    await rm(lockPath, { recursive: true, force: true }).catch(() => {});
+    clearInterval(interval);
+    await heartbeat;
+    if (await readFile(ownerPath, 'utf8').catch(() => '') === owner) {
+      await rm(lockPath, { recursive: true, force: true });
+    }
   }
 };
 
