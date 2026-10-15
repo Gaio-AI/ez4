@@ -27,6 +27,9 @@ export const generateDockerfile = (agent: AgentService): string => {
     // node images already ship uid/gid 1000 (`node`); create it only on bases that lack it.
     'RUN id -u 1000 >/dev/null 2>&1 || useradd -u 1000 -m -s /bin/bash ez4',
     'COPY --chown=1000:1000 runtime.mjs /app/runtime.mjs',
+    // The agent works (and checks out its workspace) in the current directory, which the agent user must own.
+    'RUN mkdir -p /work && chown 1000:1000 /work',
+    'WORKDIR /work',
     'USER 1000',
     'ENTRYPOINT ["node", "/app/runtime.mjs"]'
   );

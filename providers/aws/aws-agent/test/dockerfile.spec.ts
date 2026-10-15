@@ -28,6 +28,11 @@ describe('agent dockerfile generator', () => {
     ok(dockerfile.includes('RUN id -u 1000 >/dev/null 2>&1 || useradd -u 1000 -m -s /bin/bash ez4'));
     ok(dockerfile.includes('USER 1000'));
     ok(dockerfile.includes('ENTRYPOINT ["node", "/app/runtime.mjs"]'));
+
+    // The process starts in the last WORKDIR, where the workspace is checked out as uid 1000.
+    const workdirs = dockerfile.split('\n').filter((line) => line.startsWith('WORKDIR '));
+    equal(workdirs.at(-1), 'WORKDIR /work');
+    ok(dockerfile.indexOf('chown 1000:1000 /work') < dockerfile.lastIndexOf('WORKDIR /work'));
   });
 
   it('assert :: an agent with a workspace gets git once, even when it also declares it', () => {
