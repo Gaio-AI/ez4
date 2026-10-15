@@ -29,6 +29,10 @@ const sourceFile = join('test/files', 'lambda-1.js');
 const mockLambda = (existing: boolean) => {
   const commands: Command[] = [];
 
+  // A test that deploys twice mocks twice, and `restoreAll` would put the first mock back over the real
+  // method, leaving it for the specs that run next in the same process.
+  mock.restoreAll();
+
   mock.method(LambdaClient.prototype, 'send', async (command: { input: Record<string, unknown> }) => {
     if (!existing && command instanceof GetFunctionCommand) {
       throw new ResourceNotFoundException({ message: 'Function not found.', $metadata: {} });

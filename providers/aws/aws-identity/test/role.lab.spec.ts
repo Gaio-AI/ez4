@@ -3,7 +3,8 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { ok, equal } from 'node:assert/strict';
 
-import { createPolicy, createRole, isRoleState, registerTriggers } from '@ez4/aws-identity';
+import { GetRoleCommand, IAMClient } from '@aws-sdk/client-iam';
+import { buildPolicyArn, createPolicy, createRole, getAccountId, isRoleState, registerTriggers } from '@ez4/aws-identity';
 import { deploy } from '@ez4/aws-common';
 import { deepClone } from '@ez4/utils';
 
@@ -30,6 +31,12 @@ const assertDeploy = async <E extends EntryState>(resourceId: string, newState: 
   };
 };
 
+const getPermissionsBoundary = async (roleName: string) => {
+  const response = await new IAMClient({}).send(new GetRoleCommand({ RoleName: roleName }));
+
+  return response.Role?.PermissionsBoundary?.PermissionsBoundaryArn;
+};
+
 describe('role', { timeout: 60000 }, () => {
   let lastState: EntryStates | undefined;
   let roleId: string | undefined;
@@ -41,6 +48,12 @@ describe('role', { timeout: 60000 }, () => {
 
     const policyResource = createPolicy(localState, {
       policyName: 'ez4-test-role-policy',
+      policyDocument: getPolicyDocument()
+    });
+
+    // Deployed with the role, attached to nothing: a later step sets it as the role's boundary.
+    createPolicy(localState, {
+      policyName: 'ez4-test-role-boundary',
       policyDocument: getPolicyDocument()
     });
 
@@ -148,6 +161,42 @@ describe('role', { timeout: 60000 }, () => {
     };
 
     const { state } = await assertDeploy(roleId, localState, lastState);
+
+    lastState = state;
+  });
+
+  it('assert :: add permissions boundary', async () => {
+    ok(roleId && lastState);
+
+    const localState = deepClone(lastState);
+    const resource = localState[roleId];
+
+    ok(resource && isRoleState(resource));
+
+    const boundaryArn = buildPolicyArn(await getAccountId(), 'ez4-test-role-boundary');
+
+    resource.parameters.permissionsBoundary = boundaryArn;
+
+    const { state, result } = await assertDeploy(roleId, localState, lastState);
+
+    equal(await getPermissionsBoundary(result.roleName), boundaryArn);
+
+    lastState = state;
+  });
+
+  it('assert :: remove permissions boundary', async () => {
+    ok(roleId && lastState);
+
+    const localState = deepClone(lastState);
+    const resource = localState[roleId];
+
+    ok(resource && isRoleState(resource));
+
+    delete resource.parameters.permissionsBoundary;
+
+    const { state, result } = await assertDeploy(roleId, localState, lastState);
+
+    equal(await getPermissionsBoundary(result.roleName), undefined);
 
     lastState = state;
   });

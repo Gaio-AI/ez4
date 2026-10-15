@@ -44,6 +44,7 @@ export default {
   // Configure the deployment options for all resources
   deployOptions: {
     maxConcurrency: 10, // Maximum number of resource changes processed concurrently.
+    permissionsBoundary: 'MyBoundary', // Managed policy set as the permissions boundary of every role the deploy creates
 
     // Configure the deployment release
     release: {

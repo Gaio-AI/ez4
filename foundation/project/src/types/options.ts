@@ -26,6 +26,7 @@ export type DeployOptions = CommonOptions & {
   variables?: LinkedVariables;
   tags?: Record<string, string>;
   concurrency?: number;
+  permissionsBoundary?: string;
   lockId: string;
 };
 
