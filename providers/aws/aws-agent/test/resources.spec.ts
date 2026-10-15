@@ -1,5 +1,5 @@
 import type { DeployOptions, EventContext, PrepareResourceEvent } from '@ez4/project/library';
-import type { EntryState, EntryStates } from '@ez4/state';
+import type { EntryState, EntryStates, StepContext } from '@ez4/state';
 
 import { describe, it } from 'node:test';
 import { equal, ok, deepEqual } from 'node:assert/strict';
@@ -171,7 +171,9 @@ describe('agent resources wiring', () => {
     const taskdefs = Object.values(state).filter((entry): entry is EcsTaskDefState => entry?.type === EcsTaskDefServiceType);
     equal(taskdefs.length, 2);
     for (const td of taskdefs) {
-      equal(td.parameters.proxyUrl, 'http://proxy.ez4-lab-agents.local:3128');
+      const taskInput = td.parameters.getTaskDefinition({ getDependencies: () => [] } as unknown as StepContext);
+      const env = taskInput.containerDefinitions?.[0]?.environment;
+      equal(env?.find((e) => e.name === 'EZ4_AGENT_PROXY_URL')?.value, 'http://proxy.ez4-lab-agents.local:3128');
     }
   });
 });

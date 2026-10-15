@@ -24,7 +24,6 @@ export type EcsTaskDefInput = {
   subnetIds: string[];
   securityGroupIds: string[];
   tags?: EcsTaskDefParameters['tags'];
-  [key: string]: unknown;
 };
 
 export const createEcsTaskDefinition = <E extends EntryState>(
@@ -32,11 +31,9 @@ export const createEcsTaskDefinition = <E extends EntryState>(
   dependencies: (EntryState | string)[],
   parameters: EcsTaskDefInput
 ): EcsTaskDefState => {
-  const { getTaskDefinitionHash, ...rest } = parameters;
-  const hash = parameters.hash ?? getTaskDefinitionHash?.() ?? hashData(parameters.family);
+  const hash = parameters.hash ?? parameters.getTaskDefinitionHash?.() ?? hashData(parameters.family);
   const getTaskDefinition = parameters.getTaskDefinition ?? (() => ({ family: parameters.family, containerDefinitions: [] }));
   const taskDefParameters: EcsTaskDefParameters = {
-    ...rest,
     family: parameters.family,
     subnetIds: parameters.subnetIds,
     securityGroupIds: parameters.securityGroupIds,

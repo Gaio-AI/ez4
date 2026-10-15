@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { buildAndPushImage } from '../src/image/build';
 import { MissingDockerCliError } from '../src/image/errors';
 
-describe('agent image builder', () => {
+describe('ECR image builder', () => {
   it('assert :: skips build and push when image tag already exists in ECR', async () => {
     let checkedRepo = '';
     let checkedTag = '';
@@ -25,7 +25,7 @@ describe('agent image builder', () => {
     };
 
     const imageUri = await buildAndPushImage({
-      agentName: 'TestAgent',
+      imageName: 'TestAgent',
       repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
       dockerfile: 'FROM node:24-bookworm-slim',
       bundleHash: 'abc12345',
@@ -49,7 +49,7 @@ describe('agent image builder', () => {
       getAuthorizationToken: async () => ({})
     };
     await buildAndPushImage({
-      agentName: 'TestAgent',
+      imageName: 'TestAgent',
       repositoryUri: 'registry.example/test-agent',
       dockerfile: 'FROM node:24',
       bundleHash: 'abc12345',
@@ -83,7 +83,7 @@ describe('agent image builder', () => {
     };
 
     const imageUri = await buildAndPushImage({
-      agentName: 'TestAgent',
+      imageName: 'TestAgent',
       repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
       dockerfile: 'FROM node:24-bookworm-slim',
       bundleHash: 'abc12345',
@@ -114,7 +114,7 @@ describe('agent image builder', () => {
     try {
       await rejects(async () => {
         await buildAndPushImage({
-          agentName: 'TestAgent',
+          imageName: 'TestAgent',
           repositoryUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/ez4-test-agent',
           dockerfile: 'FROM node:24-bookworm-slim',
           bundleHash: 'abc12345',

@@ -12,7 +12,6 @@ export type EcsTaskDefParameters = {
   subnetIds: string[];
   securityGroupIds: string[];
   tags?: ResourceTags;
-  [key: string]: unknown;
 };
 
 export type EcsTaskDefResult = {

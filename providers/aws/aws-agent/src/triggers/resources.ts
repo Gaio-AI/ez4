@@ -5,7 +5,10 @@ import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
 import type { ConnectResourceEvent, DeployOptions, PrepareResourceEvent } from '@ez4/project/library';
 import type { NetworkLookup } from '../network/discovery';
-
+import type { StepContext } from '@ez4/state';
+import type { EcrImageState } from '@ez4/aws-ecr';
+import type { ProxyCredentialState } from '../proxy/types';
+import type { ProviderCredentialState } from '../auth/types';
 import { isAgentService } from '@ez4/agent/library';
 import { createBucket, createBucketStateId } from '@ez4/aws-bucket';
 import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
@@ -16,16 +19,19 @@ import { hashData, toKebabCase } from '@ez4/utils';
 
 import { buildAgentBundle } from '../runtime/bundle';
 import { createEcsCluster, createEcsClusterStateId, createEcsTaskDefinition } from '@ez4/aws-ecs';
-import { createAgentImage, createEcrRepository } from '@ez4/aws-ecr';
+import { createEcrImage, createEcrRepository, EcrImageServiceType } from '@ez4/aws-ecr';
 import { computeImageTag, generateDockerfile } from '../image/dockerfile';
+import { buildTaskDefinitionInput } from '../agent/taskdef';
 import { discoverAgentNetwork } from '../network/discovery';
 import { createProxyCredential, createProxyCredentialStateId } from '../proxy/credential';
+import { ProxyCredentialServiceType } from '../proxy/types';
 import { createAgentNamespace, createAgentNamespaceStateId } from '../namespace/service';
 import { createProxyService, createProxyServiceStateId } from '../proxy/ecs-service';
 import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
 import { ensureProviderCredential, getDefaultCredentialPorts } from '../auth/login';
 import { ProviderAuths } from '../auth/providers';
 import { createProviderCredential, createProviderCredentialStateId } from '../auth/service';
+import { ProviderCredentialServiceType } from '../auth/types';
 import { buildAgentExecutionRole } from '../role/execution';
 import { buildAgentTaskRole } from '../role/task';
 import {
@@ -169,8 +175,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
 
   const bundle = await ports.bundle(service, options);
   const dockerfile = generateDockerfile(service);
-  const image = createAgentImage(state, repository, {
-    agentName: service.name,
+  const image = createEcrImage(state, repository, {
+    imageName: service.name,
     dockerfile,
     bundleFile: bundle.file,
     bundleHash: bundle.hash,
@@ -189,15 +195,38 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     ],
     {
       family: service.name,
-      agentName: service.name,
-      baseName: getAgentsBaseName(options),
-      agent: { name: service.name, resources: service.resources, secrets: service.secrets },
-      bucketName,
-      region,
       subnetIds: network.subnetIds,
       securityGroupIds: network.securityGroupIds,
-      proxyUrl: getAgentProxyUrl(options),
-      tags: options.tags
+      tags: options.tags,
+      getTaskDefinition: (stepContext: StepContext) => {
+        const imageDep = stepContext.getDependencies<EcrImageState>(EcrImageServiceType).at(0);
+        const imageUri = imageDep?.result?.imageUri ?? '';
+        const roles = stepContext.getDependencies<RoleState>(RoleServiceType);
+        const taskRoleArn = roles.find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-task-role'))?.result?.roleArn ?? '';
+        const executionRoleArn =
+          roles.find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-execution-role'))?.result?.roleArn ?? '';
+        const logDep = stepContext.getDependencies<LogGroupState>(LogGroupServiceType).at(0);
+        const logGroupArn = logDep?.result?.groupArn ?? '';
+        const proxyCred = stepContext.getDependencies<ProxyCredentialState>(ProxyCredentialServiceType).at(0);
+        const proxySecretArn = proxyCred?.result?.secretArn ?? '';
+        const providerSecrets: Array<{ name: string; secretArn: string }> = [];
+        if (providerCredentialEntryId) {
+          const providerCred = stepContext.getDependencies<ProviderCredentialState>(ProviderCredentialServiceType).at(0);
+          if (providerCred?.result?.secretArn) {
+            providerSecrets.push({ name: 'CLAUDE_CODE_OAUTH_TOKEN', secretArn: providerCred.result.secretArn });
+          }
+        }
+        return buildTaskDefinitionInput(service, imageUri, taskRoleArn, executionRoleArn, logGroupArn, {
+          baseName: getAgentsBaseName(options),
+          bucketName,
+          region,
+          proxy: {
+            url: getAgentProxyUrl(options),
+            secretArn: proxySecretArn
+          },
+          ...(providerSecrets.length > 0 ? { providerSecrets } : {})
+        });
+      }
     }
   );
   linkEntryConnection(state, taskdef.entryId, cluster.entryId);

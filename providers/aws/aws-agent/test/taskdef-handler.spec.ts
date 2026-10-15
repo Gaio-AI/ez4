@@ -134,17 +134,12 @@ describe('agent ECS task definition builder', () => {
 
     const state = createEcsTaskDefinition(states, ['dep1'], {
       family: 'TestAgent',
-      agentName: 'TestAgent',
-      baseName: 'ez4-stg-agents',
-      agent: { name: 'TestAgent' },
-      bucketName: 'agent-bucket',
-      region: 'us-east-1',
       subnetIds: ['subnet-1'],
       securityGroupIds: ['sg-1']
     });
 
     equal(state.type, EcsTaskDefServiceType);
-    equal(state.parameters.agentName, 'TestAgent');
+    equal(state.parameters.family, 'TestAgent');
     equal(state.entryId, createEcsTaskDefStateId('TestAgent'));
     deepEqual(state.dependencies, ['dep1']);
     ok(states[state.entryId] !== undefined);

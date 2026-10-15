@@ -1,5 +1,5 @@
 import type { DeployOptions, EventContext, PrepareResourceEvent, ServiceMetadata } from '@ez4/project/library';
-import type { EntryState, EntryStates } from '@ez4/state';
+import type { EntryState, EntryStates, StepContext } from '@ez4/state';
 import type { AgentService } from '@ez4/agent/library';
 import type { EcsTaskDefState } from '@ez4/aws-ecs';
 
@@ -20,7 +20,7 @@ import {
 } from '../src/auth/login';
 import { ProviderCredentialServiceType } from '../src/auth/types';
 import { prepareAgentResources } from '../src/triggers/resources';
-import { buildTaskDefinitionInput } from '../src/taskdef/service';
+import { buildTaskDefinitionInput } from '../src/agent/taskdef';
 
 const options: DeployOptions = { prefix: 'ez4', projectName: 'lab', branchName: '', lockId: 'x' } as DeployOptions;
 
@@ -262,12 +262,9 @@ describe('provider login stored per stage and reused', () => {
     equal(providerCreds.length, 0);
 
     const taskdef = context.getServiceState('CustomSecretAgent', options) as EcsTaskDefState;
-    const savedAgent = taskdef.parameters.agent;
-    const secrets =
-      savedAgent && typeof savedAgent === 'object' && 'secrets' in savedAgent
-        ? (savedAgent.secrets as Record<string, string> | undefined)
-        : undefined;
-    equal(secrets?.['CLAUDE_CODE_OAUTH_TOKEN'], 'my-custom-oauth-token-secret');
+    const taskInput = taskdef.parameters.getTaskDefinition({ getDependencies: () => [] } as unknown as StepContext);
+    const secret = taskInput.containerDefinitions?.[0]?.secrets?.find((s) => s.name === 'CLAUDE_CODE_OAUTH_TOKEN');
+    equal(secret?.valueFrom, 'arn:aws:secretsmanager:us-east-1::secret:my-custom-oauth-token-secret');
   });
 
   it('assert :: force with existing secret -> login runs and store called', async () => {

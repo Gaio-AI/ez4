@@ -68,7 +68,7 @@ const createResource = (candidate: EcrImageState, context: StepContext): Promise
 
     if (!(await checkImageExists(repositoryName, parameters.imageTag))) {
       await buildAndPushImage({
-        agentName: parameters.imageName,
+        imageName: parameters.imageName,
         repositoryUri,
         dockerfile: parameters.dockerfile,
         bundleHash: parameters.bundleHash,
@@ -102,7 +102,7 @@ const updateResource = async (candidate: EcrImageState, _current: EcrImageState,
 
     if (!(await checkImageExists(repositoryName, parameters.imageTag))) {
       await buildAndPushImage({
-        agentName: parameters.imageName,
+        imageName: parameters.imageName,
         repositoryUri,
         dockerfile: parameters.dockerfile,
         bundleHash: parameters.bundleHash,

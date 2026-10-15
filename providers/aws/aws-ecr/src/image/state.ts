@@ -10,7 +10,6 @@ export const EcrImageServiceType = 'aws:ecr.image';
 
 export type EcrImageParameters = {
   imageName: string;
-  agentName?: string;
   dockerfile: string;
   bundleFile: string;
   bundleHash: string;
@@ -18,8 +17,7 @@ export type EcrImageParameters = {
 };
 
 export type EcrImageInput = {
-  imageName?: string;
-  agentName?: string;
+  imageName: string;
   dockerfile: string;
   bundleFile: string;
   bundleHash: string;
@@ -49,7 +47,7 @@ export const createEcrImage = <E extends EntryState>(
   repository: EcrRepositoryState,
   parameters: EcrImageInput
 ): EcrImageState => {
-  const imageName = parameters.imageName ?? parameters.agentName ?? 'image';
+  const imageName = parameters.imageName;
   const entryId = createEcrImageStateId(imageName);
 
   return attachEntry<E | EcrImageState, EcrImageState>(state, {
@@ -62,4 +60,3 @@ export const createEcrImage = <E extends EntryState>(
     }
   });
 };
-export const createAgentImage = createEcrImage;

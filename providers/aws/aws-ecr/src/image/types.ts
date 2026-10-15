@@ -1,5 +1,5 @@
 export type ImageBuildOptions = {
-  agentName: string;
+  imageName: string;
   repositoryUri: string;
   dockerfile: string;
   bundleHash: string;

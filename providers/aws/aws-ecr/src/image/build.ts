@@ -86,7 +86,7 @@ export const buildAndPushImage = async (options: ImageBuildOptions): Promise<str
     });
   }
 
-  const buildContext = await mkdtemp(join(tmpdir(), 'ez4-agent-image-'));
+  const buildContext = await mkdtemp(join(tmpdir(), 'ez4-ecr-image-'));
   try {
     await Promise.all([writeFile(join(buildContext, 'Dockerfile'), dockerfile), copyFile(bundleFile, join(buildContext, 'runtime.mjs'))]);
     await commandRunner('docker', ['buildx', 'build', '--platform', 'linux/amd64', '-t', fullImageUri, '--push', '.'], {
