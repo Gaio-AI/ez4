@@ -235,7 +235,7 @@ describe('proxy :: configuration and auth', () => {
     );
     ok(domains.includes('api.anthropic.com'));
     ok(domains.includes('github.com'));
-    const runtimeDomains = getAgentEgressDomains({ provider: 'custom' }, 'eu-west-1');
+    const runtimeDomains = getAgentEgressDomains({ provider: 'claude' }, 'eu-west-1');
     ok(runtimeDomains.includes('ecs.eu-west-1.amazonaws.com'));
     ok(runtimeDomains.includes('sts.eu-west-1.amazonaws.com'));
     ok(runtimeDomains.includes('sts.amazonaws.com'));
