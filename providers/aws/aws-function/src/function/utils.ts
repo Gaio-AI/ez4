@@ -5,6 +5,7 @@ import type { EntryState, StepContext } from '@ez4/state';
 import type { FunctionState, FunctionVpcConfig } from './types';
 
 import {
+  areDualStackSubnets,
   getDefaultSecurityGroupId,
   getDefaultSubnetIds,
   getDefaultVpcId,
@@ -166,9 +167,15 @@ export const resolveFunctionVpcConfig = async (): Promise<FunctionVpcConfig> => 
     throw new DefaultVpcDetailsError();
   }
 
+  // Only a dual-stack network sets the flag, so the configuration of a function on IPv4-only subnets stays the same.
+  const isDualStack = await areDualStackSubnets(subnetIds);
+
   return {
     subnetIds,
-    securityGroupIds
+    securityGroupIds,
+    ...(isDualStack && {
+      ipv6AllowedForDualStack: true
+    })
   };
 };
 

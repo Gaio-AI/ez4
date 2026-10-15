@@ -65,6 +65,8 @@ A function that needs a VPC (e.g. linked to a database through a native connecti
 
 Tag private subnets routed through a NAT to give those functions outbound access. The configuration in use is kept in the state, so a deploy after the tags change shows the move in the plan and reconfigures the functions.
 
+When every one of those subnets has an IPv6 block, the function is dual-stack (`Ipv6AllowedForDualStack`): IPv6 destinations go through the subnets' IPv6 route, typically an egress-only internet gateway, which charges nothing per GB, while IPv4 destinations keep going through the NAT. The security groups need an IPv6 egress rule. A subnet without IPv6 keeps every function on IPv4, and the deploy after the subnets change shows it in the plan.
+
 #### Reserved concurrency
 
 A function with `reservedConcurrency` (an HTTP route or route group declares it) has that many concurrent executions reserved: it never runs more at once, and the rest of the account can't take them. The deploy reserves it on creation and on the next deploy of an existing function, changes it without publishing a version, and removes the reservation once the option is taken out. A function that never declares it doesn't call the concurrency API, so only deployments that use the option need `lambda:PutFunctionConcurrency` and `lambda:DeleteFunctionConcurrency`.

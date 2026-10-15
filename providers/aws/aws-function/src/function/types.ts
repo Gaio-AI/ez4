@@ -21,6 +21,12 @@ export type FunctionRelease = {
 export type FunctionVpcConfig = {
   subnetIds: string[];
   securityGroupIds: string[];
+
+  /**
+   * Set when every subnet is dual-stack: the function then sends IPv6 traffic through the subnets' own IPv6 route
+   * (e.g. an egress-only internet gateway) instead of the IPv4 one.
+   */
+  ipv6AllowedForDualStack?: boolean;
 };
 
 export type FunctionParameters = Omit<CreateRequest, 'logGroup' | 'roleArn' | 'publish' | 'variables' | 'vpcConfig'> & {

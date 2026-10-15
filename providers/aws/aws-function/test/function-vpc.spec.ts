@@ -12,6 +12,7 @@ const execFile = promisify(execFileCallback);
 type VpcConfig = {
   SubnetIds: string[];
   SecurityGroupIds: string[];
+  Ipv6AllowedForDualStack?: boolean;
 };
 
 type DeployReport = {
@@ -25,6 +26,7 @@ type DeployReport = {
     vpcConfig?: {
       subnetIds: string[];
       securityGroupIds: string[];
+      ipv6AllowedForDualStack?: boolean;
     };
   };
   errors: string[];
@@ -61,6 +63,16 @@ const TaggedNetwork = {
     { id: 'sg-default', name: 'default' },
     { id: 'sg-functions', name: 'functions', tags: FunctionsTag }
   ]
+};
+
+const DualStackNetwork = {
+  ...TaggedNetwork,
+  subnets: TaggedNetwork.subnets.map((subnet) => (subnet.tags ? { ...subnet, ipv6: true } : subnet))
+};
+
+const PartlyDualStackNetwork = {
+  ...TaggedNetwork,
+  subnets: TaggedNetwork.subnets.map((subnet) => (subnet.id === 'subnet-private-a' ? { ...subnet, ipv6: true } : subnet))
 };
 
 /**
@@ -129,7 +141,8 @@ describe('function vpc', { timeout: 120000 }, () => {
 
     deepEqual(getVpcCommand(report, 'CreateFunctionCommand'), {
       SubnetIds: ['subnet-public-b', 'subnet-public-a'],
-      SecurityGroupIds: ['sg-default']
+      SecurityGroupIds: ['sg-default'],
+      Ipv6AllowedForDualStack: false
     });
 
     deepEqual(report.result?.vpcConfig, {
@@ -145,7 +158,8 @@ describe('function vpc', { timeout: 120000 }, () => {
 
     deepEqual(getVpcCommand(report, 'UpdateFunctionConfigurationCommand'), {
       SubnetIds: ['subnet-private-a', 'subnet-private-b'],
-      SecurityGroupIds: ['sg-functions']
+      SecurityGroupIds: ['sg-functions'],
+      Ipv6AllowedForDualStack: false
     });
 
     deepEqual(report.result?.vpcConfig, {
@@ -159,6 +173,41 @@ describe('function vpc', { timeout: 120000 }, () => {
 
     ok(!report.changes);
     deepEqual(report.commands, []);
+  });
+
+  it('assert :: dual-stack subnets let the function reach IPv6', async () => {
+    const report = await deployProject(DualStackNetwork);
+
+    ok(report.changes?.nested?.vpcConfig);
+
+    deepEqual(getVpcCommand(report, 'UpdateFunctionConfigurationCommand'), {
+      SubnetIds: ['subnet-private-a', 'subnet-private-b'],
+      SecurityGroupIds: ['sg-functions'],
+      Ipv6AllowedForDualStack: true
+    });
+
+    deepEqual(report.result?.vpcConfig, {
+      subnetIds: ['subnet-private-a', 'subnet-private-b'],
+      securityGroupIds: ['sg-functions'],
+      ipv6AllowedForDualStack: true
+    });
+  });
+
+  it('assert :: a subnet without IPv6 keeps the function on IPv4', async () => {
+    const report = await deployProject(PartlyDualStackNetwork);
+
+    ok(report.changes?.nested?.vpcConfig);
+
+    deepEqual(getVpcCommand(report, 'UpdateFunctionConfigurationCommand'), {
+      SubnetIds: ['subnet-private-a', 'subnet-private-b'],
+      SecurityGroupIds: ['sg-functions'],
+      Ipv6AllowedForDualStack: false
+    });
+
+    deepEqual(report.result?.vpcConfig, {
+      subnetIds: ['subnet-private-a', 'subnet-private-b'],
+      securityGroupIds: ['sg-functions']
+    });
   });
 
   it('assert :: a state without the configuration in use gets it once', async () => {
