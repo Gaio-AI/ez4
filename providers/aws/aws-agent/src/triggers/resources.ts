@@ -9,18 +9,8 @@ import type { StepContext } from '@ez4/state';
 import type { EcrImageState } from '@ez4/aws-ecr';
 import type { SecretState } from '@ez4/aws-secret';
 import type { AccessPointState, MountTargetState } from '@ez4/aws-efs';
-import {
-  AccessPointServiceType,
-  isMountTargetState,
-  createFileSystemStateId,
-  createAccessPointStateId
-} from '@ez4/aws-efs';
-import {
-  prepareWorkspaceResources,
-  type WorkspaceResources,
-  AgentEfsNetworkTag,
-  getWorkspaceFileSystemName
-} from '../workspace/resources';
+import { AccessPointServiceType, isMountTargetState, createFileSystemStateId, createAccessPointStateId } from '@ez4/aws-efs';
+import { prepareWorkspaceResources, type WorkspaceResources, AgentEfsNetworkTag, getWorkspaceFileSystemName } from '../workspace/resources';
 import { AgentNetworkTag } from '../network/discovery';
 import { isAgentService } from '@ez4/agent/library';
 import { createBucket, createBucketStateId } from '@ez4/aws-bucket';

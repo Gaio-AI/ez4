@@ -40,9 +40,7 @@ export const prepareWorkspaceResources = <E extends EntryState>(
   }
 
   if (!network.efsSecurityGroupIds || network.efsSecurityGroupIds.length === 0) {
-    throw new MissingAgentNetworkError(
-      `no security groups found with tag '${AgentEfsNetworkTag.key}=${AgentEfsNetworkTag.value}'`
-    );
+    throw new MissingAgentNetworkError(`no security groups found with tag '${AgentEfsNetworkTag.key}=${AgentEfsNetworkTag.value}'`);
   }
 
   const fileSystemName = getWorkspaceFileSystemName(options);
