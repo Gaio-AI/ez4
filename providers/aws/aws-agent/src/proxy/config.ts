@@ -61,9 +61,12 @@ export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: stri
 };
 const PROVIDER_DOMAINS: Record<string, string[]> = { claude: ['api.anthropic.com'] };
 
-/** Domains an agent may reach through the proxy: declared egress, AWS APIs from its permissions, and its LLM provider. */
+/** Domains an agent may reach through the proxy: runtime AWS APIs, declared egress, permissions, and its LLM provider. */
 export const getAgentEgressDomains = (agent: Pick<AgentService, 'egress' | 'permissions' | 'provider'>, region: string): string[] => {
   const domains = new Set(resolveAgentAllowedDomains({ egress: agent.egress, permissions: agent.permissions }, region));
+  domains.add(`ecs.${region}.amazonaws.com`);
+  domains.add(`sts.${region}.amazonaws.com`);
+  domains.add('sts.amazonaws.com');
   for (const domain of PROVIDER_DOMAINS[agent.provider ?? ''] ?? []) domains.add(domain);
   return Array.from(domains).sort();
 };
@@ -76,7 +79,6 @@ export const buildNoProxyList = (region: string): string[] => {
     '169.254.170.2',
     `s3.${region}.amazonaws.com`,
     `.s3.${region}.amazonaws.com`,
-    `dynamodb.${region}.amazonaws.com`,
     `logs.${region}.amazonaws.com`,
     `secretsmanager.${region}.amazonaws.com`,
     `api.ecr.${region}.amazonaws.com`,

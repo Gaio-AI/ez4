@@ -31,9 +31,9 @@ export const buildAgentTaskRole = <E extends EntryState>(
       resourceIds: [`arn:aws:s3:::${bucketName}/results/${agentKey}/*`, `arn:aws:s3:::${bucketName}/artifacts/${agentKey}/*`],
       permissions: ['s3:PutObject']
     },
-    // Read of every agent's artifacts
+    // Read own artifacts; linked agents' artifacts are granted below.
     {
-      resourceIds: [`arn:aws:s3:::${bucketName}/artifacts/*`],
+      resourceIds: [`arn:aws:s3:::${bucketName}/artifacts/${agentKey}/*`],
       permissions: ['s3:GetObject']
     },
     // Heartbeat / task describe
@@ -50,7 +50,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
         permissions: ['s3:PutObject']
       },
       {
-        resourceIds: [`arn:aws:s3:::${bucketName}/results/${linked}/*`],
+        resourceIds: [`arn:aws:s3:::${bucketName}/results/${linked}/*`, `arn:aws:s3:::${bucketName}/artifacts/${linked}/*`],
         permissions: ['s3:GetObject']
       }
     );

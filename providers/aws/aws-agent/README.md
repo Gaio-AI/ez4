@@ -21,15 +21,15 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - Dispatched markers: `dispatched/<agent>/<id>`.
 
 - **IAM Roles & Security**:
-  - Per-agent task role granting access to S3 prefixes and least-privilege permission presets (`logs-read`, `lambda-read`, `ecs-read`, `cloudformation-read`) or custom statements.
+  - Per-agent task role grants artifact reads only for its own prefix and linked agents' prefixes, plus least-privilege permission presets (`logs-read`, `lambda-read`, `ecs-read`, `cloudformation-read`) or custom statements.
   - Execution role used by ECS to pull images and inject secrets from AWS Secrets Manager.
 
 - **Egress Proxy Sandbox**:
   - Outbound traffic is restricted through an internal Squid proxy (`public.ecr.aws/ubuntu/squid`) deployed as an ECS service in the agents cluster.
   - Registered under Cloud Map private DNS namespace `<base>.local` with endpoint `http://proxy.<base>.local:3128` (where `<base>` = `${prefix}-${projectName}[-${branch}]-agents`).
   - Per-agent basic authentication password is saved in AWS Secrets Manager (`<base>-<agent>-proxy`); the proxy receives only the htpasswd hash.
-  - Allowlist enforces domains declared in `egress`, provider domains (`api.anthropic.com`), and AWS endpoints derived from permission presets.
-  - `NO_PROXY` bypasses proxy for AWS S3, ECS/EC2 metadata endpoints, and VPC interface endpoints.
+  - Allowlist enforces domains declared in `egress`, provider domains (`api.anthropic.com`), AWS endpoints derived from permission presets, and runtime ECS and STS endpoints.
+  - `NO_PROXY` bypasses the proxy for AWS S3, ECS/EC2 metadata endpoints, and configured VPC interface endpoints. DynamoDB requests use the proxy.
 
 - **Container Environment Variables**:
   - `EZ4_AGENT_NAME`: Name of the agent service.
@@ -44,6 +44,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - `<base>-task-stopped`: EventBridge rule triggered on ECS task STOPPED events.
   - `<base>-sweep`: EventBridge scheduled rule running every 15 minutes to recover untracked or timed-out executions.
   - Dispatches completed execution results to caller FIFO queues (`MessageGroupId = agentName`, `MessageDeduplicationId = id`).
+  - A failed FIFO send leaves the result undispatched so Lambda retries it; the scheduled sweep also delivers stored results missing a dispatch marker, including RunTask startup failures. Without a reply queue, RunTask startup failures throw to the caller.
 
 #### Network discovery
 

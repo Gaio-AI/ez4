@@ -99,10 +99,26 @@ describe('agent task and execution roles', () => {
     const actions = statements.flatMap((statement) => [statement.Action].flat());
     const bucket = getAgentBucketName(options);
     ok(resources.includes(`arn:aws:s3:::${bucket}/invocations/ImplementAgent/*`));
-    ok(resources.includes(`arn:aws:s3:::${bucket}/artifacts/*`));
+    ok(resources.includes(`arn:aws:s3:::${bucket}/artifacts/ImplementAgent/*`));
+    ok(resources.includes(`arn:aws:s3:::${bucket}/artifacts/ReviewAgent/*`));
+    ok(!resources.includes(`arn:aws:s3:::${bucket}/artifacts/*`));
     ok(resources.includes(`arn:aws:s3:::${bucket}/invocations/ReviewAgent/*`));
     ok(actions.includes('ecs:RunTask'));
     ok(actions.includes('iam:PassRole'));
+  });
+
+  it('does not grant an unlinked agent access to other agents artifacts', () => {
+    const state: EntryStates = {};
+    const role = buildAgentTaskRole(state, createAgentService('ImplementAgent'), options, accountId);
+    const policy = state[role.dependencies[0]] as {
+      parameters: { policyDocument: { Statement: { Action: string | string[]; Resource: string | string[] }[] } };
+    };
+    const readable = policy.parameters.policyDocument.Statement.filter((statement) => [statement.Action].flat().includes('s3:GetObject'));
+    const resources = readable.flatMap((statement) => [statement.Resource].flat());
+    const bucket = getAgentBucketName(options);
+    ok(resources.includes(`arn:aws:s3:::${bucket}/artifacts/ImplementAgent/*`));
+    ok(!resources.includes(`arn:aws:s3:::${bucket}/artifacts/ReviewAgent/*`));
+    ok(!resources.includes(`arn:aws:s3:::${bucket}/artifacts/*`));
   });
 
   it('assert :: task role name matches the PassRole resource pattern (glob -> regex)', () => {

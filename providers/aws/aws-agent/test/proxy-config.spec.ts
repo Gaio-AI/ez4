@@ -109,7 +109,7 @@ describe('proxy :: configuration and auth', () => {
     ok(noProxy.includes('secretsmanager.us-east-1.amazonaws.com'));
     ok(noProxy.includes('api.ecr.us-east-1.amazonaws.com'));
     ok(noProxy.includes('dkr.ecr.us-east-1.amazonaws.com'));
-    ok(noProxy.includes('dynamodb.us-east-1.amazonaws.com'));
+    ok(!noProxy.includes('dynamodb.us-east-1.amazonaws.com'));
     ok(noProxy.includes('.us-east-1.vpce.amazonaws.com'));
     ok(noProxy.includes('127.0.0.1'));
     ok(noProxy.includes('localhost'));
@@ -235,6 +235,10 @@ describe('proxy :: configuration and auth', () => {
     );
     ok(domains.includes('api.anthropic.com'));
     ok(domains.includes('github.com'));
+    const runtimeDomains = getAgentEgressDomains({ provider: 'custom' }, 'eu-west-1');
+    ok(runtimeDomains.includes('ecs.eu-west-1.amazonaws.com'));
+    ok(runtimeDomains.includes('sts.eu-west-1.amazonaws.com'));
+    ok(runtimeDomains.includes('sts.amazonaws.com'));
   });
 
   it('skips agents with empty allowedDomains in generateSquidConfig', () => {
