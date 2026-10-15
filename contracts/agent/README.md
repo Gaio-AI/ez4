@@ -57,6 +57,25 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
 }
 ```
 
+#### Git workspaces
+
+Declare HTTPS repositories on an agent to include them in its workspace metadata:
+
+```ts
+export declare class ReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
+  // Other required members omitted here.
+  workspace: {
+    repos: [
+      { url: 'https://github.com/acme/api.git' },
+      { url: 'https://github.com/acme/web.git'; name: 'frontend'; branch: 'develop' }
+    ];
+    auth: { githubApp: 'acme/github-app' };
+  };
+}
+```
+
+Repository names default to the URL's last path segment without `.git`; branches default to `main`. Names must be unique. Authentication accepts either `{ githubApp: 'secret-name' }` or `{ token: 'secret-name:jsonKey' }`. A caller can pass `Agent.WorkspaceRef[]` through `invoke` options, and hooks receive the repository paths and base commits in `request.workspace`. The finish hook also receives `refs`, which appear on `Agent.Result.workspace`.
+
 #### Lifecycle hooks
 
 Agents support optional `prepare` and `finish` hooks for workspace initialization, prompt formatting, and result shaping:

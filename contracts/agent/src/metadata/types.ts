@@ -18,6 +18,7 @@ export type AgentService = Omit<ServiceMetadata, 'variables' | 'services'> &
     instructions?: string;
     tools?: Agent.Tools;
     mcpServers?: Record<string, Agent.McpServer>;
+    workspace?: { repos: Required<Agent.WorkspaceRepo>[]; auth?: Agent.WorkspaceAuth };
     prepare?: FunctionSignature;
     finish?: FunctionSignature;
     image?: Agent.Image;

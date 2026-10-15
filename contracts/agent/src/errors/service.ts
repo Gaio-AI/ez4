@@ -11,3 +11,17 @@ export class IncorrectServiceError extends IncorrectTypeError {
     super(`Incorrect agent service '${serviceName}'`, serviceName, 'Agent.Service', fileName);
   }
 }
+
+export class InvalidWorkspaceRepoError extends Error {
+  constructor(agent: string, url: string) {
+    super(`Invalid workspace repository '${url}' in agent '${agent}': expected an HTTPS URL`);
+    this.name = 'InvalidWorkspaceRepoError';
+  }
+}
+
+export class DuplicateWorkspaceRepoError extends Error {
+  constructor(agent: string, name: string) {
+    super(`Duplicate workspace repository name '${name}' in agent '${agent}'`);
+    this.name = 'DuplicateWorkspaceRepoError';
+  }
+}

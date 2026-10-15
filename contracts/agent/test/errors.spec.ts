@@ -1,6 +1,12 @@
 import { deepEqual, ok } from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { IncompleteServiceError, InvalidCpuMemoryCombinationError, UnknownPresetError } from '@ez4/agent/library';
+import {
+  IncompleteServiceError,
+  InvalidCpuMemoryCombinationError,
+  UnknownPresetError,
+  InvalidWorkspaceRepoError,
+  DuplicateWorkspaceRepoError
+} from '@ez4/agent/library';
 import { parseFile } from './common/parser';
 
 describe('agent metadata errors', () => {
@@ -35,5 +41,17 @@ describe('agent metadata errors', () => {
   it('assert :: unknown preset', () => {
     const [error] = parseFile('invalid-preset', 1);
     ok(error instanceof UnknownPresetError);
+  });
+
+  it('assert :: non-https workspace repo is rejected naming agent and url', () => {
+    const errors = parseFile('invalid-workspace-url', 1);
+    const error = errors.find((entry) => entry instanceof InvalidWorkspaceRepoError);
+    ok(error);
+    ok(error.message.includes('InvalidWorkspaceAgent') && error.message.includes('git@github.com:acme/api.git'));
+  });
+
+  it('assert :: duplicate workspace repo names are rejected', () => {
+    const errors = parseFile('duplicate-workspace-repo', 1);
+    ok(errors.some((error) => error instanceof DuplicateWorkspaceRepoError && error.message.includes('api')));
   });
 });

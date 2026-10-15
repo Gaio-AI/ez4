@@ -10,6 +10,13 @@ import type {
   FinishHook as HookFinishHook
 } from './hooks';
 import type { InvokeOptions as ClientInvokeOptions, Client as AgentClient } from './client';
+import type {
+  Workspace as AgentWorkspace,
+  WorkspaceRepo as AgentWorkspaceRepo,
+  WorkspaceAuth as AgentWorkspaceAuth,
+  WorkspaceRef as AgentWorkspaceRef,
+  WorkspaceRequest as AgentWorkspaceRequest
+} from './workspace';
 
 export interface LinkOptions extends Record<string, unknown> {
   readonly replyTo?: string;
@@ -20,6 +27,11 @@ export namespace Agent {
   export type Preset = 'logs-read' | 'lambda-read' | 'ecs-read' | 'cloudformation-read';
   export type Status = ResultStatus;
   export type ErrorCode = ResultErrorCode;
+  export type Workspace = AgentWorkspace;
+  export type WorkspaceRepo = AgentWorkspaceRepo;
+  export type WorkspaceAuth = AgentWorkspaceAuth;
+  export type WorkspaceRef = AgentWorkspaceRef;
+  export type WorkspaceRequest = AgentWorkspaceRequest;
 
   export interface Input {}
   export interface Output {}
@@ -86,6 +98,7 @@ export namespace Agent {
     abstract readonly output: O;
     readonly tools?: Tools;
     readonly mcpServers?: Record<string, McpServer>;
+    readonly workspace?: Workspace;
     readonly prepare?: PrepareHook<I>;
     readonly finish?: FinishHook<I, O>;
     readonly image?: Image;

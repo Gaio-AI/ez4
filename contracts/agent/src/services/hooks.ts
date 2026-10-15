@@ -1,5 +1,6 @@
 import type { Service as CommonService } from '@ez4/common';
 import type { Service } from './contract';
+import type { WorkspaceRef, WorkspaceRequest } from './workspace';
 
 export interface Artifacts {
   put(key: string, body: string | Uint8Array): Promise<void>;
@@ -11,6 +12,7 @@ export interface PrepareRequest<I> {
   readonly input: I;
   readonly workdir: string;
   readonly artifacts: Artifacts;
+  readonly workspace?: WorkspaceRequest;
 }
 
 export interface PrepareResult {
@@ -24,6 +26,7 @@ export interface FinishRequest<I, O> {
   readonly output: O;
   readonly workdir: string;
   readonly artifacts: Artifacts;
+  readonly workspace?: WorkspaceRequest & { readonly refs: WorkspaceRef[] };
 }
 
 export type PrepareHook<I = unknown> = (

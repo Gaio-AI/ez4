@@ -22,6 +22,7 @@ import { parseAgentSchema } from './schema';
 import { parseAgentHooks } from './hooks';
 import { validateResources } from './resources';
 import { validatePermissions } from './permissions';
+import { getWorkspaceMetadata } from './workspace';
 import { IncompleteServiceError } from '../errors/service';
 
 const objectMembers = (object: TypeObject): Record<string, ModelProperty> | undefined => {
@@ -157,7 +158,7 @@ export const getAgentServicesMetadata = (reflection: ReflectionTypes) => {
     for (const member of getModelMembers(declaration, true)) {
       if (
         isModelProperty(member) &&
-        (!member.inherited || !['tools', 'mcpServers', 'image', 'egress', 'secrets', 'permissions'].includes(member.name))
+        (!member.inherited || !['tools', 'mcpServers', 'image', 'egress', 'secrets', 'permissions', 'workspace'].includes(member.name))
       ) {
         members[member.name] = member;
       }
@@ -186,6 +187,9 @@ export const getAgentServicesMetadata = (reflection: ReflectionTypes) => {
     validateResources(members, declaration, service, errorList);
     validatePermissions(members, declaration, service, errorList);
     parseOptionalMembers(members, declaration, service, errorList);
+    if (members.workspace) {
+      service.workspace = getWorkspaceMetadata(declaration.name, members.workspace, declaration, errorList);
+    }
 
     if (members.variables) {
       service.variables = getLinkedVariablesObject(members.variables, errorList) ?? {};
