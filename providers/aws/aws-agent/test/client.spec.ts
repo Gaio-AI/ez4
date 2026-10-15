@@ -350,6 +350,9 @@ describe('client :: agent client', () => {
     ]);
     const s3 = {
       send: async (cmd: unknown) => {
+        if (cmd instanceof PutObjectCommand && cmd.input.IfNoneMatch === '*' && store.has(cmd.input.Key ?? '')) {
+          throw Object.assign(new Error('Precondition Failed'), { $metadata: { httpStatusCode: 412 } });
+        }
         if (cmd instanceof GetObjectCommand) {
           const key = cmd.input.Key ?? '';
           const content = store.get(key);
@@ -413,6 +416,50 @@ describe('client :: agent client', () => {
     deepEqual(lastRunTaskInput?.clientToken, 'id-9');
   });
 
+  it('retries the same RunTask request after its invocation was created', async () => {
+    const stored = new Map<string, string>();
+    const runInputs: RunTaskCommandInput[] = [];
+    const s3 = {
+      send: async (command: unknown) => {
+        if (command instanceof PutObjectCommand) {
+          const key = command.input.Key!;
+          if (command.input.IfNoneMatch === '*' && stored.has(key)) {
+            throw Object.assign(new Error('Precondition Failed'), { $metadata: { httpStatusCode: 412 } });
+          }
+          stored.set(key, Buffer.from(command.input.Body as Uint8Array).toString());
+          return {};
+        }
+        if (command instanceof GetObjectCommand) {
+          const content = stored.get(command.input.Key!);
+          if (!content) throw Object.assign(new Error('NoSuchKey'), { name: 'NoSuchKey' });
+          return { Body: { transformToString: async () => content } };
+        }
+        throw new Error('Unexpected S3 command');
+      }
+    } as unknown as S3Client;
+    const ecs = {
+      send: async (command: unknown) => {
+        if (!(command instanceof RunTaskCommand)) throw new Error('Unexpected ECS command');
+        runInputs.push(command.input);
+        if (runInputs.length === 1) throw new Error('Connection lost after RunTask');
+        return { tasks: [{ taskArn: 'arn:task' }] };
+      }
+    } as unknown as ECSClient;
+    const client = Client.make<TestService>({
+      agentName: 'Worker', cluster: 'cluster', taskDefinition: 'task', bucket: 'bucket',
+      subnets: ['subnet-1'], securityGroups: ['sg-1'], inputSchema, s3Client: s3, ecsClient: ecs
+    });
+    await rejects(client.invoke({ task: 'original' }, { id: 'retry-1', correlation: 'first' }), /Connection lost/);
+    const initial = stored.get('invocations/Worker/retry-1.json');
+    deepEqual(await client.invoke({ task: 'different' }, { id: 'retry-1', correlation: 'second' }), { id: 'retry-1' });
+    deepEqual(runInputs[1], runInputs[0]);
+    const final = JSON.parse(stored.get('invocations/Worker/retry-1.json')!) as StoredInvocation;
+    const original = JSON.parse(initial!) as StoredInvocation;
+    equal(final.deadline, original.deadline);
+    deepEqual(final.input, original.input);
+    equal(final.correlation, original.correlation);
+    equal(final.taskArn, 'arn:task');
+  });
   it('assert :: options.workspace is stored in the invocation envelope', async () => {
     let storedInvocation: StoredInvocation | undefined;
     const s3 = {

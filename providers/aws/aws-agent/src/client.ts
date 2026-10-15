@@ -35,25 +35,6 @@ export namespace Client {
         }
 
         const id = options?.id ?? randomUUID();
-        if (options?.id) {
-          try {
-            const existing = await s3.send(
-              new GetObjectCommand({
-                Bucket: parameters.bucket,
-                Key: `invocations/${parameters.agentName}/${id}.json`
-              })
-            );
-            if (existing.Body) {
-              const content = await streamToString(existing.Body as Readable);
-              const envelope: unknown = JSON.parse(content);
-              if (envelope && typeof envelope === 'object' && 'taskArn' in envelope && typeof envelope.taskArn === 'string') {
-                return { id };
-              }
-            }
-          } catch {
-            // Invocation not yet written or unreadable; proceed with standard invoke
-          }
-        }
 
         const now = Date.now();
         const deadline = new Date(now + (timeout + 300) * 1000).toISOString();
@@ -74,14 +55,33 @@ export namespace Client {
           workspace: options?.workspace
         };
 
-        await s3.send(
-          new PutObjectCommand({
+        try {
+          await s3.send(
+            new PutObjectCommand({
+              Bucket: parameters.bucket,
+              Key: `invocations/${parameters.agentName}/${id}.json`,
+              Body: Buffer.from(JSON.stringify(invocationPayload), 'utf-8'),
+              ContentType: 'application/json',
+              ...(options?.id ? { IfNoneMatch: '*' } : {})
+            })
+          );
+        } catch (error) {
+          if (!options?.id || !error || typeof error !== 'object' || !('$metadata' in error) ||
+              !error.$metadata || typeof error.$metadata !== 'object' || !('httpStatusCode' in error.$metadata) ||
+              error.$metadata.httpStatusCode !== 412) throw error;
+          const existing = await s3.send(new GetObjectCommand({
             Bucket: parameters.bucket,
-            Key: `invocations/${parameters.agentName}/${id}.json`,
-            Body: Buffer.from(JSON.stringify(invocationPayload), 'utf-8'),
-            ContentType: 'application/json'
-          })
-        );
+            Key: `invocations/${parameters.agentName}/${id}.json`
+          }));
+          if (!existing.Body) throw new Error(`Invocation ${id} has no envelope`);
+          const envelope: unknown = JSON.parse(await streamToString(existing.Body as Readable));
+          if (!envelope || typeof envelope !== 'object' || !('deadline' in envelope) || typeof envelope.deadline !== 'string' ||
+              !('cluster' in envelope) || typeof envelope.cluster !== 'string' || !('input' in envelope)) {
+            throw new Error(`Invocation ${id} has an invalid envelope`);
+          }
+          if ('taskArn' in envelope && typeof envelope.taskArn === 'string') return { id };
+          Object.assign(invocationPayload, envelope);
+        }
 
         const runTaskResult = await ecs.send(
           new RunTaskCommand({
@@ -126,7 +126,7 @@ export namespace Client {
             agent: parameters.agentName,
             status: 'failed',
             error: { code: 'task_stopped', message: reasons },
-            correlation: options?.correlation,
+            correlation: invocationPayload.correlation,
             finishedAt: new Date().toISOString()
           };
           await s3.send(
