@@ -65,10 +65,7 @@ Declare HTTPS repositories on an agent to include them in its workspace metadata
 export declare class ReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
   // Other required members omitted here.
   workspace: {
-    repos: [
-      { url: 'https://github.com/acme/api.git' },
-      { url: 'https://github.com/acme/web.git'; name: 'frontend'; branch: 'develop' }
-    ];
+    repos: [{ url: 'https://github.com/acme/api.git' }, { url: 'https://github.com/acme/web.git'; name: 'frontend'; branch: 'develop' }];
     auth: { githubApp: 'acme/github-app' };
   };
 }
@@ -142,6 +139,64 @@ export declare class CallerService extends Example.Service {
 ```
 
 When execution completes (or fails/times out), the dispatcher delivers the agent's result to the target queue with `MessageGroupId = agentName` and `MessageDeduplicationId = id`.
+
+#### Agent workflows
+
+Workflows orchestrate multi-step execution flows across autonomous agents. A workflow defines a strongly-typed input, persistent state, a set of agents, and a step handler:
+
+```ts
+import type { Agent } from '@ez4/agent';
+import type { Service } from '@ez4/common';
+import type { CodeReviewAgent } from './agent';
+
+export interface WorkflowState {
+  stepCount: number;
+}
+
+export declare class ReviewWorkflow extends Agent.Workflow<{ pullRequest: number }, WorkflowState, { review: CodeReviewAgent }> {
+  input: { pullRequest: number };
+  agents: { review: CodeReviewAgent };
+  maxSteps: 5;
+  handler: typeof reviewStep;
+}
+
+export function reviewStep(
+  request: Agent.WorkflowRequest<ReviewWorkflow>,
+  _context: Service.Context<ReviewWorkflow>
+): Agent.WorkflowStep<WorkflowState, { review: CodeReviewAgent }> {
+  if (request.event.type === 'start') {
+    return {
+      state: { stepCount: 0 },
+      next: {
+        invoke: 'review',
+        input: { pullRequest: request.event.input.pullRequest }
+      }
+    };
+  }
+
+  // Handle agent completion result
+  const { result } = request.event;
+  return {
+    state: { stepCount: (request.state?.stepCount ?? 0) + 1 },
+    next: { complete: result.status }
+  };
+}
+```
+
+Connected services trigger workflows and inspect status through the generated `WorkflowClient`:
+
+```ts
+// Start a workflow run
+const { runId } = await reviewWorkflow.start({ pullRequest: 42 });
+
+// Check run status
+const run = await reviewWorkflow.status(runId);
+if (run?.status === 'completed') {
+  console.log('Workflow outcome:', run.outcome, run.state);
+}
+```
+
+Workflows enforce a configurable step limit (`maxSteps`, 1..100, default 10) to guard against unbounded execution loops. State transitions are saved atomically with optimistic locking.
 
 ## Providers
 

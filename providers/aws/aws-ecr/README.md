@@ -1,13 +1,56 @@
-# AWS ECR Provider for EZ4
+# EZ4: AWS ECR
 
-Provider package providing Amazon Elastic Container Registry (ECR) repository and image deployment support for EZ4 applications.
+It provides all the components to manage Amazon Elastic Container Registry (ECR) repositories and container images on AWS.
 
-## Overview
+## Getting started
 
-- **Repository**: Manages ECR repositories and repository existence checks.
-- **Image**: Builds Docker images locally using Buildx and pushes to ECR repository targets.
-- **State Triggers**: Integrates with EZ4 state engine to manage ECR resources during deployment.
+#### Install
+
+```sh
+npm install @ez4/aws-ecr -D
+```
+
+#### Overview
+
+This provider package manages container registries and images as state resources in the EZ4 deployment lifecycle:
+
+- **Repository**: Declares and provisions ECR repositories with image scanning configuration, lifecycle policies, and deletion safety (`aws:ecr.repository`).
+- **Image**: Builds Docker images locally using `docker buildx` and pushes them to target ECR repositories with content-hashed tags (`aws:ecr.image`).
+- **Triggers**: State engine handlers that reconcile repository and image state entries during deploy and destroy operations.
+
+#### Permission
+
+Ensure the user performing deployments has the permissions below:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrManagement",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:CreateRepository",
+        "ecr:DeleteRepository",
+        "ecr:DescribeRepositories",
+        "ecr:DescribeImages",
+        "ecr:PutImageScanningConfiguration",
+        "ecr:PutLifecyclePolicy",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:PutImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload"
+      ],
+      "Resource": ["*"]
+    }
+  ]
+}
+```
 
 ## License
 
-MIT
+MIT License

@@ -20,7 +20,15 @@
   ],
   "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
   "lint": "bash scripts/ci-build-once.sh && npm query .workspace | jq -r '.[].name' | xargs -P \"$(nproc)\" -I{} npm run lint -w {} --if-present && node --test scripts/ci-config.test.mjs",
-  "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js", "scripts/ci-build-once.sh"],
+  "shared-inputs": [
+    "package-lock.json",
+    "package.json",
+    ".nvmrc",
+    ".npmrc",
+    "tsconfig.base.json",
+    "eslint.base.js",
+    "scripts/ci-build-once.sh"
+  ],
   "ignore": [".github/", "*.md"],
   "tasks": [
     {
@@ -88,7 +96,8 @@
         "@ez4/aws-scheduler",
         "@ez4/aws-secret",
         "@ez4/aws-topic",
-        "@ez4/aws-valkey"
+        "@ez4/aws-valkey",
+        "@ez4/aws-vpc"
       ],
       "run": "npm run test:offline -w {package}",
       "prepare": { "*": "bash scripts/ci-build-once.sh" }
