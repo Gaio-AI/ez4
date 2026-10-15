@@ -3,7 +3,12 @@ import { deepEqual, throws } from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { buildMetadata } from '@ez4/project/library';
 import { registerTriggers, type AgentService, type AgentWorkflowService, isAgentWorkflowService } from '@ez4/agent/library';
-import { IncompleteServiceError, InvalidCpuMemoryCombinationError, InvalidWorkspaceRepoNameError, UnknownPresetError } from '@ez4/agent/library';
+import {
+  IncompleteServiceError,
+  InvalidCpuMemoryCombinationError,
+  InvalidWorkspaceRepoNameError,
+  UnknownPresetError
+} from '@ez4/agent/library';
 
 const testFile = (fileName: string, overwrite = false) => {
   const sourceFile = `./test/input/output-${fileName}.ts`;
@@ -60,7 +65,8 @@ describe('agent metadata parser and validation', () => {
   it('rejects repository names that can escape workspace paths', () => {
     throws(
       () => buildMetadata(['./test/input/invalid-workspace-name.ts']),
-      (error: unknown) => error instanceof InvalidWorkspaceRepoNameError || (error instanceof Error && error.message === 'No errors were expected.')
+      (error: unknown) =>
+        error instanceof InvalidWorkspaceRepoNameError || (error instanceof Error && error.message === 'No errors were expected.')
     );
   });
 

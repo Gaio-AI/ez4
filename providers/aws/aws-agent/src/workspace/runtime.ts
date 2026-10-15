@@ -186,7 +186,15 @@ export const refreshCache = async (runtime: WorkspaceRuntime, repo: WorkspaceRep
           if (!match) continue;
           const agent = match[1];
           const id = match[2];
-          if (!/^[A-Za-z0-9._-]+$/.test(agent) || agent === '.' || agent === '..' || !/^[A-Za-z0-9._-]+$/.test(id) || id === '.' || id === '..') continue;
+          if (
+            !/^[A-Za-z0-9._-]+$/.test(agent) ||
+            agent === '.' ||
+            agent === '..' ||
+            !/^[A-Za-z0-9._-]+$/.test(id) ||
+            id === '.' ||
+            id === '..'
+          )
+            continue;
           const leaseFile = join(runtime.root, 'leases', repo.name, agent, id);
 
           let prune = false;

@@ -2,7 +2,12 @@ import type { ModelProperty, TypeClass } from '@ez4/reflection';
 import { isModelProperty, isTypeObject, isTypeTuple } from '@ez4/reflection';
 import { getPropertyObject, getPropertyString } from '@ez4/common/library';
 import type { AgentService } from './types';
-import { DuplicateWorkspaceRepoError, IncompleteServiceError, InvalidWorkspaceRepoError, InvalidWorkspaceRepoNameError } from '../errors/service';
+import {
+  DuplicateWorkspaceRepoError,
+  IncompleteServiceError,
+  InvalidWorkspaceRepoError,
+  InvalidWorkspaceRepoNameError
+} from '../errors/service';
 
 const objectMembers = (property: ModelProperty): Record<string, ModelProperty> | undefined => {
   const object = getPropertyObject(property);

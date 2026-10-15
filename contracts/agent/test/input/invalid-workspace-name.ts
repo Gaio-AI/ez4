@@ -7,9 +7,6 @@ export declare class UnsafeWorkspaceAgent extends Agent.Service<{ task: string }
   input: { task: string };
   output: { done: boolean };
   workspace: {
-    repos: [
-      { url: 'https://github.com/acme/api.git'; name: '..' },
-      { url: 'https://github.com/acme/web.git'; name: 'nested/web' }
-    ];
+    repos: [{ url: 'https://github.com/acme/api.git'; name: '..' }, { url: 'https://github.com/acme/web.git'; name: 'nested/web' }];
   };
 }

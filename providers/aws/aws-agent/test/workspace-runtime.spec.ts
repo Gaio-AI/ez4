@@ -106,13 +106,25 @@ describe('workspace :: unsafe names', () => {
     const runtime: WorkspaceRuntime = {
       root,
       workspace: { repos: [{ name: '../outside', url: 'https://github.com/acme/api.git', branch: 'main' }] },
-      git: async () => { gitCalls++; throw new Error('git must not run'); }
+      git: async () => {
+        gitCalls++;
+        throw new Error('git must not run');
+      }
     };
     await rejects(refreshCache(runtime, runtime.workspace.repos[0]), /Invalid workspace repository name/);
     await rejects(checkoutWorkspace(runtime, join(root, 'work')), /Invalid workspace repository name/);
-    await rejects(publishWorkspace(runtime, { dir: root, repos: { '../outside': { path: root, base: 'base' } } }, 'Agent', 'id'), /Invalid workspace repository name/);
-    await rejects(publishWorkspace(runtime, { dir: root, repos: { api: { path: root, base: 'base' } } }, '../Agent', 'id'), /Invalid workspace agent name/);
-    await rejects(publishWorkspace(runtime, { dir: root, repos: { api: { path: root, base: 'base' } } }, 'Agent', '../id'), /Invalid workspace invocation id/);
+    await rejects(
+      publishWorkspace(runtime, { dir: root, repos: { '../outside': { path: root, base: 'base' } } }, 'Agent', 'id'),
+      /Invalid workspace repository name/
+    );
+    await rejects(
+      publishWorkspace(runtime, { dir: root, repos: { api: { path: root, base: 'base' } } }, '../Agent', 'id'),
+      /Invalid workspace agent name/
+    );
+    await rejects(
+      publishWorkspace(runtime, { dir: root, repos: { api: { path: root, base: 'base' } } }, 'Agent', '../id'),
+      /Invalid workspace invocation id/
+    );
     deepEqual(gitCalls, 0);
   });
 });
