@@ -102,7 +102,9 @@ describe('workflow resources and grants', () => {
       ...workflowFixture,
       agents: { reviewLoop: 'Worker' }
     });
-    const workflowFunction = Object.values(state).filter((entry): entry is EntryState => !!entry).filter(isFunctionState)[0];
+    const workflowFunction = Object.values(state)
+      .filter((entry): entry is EntryState => !!entry)
+      .filter(isFunctionState)[0];
     ok(workflowFunction);
     const variables = await workflowFunction.parameters.getFunctionVariables();
     const clientConfig = variables.EZ4_WORKFLOW_AGENT_REVIEW_LOOP;
