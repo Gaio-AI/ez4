@@ -100,6 +100,7 @@ describe('workflow resources and grants', () => {
       `arn:aws:s3:::${bucketName}/invocations/Worker/*`,
       `arn:aws:s3:::${bucketName}/workflows/ReviewLoop/*`
     ]);
+    ok(grants.some((g) => g.permissions.includes('s3:ListBucket') && g.resourceIds.includes(`arn:aws:s3:::${bucketName}`)));
   });
 
   it('assert :: a camelCase agent alias resolves from generated workflow variables', async () => {

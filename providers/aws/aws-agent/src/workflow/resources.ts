@@ -69,6 +69,8 @@ export const buildWorkflowGrants = (
       permissions: ['s3:GetObject', 's3:PutObject'],
       resourceIds: [workflowBucketArn, ...agentInvocationsArns]
     },
+    // Without ListBucket a missing run reads as AccessDenied instead of NoSuchKey, so no run could ever start.
+    { permissions: ['s3:ListBucket'], resourceIds: [`arn:aws:s3:::${bucketName}`] },
     ...invokeGrants,
     {
       permissions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
