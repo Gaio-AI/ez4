@@ -151,21 +151,23 @@ const getFieldOperation = (
         throw new MissingOperatorError(columnName);
       }
 
+      const columnContext = {
+        ...context,
+        flags: {
+          insensitive,
+          count
+        }
+      };
+
       if (operationEntries.length === 1) {
-        return getSingleOperation(columnPath, columnSchema, operationEntries[0], {
-          ...context,
-          flags: {
-            insensitive,
-            count
-          }
-        });
+        return getSingleOperation(columnPath, columnSchema, operationEntries[0], columnContext);
       }
 
-      const subContext = { ...context, path: columnPath };
-
+      // Only the fields of a JSON column are read under its path: a plain column keeps the path it
+      // was reached by, so it isn't cast as a JSON value.
       const allOperations = !hasSubColumn
-        ? getMultipleOperations(columnPath, columnSchema, operationEntries, subContext)
-        : getFilterOperations(valueOperation, columnSchema, subContext);
+        ? getMultipleOperations(columnPath, columnSchema, operationEntries, columnContext)
+        : getFilterOperations(valueOperation, columnSchema, { ...context, path: columnPath });
 
       if (allOperations.length) {
         return combineOperations(allOperations);
