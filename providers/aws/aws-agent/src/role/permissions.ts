@@ -88,9 +88,7 @@ export const PERMISSION_POLICIES: Record<AgentPermission, PermissionPolicy[]> = 
   [AgentPermission.CodeArtifactRead]: [
     {
       permissions: ['codeartifact:GetAuthorizationToken'],
-      getArns: (name, region, accountId) => [
-        `arn:aws:codeartifact:${region}:${accountId}:domain/${getCodeArtifactRepository(name).domain}`
-      ]
+      getArns: (name, region, accountId) => [`arn:aws:codeartifact:${region}:${accountId}:domain/${getCodeArtifactRepository(name).domain}`]
     },
     {
       permissions: ['codeartifact:GetRepositoryEndpoint', 'codeartifact:ReadFromRepository'],
