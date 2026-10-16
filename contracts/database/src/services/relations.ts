@@ -25,12 +25,20 @@ export interface TableRelations {}
  * Internal relation type.
  */
 export type RelationMetadata = {
-  filters: Record<string, AnyObject | undefined>;
+  filters: Record<string, RelationFilter | undefined>;
   updates: Record<string, AnyObject | undefined>;
   inserts: Record<string, AnyObject | undefined>;
   selects: Record<string, AnyObject | undefined>;
   records: Record<string, AnyObject | undefined>;
   indexes: string;
+};
+
+/**
+ * Internal relation filter type, with the related table schema `T` and its own relation filters `R`.
+ */
+export type RelationFilter<T extends AnyObject = AnyObject, R extends AnyObject = AnyObject> = {
+  schema: T;
+  filters: R;
 };
 
 /**
@@ -92,7 +100,7 @@ type ExtractRelations<
         ? {
             [P in N]: {
               indexes: RelationIndexes<N, I, R>;
-              filters: FilterableRelationSchemas<S, R>;
+              filters: FilterRelationSchemas<T, S, I, R>;
               updates: UpdateRelationSchemas<N, S, I, R>;
               inserts: InsertRelationSchemas<N, PropertyType<N, S>, S, I, R>;
               selects: SelectRelationSchemas<S, I, R> & NestedSelectRelationSchemas<T, S, I, R>;
@@ -173,9 +181,32 @@ type IsRelationIndex<N, C, V, I extends Record<string, TableIndexes>> =
 /**
  * Produce an object containing relation schemas for filters.
  */
-type FilterableRelationSchemas<S extends Record<string, TableSchema>, R extends AnyObject> = {
-  [P in keyof R as RelationTargetAlias<P>]: Omit<PropertyType<RelationSourceTable<R[P]>, S>, RelationSourceColumn<R[P]>>;
+type FilterRelationSchemas<
+  T extends DatabaseTable<TableSchema, any>[],
+  S extends Record<string, TableSchema>,
+  I extends Record<string, TableIndexes>,
+  R extends AnyObject
+> = {
+  [P in keyof R as RelationTargetAlias<P>]: RelationFilter<
+    Omit<PropertyType<RelationSourceTable<R[P]>, S>, RelationSourceColumn<R[P]>>,
+    NestedFilterRelationSchemas<T, S, I, R[P]>
+  >;
 };
+
+/**
+ * Produce an object containing the relation schemas for filters of the given relation source table.
+ */
+type NestedFilterRelationSchemas<
+  T extends DatabaseTable<TableSchema, any>[],
+  S extends Record<string, TableSchema>,
+  I extends Record<string, TableIndexes>,
+  C
+> =
+  RelationSourceTable<C> extends keyof MergeRelations<T, T, S, I>
+    ? MergeRelations<T, T, S, I>[RelationSourceTable<C>] extends { filters: infer N extends AnyObject }
+      ? N
+      : {}
+    : {};
 
 /**
  * Produce an object containing relation schemas for updates.

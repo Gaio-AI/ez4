@@ -4,7 +4,7 @@ import type { WhereFieldInput, WhereRelationInput } from './query/where';
 import type { DatabaseEngine } from './engine';
 import type { UndefinedModeUtils } from './undefined';
 import type { PaginationModeUtils } from './pagination';
-import type { RelationMetadata } from './relations';
+import type { RelationFilter, RelationMetadata } from './relations';
 import type { OrderModeUtils } from './order';
 import type { LockModeUtils } from './lock';
 import type { TableMetadata } from './table';
@@ -150,14 +150,20 @@ export namespace Query {
       ? never
       : {
           [P in keyof T['relations']['filters']]?: P extends keyof S
-            ? StrictIncludeRelation<NonNullable<T['relations']['filters'][P]>, T['engine']>
+            ? NonNullable<T['relations']['filters'][P]> extends RelationFilter<infer U, infer R>
+              ? StrictIncludeRelation<U, T['engine'], R>
+              : never
             : never;
         };
 
   export type StrictIncludeOrder<T extends AnyObject> = OrderModeUtils.AnyInput<T>;
 
-  export type StrictIncludeRelation<T extends AnyObject, E extends DatabaseEngine> = PaginationModeUtils.Range<E> & {
-    where?: WhereRelationInput<T, E>;
+  export type StrictIncludeRelation<
+    T extends AnyObject,
+    E extends DatabaseEngine,
+    R extends AnyObject = {}
+  > = PaginationModeUtils.Range<E> & {
+    where?: WhereRelationInput<T, E, R>;
     order?: StrictIncludeOrder<T>;
   };
 

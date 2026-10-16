@@ -92,17 +92,16 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
 
       const relationIncludes = include && include[fieldKey];
 
-      const relationQuery = builder
-        .select(sourceSchema)
-        .from(sourceTable)
-        .where({
-          ...relationIncludes?.where,
-          [sourceColumn]: source.reference(targetColumn)
-        });
-
       if (!source.alias) {
         source.as(builder.alias('R'));
       }
+
+      const relationQuery = builder.select(sourceSchema).from(sourceTable);
+
+      relationQuery.where({
+        ...(relationIncludes?.where && getSelectFilters(builder, relationIncludes.where, relations, relationQuery, sourceTable)),
+        [sourceColumn]: source.reference(targetColumn)
+      });
 
       if (sourceIndex === Index.Primary || sourceIndex === Index.Unique) {
         const record = getSelectFields(builder, relationFields, null, sourceSchema, relations, relationQuery, sourceTable, true);
@@ -219,14 +218,15 @@ export const getSelectFilters = (
 
         const { sourceTable, sourceColumn, sourceSchema, targetColumn } = fieldRelation;
 
-        const relationQuery = builder.select(sourceSchema).from(sourceTable).rawColumn(1).as('T');
+        // Each level has its own alias, so the reference to the level above binds to it and not to an inner level.
+        const relationQuery = builder.select(sourceSchema).from(sourceTable).rawColumn(1).as(builder.alias('T'));
 
         if (!source.alias) {
           source.as(builder.alias('R'));
         }
 
         relationQuery.where({
-          ...relationFilters,
+          ...(relationFilters && getSelectFilters(builder, relationFilters, relations, relationQuery, sourceTable)),
           [sourceColumn]: source.reference(targetColumn)
         });
 
