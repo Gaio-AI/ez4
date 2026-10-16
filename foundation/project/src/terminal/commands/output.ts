@@ -4,7 +4,7 @@ import { Logger, DynamicLogger, LogLevel } from '@ez4/logger';
 
 import { loadProject } from '../../config/project';
 import { loadProviders } from '../../config/providers';
-import { loadEnvironment } from '../../config/environment';
+import { loadEnvironment, prepareSession } from '../../config/environment';
 import { reportResourcesOutput } from '../../deploy/output';
 import { getDeployOptions } from '../../deploy/options';
 import { warnUnsupportedFlags } from '../../utils/flags';
@@ -25,6 +25,8 @@ export const outputCommand = async (input: InputOptions) => {
   if (input.environment) {
     loadEnvironment(input.environment);
   }
+
+  await prepareSession();
 
   warnUnsupportedFlags(input, {
     environment: true
