@@ -33,3 +33,30 @@ export class InvalidAtomicOperation extends Error {
     super(`Atomic operation for field '${field}' isn't supported.`);
   }
 }
+
+export class InvalidAggregateFieldError extends Error {
+  constructor(public alias: string) {
+    super(`Aggregate alias '${alias}' must have exactly one of count (true or a column), sum, min or max (a column).`);
+  }
+}
+
+export class InvalidAggregateColumnError extends Error {
+  constructor(
+    public alias: string,
+    public column: string
+  ) {
+    super(`Aggregate alias '${alias}' can't aggregate the column '${column}'.`);
+  }
+}
+
+export class EmptyAggregateQueryError extends Error {
+  constructor() {
+    super(`Aggregate query must have a group column or an aggregate.`);
+  }
+}
+
+export class DuplicateAggregateAliasError extends Error {
+  constructor(public alias: string) {
+    super(`Aggregate alias '${alias}' is also a group column.`);
+  }
+}

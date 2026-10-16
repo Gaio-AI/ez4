@@ -10,7 +10,8 @@ import type {
   RelationMode,
   StreamMode,
   OrderMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '../types/mode';
 
 /**
@@ -26,6 +27,7 @@ export type DatabaseEngine = {
   streamMode: StreamMode;
   orderMode: OrderMode;
   lockMode: LockMode;
+  aggregateMode: AggregateMode;
   options: AnyObject;
   name: string;
 };

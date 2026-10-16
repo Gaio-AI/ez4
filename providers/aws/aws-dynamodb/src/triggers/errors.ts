@@ -45,3 +45,9 @@ export class UnsupportedLockModeError extends Error {
     super(`DynamoDB doesn't support lock mode.`);
   }
 }
+
+export class UnsupportedAggregateModeError extends Error {
+  constructor() {
+    super(`DynamoDB doesn't support aggregate mode.`);
+  }
+}

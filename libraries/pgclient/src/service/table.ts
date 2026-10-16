@@ -5,6 +5,7 @@ import type { AnyObject, IsArray } from '@ez4/utils';
 import type { PgRelationRepositoryWithSchema } from '../types/repository';
 import type { PgClientDriver, PgExecuteStatement, PgExecutionResult } from '../types/driver';
 import type { InternalTableMetadata } from '../types/table';
+import type { PgAggregateInput } from '../queries/aggregate';
 
 import { DuplicateUniqueKeyError, MissingUniqueIndexError } from '@ez4/pgclient';
 import { Index } from '@ez4/database';
@@ -21,7 +22,8 @@ import {
   prepareDeleteMany,
   prepareDeleteOne,
   prepareCount,
-  prepareExists
+  prepareExists,
+  prepareAggregate
 } from '../queries/queries';
 
 export type TableContext = {
@@ -277,5 +279,15 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     const [result] = records;
 
     return Number(result?.__EZ4_COUNT) || 0;
+  }
+
+  async aggregate<B extends Query.AggregateByInput<T> = never, A extends Query.AggregateFieldsInput<T> = {}>(
+    query: Query.AggregateInput<B, A, T>
+  ) {
+    const statement = prepareAggregate(this.name, this.schema, this.relations, this.context.driver, query as PgAggregateInput);
+
+    const { records } = await this.sendStatement(statement);
+
+    return records as Query.AggregateResult<B, A, T>;
   }
 }

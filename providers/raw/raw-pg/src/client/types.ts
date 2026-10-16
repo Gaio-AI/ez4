@@ -7,7 +7,8 @@ import type {
   RelationMode,
   OrderMode,
   StreamMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '@ez4/database';
 
 /**
@@ -27,6 +28,7 @@ export type PostgresEngine = {
   orderMode: OrderMode.AnyColumns;
   streamMode: StreamMode.Unsupported;
   lockMode: LockMode.Supported;
+  aggregateMode: AggregateMode.Supported;
   options: {};
   name: 'raw-pg';
 };

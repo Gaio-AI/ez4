@@ -7,7 +7,8 @@ import type {
   RelationMode,
   StreamMode,
   OrderMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '@ez4/database';
 
 export type TestEngine = {
@@ -20,6 +21,7 @@ export type TestEngine = {
   streamMode: StreamMode.Supported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -34,6 +36,7 @@ export type TestEngineParameters<P extends ParametersMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -48,6 +51,7 @@ export type TestEngineTransaction<T extends TransactionMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -62,6 +66,7 @@ export type TestEngineInsensitive<I extends InsensitiveMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -76,6 +81,7 @@ export type TestEngineUndefined<T extends UndefinedMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -90,6 +96,7 @@ export type TestEnginePagination<P extends PaginationMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -104,6 +111,7 @@ export type TestEngineOrder<O extends OrderMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: O;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };
@@ -118,6 +126,22 @@ export type TestEngineLock<L extends LockMode> = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: L;
+  aggregateMode: AggregateMode.Unsupported;
+  options: never;
+  name: 'test';
+};
+
+export type TestEngineAggregate<A extends AggregateMode> = {
+  parametersMode: ParametersMode.OnlyIndex;
+  transactionMode: TransactionMode.Static;
+  insensitiveMode: InsensitiveMode.Unsupported;
+  undefinedMode: UndefinedMode.Unsupported;
+  paginationMode: PaginationMode.Offset;
+  relationMode: RelationMode.Supported;
+  streamMode: StreamMode.Unsupported;
+  orderMode: OrderMode.AnyColumns;
+  lockMode: LockMode.Unsupported;
+  aggregateMode: A;
   options: never;
   name: 'test';
 };

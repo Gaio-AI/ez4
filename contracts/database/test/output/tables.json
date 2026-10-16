@@ -26,6 +26,7 @@
       "orderMode": "any",
       "streamMode": "supported",
       "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
       "name": "test"
     },
     "tables": [

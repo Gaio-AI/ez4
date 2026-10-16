@@ -12,7 +12,8 @@ import type {
   OrderMode,
   LockMode,
   StreamMode,
-  RelationMode
+  RelationMode,
+  AggregateMode
 } from '../types/mode';
 
 import { createServiceMetadata } from '@ez4/project/library';
@@ -44,6 +45,7 @@ export type DatabaseEngine = {
   orderMode: OrderMode;
   streamMode: StreamMode;
   lockMode: LockMode;
+  aggregateMode: AggregateMode;
   name: string;
 };
 

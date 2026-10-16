@@ -9,6 +9,7 @@ import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { getTransformedRecords } from '../client';
 import { executeStatement, executeTransaction } from './common/client';
 import { isDuplicateItemError } from './utils/errors';
+import { UnsupportedAggregateError } from './errors';
 
 import {
   prepareInsertOne,
@@ -261,5 +262,9 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     const { records } = await executeStatement(client, statement, debug);
 
     return records.length;
+  }
+
+  aggregate(_query: never): Promise<never> {
+    return Promise.reject(new UnsupportedAggregateError());
   }
 }

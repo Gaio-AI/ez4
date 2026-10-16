@@ -7,6 +7,7 @@ import { Order } from '@ez4/database';
 import { mergeSqlAlias } from '../../utils/merge';
 import { escapeSqlName } from '../../utils/escape';
 import { InvalidColumnOrderError } from '../../errors/clauses';
+import { SqlAggregateColumn } from '../../common/aggregate';
 
 export class SqlOrderClause {
   #state: {
@@ -40,13 +41,20 @@ export class SqlOrderClause {
       const order = columns[column];
 
       if (order) {
-        orderColumns.push(getOrderColumn(column, order, source.alias));
+        const alias = isAggregateColumn(source, column) ? undefined : source.alias;
+
+        orderColumns.push(getOrderColumn(column, order, alias));
       }
     }
 
     return `ORDER BY ${orderColumns.join(', ')}`;
   }
 }
+
+// An aggregate exists only as an output column, which a table alias can't qualify.
+const isAggregateColumn = (source: SqlSource, column: string) => {
+  return !!source.results?.fields.some((field) => field instanceof SqlAggregateColumn && field.alias === column);
+};
 
 const getOrderColumn = (column: string, order: Order, alias?: string) => {
   const columnName = mergeSqlAlias(escapeSqlName(column), alias);

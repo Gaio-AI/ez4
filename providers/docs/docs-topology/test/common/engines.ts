@@ -7,7 +7,8 @@ import type {
   RelationMode,
   OrderMode,
   StreamMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '@ez4/database';
 
 export type TestEngine = {
@@ -20,6 +21,7 @@ export type TestEngine = {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 };

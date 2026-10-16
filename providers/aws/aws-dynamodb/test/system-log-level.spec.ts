@@ -5,7 +5,7 @@ import type { EntryStates } from '@ez4/state';
 import { describe, it } from 'node:test';
 import { equal, ok } from 'node:assert/strict';
 
-import { InsensitiveMode, LockMode, OrderMode, PaginationMode, ParametersMode, TransactionMode, Index } from '@ez4/database';
+import { AggregateMode, InsensitiveMode, LockMode, OrderMode, PaginationMode, ParametersMode, TransactionMode, Index } from '@ez4/database';
 import { getServiceState, setServiceState } from '@ez4/project/library';
 import { isFunctionState } from '@ez4/aws-function';
 import { createRole } from '@ez4/aws-identity';
@@ -28,7 +28,8 @@ const service = {
     insensitiveMode: InsensitiveMode.Unsupported,
     paginationMode: PaginationMode.Cursor,
     orderMode: OrderMode.IndexColumns,
-    lockMode: LockMode.Unsupported
+    lockMode: LockMode.Unsupported,
+    aggregateMode: AggregateMode.Unsupported
   },
   tables: [
     {

@@ -31,6 +31,7 @@
       "orderMode": "any",
       "streamMode": "unsupported",
       "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
       "name": "test"
     },
     "tables": []
@@ -55,6 +56,7 @@
       "orderMode": "any",
       "streamMode": "unsupported",
       "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
       "name": "test"
     },
     "tables": []
@@ -76,6 +78,7 @@
       "orderMode": "index",
       "streamMode": "unsupported",
       "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
       "name": "test"
     },
     "tables": []

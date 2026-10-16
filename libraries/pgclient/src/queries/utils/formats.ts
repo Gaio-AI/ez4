@@ -11,19 +11,37 @@ const ColumnFormats: Record<string, string> = {
 };
 
 export const getFormattedColumn = (column: string, schema: AnySchema) => {
-  if (isStringSchema(schema)) {
-    const columnMask = schema.format ? ColumnFormats[schema.format] : undefined;
+  const columnMask = getColumnMask(schema);
 
-    if (columnMask) {
-      const columnName = escapeSqlName(column);
+  if (columnMask) {
+    const columnName = escapeSqlName(column);
 
-      return (source?: SqlSource) => {
-        return formatColumn(columnName, columnMask, source);
-      };
-    }
+    return (source?: SqlSource) => {
+      return formatColumn(columnName, columnMask, source);
+    };
   }
 
   return column;
+};
+
+export const getExpressionFormatter = (schema: AnySchema) => {
+  const columnMask = getColumnMask(schema);
+
+  if (columnMask) {
+    return (expression: string) => {
+      return `to_char(${expression}, ${columnMask})`;
+    };
+  }
+
+  return undefined;
+};
+
+const getColumnMask = (schema: AnySchema) => {
+  if (isStringSchema(schema) && schema.format) {
+    return ColumnFormats[schema.format];
+  }
+
+  return undefined;
 };
 
 const formatColumn = (columnName: string, columnMask: string, source?: SqlSource) => {

@@ -10,6 +10,7 @@ export { UndefinedModeUtils } from './services/undefined';
 export { PaginationModeUtils } from './services/pagination';
 export { OrderModeUtils } from './services/order';
 export { LockModeUtils } from './services/lock';
+export { AggregateModeUtils } from './services/aggregate';
 export { EngineUtils } from './services/engine';
 export { Database } from './services/contract';
 export { Query } from './services/query';

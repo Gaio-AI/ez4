@@ -4,6 +4,7 @@ import type { PgRelationRepositoryWithSchema } from '../types/repository';
 import type { InternalTableMetadata } from '../types/table';
 import type { PgClientDriver } from '../types/driver';
 import type { UpdateQueryOptions } from './update';
+import type { PgAggregateInput } from './aggregate';
 
 import { createQueryBuilder } from './utils/builder';
 
@@ -13,6 +14,7 @@ import { prepareSelectQuery } from './select';
 import { prepareDeleteQuery } from './delete';
 import { prepareExistsQuery } from './exists';
 import { prepareCountQuery } from './count';
+import { prepareAggregateQuery } from './aggregate';
 
 export const prepareInsertOne = async <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
   table: string,
@@ -268,6 +270,32 @@ export const prepareCount = <T extends InternalTableMetadata>(
     metadata: {
       schema,
       relations,
+      columns,
+      table
+    }
+  };
+};
+
+export const prepareAggregate = (
+  table: string,
+  schema: ObjectSchema,
+  relations: PgRelationRepositoryWithSchema,
+  driver: PgClientDriver,
+  input: PgAggregateInput
+) => {
+  const builder = createQueryBuilder(driver);
+
+  const { query, columns, schema: resultSchema } = prepareAggregateQuery(builder, table, schema, relations, input);
+
+  const [statement, variables] = query.build();
+
+  // Results hold no relation, and an alias may take the name of one.
+  return {
+    query: statement,
+    variables,
+    metadata: {
+      schema: resultSchema,
+      relations: {},
       columns,
       table
     }

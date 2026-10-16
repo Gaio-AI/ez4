@@ -1,6 +1,8 @@
 import type { AnyObject, PartialProperties, PartialObject, StrictObject, IsObjectEmpty, Prettify, IsTrue } from '@ez4/utils';
 import type { AtomicFields } from './query/atomic';
 import type { WhereFieldInput, WhereRelationInput } from './query/where';
+import type { AggregateColumn, AggregateQueryInput, AggregateRecord, AggregateSelectInput } from './query/aggregate';
+import type { AggregateModeUtils } from './aggregate';
 import type { DatabaseEngine } from './engine';
 import type { UndefinedModeUtils } from './undefined';
 import type { PaginationModeUtils } from './pagination';
@@ -91,6 +93,22 @@ export namespace Query {
   export type CountInput<T extends TableMetadata> = {
     where?: WhereInput<T>;
   };
+
+  export type AggregateInput<
+    B extends AggregateByInput<T>,
+    A extends AggregateFieldsInput<T>,
+    T extends TableMetadata
+  > = AggregateModeUtils.Input<T, AggregateQueryInput<B, A, T>>;
+
+  export type AggregateResult<B extends AggregateByInput<T>, A extends AggregateFieldsInput<T>, T extends TableMetadata> = AggregateRecord<
+    B,
+    A,
+    T
+  >[];
+
+  export type AggregateByInput<T extends TableMetadata> = AggregateColumn<T>;
+
+  export type AggregateFieldsInput<T extends TableMetadata> = AggregateSelectInput<T>;
 
   export type InsertOneResult<S extends AnyObject, T extends TableMetadata> = SelectInput<T> extends S ? void : Record<S, T>;
 

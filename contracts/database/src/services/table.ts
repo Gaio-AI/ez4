@@ -162,4 +162,15 @@ export interface Table<T extends TableMetadata> {
    * @returns Returns the number of records found.
    */
   count(query: Query.CountInput<T>): Promise<number>;
+
+  /**
+   * Aggregate database records, in one result per group of the given columns or in exactly one result
+   * without them.
+   *
+   * @param query Input query.
+   * @returns Returns the group columns and the aggregates of each group.
+   */
+  aggregate<B extends Query.AggregateByInput<T> = never, A extends Query.AggregateFieldsInput<T> = {}>(
+    query: Query.AggregateInput<B, A, T>
+  ): Promise<Query.AggregateResult<B, A, T>>;
 }

@@ -2,6 +2,7 @@ import type { ObjectSchema } from '@ez4/schema';
 import type { SqlTableReference } from '../common/reference';
 import type { SqlJsonColumnOptions, SqlJsonColumnRecord } from '../common/json';
 import type { SqlArrayColumn, SqlObjectColumn, SqlResultColumn, SqlResultRecord } from '../common/results';
+import type { SqlAggregateColumnOptions } from '../common/aggregate';
 import type { SqlRawGenerator, SqlRawValue } from '../common/raw';
 import type { SqlSourceWithResults } from '../common/source';
 import type { SqlFilters, SqlOrder } from '../common/types';
@@ -113,6 +114,11 @@ export class SqlSelectStatement extends SqlSource implements SqlSourceWithResult
 
   arrayColumn(record: SqlJsonColumnRecord, options?: SqlArrayColumn) {
     this.#state.results.arrayColumn(record, options);
+    return this;
+  }
+
+  aggregateColumn(aggregate: SqlAggregateColumnOptions) {
+    this.#state.results.aggregateColumn(aggregate, this.#state.options);
     return this;
   }
 
