@@ -181,7 +181,7 @@ type IsRelationIndex<N, C, V, I extends Record<string, TableIndexes>> =
 /**
  * Produce an object containing relation schemas for filters.
  */
-type FilterRelationSchemas<
+export type FilterRelationSchemas<
   T extends DatabaseTable<TableSchema, any>[],
   S extends Record<string, TableSchema>,
   I extends Record<string, TableIndexes>,
@@ -274,7 +274,7 @@ type RecordsRelationSchemas<
 /**
  * Produce an object containing all nested relation schemas for select operations.
  */
-type NestedSelectRelationSchemas<
+export type NestedSelectRelationSchemas<
   T extends DatabaseTable<TableSchema, any>[],
   S extends Record<string, TableSchema>,
   I extends Record<string, TableIndexes>,

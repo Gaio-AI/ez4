@@ -237,6 +237,40 @@ export const testInclude = async ({ selfClient }: Service.Context<TestDatabase>)
   });
 };
 
+// Returned rather than awaited: the declaration emit has to name the inferred result, whose table
+// metadata carries the relation cycle.
+export const testDeclaration = ({ selfClient }: Service.Context<TestDatabase>) => {
+  return Promise.all([
+    selfClient.tableA.findMany({
+      select: {
+        id: true
+      }
+    }),
+    selfClient.tableB.findMany({
+      select: {
+        id: true,
+        all_a: {
+          value: true,
+          relation_b: {
+            value: true
+          }
+        }
+      }
+    }),
+    selfClient.tableA.updateOne({
+      select: {
+        id: true
+      },
+      data: {
+        value: 1
+      },
+      where: {
+        id: 'a'
+      }
+    })
+  ]);
+};
+
 export const testWrite = async ({ selfClient }: Service.Context<TestDatabase>) => {
   // Nested relation filters in the other operations with a where.
   await selfClient.tableA.updateMany({

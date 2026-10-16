@@ -1,7 +1,7 @@
 export { StreamAnyChange, StreamDeleteChange, StreamInsertChange, StreamUpdateChange, StreamChangeType } from './services/streams';
 
 export { Client } from './services/client';
-export { RelationMetadata } from './services/relations';
+export { RelationMetadata, FilterRelationSchemas, NestedSelectRelationSchemas } from './services/relations';
 export { TableMetadata, Table } from './services/table';
 export { ParametersModeUtils } from './services/parameters';
 export { TransactionModeUtils } from './services/transaction';
