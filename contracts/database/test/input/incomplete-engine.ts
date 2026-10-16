@@ -8,7 +8,8 @@ import type {
   RelationMode,
   OrderMode,
   StreamMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '@ez4/database';
 
 // @ts-expect-error Incomplete engine, missing name.
@@ -22,6 +23,7 @@ export declare class TestDatabase extends Database.Service<{
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
 }> {
   tables: [];
 }

@@ -76,6 +76,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select boolean', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         boolean: true
       },
@@ -107,6 +108,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select integer', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         integer: true
       },
@@ -138,6 +140,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select decimal', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         decimal: true
       },
@@ -169,6 +172,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select string', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         string: true
       },
@@ -200,6 +204,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select date-time', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         datetime: true
       },
@@ -231,6 +236,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select date', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         date: true
       },
@@ -262,6 +268,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select time', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         time: true
       },
@@ -293,6 +300,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select json (all fields)', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         json: true
       },
@@ -339,6 +347,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select json (single field)', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         json: {
           number: true
@@ -381,6 +390,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select json (multiple field)', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         json: {
           string: true,
@@ -426,6 +436,7 @@ describe('client update one', async () => {
 
   it('assert :: update one and select json (null fields)', async () => {
     const previousA = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         json: true
       },
@@ -447,6 +458,7 @@ describe('client update one', async () => {
     });
 
     const previousB = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         json: true
       },

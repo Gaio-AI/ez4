@@ -14,6 +14,7 @@ export type UnsupportedRelationEngine = {
   orderMode: TestEngine['orderMode'];
   streamMode: StreamMode.Unsupported;
   lockMode: TestEngine['lockMode'];
+  aggregateMode: TestEngine['aggregateMode'];
   options: never;
   name: 'unsupported';
 };

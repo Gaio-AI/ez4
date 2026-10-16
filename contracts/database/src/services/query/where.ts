@@ -1,5 +1,6 @@
 import type { AnyObject, IsObject, IsObjectEmpty, Prettify } from '@ez4/utils';
 import type { DecomposeIndexName, PrimaryIndexes, UniqueIndexes } from '../indexes';
+import type { RelationFilter } from '../relations';
 import type { InsensitiveModeUtils } from '../insensitive';
 import type { DatabaseEngine } from '../engine';
 import type { TableMetadata } from '../table';
@@ -25,22 +26,23 @@ export type WhereFieldInput<T extends TableMetadata, I extends boolean = false> 
   }
 >;
 
-export type WhereRelationInput<T extends AnyObject, E extends DatabaseEngine> = WhereObjectField<T, E> & {
-  /**
-   * Check whether the expression is not true.
-   */
-  NOT?: WhereRelationInput<T, E>;
+export type WhereRelationInput<T extends AnyObject, E extends DatabaseEngine, R extends AnyObject = {}> = WhereObjectField<T, E> &
+  WhereRelationFilters<R, E> & {
+    /**
+     * Check whether the expression is not true.
+     */
+    NOT?: WhereRelationInput<T, E, R>;
 
-  /**
-   * Check whether all the expressions are true.
-   */
-  AND?: WhereRelationInput<T, E>[];
+    /**
+     * Check whether all the expressions are true.
+     */
+    AND?: WhereRelationInput<T, E, R>[];
 
-  /**
-   * Check whether any of all the expressions are true.
-   */
-  OR?: WhereRelationInput<T, E>[];
-};
+    /**
+     * Check whether any of all the expressions are true.
+     */
+    OR?: WhereRelationInput<T, E, R>[];
+  };
 
 export type WhereOperators = keyof (WhereNegate<any, never> &
   WhereEqual<any, never> &
@@ -79,9 +81,9 @@ type WhereObjectField<V extends AnyObject, E extends DatabaseEngine> = {
 };
 
 type WhereRelationFilters<V extends AnyObject, E extends DatabaseEngine> = {
-  [P in keyof V]?: IsObject<V[P]> extends true
-    ? IsObjectEmpty<V[P]> extends false
-      ? null | WhereRelationInput<V[P], E>
+  [P in keyof V]?: V[P] extends RelationFilter<infer T, infer R>
+    ? IsObjectEmpty<T & R> extends false
+      ? null | WhereRelationInput<T, E, R>
       : null | {}
     : never;
 };

@@ -36,6 +36,7 @@ export * from './statements/update';
 export * from './statements/delete';
 
 export * from './common/json';
+export * from './common/aggregate';
 export * from './common/source';
 export * from './common/reference';
 export * from './common/results';

@@ -1,10 +1,12 @@
 import type { ObjectSchema } from '@ez4/schema';
 import type { SqlSource } from '../../common/source';
-import type { SqlRecord } from '../../common/types';
+import type { SqlFilters, SqlRecord } from '../../common/types';
 import type { SqlBuilderOptions, SqlBuilderReferences } from '../../builder';
 
 import { getUpdateColumns } from '../../helpers/update';
+import { MissingConflictTargetError } from '../../errors/clauses';
 import { escapeSqlNames } from '../../utils/escape';
+import { SqlWhereClause } from './where';
 
 export class SqlConflictClause {
   #state: {
@@ -12,8 +14,9 @@ export class SqlConflictClause {
     schema?: ObjectSchema;
     references: SqlBuilderReferences;
     options: SqlBuilderOptions;
-    columns: string[];
+    columns?: string[];
     record?: SqlRecord;
+    where?: SqlWhereClause;
   };
 
   constructor(
@@ -21,8 +24,9 @@ export class SqlConflictClause {
     schema: ObjectSchema | undefined,
     references: SqlBuilderReferences,
     options: SqlBuilderOptions,
-    columns: string[],
-    record?: SqlRecord
+    columns?: string[],
+    record?: SqlRecord,
+    filters?: SqlFilters
   ) {
     this.#state = {
       source,
@@ -32,10 +36,14 @@ export class SqlConflictClause {
       columns,
       record
     };
+
+    if (filters) {
+      this.where(filters);
+    }
   }
 
   get empty() {
-    return !this.#state.columns.length;
+    return !!this.#state.columns && !this.#state.columns.length;
   }
 
   apply(record: SqlRecord) {
@@ -51,25 +59,53 @@ export class SqlConflictClause {
   }
 
   column(column: string) {
-    this.#state.columns.push(column);
+    (this.#state.columns ??= []).push(column);
+
+    return this;
+  }
+
+  where(filters: SqlFilters) {
+    const { source, references, options, where } = this.#state;
+
+    if (!where) {
+      this.#state.where = new SqlWhereClause(source, references, options, filters);
+    } else {
+      where.apply(filters);
+    }
 
     return this;
   }
 
   build(): [string, unknown[]] {
-    const { references, options, schema, source, columns, record } = this.#state;
+    const { references, options, schema, source, columns, record, where } = this.#state;
 
-    const clause = [`ON CONFLICT (${escapeSqlNames(columns)}) DO`];
+    // Without columns any unique violation is the conflict, which can only be skipped.
+    const clause = [columns ? `ON CONFLICT (${escapeSqlNames(columns)}) DO` : 'ON CONFLICT DO'];
     const variables: unknown[] = [];
 
     const context = { variables, references, options };
 
     const updateColumns = record && getUpdateColumns(source, record, schema, context);
 
-    if (updateColumns?.length) {
-      clause.push(`UPDATE SET ${updateColumns.join(', ')}`);
-    } else {
+    if (!updateColumns?.length) {
       clause.push('NOTHING');
+
+      return [clause.join(' '), variables];
+    }
+
+    if (!columns) {
+      throw new MissingConflictTargetError();
+    }
+
+    clause.push(`UPDATE SET ${updateColumns.join(', ')}`);
+
+    const whereResult = where && !where.empty && where.build();
+
+    if (whereResult) {
+      const [whereClause, whereVariables] = whereResult;
+
+      clause.push(whereClause);
+      variables.push(...whereVariables);
     }
 
     return [clause.join(' '), variables];

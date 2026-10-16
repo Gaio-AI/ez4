@@ -1,7 +1,7 @@
 import type { AnySchema, ObjectSchema } from '@ez4/schema';
-import type { SqlRawGenerator } from './common/raw';
+import type { SqlRawConditionGenerator, SqlRawGenerator } from './common/raw';
 
-import { SqlRawValue, SqlRawOperation } from './common/raw';
+import { SqlRawValue, SqlRawOperation, SqlRawCondition } from './common/raw';
 import { SqlTableStatement } from './statements/table';
 import { SqlIndexStatement } from './statements/index';
 import { SqlSelectStatement } from './statements/select';
@@ -76,6 +76,10 @@ export class SqlBuilder {
 
   rawOperation(operator: string, value: unknown | SqlRawGenerator) {
     return new SqlRawOperation(operator, value);
+  }
+
+  rawCondition(generator: SqlRawConditionGenerator) {
+    return new SqlRawCondition(generator);
   }
 
   reset() {

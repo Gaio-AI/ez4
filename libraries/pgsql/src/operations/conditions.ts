@@ -7,8 +7,9 @@ import type { SqlSource } from '../common/source';
 import { getSchemaProperty, isArraySchema, isObjectSchema, isTupleSchema, isUnionSchema } from '@ez4/schema';
 import { deepMerge, isAnyObject, isEmptyObject } from '@ez4/utils';
 
-import { SqlRawValue } from '../common/raw';
+import { SqlRawCondition, SqlRawValue } from '../common/raw';
 import { SqlOperator } from '../common/types';
+import { getOperandValue } from './utils';
 import { SqlColumnReference } from '../common/reference';
 import { mergeSqlAlias, mergeSqlJsonPath, mergeSqlPath } from '../utils/merge';
 import { InvalidOperandError, MissingOperatorError } from '../errors/operations';
@@ -284,6 +285,11 @@ const getLogicalOperations = (field: string, value: unknown, schema: AnySchema |
   const allOperations = [];
 
   for (const current of value) {
+    if (current instanceof SqlRawCondition) {
+      allOperations.push(current.build((operand, operandSchema) => getOperandValue(operandSchema, operand, context), context.source));
+      continue;
+    }
+
     if (field === 'AND') {
       allOperations.push(...getFilterOperations(current, schema, context));
       continue;

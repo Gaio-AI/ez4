@@ -30,7 +30,9 @@ describe('update secondary relations', () => {
     const relations = getRelationsWithSchema(tableName, TestRelationRepository);
     const builder = new SqlBuilder();
 
-    const { queries } = await prepareUpdateQuery(builder, tableName, repository.schema, relations, input);
+    const { queries } = await prepareUpdateQuery(builder, tableName, repository.schema, relations, input, {
+      primaryKey: ['id_a']
+    });
 
     return builder.with(queries).build();
   };
@@ -54,18 +56,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1 FROM "Q0" WHERE "U"."id_a" = :2) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0 WHERE "R0"."id_a" = :1 ` +
         // Return
-        `SELECT "value", "relation_1" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId]);
+    assert.deepEqual(variables, ['foo', sourceId]);
   });
 
   it('assert :: prepare undefined relation (secondary to primary)', async ({ assert }) => {
@@ -89,18 +86,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1 FROM "Q0" WHERE "U"."id_a" = :2) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0 WHERE "R0"."id_a" = :1 ` +
         // Return
-        `SELECT "value", "relation_1" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId]);
+    assert.deepEqual(variables, ['foo', sourceId]);
   });
 
   it('assert :: prepare update relation (secondary to primary)', async ({ assert }) => {
@@ -151,20 +143,15 @@ describe('update secondary relations', () => {
     assert.equal(
       statement,
       `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
         // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1 FROM "Q0" WHERE "U"."id_a" = :2 ` +
-        `RETURNING "U"."relation_1_id"), ` +
+        `"Q0" AS (UPDATE ONLY "table_a" SET "value" = :0 WHERE "id_a" = :1 RETURNING "id_a", "relation_1_id"), ` +
         // Relation record
-        `"Q2" AS (UPDATE ONLY "table_b" AS "T" SET "value" = :3 FROM "Q1" WHERE "T"."id_b" = "Q1"."relation_1_id") ` +
-        // Return
-        `SELECT "value", "relation_1" FROM "Q0"`
+        `"Q1" AS (UPDATE ONLY "table_b" AS "T" SET "value" = :2 FROM "Q0" WHERE "T"."id_b" = "Q0"."relation_1_id") ` +
+        // Keys of the records to read again
+        `SELECT "id_a" FROM "Q0"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId, 'bar']);
+    assert.deepEqual(variables, ['foo', sourceId, 'bar']);
   });
 
   it('assert :: prepare update, connect and select relation (secondary to primary)', async ({ assert }) => {
@@ -188,18 +175,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1, "relation_1_id" = :2 FROM "Q0" WHERE "U"."id_a" = :3) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0, "relation_1_id" = :1 WHERE "R0"."id_a" = :2 ` +
         // Return
-        `SELECT "value", "relation_1" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', targetId, sourceId]);
+    assert.deepEqual(variables, ['foo', targetId, sourceId]);
   });
 
   it('assert :: prepare update, disconnect and select relation (secondary to primary)', async ({ assert }) => {
@@ -223,18 +205,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1, "relation_1_id" = null FROM "Q0" WHERE "U"."id_a" = :2) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0, "relation_1_id" = null WHERE "R0"."id_a" = :1 ` +
         // Return
-        `SELECT "value", "relation_1" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_b" AS "S0" WHERE "S0"."id_b" = "R0"."relation_1_id" LIMIT 1) AS "relation_1"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId]);
+    assert.deepEqual(variables, ['foo', sourceId]);
   });
 
   it('assert :: prepare update invalid connection (secondary to primary)', async ({ assert }) => {
@@ -274,18 +251,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1 FROM "Q0" WHERE "U"."id_a" = :2) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0 WHERE "R0"."id_a" = :1 ` +
         // Return
-        `SELECT "value", "relation_2" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId]);
+    assert.deepEqual(variables, ['foo', sourceId]);
   });
 
   it('assert :: prepare undefined relation (secondary to unique)', async ({ assert }) => {
@@ -309,18 +281,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1 FROM "Q0" WHERE "U"."id_a" = :2) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0 WHERE "R0"."id_a" = :1 ` +
         // Return
-        `SELECT "value", "relation_2" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId]);
+    assert.deepEqual(variables, ['foo', sourceId]);
   });
 
   it('assert :: prepare update relation (secondary to unique)', async ({ assert }) => {
@@ -371,20 +338,15 @@ describe('update secondary relations', () => {
     assert.equal(
       statement,
       `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
         // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1 FROM "Q0" WHERE "U"."id_a" = :2 ` +
-        `RETURNING "U"."relation_2_id"), ` +
+        `"Q0" AS (UPDATE ONLY "table_a" SET "value" = :0 WHERE "id_a" = :1 RETURNING "id_a", "relation_2_id"), ` +
         // Relation record
-        `"Q2" AS (UPDATE ONLY "table_c" AS "T" SET "value" = :3 FROM "Q1" WHERE "T"."unique_2_id" = "Q1"."relation_2_id") ` +
-        // Return
-        `SELECT "value", "relation_2" FROM "Q0"`
+        `"Q1" AS (UPDATE ONLY "table_c" AS "T" SET "value" = :2 FROM "Q0" WHERE "T"."unique_2_id" = "Q0"."relation_2_id") ` +
+        // Keys of the records to read again
+        `SELECT "id_a" FROM "Q0"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId, 'bar']);
+    assert.deepEqual(variables, ['foo', sourceId, 'bar']);
   });
 
   it('assert :: prepare update, connect and select relation (secondary to unique)', async ({ assert }) => {
@@ -408,17 +370,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1, "relation_2_id" = :2 FROM "Q0" WHERE "U"."id_a" = :3) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0, "relation_2_id" = :1 WHERE "R0"."id_a" = :2 ` +
         // Return
-        `SELECT "value", "relation_2" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', targetId, sourceId]);
+    assert.deepEqual(variables, ['foo', targetId, sourceId]);
   });
 
   it('assert :: prepare update, disconnect and select relation (secondary to unique)', async ({ assert }) => {
@@ -442,18 +400,13 @@ describe('update secondary relations', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
-        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2" ` +
-        `FROM "table_a" AS "R0" WHERE "R0"."id_a" = :0), ` +
-        // Main record
-        `"Q1" AS (UPDATE ONLY "table_a" AS "U" SET "value" = :1, "relation_2_id" = null FROM "Q0" WHERE "U"."id_a" = :2) ` +
+      `UPDATE ONLY "table_a" AS "R0" SET "value" = :0, "relation_2_id" = null WHERE "R0"."id_a" = :1 ` +
         // Return
-        `SELECT "value", "relation_2" FROM "Q0"`
+        `RETURNING "R0"."value", (SELECT jsonb_build_object('value', "S0"."value") ` +
+        `FROM "table_c" AS "S0" WHERE "S0"."unique_2_id" = "R0"."relation_2_id" LIMIT 1) AS "relation_2"`
     );
 
-    assert.deepEqual(variables, [sourceId, 'foo', sourceId]);
+    assert.deepEqual(variables, ['foo', sourceId]);
   });
 
   it('assert :: prepare update invalid connection (secondary to unique)', async ({ assert }) => {

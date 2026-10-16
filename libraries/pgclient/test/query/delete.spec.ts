@@ -44,13 +44,37 @@ describe('delete query', () => {
     }
   };
 
-  const prepareDelete = <S extends Query.SelectInput<TestTableMetadata>>(input: Query.DeleteOneInput<S, TestTableMetadata>) => {
+  const prepareDelete = <S extends Query.SelectInput<TestTableMetadata>>(
+    input: Query.DeleteOneInput<S, TestTableMetadata> | Query.DeleteManyInput<S, TestTableMetadata>
+  ) => {
     const builder = new SqlBuilder();
 
-    const { query } = prepareDeleteQuery(builder, tableName, testSchema, {}, input);
+    const { queries } = prepareDeleteQuery(builder, tableName, testSchema, {}, input, {
+      primaryKey: ['id']
+    });
 
-    return query.build();
+    return builder.with(queries).build();
   };
+
+  it('assert :: prepare delete (take)', () => {
+    const [statement, variables] = prepareDelete({
+      where: {
+        foo: 123
+      },
+      take: 5
+    });
+
+    equal(
+      statement,
+      `WITH ` +
+        // Page of keys
+        `"Q0" AS (SELECT "R0"."id" AS "__EZ4_KEY_0" FROM "ez4-test-delete" AS "R0" WHERE "R0"."foo" = :0 LIMIT 5) ` +
+        // Records of the page that still match
+        `DELETE FROM "ez4-test-delete" AS "R1" WHERE ("R1"."foo" = :1 AND EXISTS (SELECT 1 FROM "Q0" WHERE "__EZ4_KEY_0" = "R1"."id"))`
+    );
+
+    deepEqual(variables, [123, 123]);
+  });
 
   it('assert :: prepare delete', () => {
     const [statement, variables] = prepareDelete({

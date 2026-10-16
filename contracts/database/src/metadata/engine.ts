@@ -28,7 +28,8 @@ import {
   UndefinedMode,
   StreamMode,
   OrderMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '../types/mode';
 
 export const isDatabaseEngineDeclaration = (type: TypeModel) => {
@@ -60,6 +61,7 @@ const isCompleteEngine = (type: Incomplete<DatabaseEngine>): type is DatabaseEng
     'orderMode',
     'streamMode',
     'lockMode',
+    'aggregateMode',
     'name'
   ]);
 };
@@ -95,6 +97,7 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, parent: TypeModel, mem
     'streamMode',
     'orderMode',
     'lockMode',
+    'aggregateMode',
     'name'
   ]);
 
@@ -178,6 +181,13 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, parent: TypeModel, mem
 
       case 'lockMode': {
         if ((engine.lockMode = getPropertyStringIn(member, [LockMode.Unsupported, LockMode.Supported]))) {
+          properties.delete(member.name);
+        }
+        break;
+      }
+
+      case 'aggregateMode': {
+        if ((engine.aggregateMode = getPropertyStringIn(member, [AggregateMode.Unsupported, AggregateMode.Supported]))) {
           properties.delete(member.name);
         }
         break;

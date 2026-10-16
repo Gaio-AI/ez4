@@ -22,6 +22,12 @@ export class InvalidWhereClauseError extends Error {
   }
 }
 
+export class MissingConflictTargetError extends Error {
+  constructor() {
+    super(`Conflict update requires the conflict columns.`);
+  }
+}
+
 export class NoStatementsError extends Error {
   constructor() {
     super(`At least one statement is required.`);

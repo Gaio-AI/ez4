@@ -1,5 +1,6 @@
 import type { DynamoDBDocumentClient, ExecuteStatementCommandInput } from '@aws-sdk/lib-dynamodb';
 import type { ObjectSchema } from '@ez4/schema';
+import type { AnyObject } from '@ez4/utils';
 import type { Query } from '@ez4/database';
 import type { InternalTableMetadata } from '../types';
 
@@ -79,17 +80,18 @@ export const prepareDeleteOne = <T extends InternalTableMetadata, S extends Quer
   };
 };
 
-export const prepareInsertMany = async <T extends InternalTableMetadata>(
+export const prepareInsertMany = async <T extends InternalTableMetadata, S extends AnyObject>(
   table: string,
   schema: ObjectSchema,
   indexes: string[][],
-  query: Query.InsertManyInput<T>
-): Promise<ExecuteStatementCommandInput[]> => {
+  query: Query.InsertManyInput<S, T>
+): Promise<[ExecuteStatementCommandInput[], AnyObject[]]> => {
   const [[partitionKey, sortKey]] = indexes;
 
   const identifiers = new Set<string>();
 
   const transactions = [];
+  const records = [];
 
   for (const data of query.data) {
     const { [partitionKey]: partitionId, [sortKey]: sortId } = data as any;
@@ -114,9 +116,11 @@ export const prepareInsertMany = async <T extends InternalTableMetadata>(
         Parameters: variables
       })
     });
+
+    records.push(data);
   }
 
-  return transactions;
+  return [transactions, records];
 };
 
 export const prepareFindMany = <T extends InternalTableMetadata, S extends Query.SelectInput<T>, C extends boolean>(

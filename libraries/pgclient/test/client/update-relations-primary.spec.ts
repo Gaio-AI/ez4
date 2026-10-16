@@ -130,7 +130,7 @@ describe('client update primary relations', async () => {
       value: 'foo',
       relations: [
         {
-          value: 'bar'
+          value: 'bar-updated'
         }
       ]
     });
@@ -166,7 +166,7 @@ describe('client update primary relations', async () => {
     deepEqual(result, {
       value: 'foo',
       relation: {
-        value: 'bar'
+        value: 'bar-updated'
       }
     });
 
@@ -214,6 +214,9 @@ describe('client update primary relations', async () => {
       relations: [
         {
           value: 'bar'
+        },
+        {
+          value: 'bar-updated'
         }
       ]
     });
@@ -248,12 +251,8 @@ describe('client update primary relations', async () => {
     });
 
     deepEqual(result, {
-      value: 'foo',
-      relations: [
-        {
-          value: 'bar'
-        }
-      ]
+      value: 'foo-updated',
+      relations: []
     });
 
     await assertTableBRelations(primaryId, {
@@ -289,10 +288,8 @@ describe('client update primary relations', async () => {
     });
 
     deepEqual(result, {
-      value: 'foo',
-      relation: {
-        value: 'bar'
-      }
+      value: 'foo-updated',
+      relation: null
     });
 
     await assertTableBRelation(primaryId, {

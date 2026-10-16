@@ -1,5 +1,7 @@
 import { deleteRelationTables, makeRelationClient, prepareRelationTables } from './common/relation';
 
+import { Order } from '@ez4/database';
+
 import { after, before, describe, it } from 'node:test';
 import { deepEqual } from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -192,6 +194,117 @@ describe('client select relations', async () => {
       },
       relation_2: {
         value: 'tableC'
+      }
+    });
+  });
+
+  it('assert :: select ordered relations (only the selected fields)', async () => {
+    const select = {
+      value: true,
+      relations: {
+        value: true
+      }
+    };
+
+    const result = await client.table_b.findOne({
+      select,
+      include: {
+        relations: {
+          order: {
+            value: Order.Desc
+          }
+        }
+      },
+      where: {
+        id_b: idB
+      }
+    });
+
+    deepEqual(result, {
+      value: 'tableB',
+      relations: [{ value: 'tableA2' }, { value: 'tableA' }]
+    });
+
+    const resultById = await client.table_b.findOne({
+      select,
+      include: {
+        relations: {
+          order: {
+            id_a: Order.Asc
+          }
+        }
+      },
+      where: {
+        id_b: idB
+      }
+    });
+
+    deepEqual(
+      resultById?.relations.map((relation) => Object.keys(relation)),
+      [['value'], ['value']]
+    );
+
+    deepEqual(select, {
+      value: true,
+      relations: {
+        value: true
+      }
+    });
+  });
+
+  it('assert :: select ordered and paginated relations (only the selected fields)', async () => {
+    const select = {
+      value: true,
+      relations: {
+        value: true
+      }
+    };
+
+    const result = await client.table_b.findOne({
+      select,
+      include: {
+        relations: {
+          order: {
+            id_a: Order.Asc
+          },
+          take: 5
+        }
+      },
+      where: {
+        id_b: idB
+      }
+    });
+
+    deepEqual(
+      result?.relations.map((relation) => Object.keys(relation)),
+      [['value'], ['value']]
+    );
+
+    const resultByValue = await client.table_b.findOne({
+      select,
+      include: {
+        relations: {
+          order: {
+            value: Order.Asc
+          },
+          skip: 1,
+          take: 1
+        }
+      },
+      where: {
+        id_b: idB
+      }
+    });
+
+    deepEqual(resultByValue, {
+      value: 'tableB',
+      relations: [{ value: 'tableA2' }]
+    });
+
+    deepEqual(select, {
+      value: true,
+      relations: {
+        value: true
       }
     });
   });

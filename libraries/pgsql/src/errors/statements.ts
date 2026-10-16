@@ -15,3 +15,9 @@ export class EmptyRecordError extends Error {
     super(`Record for the statement is empty.`);
   }
 }
+
+export class MultipleRecordsError extends Error {
+  constructor() {
+    super(`Multiple records aren't supported for the statement.`);
+  }
+}

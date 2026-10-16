@@ -1,7 +1,7 @@
 export { StreamAnyChange, StreamDeleteChange, StreamInsertChange, StreamUpdateChange, StreamChangeType } from './services/streams';
 
 export { Client } from './services/client';
-export { RelationMetadata } from './services/relations';
+export { RelationMetadata, FilterRelationSchemas, NestedSelectRelationSchemas } from './services/relations';
 export { TableMetadata, Table } from './services/table';
 export { ParametersModeUtils } from './services/parameters';
 export { TransactionModeUtils } from './services/transaction';
@@ -10,6 +10,7 @@ export { UndefinedModeUtils } from './services/undefined';
 export { PaginationModeUtils } from './services/pagination';
 export { OrderModeUtils } from './services/order';
 export { LockModeUtils } from './services/lock';
+export { AggregateModeUtils } from './services/aggregate';
 export { EngineUtils } from './services/engine';
 export { Database } from './services/contract';
 export { Query } from './services/query';

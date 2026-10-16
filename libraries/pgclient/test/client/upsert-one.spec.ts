@@ -16,6 +16,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select boolean', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           boolean: true
         },
@@ -67,6 +68,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select integer', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           integer: true
         },
@@ -118,6 +120,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select decimal', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           decimal: true
         },
@@ -169,6 +172,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select string', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           string: true
         },
@@ -220,6 +224,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select date-time', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           datetime: true
         },
@@ -271,6 +276,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select date', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           date: true
         },
@@ -322,6 +328,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select time', async () => {
     const upsert = () =>
       client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           time: true
         },
@@ -372,6 +379,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select json (all fields)', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           json: true
         },
@@ -448,6 +456,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select json (single field)', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           json: {
             number: true
@@ -519,6 +528,7 @@ describe('client upsert one', async () => {
   it('assert :: upsert one and select json (multiple field)', async () => {
     const upsert = () => {
       return client.ez4_test_table.upsertOne({
+        previous: true,
         select: {
           json: {
             string: true,
@@ -615,6 +625,7 @@ describe('client upsert one', async () => {
     });
 
     const previous = await client.ez4_test_table.upsertOne({
+      previous: true,
       select: {
         json: true
       },

@@ -1,14 +1,18 @@
 import type { TableIndex } from '@ez4/database/library';
 import type { Table as DbTable, Query } from '@ez4/database';
 import type { ObjectSchema } from '@ez4/schema';
-import type { IsArray } from '@ez4/utils';
+import type { AnyObject, IsArray } from '@ez4/utils';
 import type { PgRelationRepositoryWithSchema } from '../types/repository';
 import type { PgClientDriver, PgExecuteStatement, PgExecutionResult } from '../types/driver';
 import type { InternalTableMetadata } from '../types/table';
+import type { PgAggregateInput } from '../queries/aggregate';
 
 import { DuplicateUniqueKeyError, MissingUniqueIndexError } from '@ez4/pgclient';
+import { isAnyNumber } from '@ez4/utils';
 
-import { tryExtractUniqueIndex } from './utils/indexes';
+import { takeRecordsCursor } from '../queries/utils/cursor';
+import { getPrimaryColumns, tryExtractUniqueIndex } from './utils/indexes';
+import { UPSERT_INSERTED_FLAG } from '../queries/upsert';
 
 import {
   prepareInsertOne,
@@ -20,7 +24,9 @@ import {
   prepareDeleteMany,
   prepareDeleteOne,
   prepareCount,
-  prepareExists
+  prepareExists,
+  prepareAggregate,
+  prepareUpsertOne
 } from '../queries/queries';
 
 export type TableContext = {
@@ -30,6 +36,24 @@ export type TableContext = {
 };
 
 type SendStatementResult<T> = IsArray<T> extends true ? PgExecutionResult[] : PgExecutionResult;
+
+const UPSERT_WRITTEN_FLAG = '__EZ4_OK';
+
+const getUpsertResult = <S extends Query.SelectInput<T>, T extends InternalTableMetadata>(
+  query: Query.UpsertOneInput<S, T>,
+  record: AnyObject | undefined,
+  inserted: boolean
+) => {
+  if (!query.select) {
+    return { inserted } as Query.UpsertOneResult<S, T>;
+  }
+
+  return { record, inserted } as Query.UpsertOneResult<S, T>;
+};
+
+const getKeyFields = (columns: string[]) => {
+  return Object.fromEntries(columns.map((column) => [column, true]));
+};
 
 export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   constructor(
@@ -70,12 +94,49 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     return records[0] as Query.InsertOneResult<S, T>;
   }
 
+  private get primaryKey() {
+    return getPrimaryColumns(this.indexes);
+  }
+
   async updateOne<S extends Query.SelectInput<T>>(query: Query.UpdateOneInput<S, T>) {
-    const statement = await prepareUpdateOne(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = await prepareUpdateOne(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryKey: this.primaryKey
+    });
 
     const { records } = await this.sendStatement(statement);
 
+    if (statement.reloadKey) {
+      const [record] = await this.findWrittenRecords(statement.reloadKey, records, query);
+
+      return record as Query.UpdateOneResult<S, T>;
+    }
+
     return records[0] as Query.UpdateOneResult<S, T>;
+  }
+
+  private async findWrittenRecords<S extends Query.SelectInput<T>>(
+    primaryKey: string[],
+    records: (AnyObject | undefined)[],
+    query: Pick<Query.UpdateOneInput<S, T>, 'select' | 'include'>
+  ) {
+    const keys = records.filter((record) => !!record);
+
+    if (!keys.length || !query.select) {
+      return [];
+    }
+
+    const where =
+      primaryKey.length === 1
+        ? { [primaryKey[0]]: { isIn: keys.map((key) => key[primaryKey[0]]) } }
+        : { OR: keys.map((key) => Object.fromEntries(primaryKey.map((column) => [column, key[column]]))) };
+
+    const result = await this.findMany({
+      select: query.select,
+      include: query.include,
+      where: where as Query.WhereInput<T>
+    });
+
+    return result.records as AnyObject[];
   }
 
   async findOne<S extends Query.SelectInput<T>>(query: Query.FindOneInput<S, T>) {
@@ -101,104 +162,174 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
       throw new MissingUniqueIndexError();
     }
 
+    const statement = await prepareUpsertOne(this.name, this.schema, this.relations, this.context.driver, query, uniqueIndex.columns);
+
+    if (!statement) {
+      return this.upsertInSteps(query);
+    }
+
+    for (let attempt = 1; ; attempt++) {
+      const { records } = await this.sendStatement(statement);
+
+      const [record] = records;
+
+      if (record) {
+        const { [UPSERT_INSERTED_FLAG]: inserted, ...fields } = record;
+
+        return getUpsertResult<S, T>(query, fields, !!inserted);
+      }
+
+      // The existing record doesn't match the other filters, and it can't be inserted either.
+      if (!statement.skipsUpdate || attempt > 1) {
+        throw new DuplicateUniqueKeyError();
+      }
+
+      // With nothing to update the existing record is read as it is, and the insert is tried again when it went away.
+      const existing = await this.findOne({
+        select: query.select ?? (getKeyFields(uniqueIndex.columns) as Query.StrictSelectInput<S, T>),
+        include: query.include,
+        where: query.where,
+        lock: query.lock
+      });
+
+      if (existing) {
+        return getUpsertResult<S, T>(query, existing, false);
+      }
+    }
+  }
+
+  // The update runs first and the insert skips a conflict, so a record another call inserts meanwhile is updated on
+  // the retry instead of failing the statement and with it the transaction.
+  private async upsertInSteps<S extends Query.SelectInput<T>>(query: Query.UpsertOneInput<S, T>) {
     const { driver } = this.context;
 
     const updateQuery = {
       select: query.select,
       include: query.include,
+      previous: query.previous,
       data: query.update,
       where: query.where,
       lock: query.lock
     };
 
     const updateStatement = await prepareUpdateOne(this.name, this.schema, this.relations, driver, updateQuery, {
-      flag: '__EZ4_OK'
+      primaryKey: this.primaryKey,
+      flag: UPSERT_WRITTEN_FLAG
     });
 
-    let hasConflict = false;
+    const insertQuery = {
+      select: query.select,
+      data: query.insert
+    };
 
-    do {
-      const { records: updateRecords } = await this.sendStatement(updateStatement);
+    const insertStatement = await prepareInsertOne(this.name, this.schema, this.relations, driver, insertQuery, {
+      flag: UPSERT_WRITTEN_FLAG,
+      skipConflicts: true
+    });
 
-      const [updateRecord] = updateRecords;
+    for (let attempt = 1; ; attempt++) {
+      const [updateRecord] = (await this.sendStatement(updateStatement)).records;
 
-      if (updateRecord?.__EZ4_OK) {
-        delete updateRecord.__EZ4_OK;
+      if (updateRecord?.[UPSERT_WRITTEN_FLAG]) {
+        const { [UPSERT_WRITTEN_FLAG]: _flag, ...fields } = updateRecord;
 
-        return {
-          record: updateRecord,
-          inserted: false
-        } as Query.UpsertOneResult<S, T>;
+        const record = updateStatement.reloadKey ? (await this.findWrittenRecords(updateStatement.reloadKey, [fields], query))[0] : fields;
+
+        return getUpsertResult<S, T>(query, record, false);
       }
 
       try {
-        const insertStatement = await prepareInsertOne(this.name, this.schema, this.relations, driver, {
-          select: query.select,
-          data: query.insert
-        });
+        const [insertRecord] = (await this.sendStatement(insertStatement)).records;
 
-        const { records: insertRecords } = await this.sendStatement(insertStatement);
+        if (insertRecord?.[UPSERT_WRITTEN_FLAG]) {
+          const { [UPSERT_WRITTEN_FLAG]: _flag, ...fields } = insertRecord;
 
-        return {
-          record: insertRecords[0],
-          inserted: true
-        } as Query.UpsertOneResult<S, T>;
+          return getUpsertResult<S, T>(query, fields, true);
+        }
       } catch (error) {
-        // In case of race condition or multiple conflicts, fallback to update retry.
-        if (!hasConflict && error instanceof DuplicateUniqueKeyError) {
-          hasConflict = true;
-          continue;
+        // An insert that creates related records first fails on the conflict instead of skipping it.
+        if (attempt > 1 || !(error instanceof DuplicateUniqueKeyError)) {
+          throw error;
         }
 
-        throw error;
+        continue;
       }
-    } while (true);
+
+      if (attempt > 1) {
+        throw new DuplicateUniqueKeyError();
+      }
+    }
   }
 
-  async insertMany(query: Query.InsertManyInput<T>) {
-    const statements = await prepareInsertMany<T>(this.name, this.schema, this.relations, this.context.driver, query);
+  async insertMany<S extends Query.InsertManySelectInput<T>>(query: Query.InsertManyInput<S, T>) {
+    const statements = await prepareInsertMany(this.name, this.schema, this.relations, this.context.driver, query);
 
-    await this.sendStatement(statements);
+    // One statement is atomic on its own, and several run in one transaction (the caller's when there is one).
+    const results =
+      statements.length > 1
+        ? await this.sendStatement(statements)
+        : await Promise.all(statements.map((statement) => this.sendStatement(statement)));
+
+    if (!query.select) {
+      return undefined as Query.InsertManyResult<S, T>;
+    }
+
+    return results.flatMap(({ records }) => records) as Query.InsertManyResult<S, T>;
   }
 
   async updateMany<S extends Query.SelectInput<T>>(query: Query.UpdateManyInput<S, T>) {
-    const statement = await prepareUpdateMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = await prepareUpdateMany(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryKey: this.primaryKey
+    });
 
     const { records } = await this.sendStatement(statement);
 
-    if (query.select) {
-      return records as Query.UpdateManyResult<S, T>;
+    if (!query.select) {
+      return undefined as Query.UpdateManyResult<S, T>;
     }
 
-    return undefined as Query.UpdateManyResult<S, T>;
+    if (statement.reloadKey) {
+      return (await this.findWrittenRecords(statement.reloadKey, records, query)) as Query.UpdateManyResult<S, T>;
+    }
+
+    return records as Query.UpdateManyResult<S, T>;
   }
 
   async findMany<S extends Query.SelectInput<T>, C extends boolean = false>(query: Query.FindManyInput<S, C, T>) {
-    const findStatement = prepareFindMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const { statement: findStatement, cursorFields } = prepareFindMany(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryColumns: this.primaryKey
+    });
+
+    const { records } = await this.sendStatement(findStatement);
+
+    const cursor =
+      cursorFields && 'take' in query && isAnyNumber(query.take) ? takeRecordsCursor(records, cursorFields, query.take) : undefined;
 
     if (query.count) {
+      // The total counts the filter alone, without the position of the cursor.
       const countStatement = prepareCount(this.name, this.schema, this.relations, this.context.driver, {
         where: query.where
       });
 
-      const { records } = await this.sendStatement(findStatement);
       const { records: count } = await this.sendStatement(countStatement);
 
       return {
         records,
-        total: Number(count?.[0]?.__EZ4_COUNT) || 0
+        total: Number(count?.[0]?.__EZ4_COUNT) || 0,
+        ...(cursor && { cursor })
       } as Query.FindManyResult<S, C, T>;
     }
 
-    const { records } = await this.sendStatement(findStatement);
-
     return {
-      records
+      records,
+      ...(cursor && { cursor })
     } as Query.FindManyResult<S, C, T>;
   }
 
   async deleteMany<S extends Query.SelectInput<T>>(query: Query.DeleteManyInput<S, T>) {
-    const statement = prepareDeleteMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = prepareDeleteMany(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryKey: this.primaryKey
+    });
 
     const { records } = await this.sendStatement(statement);
 
@@ -227,5 +358,15 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     const [result] = records;
 
     return Number(result?.__EZ4_COUNT) || 0;
+  }
+
+  async aggregate<B extends Query.AggregateByInput<T> = never, A extends Query.AggregateFieldsInput<T> = {}>(
+    query: Query.AggregateInput<B, A, T>
+  ) {
+    const statement = prepareAggregate(this.name, this.schema, this.relations, this.context.driver, query as PgAggregateInput);
+
+    const { records } = await this.sendStatement(statement);
+
+    return records as Query.AggregateResult<B, A, T>;
   }
 }

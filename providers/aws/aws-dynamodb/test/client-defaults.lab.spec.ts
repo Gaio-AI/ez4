@@ -227,7 +227,7 @@ describe('dynamodb client defaults', { timeout: 60000 }, () => {
     });
 
     deepEqual(result, {
-      string: 'abc',
+      string: 'def',
       integer: 123,
       decimal: 4.56
     });
@@ -253,12 +253,12 @@ describe('dynamodb client defaults', { timeout: 60000 }, () => {
     deepEqual(result, [
       {
         string: 'abc',
-        integer: 123,
+        integer: 789,
         decimal: 4.56
       },
       {
         string: 'def',
-        integer: 123,
+        integer: 789,
         decimal: 4.56
       }
     ]);

@@ -1,7 +1,7 @@
-import type { SqlBuilder, SqlFilters, SqlJsonColumnRecord, SqlSource } from '@ez4/pgsql';
+import type { SqlBuilder, SqlFilters, SqlJsonColumnRecord, SqlOrder, SqlSource } from '@ez4/pgsql';
 import type { ObjectSchema } from '@ez4/schema';
 import type { AnyObject } from '@ez4/utils';
-import type { Query } from '@ez4/database';
+import type { Order, Query } from '@ez4/database';
 import type { PgRelationRepositoryWithSchema } from '../types/repository';
 import type { InternalTableMetadata } from '../types/table';
 
@@ -10,34 +10,59 @@ import { InvalidRelationFieldError, MissingFieldSchemaError } from '@ez4/pgclien
 import { isObjectSchema } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
-import { getFormattedColumn } from './utils/formats';
+import { getCursorColumn, getFormattedColumn } from './utils/formats';
+import { getCursorCondition, getCursorFields } from './utils/cursor';
+
+export type SelectQueryOptions = {
+  /**
+   * Primary index columns of the table, which make the order of a page unique.
+   */
+  primaryColumns?: string[];
+};
 
 export const prepareSelectQuery = <T extends InternalTableMetadata, S extends Query.SelectInput<T>, C extends boolean>(
   builder: SqlBuilder,
   table: string,
   schema: ObjectSchema,
   relations: PgRelationRepositoryWithSchema,
-  input: Query.FindOneInput<S, T> | Query.FindManyInput<S, C, T>
+  input: Query.FindOneInput<S, T> | Query.FindManyInput<S, C, T>,
+  options?: SelectQueryOptions
 ) => {
   const query = builder.select(schema).from(table);
   const record = getSelectFields(builder, input.select, input.include, schema, relations, query, table);
 
+  const order = 'order' in input ? getPageOrder(input, options?.primaryColumns) : undefined;
+
+  const cursorFields =
+    'take' in input && isAnyNumber(input.take) && input.take > 0 && order && !isEmptyObject(order)
+      ? assignCursorFields(record, order, schema, query)
+      : undefined;
+
   query.record(record);
 
-  if (input.where) {
-    query.where(getSelectFilters(builder, input.where, relations, query, table));
+  const filters = input.where && getSelectFilters(builder, input.where, relations, query, table);
+
+  if ('cursor' in input && input.cursor !== undefined) {
+    const cursorCondition = getCursorCondition(builder, input.cursor, order ?? {}, schema, options?.primaryColumns);
+
+    query.where({
+      ...filters,
+      AND: [...(filters?.AND ?? []), cursorCondition]
+    });
+  } else if (filters) {
+    query.where(filters);
   }
 
   if (input.lock) {
     query.lock();
   }
 
-  if ('order' in input) {
-    query.order(input.order);
+  if (order) {
+    query.order(order);
 
     // An unqualified ORDER BY name binds to the output column, which is the formatted text for date and
     // time fields, so the source gets an alias and the order references the table column and its index.
-    if (input.order && !isEmptyObject(input.order) && !query.alias) {
+    if (!isEmptyObject(order) && !query.alias) {
       query.as(builder.alias('R'));
     }
   }
@@ -47,13 +72,75 @@ export const prepareSelectQuery = <T extends InternalTableMetadata, S extends Qu
   }
 
   if ('take' in input && isAnyNumber(input.take)) {
-    query.take(input.take);
+    // A page with a cursor reads one record past its end, which is only there to tell a next page exists.
+    query.take(cursorFields ? input.take + 1 : input.take);
   }
 
   return {
     columns: Object.keys(record),
+    cursorFields,
     query
   };
+};
+
+/**
+ * Get the order of a page: the primary columns missing from a non-empty order are appended to it in the direction
+ * of its last column, so rows that tie on the order keep one position from a page to the next.
+ */
+export const getTiebreakOrder = (order: SqlOrder, primaryColumns: string[] | undefined) => {
+  const pageOrder: SqlOrder = {};
+
+  let lastDirection: Order | undefined;
+
+  for (const column in order) {
+    const direction = order[column];
+
+    if (direction) {
+      pageOrder[column] = lastDirection = direction;
+    }
+  }
+
+  if (!lastDirection || !primaryColumns) {
+    return pageOrder;
+  }
+
+  for (const column of primaryColumns) {
+    pageOrder[column] ??= lastDirection;
+  }
+
+  return pageOrder;
+};
+
+const getPageOrder = <T extends InternalTableMetadata, S extends AnyObject, C extends boolean>(
+  input: Query.FindManyInput<S, C, T>,
+  primaryColumns: string[] | undefined
+) => {
+  const { order } = input;
+
+  const isPage = ('take' in input && isAnyNumber(input.take)) || ('skip' in input && isAnyNumber(input.skip)) || input.cursor !== undefined;
+
+  if (!order || !isPage) {
+    return order;
+  }
+
+  return getTiebreakOrder(order, primaryColumns);
+};
+
+// The cursor reads the last record's order values at full precision, in columns that never reach the records.
+const assignCursorFields = (record: SqlJsonColumnRecord, order: SqlOrder, schema: ObjectSchema, source: SqlSource) => {
+  const cursorFields = getCursorFields(order);
+
+  for (const { column, alias } of cursorFields) {
+    const columnSchema = schema.properties[column];
+
+    if (!columnSchema) {
+      throw new MissingFieldSchemaError(column);
+    }
+
+    record[alias] = source.reference(getCursorColumn(column, columnSchema), alias);
+  }
+
+  return cursorFields;
 };
 
 export const getSelectFields = <T extends InternalTableMetadata, S extends AnyObject>(
@@ -82,7 +169,7 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
     const fieldRelation = relations[fieldPath];
 
     if (fieldRelation) {
-      const { sourceTable, sourceColumn, sourceSchema, sourceIndex, targetColumn } = fieldRelation;
+      const { sourceTable, sourceColumn, sourceSchema, sourceIndex, targetColumn, primaryColumn } = fieldRelation;
 
       const relationFields = fieldValue === true ? getDefaultSelectFields(sourceSchema) : fieldValue;
 
@@ -92,17 +179,16 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
 
       const relationIncludes = include && include[fieldKey];
 
-      const relationQuery = builder
-        .select(sourceSchema)
-        .from(sourceTable)
-        .where({
-          ...relationIncludes?.where,
-          [sourceColumn]: source.reference(targetColumn)
-        });
-
       if (!source.alias) {
         source.as(builder.alias('R'));
       }
+
+      const relationQuery = builder.select(sourceSchema).from(sourceTable);
+
+      relationQuery.where({
+        ...(relationIncludes?.where && getSelectFilters(builder, relationIncludes.where, relations, relationQuery, sourceTable)),
+        [sourceColumn]: source.reference(targetColumn)
+      });
 
       if (sourceIndex === Index.Primary || sourceIndex === Index.Unique) {
         const record = getSelectFields(builder, relationFields, null, sourceSchema, relations, relationQuery, sourceTable, true);
@@ -113,12 +199,9 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
         continue;
       }
 
+      // The aggregate orders by the table columns, so the order fields stay out of each related record.
       if (!relationIncludes || (!('skip' in relationIncludes) && !('take' in relationIncludes))) {
         const record = getSelectFields(builder, relationFields, null, sourceSchema, relations, relationQuery, sourceTable, true);
-
-        if (relationIncludes?.order) {
-          assignExtraSelectFields(record, relationIncludes.order);
-        }
 
         relationQuery.arrayColumn(record, {
           order: relationIncludes?.order
@@ -130,11 +213,14 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
 
       const record = getSelectFields(builder, relationFields, null, sourceSchema, relations, relationQuery, sourceTable);
 
-      if (relationIncludes?.order) {
-        assignExtraSelectFields(relationFields, relationIncludes.order);
-        assignExtraSelectFields(record, relationIncludes.order);
+      const relationOrder = relationIncludes.order && getTiebreakOrder(relationIncludes.order, primaryColumn ? [primaryColumn] : []);
 
-        relationQuery.order(relationIncludes.order);
+      // The page is aggregated from a subquery, which has to return the order fields for the aggregate to sort
+      // by them, while each related record keeps only the selected fields.
+      if (relationOrder) {
+        assignExtraSelectFields(record, relationOrder);
+
+        relationQuery.order(relationOrder);
       }
 
       relationQuery.record(record);
@@ -150,7 +236,7 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
       const wrapQuery = builder.select().from(relationQuery);
 
       wrapQuery.arrayColumn(relationFields, {
-        order: relationIncludes?.order
+        order: relationOrder
       });
 
       output[fieldKey] = wrapQuery;
@@ -189,6 +275,8 @@ export const getSelectFilters = (
 ) => {
   const result: SqlFilters = {};
 
+  const missingRelations: SqlFilters[] = [];
+
   for (const filterKey in filters) {
     if (filters[filterKey] === undefined) {
       continue;
@@ -219,29 +307,32 @@ export const getSelectFilters = (
 
         const { sourceTable, sourceColumn, sourceSchema, targetColumn } = fieldRelation;
 
-        const relationQuery = builder.select(sourceSchema).from(sourceTable).rawColumn(1).as('T');
-
-        result[filterKey] = relationQuery;
+        // Each level has its own alias, so the reference to the level above binds to it and not to an inner level.
+        const relationQuery = builder.select(sourceSchema).from(sourceTable).rawColumn(1).as(builder.alias('T'));
 
         if (!source.alias) {
           source.as(builder.alias('R'));
         }
 
-        if (relationFilters) {
-          relationQuery.where({
-            ...relationFilters,
-            [sourceColumn]: source.reference(targetColumn)
-          });
+        relationQuery.where({
+          ...(relationFilters && getSelectFilters(builder, relationFilters, relations, relationQuery, sourceTable)),
+          [sourceColumn]: source.reference(targetColumn)
+        });
 
+        // A null filter asks for the records without a related one.
+        if (relationFilters === null) {
+          missingRelations.push({ NOT: { [filterKey]: relationQuery } });
           continue;
         }
 
-        relationQuery.where({
-          [sourceColumn]: {
-            not: source.reference(targetColumn)
-          }
-        });
+        result[filterKey] = relationQuery;
     }
+  }
+
+  // Joined through AND after the loop: a NOT of their own would replace the one the filters carry, and the
+  // filters' own AND is only built inside the loop.
+  if (missingRelations.length) {
+    result.AND = [...(result.AND ?? []), ...missingRelations];
   }
 
   return result;

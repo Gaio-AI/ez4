@@ -1,10 +1,12 @@
 import type { AnyObject, PartialProperties, PartialObject, StrictObject, IsObjectEmpty, Prettify, IsTrue } from '@ez4/utils';
 import type { AtomicFields } from './query/atomic';
 import type { WhereFieldInput, WhereRelationInput } from './query/where';
+import type { AggregateColumn, AggregateQueryInput, AggregateRecord, AggregateSelectInput } from './query/aggregate';
+import type { AggregateModeUtils } from './aggregate';
 import type { DatabaseEngine } from './engine';
 import type { UndefinedModeUtils } from './undefined';
 import type { PaginationModeUtils } from './pagination';
-import type { RelationMetadata } from './relations';
+import type { RelationFilter, RelationMetadata } from './relations';
 import type { OrderModeUtils } from './order';
 import type { LockModeUtils } from './lock';
 import type { TableMetadata } from './table';
@@ -23,9 +25,15 @@ export namespace Query {
     lock?: LockModeUtils.Input<T>;
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
+    previous?: PreviousInput;
     data: Prettify<UpdateDataInput<T>>;
     where: WhereInput<T, true>;
   };
+
+  /**
+   * When `true`, `select` returns each record as it was before the write instead of as the write left it.
+   */
+  export type PreviousInput = boolean;
 
   export type FindOneInput<S extends AnyObject, T extends TableMetadata> = {
     lock?: LockModeUtils.Input<T>;
@@ -38,6 +46,7 @@ export namespace Query {
     lock?: LockModeUtils.Input<T>;
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
+    previous?: PreviousInput;
     update: Prettify<UpdateDataInput<T>>;
     insert: Prettify<InsertDataInput<T>>;
     where: WhereInput<T, true>;
@@ -49,14 +58,28 @@ export namespace Query {
     where: WhereInput<T, true>;
   };
 
-  export type InsertManyInput<T extends TableMetadata> = {
+  export type InsertManyInput<S extends AnyObject, T extends TableMetadata> = {
+    select?: StrictObject<S, T['schema']>;
+    skipDuplicates?: SkipDuplicatesInput;
     data: Prettify<T['schema']>[];
   };
+
+  /**
+   * When `true`, a record that conflicts with an existing one on any unique index (primary included) is skipped
+   * instead of failing the insert.
+   */
+  export type SkipDuplicatesInput = boolean;
+
+  /**
+   * Fields `insertMany` returns, from the table schema alone.
+   */
+  export type InsertManySelectInput<T extends TableMetadata> = PartialProperties<T['schema']>;
 
   export type UpdateManyInput<S extends AnyObject, T extends TableMetadata> = PaginationModeUtils.End<T['engine']> & {
     lock?: LockModeUtils.Input<T>;
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
+    previous?: PreviousInput;
     data: Prettify<UpdateDataInput<T>>;
     where?: WhereInput<T>;
   };
@@ -84,6 +107,22 @@ export namespace Query {
     where?: WhereInput<T>;
   };
 
+  export type AggregateInput<
+    B extends AggregateByInput<T>,
+    A extends AggregateFieldsInput<T>,
+    T extends TableMetadata
+  > = AggregateModeUtils.Input<T, AggregateQueryInput<B, A, T>>;
+
+  export type AggregateResult<B extends AggregateByInput<T>, A extends AggregateFieldsInput<T>, T extends TableMetadata> = AggregateRecord<
+    B,
+    A,
+    T
+  >[];
+
+  export type AggregateByInput<T extends TableMetadata> = AggregateColumn<T>;
+
+  export type AggregateFieldsInput<T extends TableMetadata> = AggregateSelectInput<T>;
+
   export type InsertOneResult<S extends AnyObject, T extends TableMetadata> = SelectInput<T> extends S ? void : Record<S, T>;
 
   export type UpdateOneResult<S extends AnyObject, T extends TableMetadata> = SelectInput<T> extends S ? void : Record<S, T> | undefined;
@@ -97,7 +136,7 @@ export namespace Query {
 
   export type UpdateManyResult<S extends AnyObject, T extends TableMetadata> = SelectInput<T> extends S ? void : Record<S, T>[];
 
-  export type InsertManyResult = void;
+  export type InsertManyResult<S extends AnyObject, T extends TableMetadata> = InsertManySelectInput<T> extends S ? void : Record<S, T>[];
 
   export type FindManyResult<S extends AnyObject, C extends boolean, T extends TableMetadata> =
     IsTrue<C> extends true ? FindManyResultTotal<S, T> : FindManyResultOnly<S, T>;
@@ -142,16 +181,24 @@ export namespace Query {
       ? never
       : {
           [P in keyof T['relations']['filters']]?: P extends keyof S
-            ? StrictIncludeRelation<NonNullable<T['relations']['filters'][P]>, T['engine']>
+            ? NonNullable<T['relations']['filters'][P]> extends RelationFilter<infer U, infer R>
+              ? StrictIncludeRelation<U, T['engine'], R>
+              : never
             : never;
         };
 
   export type StrictIncludeOrder<T extends AnyObject> = OrderModeUtils.AnyInput<T>;
 
-  export type StrictIncludeRelation<T extends AnyObject, E extends DatabaseEngine> = PaginationModeUtils.Range<E> & {
-    where?: WhereRelationInput<T, E>;
-    order?: StrictIncludeOrder<T>;
-  };
+  // A related page has no cursor in the offset mode, so it takes the begin and end of the range alone.
+  export type StrictIncludeRelation<
+    T extends AnyObject,
+    E extends DatabaseEngine,
+    R extends AnyObject = {}
+  > = PaginationModeUtils.Begin<E> &
+    PaginationModeUtils.End<E> & {
+      where?: WhereRelationInput<T, E, R>;
+      order?: StrictIncludeOrder<T>;
+    };
 
   export type WhereInput<T extends TableMetadata, I extends boolean = false> = WhereFieldInput<T, I>;
 

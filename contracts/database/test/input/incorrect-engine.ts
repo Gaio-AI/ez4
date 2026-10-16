@@ -8,7 +8,8 @@ import type {
   RelationMode,
   StreamMode,
   OrderMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '@ez4/database';
 
 export declare class TestDatabase extends Database.Service<TestEngine> {
@@ -28,6 +29,7 @@ declare class TestEngine {
   streamMode: StreamMode.Unsupported;
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: never;
   name: 'test';
 }

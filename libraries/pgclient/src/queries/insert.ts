@@ -32,35 +32,52 @@ import { getFormattedColumn } from './utils/formats';
 import { getWithSchemaValidation, validateRecordSchema } from '../utils/schema';
 import { getDefaultSelectFields, getSelectFields } from './select';
 
-type InsertRelationRepository = Record<string, PgRelationWithSchema & { relationQueries: (SqlInsertStatement | SqlUpdateStatement)[] }>;
+export type InsertRelationRepository = Record<
+  string,
+  PgRelationWithSchema & { relationQueries: (SqlInsertStatement | SqlUpdateStatement)[] }
+>;
 
 type RelationRepository = Record<string, PgRelationWithSchema & { relationQueries?: (SqlInsertStatement | SqlUpdateStatement)[] }>;
+
+export type InsertQueryOptions = {
+  /**
+   * Skip the record when it conflicts with an existing one, unless the insert creates related records first: those
+   * would stay without the record, so the conflict fails the statement instead.
+   */
+  skipConflicts?: boolean;
+
+  /**
+   * Result column that is `1` when the record is inserted.
+   */
+  flag?: string;
+};
+
+export type InsertManyQueryInput<T extends InternalTableMetadata, S extends AnyObject> = Omit<Query.InsertManyInput<S, T>, 'data'>;
 
 export const prepareInsertQuery = async <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
   builder: SqlBuilder,
   table: string,
   schema: ObjectSchema,
   relations: PgRelationRepositoryWithSchema,
-  input: Query.InsertOneInput<S, T>
+  input: Query.InsertOneInput<S, T>,
+  options?: InsertQueryOptions
 ) => {
   const preInsertQueriesMap = preparePreInsertRelations(builder, input.data, relations, table);
 
-  const preInsertQueries = Object.values(preInsertQueriesMap)
-    .map(({ relationQueries }) => relationQueries)
-    .flat();
+  const preInsertQueries = getRelationQueries(preInsertQueriesMap);
 
   const insertRecord = await getInsertRecord(input.data, schema, relations, preInsertQueriesMap, table);
   const insertQuery = builder.insert(schema).record(insertRecord).into(table).returning();
 
   if (preInsertQueries.length) {
     insertQuery.select(...preInsertQueries.map((input) => input.reference()));
+  } else if (options?.skipConflicts) {
+    insertQuery.conflict();
   }
 
   const postInsertQueriesMap = preparePostInsertRelations(builder, input.data, relations, insertQuery, table);
 
-  const postInsertQueries = Object.values(postInsertQueriesMap)
-    .map(({ relationQueries }) => relationQueries)
-    .flat();
+  const postInsertQueries = getRelationQueries(postInsertQueriesMap);
 
   const columns = [];
 
@@ -80,12 +97,62 @@ export const prepareInsertQuery = async <T extends InternalTableMetadata, S exte
 
     selectQuery.record(record);
     queries.push(selectQuery);
+  } else if (options?.flag && postInsertQueries.length) {
+    // The last statement writes the relations, so the flag is read from the inserted record.
+    queries.push(builder.select().from(insertQuery.reference()));
+  }
+
+  if (options?.flag) {
+    const resultQuery = queries[queries.length - 1];
+
+    resultQuery.results?.rawColumn(1, options.flag);
+    columns.push(options.flag);
   }
 
   return {
     columns,
     queries
   };
+};
+
+export const prepareInsertManyQuery = <T extends InternalTableMetadata, S extends AnyObject>(
+  builder: SqlBuilder,
+  table: string,
+  schema: ObjectSchema,
+  records: SqlRecord[],
+  input: InsertManyQueryInput<T, S>
+) => {
+  const insertQuery = builder.insert(schema).into(table).records(records);
+
+  if (input.skipDuplicates) {
+    insertQuery.conflict();
+  }
+
+  if (!input.select) {
+    return {
+      query: insertQuery,
+      columns: []
+    };
+  }
+
+  // Without relations, a relation in the select fails as a field missing from the schema.
+  const record = getSelectFields(builder, input.select, null, schema, {}, insertQuery, table);
+
+  insertQuery.returning(record);
+
+  return {
+    query: insertQuery,
+    columns: Object.keys(record)
+  };
+};
+
+export const getInsertManyRecords = (data: SqlRecord[], schema: ObjectSchema, relations: PgRelationRepositoryWithSchema, table: string) => {
+  // No relation data is expected, and without its repository a relation field fails as invalid.
+  return Promise.all(data.map((record) => getInsertRecord(record, schema, relations, {}, table)));
+};
+
+export const getRelationQueries = (repository: InsertRelationRepository) => {
+  return Object.values(repository).flatMap(({ relationQueries }) => relationQueries);
 };
 
 export const getInsertRecord = async (
@@ -193,7 +260,7 @@ export const getInsertRecord = async (
   return record;
 };
 
-const preparePreInsertRelations = (
+export const preparePreInsertRelations = (
   builder: SqlBuilder,
   data: Query.InsertDataInput<InternalTableMetadata>,
   relations: PgRelationRepositoryWithSchema,
@@ -248,7 +315,7 @@ const preparePreInsertRelations = (
   return queries;
 };
 
-const preparePostInsertRelations = (
+export const preparePostInsertRelations = (
   builder: SqlBuilder,
   data: Query.InsertDataInput<InternalTableMetadata>,
   relations: PgRelationRepositoryWithSchema,

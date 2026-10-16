@@ -1,5 +1,6 @@
 import type { SqlJsonColumnOptions, SqlJsonColumnRecord } from './json';
-import type { SqlBuilderReferences } from '../builder';
+import type { SqlBuilderOptions, SqlBuilderReferences } from '../builder';
+import type { SqlAggregateColumnOptions } from './aggregate';
 import type { SqlRawGenerator } from './raw';
 import type { SqlSource } from './source';
 import type { SqlColumn } from './types';
@@ -13,6 +14,7 @@ import { SqlSelectStatement } from '../statements/select';
 import { getUniqueAlias } from '../helpers/alias';
 import { SqlRawColumn, SqlRawValue } from './raw';
 import { SqlColumnReference } from './reference';
+import { SqlAggregateColumn } from './aggregate';
 import { SqlJsonColumn } from './json';
 
 export type SqlObjectColumn = Omit<SqlJsonColumnOptions, 'aggregate' | 'order'>;
@@ -31,9 +33,11 @@ type SqlResultsContext = {
   variables: unknown[];
 };
 
+type SqlResultsColumn = SqlResultColumn | SqlJsonColumn | SqlAggregateColumn;
+
 export class SqlResults {
   #state: {
-    columns: (SqlResultColumn | SqlJsonColumn)[];
+    columns: SqlResultsColumn[];
     references: SqlBuilderReferences;
     source: SqlSource;
   };
@@ -104,6 +108,11 @@ export class SqlResults {
     });
   }
 
+  aggregateColumn(aggregate: SqlAggregateColumnOptions, options: SqlBuilderOptions) {
+    this.#state.columns.push(new SqlAggregateColumn(this.#state.source, this.#state.references, options, aggregate));
+    return this;
+  }
+
   build(): [string, unknown[]] {
     const { source, references, columns } = this.#state;
 
@@ -118,7 +127,7 @@ export class SqlResults {
 }
 
 const getRecordColumns = (record: SqlResultRecord, source: SqlSource, references: SqlBuilderReferences) => {
-  const columns: (SqlResultColumn | SqlJsonColumn)[] = [];
+  const columns: SqlResultsColumn[] = [];
 
   for (const column in record) {
     const value = record[column];
@@ -139,7 +148,7 @@ const getRecordColumns = (record: SqlResultRecord, source: SqlSource, references
   return columns;
 };
 
-const getResultColumns = (columns: (SqlResultColumn | SqlJsonColumn)[], context: SqlResultsContext) => {
+const getResultColumns = (columns: SqlResultsColumn[], context: SqlResultsContext) => {
   const { source, references, variables } = context;
 
   const columnsList = columns.map((column) => {
@@ -149,6 +158,14 @@ const getResultColumns = (columns: (SqlResultColumn | SqlJsonColumn)[], context:
 
     if (column instanceof SqlRawValue || column instanceof SqlRawColumn) {
       return column.build(source);
+    }
+
+    if (column instanceof SqlAggregateColumn) {
+      const [aggregateResult, aggregateVariables] = column.build();
+
+      variables.push(...aggregateVariables);
+
+      return aggregateResult;
     }
 
     if (column instanceof SqlJsonColumn) {

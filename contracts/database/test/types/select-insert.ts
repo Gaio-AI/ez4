@@ -64,4 +64,28 @@ export const testInsertMany = async ({ selfClient }: Service.Context<TestDatabas
   });
 
   assertType<void, typeof resultA>(true);
+
+  // Insert with select
+  const resultB = await selfClient.table.insertMany({
+    skipDuplicates: true,
+    select: {
+      id: true
+    },
+    data: [
+      {
+        id: 'foo',
+        value: 123
+      }
+    ]
+  });
+
+  assertType<{ id: string }[], typeof resultB>(true);
+
+  // Insert skipping duplicates without select
+  const resultC = await selfClient.table.insertMany({
+    skipDuplicates: true,
+    data: []
+  });
+
+  assertType<void, typeof resultC>(true);
 };

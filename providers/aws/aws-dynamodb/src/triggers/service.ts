@@ -1,6 +1,6 @@
 import type { ConnectResourceEvent, PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
 
-import { InsensitiveMode, LockMode, OrderMode, PaginationMode, ParametersMode, TransactionMode } from '@ez4/database';
+import { AggregateMode, InsensitiveMode, LockMode, OrderMode, PaginationMode, ParametersMode, TransactionMode } from '@ez4/database';
 import { getServiceName, isLinkedContextVpcRequired, linkServiceContext } from '@ez4/project/library';
 import { createVirtualState } from '@ez4/common/library';
 import { getFunctionState } from '@ez4/aws-function';
@@ -14,7 +14,8 @@ import {
   UnsupportedParametersModeError,
   UnsupportedOrderModeError,
   UnsupportedRelationError,
-  UnsupportedLockModeError
+  UnsupportedLockModeError,
+  UnsupportedAggregateModeError
 } from './errors';
 
 import { getTableName } from '../utils/table';
@@ -65,6 +66,10 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
 
   if (engine.lockMode !== LockMode.Unsupported) {
     throw new UnsupportedLockModeError();
+  }
+
+  if (engine.aggregateMode !== AggregateMode.Unsupported) {
+    throw new UnsupportedAggregateModeError();
   }
 
   const tablePrefix = getServiceName(service, options);

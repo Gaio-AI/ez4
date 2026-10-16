@@ -434,6 +434,36 @@ describe('sql where tests', () => {
     assert.equal(statement, `SELECT FROM "test" WHERE "foo" = plain_foo AND "bar" = plain_bar`);
   });
 
+  it('assert :: where with raw condition', ({ assert }) => {
+    const query = sql.select().from('test').as('alias');
+
+    query.where({
+      foo: 'abc',
+      AND: [
+        sql.rawCondition((bind, source) => {
+          return `("${source?.alias}"."bar", "baz") < (${bind(123)}, CAST(${bind('2024-01-01')} AS date))`;
+        })
+      ],
+      OR: [
+        {
+          qux: true
+        },
+        sql.rawCondition((bind) => `"quux" > ${bind(456)} OR "quux" IS NULL`)
+      ]
+    });
+
+    const [statement, variables] = query.build();
+
+    assert.deepEqual(variables, ['abc', 123, '2024-01-01', true, 456]);
+
+    assert.equal(
+      statement,
+      `SELECT FROM "test" AS "alias" WHERE "alias"."foo" = :0 ` +
+        `AND ((("alias"."bar", "baz") < (:1, CAST(:2 AS date)))) ` +
+        `AND ("alias"."qux" = :3 OR ("quux" > :4 OR "quux" IS NULL))`
+    );
+  });
+
   it('assert :: where with reference', ({ assert }) => {
     const query = sql.select().from('test');
 

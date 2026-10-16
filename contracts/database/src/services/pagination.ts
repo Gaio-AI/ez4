@@ -9,7 +9,9 @@ export namespace PaginationModeUtils {
    * Get the pagination range based on the given database engine.
    */
   export type Range<E extends DatabaseEngine> =
-    EngineUtils.GetPaginationMode<E> extends PaginationMode.Cursor ? { cursor?: string; limit?: number } : { skip?: number; take?: number };
+    EngineUtils.GetPaginationMode<E> extends PaginationMode.Cursor
+      ? { cursor?: string; limit?: number }
+      : { skip?: number; take?: number; cursor?: string };
 
   /**
    * Get the pagination begin based on the given table metadata.
@@ -24,7 +26,7 @@ export namespace PaginationModeUtils {
     EngineUtils.GetPaginationMode<E> extends PaginationMode.Cursor ? { limit?: number } : { take?: number };
 
   /**
-   * Get the pagination result based on the given table metadata.
+   * Get the pagination result based on the given table metadata, every mode returns the cursor of the next page.
    */
-  export type Result<E extends DatabaseEngine> = EngineUtils.GetPaginationMode<E> extends PaginationMode.Cursor ? { cursor?: string } : {};
+  export type Result<_E extends DatabaseEngine> = { cursor?: string };
 }

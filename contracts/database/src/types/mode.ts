@@ -69,3 +69,11 @@ export const enum LockMode {
   Unsupported = 'unsupported',
   Supported = 'supported'
 }
+
+/**
+ * Aggregate mode.
+ */
+export const enum AggregateMode {
+  Unsupported = 'unsupported',
+  Supported = 'supported'
+}

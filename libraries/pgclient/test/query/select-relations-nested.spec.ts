@@ -360,7 +360,7 @@ describe('select nested relations', () => {
     assert.equal(
       statement,
       `SELECT "R0"."id", ` +
-        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "S0"."id", 'column', "S0"."column") ORDER BY "S0"."column" DESC), '[]'::json) ` +
+        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "S0"."id") ORDER BY "S0"."column" DESC), '[]'::json) ` +
         /**/ `FROM "ez4-test-c" AS "S0" ` +
         /**/ `WHERE "S0"."column" > :0 AND "S0"."relation_b_id" = "R0"."relation_cb_id"` +
         `) AS "relation_cb" ` +
@@ -443,7 +443,7 @@ describe('select nested relations', () => {
     assert.equal(
       statement,
       `SELECT "R0"."id", ` +
-        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "id", 'column', "column") ORDER BY "column" DESC), '[]'::json) ` +
+        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "id") ORDER BY "column" DESC), '[]'::json) ` +
         /**/ `FROM (` +
         /****/ `SELECT "S0"."id", "S0"."column" FROM "ez4-test-c" AS "S0" ` +
         /****/ `WHERE "S0"."column" > :0 AND "S0"."relation_b_id" = "R0"."relation_cb_id" ` +
@@ -457,5 +457,103 @@ describe('select nested relations', () => {
     );
 
     assert.deepEqual(variables, [100, '00000000-0000-1000-9000-000000000000']);
+  });
+
+  it('assert :: prepare nested relation filters', ({ assert }) => {
+    const [statement, variables] = prepareCSelect({
+      select: {
+        id: true
+      },
+      where: {
+        id: '00000000-0000-1000-9000-000000000000',
+        relation_b: {
+          relation_c: {
+            column: 42
+          }
+        }
+      }
+    });
+
+    assert.equal(
+      statement,
+      `SELECT "R0"."id" FROM "ez4-test-c" AS "R0" WHERE "R0"."id" = :0 AND ` +
+        `EXISTS (SELECT 1 FROM "ez4-test-b" AS "T0" WHERE ` +
+        /**/ `EXISTS (SELECT 1 FROM "ez4-test-c" AS "T1" WHERE "T1"."column" = :1 AND "T1"."id" = "T0"."relation_c_id") ` +
+        `AND "T0"."id" = "R0"."relation_b_id")`
+    );
+
+    assert.deepEqual(variables, ['00000000-0000-1000-9000-000000000000', 42]);
+  });
+
+  it('assert :: prepare nested relation filters (three levels, null and logical operators)', ({ assert }) => {
+    const [statement, variables] = prepareCSelect({
+      select: {
+        id: true
+      },
+      where: {
+        id: '00000000-0000-1000-9000-000000000000',
+        relation_b: {
+          relation_a: null,
+          relation_c: {
+            column: 2,
+            OR: [{ relation_b: { relation_a_id: '00000000-0000-1000-9000-000000000001' } }, { NOT: { relation_b: {} } }]
+          }
+        }
+      }
+    });
+
+    assert.equal(
+      statement,
+      `SELECT "R0"."id" FROM "ez4-test-c" AS "R0" WHERE "R0"."id" = :0 AND ` +
+        // First level
+        `EXISTS (SELECT 1 FROM "ez4-test-b" AS "T0" WHERE ` +
+        /**/ `EXISTS (SELECT 1 FROM "ez4-test-c" AS "T2" WHERE "T2"."column" = :1 AND (` +
+        /****/ `EXISTS (SELECT 1 FROM "ez4-test-b" AS "T3" WHERE "T3"."relation_a_id" = :2 AND "T3"."id" = "T2"."relation_b_id") OR ` +
+        /****/ `NOT EXISTS (SELECT 1 FROM "ez4-test-b" AS "T4" WHERE "T4"."id" = "T2"."relation_b_id")` +
+        /**/ `) AND "T2"."id" = "T0"."relation_c_id") AND ` +
+        /**/ `(NOT EXISTS (SELECT 1 FROM "ez4-test-a" AS "T1" WHERE "T1"."id" = "T0"."relation_a_id")) ` +
+        `AND "T0"."id" = "R0"."relation_b_id")`
+    );
+
+    assert.deepEqual(variables, ['00000000-0000-1000-9000-000000000000', 2, '00000000-0000-1000-9000-000000000001']);
+  });
+
+  it('assert :: prepare nested relation filters (with include)', ({ assert }) => {
+    const [statement, variables] = prepareDSelect({
+      select: {
+        id: true,
+        relation_cb: {
+          id: true
+        }
+      },
+      include: {
+        relation_cb: {
+          where: {
+            relation_b: {
+              relation_a: {}
+            }
+          }
+        }
+      },
+      where: {
+        id: '00000000-0000-1000-9000-000000000000'
+      }
+    });
+
+    assert.equal(
+      statement,
+      `SELECT "R0"."id", ` +
+        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "S0"."id")), '[]'::json) ` +
+        /**/ `FROM "ez4-test-c" AS "S0" WHERE ` +
+        /**/ `EXISTS (SELECT 1 FROM "ez4-test-b" AS "T0" WHERE ` +
+        /****/ `EXISTS (SELECT 1 FROM "ez4-test-a" AS "T1" WHERE "T1"."id" = "T0"."relation_a_id") ` +
+        /****/ `AND "T0"."id" = "S0"."relation_b_id") ` +
+        /**/ `AND "S0"."relation_b_id" = "R0"."relation_cb_id"` +
+        `) AS "relation_cb" ` +
+        `FROM "ez4-test-d" AS "R0" ` +
+        `WHERE "R0"."id" = :0`
+    );
+
+    assert.deepEqual(variables, ['00000000-0000-1000-9000-000000000000']);
   });
 });

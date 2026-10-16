@@ -11,7 +11,8 @@ import type {
   RelationMode,
   OrderMode,
   StreamMode,
-  LockMode
+  LockMode,
+  AggregateMode
 } from '@ez4/database';
 
 export type Repository = Record<string, RepositoryTable>;
@@ -46,6 +47,7 @@ export type DynamoDbEngine = {
   orderMode: OrderMode.IndexColumns;
   streamMode: StreamMode.Supported;
   lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
   options: DynamoDbOptions;
   name: 'dynamodb';
 };

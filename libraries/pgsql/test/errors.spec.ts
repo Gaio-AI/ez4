@@ -5,8 +5,10 @@ import {
   InvalidColumnOrderError,
   InvalidWhereClauseError,
   MissingClauseError,
+  MissingConflictTargetError,
   MissingRecordError,
   MissingTableNameError,
+  MultipleRecordsError,
   NoStatementsError,
   SqlBuilder,
   TooManyClausesError
@@ -34,6 +36,22 @@ describe('sql error tests', () => {
     const query = sql.insert().into('table').where({ foo: 'bar' });
 
     assert.throws(() => query.build(), InvalidWhereClauseError);
+  });
+
+  it('assert :: invalid insert records', ({ assert }) => {
+    const sql = new SqlBuilder();
+
+    const query = sql.insert().into('table').select();
+
+    assert.throws(() => sql.insert().into('table').records([{}, {}]).build(), EmptyRecordError);
+    assert.throws(() => query.records([{ foo: 1 }, { foo: 2 }]).build(), MultipleRecordsError);
+  });
+
+  it('assert :: invalid insert conflict clause', ({ assert }) => {
+    const sql = new SqlBuilder();
+    const query = sql.insert().into('table').record({ foo: 1 }).conflict(undefined, { foo: 2 });
+
+    assert.throws(() => query.build(), MissingConflictTargetError);
   });
 
   it('assert :: missing and incompatible clauses', ({ assert }) => {
