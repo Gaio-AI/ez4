@@ -60,3 +60,15 @@ export class DuplicateAggregateAliasError extends Error {
     super(`Aggregate alias '${alias}' is also a group column.`);
   }
 }
+
+export class InvalidCursorError extends Error {
+  constructor(public reason: string) {
+    super(`Pagination cursor is invalid: ${reason}.`);
+  }
+}
+
+export class UnsupportedCursorError extends Error {
+  constructor(public reason: string) {
+    super(`Pagination cursor isn't supported: ${reason}.`);
+  }
+}

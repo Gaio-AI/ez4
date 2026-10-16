@@ -8,9 +8,10 @@ import type { InternalTableMetadata } from '../types/table';
 import type { PgAggregateInput } from '../queries/aggregate';
 
 import { DuplicateUniqueKeyError, MissingUniqueIndexError } from '@ez4/pgclient';
-import { Index } from '@ez4/database';
+import { isAnyNumber } from '@ez4/utils';
 
-import { tryExtractUniqueIndex } from './utils/indexes';
+import { takeRecordsCursor } from '../queries/utils/cursor';
+import { getPrimaryColumns, tryExtractUniqueIndex } from './utils/indexes';
 
 import {
   prepareInsertOne,
@@ -74,7 +75,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   private get primaryKey() {
-    return this.indexes.find((index) => index.type === Index.Primary)?.columns;
+    return getPrimaryColumns(this.indexes);
   }
 
   async updateOne<S extends Query.SelectInput<T>>(query: Query.UpdateOneInput<S, T>) {
@@ -226,26 +227,33 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   async findMany<S extends Query.SelectInput<T>, C extends boolean = false>(query: Query.FindManyInput<S, C, T>) {
-    const findStatement = prepareFindMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const { statement: findStatement, cursorFields } = prepareFindMany(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryColumns: this.primaryKey
+    });
+
+    const { records } = await this.sendStatement(findStatement);
+
+    const cursor =
+      cursorFields && 'take' in query && isAnyNumber(query.take) ? takeRecordsCursor(records, cursorFields, query.take) : undefined;
 
     if (query.count) {
+      // The total counts the filter alone, without the position of the cursor.
       const countStatement = prepareCount(this.name, this.schema, this.relations, this.context.driver, {
         where: query.where
       });
 
-      const { records } = await this.sendStatement(findStatement);
       const { records: count } = await this.sendStatement(countStatement);
 
       return {
         records,
-        total: Number(count?.[0]?.__EZ4_COUNT) || 0
+        total: Number(count?.[0]?.__EZ4_COUNT) || 0,
+        ...(cursor && { cursor })
       } as Query.FindManyResult<S, C, T>;
     }
 
-    const { records } = await this.sendStatement(findStatement);
-
     return {
-      records
+      records,
+      ...(cursor && { cursor })
     } as Query.FindManyResult<S, C, T>;
   }
 

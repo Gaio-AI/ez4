@@ -1,8 +1,16 @@
+import type { AnySchema } from '@ez4/schema';
 import type { SqlSource } from './source';
 
 import { escapeSqlName } from '../utils/escape';
 
 export type SqlRawGenerator = (statement?: SqlSource) => string;
+
+/**
+ * Bind the given value as a statement variable and return its placeholder.
+ */
+export type SqlRawBinder = (value: unknown, schema?: AnySchema) => string;
+
+export type SqlRawConditionGenerator = (bind: SqlRawBinder, statement?: SqlSource) => string;
 
 export abstract class SqlRaw {
   abstract build(source?: SqlSource): unknown;
@@ -61,6 +69,28 @@ export class SqlRawColumn extends SqlRaw {
     }
 
     return result;
+  }
+}
+
+/**
+ * A condition written in SQL, with its values bound as statement variables. It goes in a list of
+ * `AND` or `OR` filters, inside parentheses of its own.
+ */
+export class SqlRawCondition {
+  #state: {
+    generator: SqlRawConditionGenerator;
+  };
+
+  constructor(generator: SqlRawConditionGenerator) {
+    this.#state = {
+      generator
+    };
+  }
+
+  build(bind: SqlRawBinder, source?: SqlSource) {
+    const { generator } = this.#state;
+
+    return `(${generator(bind, source)})`;
   }
 }
 

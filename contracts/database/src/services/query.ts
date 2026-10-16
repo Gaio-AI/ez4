@@ -176,14 +176,16 @@ export namespace Query {
 
   export type StrictIncludeOrder<T extends AnyObject> = OrderModeUtils.AnyInput<T>;
 
+  // A related page has no cursor in the offset mode, so it takes the begin and end of the range alone.
   export type StrictIncludeRelation<
     T extends AnyObject,
     E extends DatabaseEngine,
     R extends AnyObject = {}
-  > = PaginationModeUtils.Range<E> & {
-    where?: WhereRelationInput<T, E, R>;
-    order?: StrictIncludeOrder<T>;
-  };
+  > = PaginationModeUtils.Begin<E> &
+    PaginationModeUtils.End<E> & {
+      where?: WhereRelationInput<T, E, R>;
+      order?: StrictIncludeOrder<T>;
+    };
 
   export type WhereInput<T extends TableMetadata, I extends boolean = false> = WhereFieldInput<T, I>;
 

@@ -16,6 +16,10 @@ export const getPrimaryIndex = (indexes: PgIndexRepository) => {
   return undefined;
 };
 
+export const getPrimaryColumns = (indexes: TableIndex[]) => {
+  return indexes.find((index) => index.type === Index.Primary)?.columns;
+};
+
 export const tryExtractUniqueIndex = (indexes: TableIndex[], fields: AnyObject) => {
   const allFields = Object.keys(fields);
 

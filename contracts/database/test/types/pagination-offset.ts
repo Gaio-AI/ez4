@@ -2,6 +2,8 @@ import type { Client, Database, PaginationMode, Index } from '@ez4/database';
 import type { Environment, Service } from '@ez4/common';
 import type { TestEnginePagination } from '../common/engines';
 
+import { assertType } from '@ez4/utils';
+
 declare class TestTable implements Database.Schema {
   id: string;
   next_id: string;
@@ -30,8 +32,8 @@ export declare class TestDatabase extends Database.Service<TestEnginePagination<
 }
 
 export async function testHandler({ selfClient }: Service.Context<TestDatabase>) {
-  // Paginate using cursor.
-  selfClient.table.findMany({
+  // Paginate using offset.
+  const resultA = await selfClient.table.findMany({
     select: {
       id: true,
       value: true
@@ -40,7 +42,21 @@ export async function testHandler({ selfClient }: Service.Context<TestDatabase>)
     take: 5
   });
 
-  // Paginate using cursor in the sub-query.
+  assertType<string | undefined, typeof resultA.cursor>(true);
+
+  // Paginate using cursor.
+  const resultB = await selfClient.table.findMany({
+    select: {
+      id: true,
+      value: true
+    },
+    cursor: resultA.cursor,
+    take: 5
+  });
+
+  assertType<string | undefined, typeof resultB.cursor>(true);
+
+  // Paginate using offset in the sub-query.
   selfClient.table.findMany({
     select: {
       id: true,
@@ -50,6 +66,22 @@ export async function testHandler({ selfClient }: Service.Context<TestDatabase>)
     include: {
       next: {
         skip: 5,
+        take: 5
+      }
+    }
+  });
+
+  // No cursor in the sub-query.
+  selfClient.table.findMany({
+    select: {
+      id: true,
+      value: true,
+      next: true
+    },
+    include: {
+      next: {
+        // @ts-expect-error Cursor isn't supported in the sub-query.
+        cursor: 'foo-bar',
         take: 5
       }
     }

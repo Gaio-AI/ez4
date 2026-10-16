@@ -6,6 +6,7 @@ import type { PgClientDriver } from '../types/driver';
 import type { UpdateQueryOptions } from './update';
 import type { DeleteQueryOptions } from './delete';
 import type { PgAggregateInput } from './aggregate';
+import type { SelectQueryOptions } from './select';
 
 import { createQueryBuilder } from './utils/builder';
 
@@ -155,22 +156,26 @@ export const prepareFindMany = <T extends InternalTableMetadata, S extends Query
   schema: ObjectSchema,
   relations: PgRelationRepositoryWithSchema,
   driver: PgClientDriver,
-  input: Query.FindManyInput<S, C, T>
+  input: Query.FindManyInput<S, C, T>,
+  options?: SelectQueryOptions
 ) => {
   const builder = createQueryBuilder(driver);
 
-  const { query, columns } = prepareSelectQuery(builder, table, schema, relations, input);
+  const { query, columns, cursorFields } = prepareSelectQuery(builder, table, schema, relations, input, options);
 
   const [statement, variables] = query.build();
 
   return {
-    query: statement,
-    variables,
-    metadata: {
-      schema,
-      relations,
-      columns,
-      table
+    cursorFields,
+    statement: {
+      query: statement,
+      variables,
+      metadata: {
+        schema,
+        relations,
+        columns,
+        table
+      }
     }
   };
 };

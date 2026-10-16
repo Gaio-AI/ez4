@@ -286,10 +286,12 @@ describe('select schema', () => {
 
     assert.equal(
       statement,
-      `SELECT to_char("R0"."baz", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "baz" FROM "ez4-test-select-schema" AS "R0" ` +
+      `SELECT to_char("R0"."baz", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "baz", ` +
+        `to_char("R0"."baz" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "__EZ4_CURSOR_0" ` +
+        `FROM "ez4-test-select-schema" AS "R0" ` +
         `WHERE "R0"."bar" = :0 ` +
         `ORDER BY "R0"."baz" DESC ` +
-        `LIMIT 1`
+        `LIMIT 2`
     );
 
     assert.deepEqual(variables, [123]);
