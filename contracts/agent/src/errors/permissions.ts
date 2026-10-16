@@ -9,6 +9,16 @@ export class UnknownPermissionError extends TypeError {
   }
 }
 
+export class InvalidGrantResourceError extends TypeError {
+  constructor(
+    public permission: string,
+    public resource: string,
+    fileName?: string
+  ) {
+    super(`Invalid resource '${resource}' for agent permission '${permission}', expected '<domain>/<repository>'.`, fileName);
+  }
+}
+
 export class InvalidReplyToError extends TypeError {
   constructor(
     public replyTo: unknown,

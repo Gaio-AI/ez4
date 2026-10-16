@@ -20,5 +20,11 @@ export const enum AgentPermission {
   /**
    * Read CloudFormation stacks, their events, resources and templates.
    */
-  CloudFormationRead = 'cloudformation-read'
+  CloudFormationRead = 'cloudformation-read',
+
+  /**
+   * Install packages from CodeArtifact repositories: authorization token, repository endpoint and package reads.
+   * Resources are `<domain>/<repository>`, which belong to the account, so they take no deploy prefix.
+   */
+  CodeArtifactRead = 'codeartifact-read'
 }

@@ -42,7 +42,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - Outbound traffic is restricted through an internal Squid proxy (`public.ecr.aws/ubuntu/squid`) deployed as an ECS service in the agents cluster.
   - Registered under Cloud Map private DNS namespace `<base>.local` with endpoint `http://proxy.<base>.local:3128` (where `<base>` = `${prefix}-${projectName}[-${branch}]-agents`).
   - Per-agent basic authentication password is saved in AWS Secrets Manager (`<base>-<agent>-proxy`); the proxy receives only the htpasswd hash.
-  - Allowlist enforces domains declared in `egress`, provider domains (`api.anthropic.com`), AWS endpoints of granted permissions and statement actions, and runtime ECS and STS endpoints.
+  - Allowlist enforces the provider hosts (`claude`: `api.anthropic.com`, `claude.ai`, `claude.com`, `platform.claude.com`, `console.anthropic.com`), workspace repository hosts, AWS endpoints of granted permissions (plus the CodeArtifact npm endpoint of a `CodeArtifactRead` domain) and statement actions, runtime ECS and STS endpoints, and the extra domains declared in `egress`.
   - `NO_PROXY` bypasses the proxy for AWS S3, ECS/EC2 metadata endpoints, and configured VPC interface endpoints. DynamoDB requests use the proxy.
 
 - **Modular Provider Architecture**:

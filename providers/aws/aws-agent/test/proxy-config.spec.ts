@@ -2,7 +2,7 @@ import type { EntryStates, StepContext, StepOptions } from '@ez4/state';
 import type { AgentDomainInput } from '../src/proxy/config';
 
 import { describe, it } from 'node:test';
-import { equal, ok, throws } from 'node:assert/strict';
+import { deepEqual, equal, ok, throws } from 'node:assert/strict';
 
 import {
   SecretsManagerClient,
@@ -76,11 +76,21 @@ describe('proxy :: configuration and auth', () => {
         ]
       }
     };
-    const domains = resolveAgentAllowedDomains(input, 'us-east-1');
+    const domains = resolveAgentAllowedDomains(input, 'us-east-1', '123456789012');
 
     ok(domains.includes('api.linear.app'));
     ok(domains.includes('logs.us-east-1.amazonaws.com'));
     ok(domains.includes('ecs.us-east-1.amazonaws.com'));
+  });
+
+  it('resolves the npm endpoint of each granted CodeArtifact repository domain', () => {
+    const domains = resolveAgentAllowedDomains(
+      { permissions: { grants: [{ permission: AgentPermission.CodeArtifactRead, resources: ['acme/npm'] }] } },
+      'us-east-1',
+      '123456789012'
+    );
+
+    deepEqual(domains, ['acme-123456789012.d.codeartifact.us-east-1.amazonaws.com', 'codeartifact.us-east-1.amazonaws.com']);
   });
 
   it('resolves agent domains from statements action prefixes as <service>.<region>.amazonaws.com', () => {
@@ -103,7 +113,7 @@ describe('proxy :: configuration and auth', () => {
         ]
       }
     };
-    const domains = resolveAgentAllowedDomains(input, 'us-east-1');
+    const domains = resolveAgentAllowedDomains(input, 'us-east-1', '123456789012');
 
     ok(domains.includes('github.com'));
     ok(domains.includes('sts.us-east-1.amazonaws.com'));
@@ -247,20 +257,17 @@ describe('proxy :: configuration and auth', () => {
 
     setSecretsManagerClient(null);
   });
-  it('resolves agent egress domains including provider domains', () => {
-    const domains = getAgentEgressDomains(
-      {
-        provider: 'claude',
-        egress: ['github.com']
-      },
-      'us-east-1'
-    );
-    ok(domains.includes('api.anthropic.com'));
+  it('resolves agent egress domains as the provider hosts plus the declared egress', () => {
+    const domains = getAgentEgressDomains({ provider: 'claude', egress: ['github.com'] }, 'us-east-1', '123456789012');
+    for (const domain of ['api.anthropic.com', 'claude.ai', 'claude.com', 'platform.claude.com', 'console.anthropic.com']) {
+      ok(domains.includes(domain), domain);
+    }
     ok(domains.includes('github.com'));
-    const runtimeDomains = getAgentEgressDomains({ provider: 'claude' }, 'eu-west-1');
+    const runtimeDomains = getAgentEgressDomains({ provider: 'claude' }, 'eu-west-1', '123456789012');
     ok(runtimeDomains.includes('ecs.eu-west-1.amazonaws.com'));
     ok(runtimeDomains.includes('sts.eu-west-1.amazonaws.com'));
     ok(runtimeDomains.includes('sts.amazonaws.com'));
+    ok(!runtimeDomains.includes('github.com'));
   });
 
   it('skips agents with empty allowedDomains in generateSquidConfig', () => {

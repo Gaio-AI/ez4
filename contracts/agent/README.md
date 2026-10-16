@@ -59,18 +59,25 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
 
 #### Permissions
 
-`grants` give an agent read access to AWS resources by name, with one `AgentPermission` member each: `LogsRead` (log groups), `LambdaRead` (functions), `EcsRead` (clusters) and `CloudFormationRead` (stacks). Names leave out the deploy prefix, which EZ4 adds as it does to every resource it names (`<prefix>-<project>-...`), and `*` matches anything: `api-*` reads `stg-api-*` in a `stg` deploy and `prd-api-*` in a `prd` one, including the log groups of the `api` project's functions.
+`grants` give an agent read access to AWS resources by name, with one `AgentPermission` member each: `LogsRead` (log groups), `LambdaRead` (functions), `EcsRead` (clusters), `CloudFormationRead` (stacks) and `CodeArtifactRead` (package repositories). Names leave out the deploy prefix, which EZ4 adds as it does to every resource it names (`<prefix>-<project>-...`), and `*` matches anything: `api-*` reads `stg-api-*` in a `stg` deploy and `prd-api-*` in a `prd` one, including the log groups of the `api` project's functions. CodeArtifact repositories belong to the account, not the deploy, so `CodeArtifactRead` names them as `<domain>/<repository>` with no prefix.
 
 `statements` allow any other IAM actions on full resource ARNs, for resources EZ4 does not name:
 
 ```ts
 permissions: {
-  grants: [{ permission: AgentPermission.LogsRead; resources: ['api-*', 'billing-worker'] }];
+  grants: [
+    { permission: AgentPermission.LogsRead; resources: ['api-*', 'billing-worker'] },
+    { permission: AgentPermission.CodeArtifactRead; resources: ['acme/npm'] }
+  ];
   statements: [{ actions: ['s3:GetObject']; resources: ['arn:aws:s3:::reports-bucket/*'] }];
 };
 ```
 
-The egress proxy lets the agent reach the endpoint of each granted service (`logs.<region>.amazonaws.com`, ...). A log group grant cannot hide group names: listing log groups is not scoped by IAM, reading their events is.
+The egress proxy lets the agent reach the endpoint of each granted service (`logs.<region>.amazonaws.com`, ...) and, for `CodeArtifactRead`, the npm endpoint of the domain (`<domain>-<account>.d.codeartifact.<region>.amazonaws.com`). A log group grant cannot hide group names: listing log groups is not scoped by IAM, reading their events is.
+
+#### Egress
+
+EZ4 allows on its own the hosts the agent's provider needs (for `claude`: `api.anthropic.com`, `claude.ai`, `claude.com`, `platform.claude.com` and `console.anthropic.com`), the hosts of its workspace repositories, the AWS endpoints of its permissions and the runtime's ECS and STS endpoints. `egress` lists only what the agent reaches beyond those, such as `registry.npmjs.org`; an agent that needs nothing else declares no `egress`.
 
 #### Git workspaces
 

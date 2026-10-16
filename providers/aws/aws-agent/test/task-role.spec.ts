@@ -162,6 +162,31 @@ describe('agent task and execution roles', () => {
     deepEqual(unscoped, ['logs:GetQueryResults', 'logs:StopQuery']);
   });
 
+  it('assert :: a CodeArtifact grant reads the named account repository without the deploy prefix', () => {
+    const grants = buildPermissionGrants(
+      { grants: [{ permission: AgentPermission.CodeArtifactRead, resources: ['acme/npm'] }] },
+      { ...options, prefix: 'prd' },
+      region,
+      accountId
+    );
+
+    deepEqual(grants, [
+      {
+        resourceIds: [`arn:aws:codeartifact:${region}:${accountId}:domain/acme`],
+        permissions: ['codeartifact:GetAuthorizationToken']
+      },
+      {
+        resourceIds: [`arn:aws:codeartifact:${region}:${accountId}:repository/acme/npm`],
+        permissions: ['codeartifact:GetRepositoryEndpoint', 'codeartifact:ReadFromRepository']
+      },
+      {
+        resourceIds: ['*'],
+        permissions: ['sts:GetServiceBearerToken'],
+        conditions: { StringEquals: { 'sts:AWSServiceName': 'codeartifact.amazonaws.com' } }
+      }
+    ]);
+  });
+
   it('assert :: statements keep their resource ARNs as declared', () => {
     const [grant] = buildPermissionGrants(
       { statements: [{ actions: ['s3:GetObject'], resources: ['arn:aws:s3:::reports/${aws:PrincipalTag/team}/*'] }] },

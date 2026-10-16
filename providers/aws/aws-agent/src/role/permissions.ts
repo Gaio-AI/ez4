@@ -11,6 +11,17 @@ type PermissionPolicy = {
    * ARNs of a named resource the actions apply to; actions without resource-level permissions omit it and get `*`.
    */
   getArns?: (name: string, region: string, accountId: string) => string[];
+
+  /**
+   * IAM conditions that narrow an action IAM cannot scope by resource.
+   */
+  conditions?: IdentityGrant['conditions'];
+};
+
+/** Splits a CodeArtifact grant resource (`<domain>/<repository>`). */
+const getCodeArtifactRepository = (name: string) => {
+  const [domain, repository] = name.split('/');
+  return { domain: domain!, repository: repository! };
 };
 
 export const PERMISSION_POLICIES: Record<AgentPermission, PermissionPolicy[]> = {
@@ -73,6 +84,26 @@ export const PERMISSION_POLICIES: Record<AgentPermission, PermissionPolicy[]> = 
       ],
       getArns: (name, region, accountId) => [`arn:aws:cloudformation:${region}:${accountId}:stack/${name}/*`]
     }
+  ],
+  [AgentPermission.CodeArtifactRead]: [
+    {
+      permissions: ['codeartifact:GetAuthorizationToken'],
+      getArns: (name, region, accountId) => [
+        `arn:aws:codeartifact:${region}:${accountId}:domain/${getCodeArtifactRepository(name).domain}`
+      ]
+    },
+    {
+      permissions: ['codeartifact:GetRepositoryEndpoint', 'codeartifact:ReadFromRepository'],
+      getArns: (name, region, accountId) => {
+        const { domain, repository } = getCodeArtifactRepository(name);
+        return [`arn:aws:codeartifact:${region}:${accountId}:repository/${domain}/${repository}`];
+      }
+    },
+    {
+      // The CodeArtifact token is an STS bearer token, which IAM scopes by service only.
+      permissions: ['sts:GetServiceBearerToken'],
+      conditions: { StringEquals: { 'sts:AWSServiceName': 'codeartifact.amazonaws.com' } }
+    }
   ]
 };
 
@@ -81,7 +112,24 @@ export const PERMISSION_SERVICES: Record<AgentPermission, string> = {
   [AgentPermission.LogsRead]: 'logs',
   [AgentPermission.LambdaRead]: 'lambda',
   [AgentPermission.EcsRead]: 'ecs',
-  [AgentPermission.CloudFormationRead]: 'cloudformation'
+  [AgentPermission.CloudFormationRead]: 'cloudformation',
+  [AgentPermission.CodeArtifactRead]: 'codeartifact'
+};
+
+/** Permissions on account resources EZ4 does not name, so their names take no deploy prefix. */
+const ACCOUNT_PERMISSIONS = new Set<AgentPermission>([AgentPermission.CodeArtifactRead]);
+
+/** Domains a grant reaches besides its service endpoint, such as the npm endpoint of a CodeArtifact repository. */
+export const getGrantDomains = ({ permission, resources }: Agent.Grant, region: string, accountId: string): string[] => {
+  const domains = [`${PERMISSION_SERVICES[permission]}.${region}.amazonaws.com`];
+
+  if (permission === AgentPermission.CodeArtifactRead) {
+    for (const resource of resources) {
+      domains.push(`${getCodeArtifactRepository(resource).domain}-${accountId}.d.codeartifact.${region}.amazonaws.com`);
+    }
+  }
+
+  return domains;
 };
 
 export const buildPermissionGrants = (
@@ -96,11 +144,11 @@ export const buildPermissionGrants = (
   const prefix = toKebabCase(options.prefix);
 
   for (const { permission, resources } of permissions.grants ?? []) {
-    const names = resources.map((resource) => `${prefix}-${resource}`);
+    const names = ACCOUNT_PERMISSIONS.has(permission) ? resources : resources.map((resource) => `${prefix}-${resource}`);
 
-    for (const { permissions: actions, getArns } of PERMISSION_POLICIES[permission]) {
+    for (const { permissions: actions, getArns, conditions } of PERMISSION_POLICIES[permission]) {
       const resourceIds = getArns ? [...new Set(names.flatMap((name) => getArns(name, region, accountId)))] : ['*'];
-      grants.push({ resourceIds, permissions: actions });
+      grants.push({ resourceIds, permissions: actions, ...(conditions && { conditions }) });
     }
   }
 

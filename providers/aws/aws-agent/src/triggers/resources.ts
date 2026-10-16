@@ -195,7 +195,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   if (!state[createEcsServiceStateId(proxyServiceName)]) {
     const proxyLogGroup = createLogGroup(state, { groupName: proxyServiceName, retention: 30, tags: options.tags });
     const squidConfig = generateSquidConfig({
-      agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region) }))
+      agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region, accountId) }))
     });
     const proxyEntryId = createEcsServiceStateId(proxyServiceName);
     createEcsService(state, [namespace, proxyLogGroup, executionRole, cluster, ...credentials], {

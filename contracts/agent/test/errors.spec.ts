@@ -4,6 +4,7 @@ import {
   IncompleteServiceError,
   InvalidCpuMemoryCombinationError,
   UnknownPermissionError,
+  InvalidGrantResourceError,
   InvalidWorkspaceRepoError,
   DuplicateWorkspaceRepoError,
   UnknownWorkflowAgentError,
@@ -44,6 +45,12 @@ describe('agent metadata errors', () => {
     const [error] = parseFile('invalid-permission', 1);
     ok(error instanceof UnknownPermissionError);
     deepEqual(error.permission, 'logs-write');
+  });
+
+  it('assert :: a CodeArtifact grant resource without a repository is rejected', () => {
+    const [error] = parseFile('invalid-grant-resource', 1);
+    ok(error instanceof InvalidGrantResourceError);
+    deepEqual(error.resource, 'acme');
   });
 
   it('assert :: non-https workspace repo is rejected naming agent and url', () => {

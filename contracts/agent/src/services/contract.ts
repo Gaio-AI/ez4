@@ -81,6 +81,7 @@ export namespace Agent {
     /**
      * Names of the resources (log groups, functions, clusters or stacks) it applies to, without the deploy prefix,
      * where `*` matches anything: `api-*` reads `stg-api-*` in a `stg` deploy and `prd-api-*` in a `prd` one.
+     * `CodeArtifactRead` names account repositories as `<domain>/<repository>`, with no prefix.
      */
     readonly resources: string[];
   }
@@ -144,6 +145,10 @@ export namespace Agent {
     readonly image?: Image;
     readonly resources?: Resources;
     readonly permissions?: Permissions;
+    /**
+     * Domains the agent reaches besides the ones EZ4 allows on its own: the provider's (Claude login and API),
+     * the workspace repository hosts and the AWS endpoints of its permissions.
+     */
     readonly egress?: string[];
     readonly secrets?: Record<string, string>;
     readonly variables?: LinkedVariables;

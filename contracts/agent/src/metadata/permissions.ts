@@ -5,15 +5,18 @@ import type { AgentService } from './types';
 import { isModelProperty, isTypeObject, isTypeTuple } from '@ez4/reflection';
 import { getPropertyString, getPropertyStringIn, getPropertyStringList } from '@ez4/common/library';
 import { AgentPermission } from '../services/permissions';
-import { UnknownPermissionError } from '../errors/permissions';
+import { InvalidGrantResourceError, UnknownPermissionError } from '../errors/permissions';
 import { IncompleteServiceError } from '../errors/service';
 
 const AGENT_PERMISSIONS = [
   AgentPermission.LogsRead,
   AgentPermission.LambdaRead,
   AgentPermission.EcsRead,
-  AgentPermission.CloudFormationRead
+  AgentPermission.CloudFormationRead,
+  AgentPermission.CodeArtifactRead
 ];
+
+const CODEARTIFACT_REPOSITORY = /^[a-z][a-z0-9-]{1,49}\/[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/;
 
 export const validatePermissions = (
   members: Record<string, ModelProperty>,
@@ -65,6 +68,14 @@ const readGrants = (member: ModelProperty, declaration: TypeClass, errorList: Er
     if (!permission) {
       errorList.push(new UnknownPermissionError(getPropertyString(fields.permission) ?? 'unknown', declaration.file));
       continue;
+    }
+
+    if (permission === AgentPermission.CodeArtifactRead) {
+      const invalid = resources.find((resource) => !CODEARTIFACT_REPOSITORY.test(resource));
+      if (invalid !== undefined) {
+        errorList.push(new InvalidGrantResourceError(permission, invalid, declaration.file));
+        continue;
+      }
     }
 
     grants.push({ permission, resources });

@@ -1,7 +1,7 @@
 import type { Agent } from '@ez4/agent';
 import type { SquidConfigOptions } from './types';
 import type { AgentService } from '@ez4/agent/library';
-import { PERMISSION_SERVICES } from '../role/permissions';
+import { getGrantDomains } from '../role/permissions';
 import { getWorkspaceDomains } from '../workspace/resources';
 
 export interface AgentDomainInput {
@@ -23,15 +23,17 @@ export const normalizeDomain = (domain: string): string => {
   return trimmed;
 };
 
-export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: string): string[] => {
+export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: string, accountId: string): string[] => {
   const domains = new Set<string>();
 
   for (const domain of agent.egress ?? []) {
     domains.add(normalizeDomain(domain));
   }
 
-  for (const { permission } of agent.permissions?.grants ?? []) {
-    domains.add(`${PERMISSION_SERVICES[permission]}.${region}.amazonaws.com`);
+  for (const grant of agent.permissions?.grants ?? []) {
+    for (const domain of getGrantDomains(grant, region, accountId)) {
+      domains.add(domain);
+    }
   }
 
   for (const statement of agent.permissions?.statements ?? []) {
@@ -46,18 +48,25 @@ export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: stri
   return Array.from(domains).sort();
 };
 
-const PROVIDER_DOMAINS: Record<string, string[]> = { claude: ['api.anthropic.com'] };
+/**
+ * Hosts the provider CLI reaches with its OAuth token: the model API plus the account and token endpoints.
+ */
+export const PROVIDER_DOMAINS: Record<Agent.ProviderName, string[]> = {
+  claude: ['api.anthropic.com', 'claude.ai', 'claude.com', 'platform.claude.com', 'console.anthropic.com']
+};
 
-/** Domains an agent may reach through the proxy: runtime AWS APIs, declared egress, permissions, and its LLM provider. */
+/** Domains an agent may reach through the proxy: its provider, workspace hosts, permissions, runtime AWS APIs and declared egress. */
 export const getAgentEgressDomains = (
   agent: Pick<AgentService, 'egress' | 'permissions' | 'provider' | 'workspace'>,
-  region: string
+  region: string,
+  accountId: string
 ): string[] => {
-  const domains = new Set(resolveAgentAllowedDomains({ egress: agent.egress, permissions: agent.permissions }, region));
+  const domains = new Set(resolveAgentAllowedDomains({ egress: agent.egress, permissions: agent.permissions }, region, accountId));
   domains.add(`ecs.${region}.amazonaws.com`);
   domains.add(`sts.${region}.amazonaws.com`);
   domains.add('sts.amazonaws.com');
-  for (const domain of PROVIDER_DOMAINS[agent.provider ?? ''] ?? []) domains.add(domain);
+  // Metadata does not reject an unknown provider name, which then adds no provider host.
+  for (const domain of (agent.provider && PROVIDER_DOMAINS[agent.provider]) || []) domains.add(domain);
   if (agent.workspace) {
     for (const domain of getWorkspaceDomains(agent.workspace)) {
       domains.add(domain);
