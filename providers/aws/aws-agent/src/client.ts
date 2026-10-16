@@ -8,7 +8,7 @@ import type { Agent } from '@ez4/agent';
 import { AgentErrorCode, AgentResultStatus } from '@ez4/agent';
 import { AGENT_CONTAINER_NAME } from './agent/taskdef';
 
-export { WorkflowClient, type WorkflowClientParameters } from './workflow/client';
+export { WorkflowClient, type WorkflowClientParameters, type WorkflowStageParameters } from './workflow/client';
 
 export interface ClientParameters {
   agentName: string;

@@ -1,20 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { SQSClient, SendMessageCommand, GetQueueUrlCommand } from '@aws-sdk/client-sqs';
 import { validate, getErrorDetails } from '@ez4/validator';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
 import { WorkflowEventType } from '@ez4/agent';
-import { getWorkflowStateKey } from '../utils/names';
+import { type AgentsNameOptions, getAgentBucketName, getWorkflowStartQueueName, getWorkflowStateKey } from '../utils/names';
 
 export interface WorkflowClientParameters {
   workflow: string;
   startQueueUrl: string;
   bucket: string;
-  inputSchema: ObjectSchema;
+  inputSchema?: ObjectSchema;
   s3Client?: S3Client;
   sqsClient?: SQSClient;
+}
+
+export interface WorkflowStageParameters extends Omit<WorkflowClientParameters, 'startQueueUrl' | 'bucket'> {
+  options: AgentsNameOptions;
 }
 
 export namespace WorkflowClient {
@@ -24,7 +28,7 @@ export namespace WorkflowClient {
 
     return {
       async start(input: Agent.WorkflowInputOf<W>, options?: { runId?: string }): Promise<{ runId: string }> {
-        const errors = await validate(input, parameters.inputSchema);
+        const errors = parameters.inputSchema && (await validate(input, parameters.inputSchema));
         if (errors && errors.length > 0) {
           throw new Error(`Workflow input validation failed: ${JSON.stringify(getErrorDetails(errors))}`);
         }
@@ -69,6 +73,21 @@ export namespace WorkflowClient {
         }
       }
     };
+  };
+
+  export const fromStage = async <W extends Agent.Workflow<any, any, any>>(
+    parameters: WorkflowStageParameters
+  ): Promise<Agent.WorkflowClient<W>> => {
+    const { options, ...clientParameters } = parameters;
+    const sqsClient = parameters.sqsClient ?? new SQSClient();
+    const queueName = getWorkflowStartQueueName(parameters.workflow, options);
+    const { QueueUrl } = await sqsClient.send(new GetQueueUrlCommand({ QueueName: queueName }));
+
+    if (!QueueUrl) {
+      throw new Error(`Workflow start queue ${queueName} not found`);
+    }
+
+    return make<W>({ ...clientParameters, sqsClient, startQueueUrl: QueueUrl, bucket: getAgentBucketName(options) });
   };
 }
 

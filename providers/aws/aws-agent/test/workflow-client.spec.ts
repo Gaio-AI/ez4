@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test';
 import { deepEqual, equal, rejects } from 'node:assert/strict';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { SQSClient, SendMessageCommand, GetQueueUrlCommand } from '@aws-sdk/client-sqs';
 import { SchemaType } from '@ez4/schema';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
 import { WorkflowClient } from '../src/workflow/client';
+import { getAgentBucketName } from '../src/utils/names';
 
 interface ReviewInput {
   issueId: string;
@@ -22,6 +23,9 @@ const fakeSqs = () => {
   const client = {
     sent,
     send: async (command: unknown) => {
+      if (command instanceof GetQueueUrlCommand) {
+        return { QueueUrl: `https://sqs/${command.input.QueueName}` };
+      }
       if (command instanceof SendMessageCommand) {
         sent.push(command.input);
         return { MessageId: 'msg-1' };
@@ -126,5 +130,25 @@ describe('workflow client', () => {
     });
 
     await rejects(client.start({ issueId: 123 as unknown as string }), /Workflow input validation failed/);
+  });
+
+  it('assert :: fromStage resolves the start queue and state bucket from the stage', async () => {
+    const options = { prefix: 'stg', projectName: 'agents' };
+    const sqs = fakeSqs();
+    const bucket = getAgentBucketName(options);
+    const s3 = fakeS3({
+      'workflows/CodeAgent/r1.json': JSON.stringify({ runId: 'r1', status: 'completed' })
+    });
+    const client = await WorkflowClient.fromStage<ReviewWorkflow>({
+      workflow: 'CodeAgent',
+      options,
+      s3Client: s3,
+      sqsClient: sqs
+    });
+
+    await client.start({ issueId: 123 as unknown as string }, { runId: 'r1' });
+    equal(sqs.sent[0].QueueUrl, 'https://sqs/stg-agents-agents-code-agent-start');
+    equal(bucket.startsWith('stg-agents-agents-'), true);
+    equal((await client.status('r1'))?.status, 'completed');
   });
 });

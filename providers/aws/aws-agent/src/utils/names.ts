@@ -3,7 +3,9 @@ import type { AgentService } from '@ez4/agent/library';
 import { createHash } from 'node:crypto';
 import { toKebabCase } from '@ez4/utils';
 
-export const getAgentsBaseName = (options: DeployOptions) => {
+export type AgentsNameOptions = Pick<DeployOptions, 'prefix' | 'projectName'> & { branchName?: string };
+
+export const getAgentsBaseName = (options: AgentsNameOptions) => {
   const parts = [options.prefix, options.projectName, options.branchName, 'agents'];
   return parts
     .filter((part): part is string => !!part)
@@ -13,7 +15,7 @@ export const getAgentsBaseName = (options: DeployOptions) => {
 
 export const getAgentClusterName = (options: DeployOptions) => getAgentsBaseName(options);
 
-export const getAgentBucketName = (options: DeployOptions) => {
+export const getAgentBucketName = (options: AgentsNameOptions) => {
   const base = getAgentsBaseName(options);
   return `${base}-${createHash('sha256').update(base).digest('hex').slice(0, 6)}`;
 };
@@ -50,7 +52,7 @@ export const getSecretResourceArn = (secretRef: string, region: string, accountI
   return `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretName}-*`;
 };
 
-export const getWorkflowStartQueueName = (workflow: string, options: DeployOptions) =>
+export const getWorkflowStartQueueName = (workflow: string, options: AgentsNameOptions) =>
   `${getAgentsBaseName(options)}-${toKebabCase(workflow)}-start`;
 
 export const getWorkflowResultsQueueName = (workflow: string, options: DeployOptions) =>
