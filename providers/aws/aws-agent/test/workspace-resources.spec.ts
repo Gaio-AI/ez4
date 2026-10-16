@@ -155,11 +155,18 @@ describe('agent workspace resources', () => {
   });
 
   it('assert :: GitHub App credentials reach the task only through the managed secret', () => {
-    const input = buildAgentTaskDefinition(workspaceAgent, fakeContext({ fileSystemId: 'fs-1', accessPointId: 'fsap-1' }), undefined, undefined, undefined, {
-      baseName: 'ez4-test-stg-agents',
-      bucketName: 'bucket',
-      workspaceSecretArn: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ez4-test-stg-agents-workspace-agent-workspace-AbCdEf'
-    });
+    const input = buildAgentTaskDefinition(
+      workspaceAgent,
+      fakeContext({ fileSystemId: 'fs-1', accessPointId: 'fsap-1' }),
+      undefined,
+      undefined,
+      undefined,
+      {
+        baseName: 'ez4-test-stg-agents',
+        bucketName: 'bucket',
+        workspaceSecretArn: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ez4-test-stg-agents-workspace-agent-workspace-AbCdEf'
+      }
+    );
     const container = input.containerDefinitions?.[0];
     deepEqual(
       container?.secrets?.find((secret) => secret.name === 'EZ4_WORKSPACE_GITHUB_APP')?.valueFrom,

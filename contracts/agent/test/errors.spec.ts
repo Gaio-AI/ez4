@@ -67,7 +67,11 @@ describe('agent metadata errors', () => {
 
   it('assert :: GitHub App auth without every credential is rejected', () => {
     const errors = parseFile('invalid-workspace-github-app', 1);
-    ok(errors.some((error) => error instanceof IncompleteServiceError && error.properties.includes('MissingKeyAgent.workspace.auth.githubApp')));
+    ok(
+      errors.some(
+        (error) => error instanceof IncompleteServiceError && error.properties.includes('MissingKeyAgent.workspace.auth.githubApp')
+      )
+    );
   });
 
   it('assert :: unknown workflow agent alias reports workflow and agent name', () => {
