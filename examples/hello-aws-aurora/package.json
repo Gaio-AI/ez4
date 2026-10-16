@@ -18,9 +18,9 @@
     "generate:erd": "ez4 generate -- database:erd docs/"
   },
   "dependencies": {
-    "@ez4/aws-aurora": "^2.0.0",
-    "@ez4/docs-database": "^2.0.0",
-    "@ez4/database": "^2.0.0",
-    "@ez4/project": "^2.0.0"
+    "@ez4/aws-aurora": "^2.1.0",
+    "@ez4/docs-database": "^2.1.0",
+    "@ez4/database": "^2.1.0",
+    "@ez4/project": "^2.1.0"
   }
 }
