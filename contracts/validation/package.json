@@ -1,7 +1,7 @@
 {
   "name": "@ez4/validation",
   "description": "EZ4: Components to build validation services",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -53,14 +53,14 @@
     "live:publish": "npm run build && npm publish --access public"
   },
   "devDependencies": {
-    "@ez4/validation": "^2.1.0"
+    "@ez4/validation": "^2.2.0"
   },
   "dependencies": {
-    "@ez4/common": "^2.1.0",
-    "@ez4/project": "^2.1.0",
-    "@ez4/reflection": "^2.1.0",
-    "@ez4/schema": "^2.1.0",
-    "@ez4/utils": "^2.1.0",
-    "@ez4/validator": "^2.1.0"
+    "@ez4/common": "^2.2.0",
+    "@ez4/project": "^2.2.0",
+    "@ez4/reflection": "^2.2.0",
+    "@ez4/schema": "^2.2.0",
+    "@ez4/utils": "^2.2.0",
+    "@ez4/validator": "^2.2.0"
   }
 }

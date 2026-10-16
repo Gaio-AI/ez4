@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-email",
   "description": "EZ4: Self-managed AWS Simple Email Service provider",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -50,12 +50,12 @@
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1127.0",
-    "@ez4/aws-common": "^2.1.0",
-    "@ez4/aws-identity": "^2.1.0",
-    "@ez4/common": "^2.1.0",
-    "@ez4/email": "^2.1.0",
-    "@ez4/project": "^2.1.0",
-    "@ez4/state": "^2.1.0",
-    "@ez4/utils": "^2.1.0"
+    "@ez4/aws-common": "^2.2.0",
+    "@ez4/aws-identity": "^2.2.0",
+    "@ez4/common": "^2.2.0",
+    "@ez4/email": "^2.2.0",
+    "@ez4/project": "^2.2.0",
+    "@ez4/state": "^2.2.0",
+    "@ez4/utils": "^2.2.0"
   }
 }
