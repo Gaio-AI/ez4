@@ -196,8 +196,18 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    const first: AgentService = { ...createAgentService('AgentOne'), provider: AgentProvider.Claude, model: 'claude-3-7-sonnet', instructions: 'i' };
-    const second: AgentService = { ...createAgentService('AgentTwo'), provider: AgentProvider.Claude, model: 'claude-3-7-sonnet', instructions: 'i' };
+    const first: AgentService = {
+      ...createAgentService('AgentOne'),
+      provider: AgentProvider.Claude,
+      model: 'claude-3-7-sonnet',
+      instructions: 'i'
+    };
+    const second: AgentService = {
+      ...createAgentService('AgentTwo'),
+      provider: AgentProvider.Claude,
+      model: 'claude-3-7-sonnet',
+      instructions: 'i'
+    };
     const metadata = { AgentOne: first, AgentTwo: second };
 
     for (const service of [first, second]) {

@@ -23,7 +23,9 @@ export const enum WorkflowEventType {
 
 export type WorkflowEvent<I, A extends WorkflowAgents> =
   | { readonly type: WorkflowEventType.Start; readonly input: I }
-  | { [K in keyof A & string]: { readonly type: WorkflowEventType.Result; readonly agent: K; readonly result: Agent.Result<A[K]> } }[keyof A & string];
+  | {
+      [K in keyof A & string]: { readonly type: WorkflowEventType.Result; readonly agent: K; readonly result: Agent.Result<A[K]> };
+    }[keyof A & string];
 
 export type WorkflowNext<A extends WorkflowAgents> =
   | {

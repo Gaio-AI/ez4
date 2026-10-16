@@ -123,7 +123,13 @@ describe('agent resources wiring', () => {
 
   it('assert :: a new agent bundle or variable changes the task definition hash, so deploy registers a new revision', async () => {
     const deployWith = async (bundleHash: string, variables: Record<string, string>) => {
-      const agent = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i', variables } as never;
+      const agent = {
+        ...createAgentService('EchoAgent'),
+        provider: AgentProvider.Claude,
+        model: 'm',
+        instructions: 'i',
+        variables
+      } as never;
       const state: EntryStates = {};
       const context = makeContext();
       const bundle = async () => ({ file: '/tmp/echo.mjs', hash: bundleHash });
@@ -141,7 +147,13 @@ describe('agent resources wiring', () => {
   });
 
   it('assert :: the agent bundle and task variables include what linked services add after prepare', async () => {
-    const agent = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i', variables: {} } as AgentService;
+    const agent = {
+      ...createAgentService('EchoAgent'),
+      provider: AgentProvider.Claude,
+      model: 'm',
+      instructions: 'i',
+      variables: {}
+    } as AgentService;
     const state: EntryStates = {};
     const context = makeContext();
     await prepareAgentResources({ state, service: agent, metadata: { EchoAgent: agent }, options, context } as PrepareResourceEvent, ports);

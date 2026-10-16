@@ -170,10 +170,13 @@ describe('workflow :: step runtime', () => {
   it('assert :: failed agent result reaches the handler', async () => {
     const seen: string[] = [];
     const { run } = await harnessAfterStart();
-    await run({ type: WorkflowEventType.Result, result: { ...okResult('id-1', 'r1', 1), status: AgentResultStatus.Failed, output: undefined } }, async (request) => {
-      if (request.event.type === WorkflowEventType.Result) seen.push(request.event.result.status);
-      return { state: { rounds: 0 }, next: { complete: 'blocked' } };
-    });
+    await run(
+      { type: WorkflowEventType.Result, result: { ...okResult('id-1', 'r1', 1), status: AgentResultStatus.Failed, output: undefined } },
+      async (request) => {
+        if (request.event.type === WorkflowEventType.Result) seen.push(request.event.result.status);
+        return { state: { rounds: 0 }, next: { complete: 'blocked' } };
+      }
+    );
     deepEqual(seen, ['failed']);
   });
 
