@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { defaultGit } from '../src/workspace/git';
-import { checkoutWorkspace, publishWorkspace, refreshCache, withLock, type WorkspaceRuntime } from '../src/workspace/runtime';
+import { checkoutWorkspace, publishWorkspace, pushWorkspaceBranch, refreshCache, withLock, type WorkspaceRuntime } from '../src/workspace/runtime';
 
 const git = defaultGit;
 
@@ -160,6 +160,42 @@ describe('workspace :: runtime', () => {
     const request = await checkoutWorkspace(runtime, workdir);
     const [ref] = await publishWorkspace(runtime, request, 'Implement', 'inv-2');
     deepEqual(ref.changed, false);
+  });
+
+  it('assert :: push lands the published head on the branch and the next round fast-forwards it', async () => {
+    const { runtime, workdir, remote } = await setupWorkspace({ repos: ['api'] });
+    const remoteHead = async () =>
+      (await git(['rev-parse', 'refs/heads/agent/fix'], { cwd: join(remote, 'api.git') })).stdout.trim();
+
+    const first = await checkoutWorkspace(runtime, workdir);
+    await writeFile(join(first.repos.api.path, 'fix.txt'), 'fixed');
+    const firstRefs = await publishWorkspace(runtime, first, 'Implement', 'inv-1');
+    await pushWorkspaceBranch(runtime, first, firstRefs, 'api', 'agent/fix');
+    deepEqual(await remoteHead(), firstRefs[0].head);
+
+    const second = await checkoutWorkspace(runtime, await mkdtemp(join(tmpdir(), 'wd-')), firstRefs);
+    await writeFile(join(second.repos.api.path, 'fix.txt'), 'fixed again');
+    const secondRefs = await publishWorkspace(runtime, second, 'Implement', 'inv-2');
+    await pushWorkspaceBranch(runtime, second, secondRefs, 'api', 'agent/fix');
+    deepEqual(await remoteHead(), secondRefs[0].head);
+  });
+
+  it('assert :: push rejects a diverged branch, the workspace branch and an invalid name', async () => {
+    const { runtime, workdir, remote } = await setupWorkspace({ repos: ['api'] });
+    const first = await checkoutWorkspace(runtime, workdir);
+    await writeFile(join(first.repos.api.path, 'one.txt'), 'one');
+    await pushWorkspaceBranch(runtime, first, await publishWorkspace(runtime, first, 'Implement', 'inv-1'), 'api', 'agent/fix');
+
+    const other = await checkoutWorkspace(runtime, await mkdtemp(join(tmpdir(), 'wd-')));
+    await writeFile(join(other.repos.api.path, 'two.txt'), 'two');
+    const otherRefs = await publishWorkspace(runtime, other, 'Implement', 'inv-2');
+    await rejects(pushWorkspaceBranch(runtime, other, otherRefs, 'api', 'agent/fix'), /rejected|fetch first|non-fast-forward/);
+    await rejects(pushWorkspaceBranch(runtime, other, otherRefs, 'api', 'main'), /Refusing to push the workspace branch/);
+    await rejects(pushWorkspaceBranch(runtime, other, otherRefs, 'api', 'bad..name'), /Invalid branch name/);
+    await rejects(pushWorkspaceBranch(runtime, other, [], 'api', 'agent/other'), /has no published commit/);
+
+    const { stdout } = await git(['rev-parse', 'refs/heads/main'], { cwd: join(remote, 'api.git') });
+    notEqual(stdout.trim(), otherRefs[0].head);
   });
 
   it('assert :: token stays out of git config and errors', async () => {

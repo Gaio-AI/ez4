@@ -8,7 +8,7 @@ import { getJsonSchema } from '@ez4/agent/utils';
 import { validate, createValidatorContext, getErrorDetails } from '@ez4/validator';
 import { createArtifactsClient } from './artifacts';
 import { createTimeoutTimer } from './timer';
-import { checkoutWorkspace, publishWorkspace, type WorkspaceRuntime } from '../workspace/runtime';
+import { checkoutWorkspace, publishWorkspace, pushWorkspaceBranch, type WorkspaceRuntime } from '../workspace/runtime';
 
 export interface InvocationEnvelope {
   input: unknown;
@@ -181,6 +181,15 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     }
 
     if (finish) {
+      const refs = workspaceRefs ?? [];
+      const finishWorkspace: Agent.FinishWorkspace | undefined =
+        workspace && workspaceRequest
+          ? {
+              ...workspaceRequest,
+              refs,
+              push: (repo, branch) => pushWorkspaceBranch(workspace, workspaceRequest, refs, repo, branch)
+            }
+          : undefined;
       try {
         effectiveOutput = await finish(
           {
@@ -189,7 +198,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
             output: providerResponse.output,
             workdir: effectiveWorkdir,
             artifacts,
-            workspace: workspaceRequest ? { ...workspaceRequest, refs: workspaceRefs ?? [] } : undefined
+            workspace: finishWorkspace
           },
           context as CommonService.Context<Agent.Service<any, any>>
         );

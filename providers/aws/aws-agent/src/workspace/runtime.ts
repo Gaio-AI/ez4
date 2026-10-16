@@ -363,3 +363,40 @@ export const publishWorkspace = async (
 
   return publishedRefs;
 };
+
+/**
+ * Pushes the commit published for `repoName` to `branch` on the repository remote. Plain push, so only a
+ * fast-forward lands; the branch the workspace checks out is refused.
+ */
+export const pushWorkspaceBranch = async (
+  runtime: WorkspaceRuntime,
+  request: Agent.WorkspaceRequest,
+  refs: Agent.WorkspaceRef[],
+  repoName: string,
+  branch: string
+): Promise<void> => {
+  const repo = runtime.workspace.repos.find(({ name }) => name === repoName);
+  const repoDir = request.repos[repoName]?.path;
+  const ref = refs.find((entry) => entry.repo === repoName);
+
+  if (!repo || !repoDir) throw new Error(`Repository '${repoName}' is not in the workspace`);
+  if (!ref) throw new Error(`Repository '${repoName}' has no published commit`);
+
+  const git = runtime.git ?? defaultGit;
+  const formatResult = await git(['check-ref-format', '--branch', branch], { cwd: repoDir });
+
+  if (formatResult.exitCode !== 0 || formatResult.stdout.trim() !== branch) {
+    throw new Error(`Invalid branch name '${branch}'`);
+  }
+  if (branch === (repo.branch || 'main')) {
+    throw new Error(`Refusing to push the workspace branch '${branch}' of '${repoName}'`);
+  }
+
+  const token = runtime.token ? await runtime.token() : undefined;
+  const env = token ? authEnv(repo.url, token) : undefined;
+  const pushResult = await git(['push', repo.url, `${ref.head}:refs/heads/${branch}`], { cwd: repoDir, env });
+
+  if (pushResult.exitCode !== 0) {
+    throw new Error(redact(pushResult.stderr || pushResult.stdout || 'git push failed', token));
+  }
+};

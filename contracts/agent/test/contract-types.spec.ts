@@ -23,7 +23,8 @@ const prepareWorkspace: Agent.PrepareRequest<{ task: string }>['workspace'] = {
 };
 const finishWorkspace: Agent.FinishRequest<{ task: string }, { done: boolean }>['workspace'] = {
   ...prepareWorkspace!,
-  refs: options.workspace!
+  refs: options.workspace!,
+  push: async () => {}
 };
 void resultWorkspace;
 void finishWorkspace;

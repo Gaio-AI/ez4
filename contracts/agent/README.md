@@ -101,6 +101,14 @@ export declare class ReviewAgent extends Agent.Service<ReviewInput, ReviewOutput
 
 Repository names default to the URL's last path segment without `.git`; branches default to `main`. Names must be unique. Authentication accepts either a GitHub App, whose `appId`, `installationId` and `privateKey` usually come from environment variables, or `{ token: 'secret-name:jsonKey' }`. A caller can pass `Agent.WorkspaceRef[]` through `invoke` options, and hooks receive the repository paths and base commits in `request.workspace`. The finish hook also receives `refs`, which appear on `Agent.Result.workspace`.
 
+The finish hook can publish a commit outside the workspace with `request.workspace.push(repo, branch)`. It pushes the commit published for `repo` to `branch` on the repository remote. The push uses the workspace credentials, which the model never sees. Only fast-forwards land, and the branch the workspace checks out is refused:
+
+```ts
+for (const ref of request.workspace?.refs ?? []) {
+  if (ref.changed) await request.workspace?.push(ref.repo, `agent/${request.id}`);
+}
+```
+
 #### Lifecycle hooks
 
 Agents support optional `prepare` and `finish` hooks for workspace initialization, prompt formatting, and result shaping:

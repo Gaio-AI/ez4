@@ -6,6 +6,7 @@ import type {
   PrepareRequest as HookPrepareRequest,
   PrepareResult as HookPrepareResult,
   FinishRequest as HookFinishRequest,
+  FinishWorkspace as HookFinishWorkspace,
   PrepareHook as HookPrepareHook,
   FinishHook as HookFinishHook
 } from './hooks';
@@ -135,6 +136,7 @@ export namespace Agent {
   export type PrepareRequest<I> = HookPrepareRequest<I>;
   export type PrepareResult = HookPrepareResult;
   export type FinishRequest<I, O> = HookFinishRequest<I, O>;
+  export type FinishWorkspace = HookFinishWorkspace;
 
   export type PrepareHook<I = unknown> = HookPrepareHook<I>;
   export type FinishHook<I = unknown, O = unknown> = HookFinishHook<I, O>;
