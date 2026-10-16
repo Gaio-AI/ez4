@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-vpc",
   "description": "EZ4: Self-managed AWS VPC provider",
-  "version": "1.10.1",
+  "version": "2.0.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.1127.0",
-    "@ez4/aws-common": "^1.10.0",
-    "@ez4/project": "^1.10.0"
+    "@ez4/aws-common": "^2.0.0",
+    "@ez4/project": "^2.0.0"
   }
 }
