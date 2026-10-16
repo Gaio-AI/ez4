@@ -2,6 +2,7 @@ import type { Agent } from '@ez4/agent';
 import type { ObjectSchema } from '@ez4/schema';
 import type { AgentStorage } from './storage';
 import type { AgentProvider } from './types';
+import * as http from 'node:http';
 import { runAgentRuntime } from './main';
 import { createS3Storage } from './storage';
 import { AgentProviders } from './providers/index';
@@ -26,8 +27,16 @@ export class MissingAgentEnvironmentError extends Error {
   }
 }
 
+/**
+ * Node reads `NODE_USE_ENV_PROXY` once, when it starts, so the variables set after that only reach the processes
+ * this one spawns. `setGlobalProxyFromEnv` (Node 24.14 and later) makes the `fetch` of this process read them now.
+ */
+const enableProxyInProcess = () => {
+  (http as { setGlobalProxyFromEnv?: () => void }).setGlobalProxyFromEnv?.();
+};
+
 /** Points HTTP clients (the provider CLI and its tools) at the egress proxy, authenticated as this agent. */
-export const applyProxyEnvironment = (env: Record<string, string | undefined>) => {
+export const applyProxyEnvironment = (env: Record<string, string | undefined>, enableProxy = enableProxyInProcess) => {
   const proxyUrl = env.EZ4_AGENT_PROXY_URL;
   const password = env.EZ4_AGENT_PROXY_PASSWORD;
   const agentName = env.EZ4_AGENT_NAME;
@@ -39,6 +48,7 @@ export const applyProxyEnvironment = (env: Record<string, string | undefined>) =
   env.HTTPS_PROXY = env.HTTP_PROXY = env.https_proxy = env.http_proxy = value;
   env.NODE_USE_ENV_PROXY = '1';
   delete env.EZ4_AGENT_PROXY_PASSWORD;
+  enableProxy();
 };
 
 const required = (env: Record<string, string | undefined>, name: string) => {
