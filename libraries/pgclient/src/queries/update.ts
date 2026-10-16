@@ -7,7 +7,7 @@ import type { InternalTableMetadata } from '../types/table';
 
 import { InvalidAtomicOperation, InvalidFieldSchemaError, InvalidRelationFieldError, MissingPrimaryIndexError } from '@ez4/pgclient';
 import { getOptionalSchema, getSchemaProperty, isNumberSchema, isObjectSchema, isUnionSchema } from '@ez4/schema';
-import { isAnyObject, isEmptyObject, isNullish } from '@ez4/utils';
+import { isAnyNumber, isAnyObject, isEmptyObject, isNullish } from '@ez4/utils';
 import { SqlSelectStatement, escapeSqlName, mergeSqlAlias } from '@ez4/pgsql';
 import { Index, Order } from '@ez4/database';
 
@@ -82,6 +82,24 @@ export const prepareUpdateQuery = async <T extends InternalTableMetadata, S exte
     }
   }
 
+  const take = 'take' in input && isAnyNumber(input.take) ? input.take : undefined;
+
+  let keyQuery: SqlSelectStatement | undefined;
+
+  if (take !== undefined) {
+    if (updateQuery instanceof SqlSelectStatement) {
+      updateQuery.take(take);
+    } else if (previousQuery) {
+      previousQuery.take(take);
+    } else {
+      keyQuery = prepareKeyQuery(builder, table, schema, relations, input.where, options?.primaryKey).take(take);
+
+      updateQuery.from(keyQuery.reference()).as('U');
+
+      queries.push(keyQuery);
+    }
+  }
+
   const postUpdateQueries = await preparePostUpdateRelations(builder, input.data, relations, updateQuery, table);
 
   queries.push(updateQuery, ...postUpdateQueries);
@@ -89,17 +107,23 @@ export const prepareUpdateQuery = async <T extends InternalTableMetadata, S exte
   // The update writes the records the previous query locked, and no other, so they are the ones reported.
   if (previousQuery) {
     updateQuery.where(getPreviousKeyFilters(previousQuery, options?.primaryKey ?? []));
+  } else if (keyQuery) {
+    // The filters apply again to the records of the page, so one that another update changed meanwhile and no
+    // longer matches is left alone.
+    const filters = input.where ? [getSelectFilters(builder, input.where, relations, updateQuery, table)] : [];
+
+    updateQuery.where({ AND: [...filters, getPreviousKeyFilters(keyQuery, options?.primaryKey ?? [])] });
   } else if (input.where) {
     updateQuery.where(getSelectFilters(builder, input.where, relations, updateQuery, table));
   }
 
   if (input.select && (postUpdateQueries.length > 0 || previousQuery)) {
-    const [firstQuery] = queries;
+    const resultQuery = previousQuery ?? updateQuery;
 
     queries.push(
       builder
         .select()
-        .from(firstQuery.reference())
+        .from(resultQuery.reference())
         .columns(...columns)
     );
   }
@@ -450,15 +474,42 @@ const preparePreviousQuery = <T extends InternalTableMetadata, S extends Query.S
   // record another update changed meanwhile is read again, or left out when it no longer matches.
   previousQuery.record(selectFields).order(getKeyOrder(primaryKey)).lock();
 
-  // The key is read unformatted under an alias of its own, so the update joins on the column type.
-  primaryKey.forEach((column, index) => {
-    previousQuery.rawColumn((source) => mergeSqlAlias(escapeSqlName(column), source?.alias), getKeyAlias(index));
-  });
+  addKeyColumns(previousQuery, primaryKey);
 
   return previousQuery;
 };
 
-const getPreviousKeyFilters = (previousQuery: SqlSelectStatement, primaryKey: string[]) => {
+export const prepareKeyQuery = (
+  builder: SqlBuilder,
+  table: string,
+  schema: ObjectSchema,
+  relations: PgRelationRepositoryWithSchema,
+  where: SqlFilters | undefined,
+  primaryKey: string[] | undefined
+) => {
+  if (!primaryKey?.length) {
+    throw new MissingPrimaryIndexError(table);
+  }
+
+  const keyQuery = builder.select(schema).from(table).as(builder.alias('R'));
+
+  if (where) {
+    keyQuery.where(getSelectFilters(builder, where, relations, keyQuery, table));
+  }
+
+  addKeyColumns(keyQuery, primaryKey);
+
+  return keyQuery;
+};
+
+// The key is read unformatted under an alias of its own, so the statement joins on the column type.
+const addKeyColumns = (query: SqlSelectStatement, primaryKey: string[]) => {
+  primaryKey.forEach((column, index) => {
+    query.rawColumn((source) => mergeSqlAlias(escapeSqlName(column), source?.alias), getKeyAlias(index));
+  });
+};
+
+export const getPreviousKeyFilters = (previousQuery: SqlSelectStatement, primaryKey: string[]) => {
   const filters: SqlFilters = {};
 
   primaryKey.forEach((column, index) => {
@@ -488,7 +539,7 @@ const getKeyFields = (primaryKey: string[]) => {
   return fields;
 };
 
-const getKeyAlias = (index: number) => {
+export const getKeyAlias = (index: number) => {
   return `__EZ4_KEY_${index}`;
 };
 

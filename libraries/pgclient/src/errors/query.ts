@@ -6,7 +6,7 @@ export class MissingUniqueIndexError extends Error {
 
 export class MissingPrimaryIndexError extends Error {
   constructor(public table: string) {
-    super(`Table '${table}' needs a primary index to select the records as they were before an update.`);
+    super(`Table '${table}' has no primary index, which the operation needs to tell its records apart.`);
   }
 }
 

@@ -4,6 +4,7 @@ import type { PgRelationRepositoryWithSchema } from '../types/repository';
 import type { InternalTableMetadata } from '../types/table';
 import type { PgClientDriver } from '../types/driver';
 import type { UpdateQueryOptions } from './update';
+import type { DeleteQueryOptions } from './delete';
 import type { PgAggregateInput } from './aggregate';
 
 import { createQueryBuilder } from './utils/builder';
@@ -102,9 +103,9 @@ export const prepareDeleteOne = <T extends InternalTableMetadata, S extends Quer
 ) => {
   const builder = createQueryBuilder(driver);
 
-  const { query, columns } = prepareDeleteQuery(builder, table, schema, relations, input);
+  const { queries, columns } = prepareDeleteQuery(builder, table, schema, relations, input);
 
-  const [statement, variables] = query.build();
+  const [statement, variables] = builder.with(queries).build();
 
   return {
     query: statement,
@@ -206,13 +207,14 @@ export const prepareDeleteMany = <T extends InternalTableMetadata, S extends Que
   schema: ObjectSchema,
   relations: PgRelationRepositoryWithSchema,
   driver: PgClientDriver,
-  input: Query.DeleteManyInput<S, T>
+  input: Query.DeleteManyInput<S, T>,
+  options?: DeleteQueryOptions
 ) => {
   const builder = createQueryBuilder(driver);
 
-  const { query, columns } = prepareDeleteQuery(builder, table, schema, relations, input);
+  const { queries, columns } = prepareDeleteQuery(builder, table, schema, relations, input, options);
 
-  const [statement, variables] = query.build();
+  const [statement, variables] = builder.with(queries).build();
 
   return {
     query: statement,

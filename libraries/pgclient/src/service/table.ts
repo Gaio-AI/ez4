@@ -250,7 +250,9 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   async deleteMany<S extends Query.SelectInput<T>>(query: Query.DeleteManyInput<S, T>) {
-    const statement = prepareDeleteMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = prepareDeleteMany(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryKey: this.primaryKey
+    });
 
     const { records } = await this.sendStatement(statement);
 
