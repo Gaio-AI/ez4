@@ -123,8 +123,9 @@ export interface Table<T extends TableMetadata> {
    * Insert multiple records into the database.
    *
    * @param query Input query.
+   * @returns Returns the inserted records when `select` is given (with `skipDuplicates`, only the ones inserted).
    */
-  insertMany(query: Query.InsertManyInput<T>): Promise<Query.InsertManyResult>;
+  insertMany<S extends Query.InsertManySelectInput<T>>(query: Query.InsertManyInput<S, T>): Promise<Query.InsertManyResult<S, T>>;
 
   /**
    * Find multiple database records.

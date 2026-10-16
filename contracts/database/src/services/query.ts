@@ -58,9 +58,22 @@ export namespace Query {
     where: WhereInput<T, true>;
   };
 
-  export type InsertManyInput<T extends TableMetadata> = {
+  export type InsertManyInput<S extends AnyObject, T extends TableMetadata> = {
+    select?: StrictObject<S, T['schema']>;
+    skipDuplicates?: SkipDuplicatesInput;
     data: Prettify<T['schema']>[];
   };
+
+  /**
+   * When `true`, a record that conflicts with an existing one on any unique index (primary included) is skipped
+   * instead of failing the insert.
+   */
+  export type SkipDuplicatesInput = boolean;
+
+  /**
+   * Fields `insertMany` returns, from the table schema alone.
+   */
+  export type InsertManySelectInput<T extends TableMetadata> = PartialProperties<T['schema']>;
 
   export type UpdateManyInput<S extends AnyObject, T extends TableMetadata> = PaginationModeUtils.End<T['engine']> & {
     lock?: LockModeUtils.Input<T>;
@@ -123,7 +136,7 @@ export namespace Query {
 
   export type UpdateManyResult<S extends AnyObject, T extends TableMetadata> = SelectInput<T> extends S ? void : Record<S, T>[];
 
-  export type InsertManyResult = void;
+  export type InsertManyResult<S extends AnyObject, T extends TableMetadata> = InsertManySelectInput<T> extends S ? void : Record<S, T>[];
 
   export type FindManyResult<S extends AnyObject, C extends boolean, T extends TableMetadata> =
     IsTrue<C> extends true ? FindManyResultTotal<S, T> : FindManyResultOnly<S, T>;

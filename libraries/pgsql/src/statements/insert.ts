@@ -7,7 +7,7 @@ import type { SqlFilters, SqlRecord } from '../common/types';
 
 import { getFields, getValues } from '../utils/column';
 import { escapeSqlName, escapeSqlNames } from '../utils/escape';
-import { MissingTableNameError } from '../errors/statements';
+import { EmptyRecordError, MissingTableNameError, MultipleRecordsError } from '../errors/statements';
 import { InvalidWhereClauseError } from '../errors/clauses';
 import { SqlReturningClause } from '../clauses/query/returning';
 import { SqlConflictClause } from '../clauses/query/conflict';
@@ -33,7 +33,7 @@ export class SqlInsertStatement extends SqlSource {
     sources?: (SqlTableReference | SqlSelectStatement)[];
     where?: SqlWhereClause;
     schema?: ObjectSchema;
-    record?: SqlRecord;
+    records: SqlRecord[];
     building: boolean;
     table?: string;
     alias?: string;
@@ -44,6 +44,7 @@ export class SqlInsertStatement extends SqlSource {
 
     this.#state = {
       building: false,
+      records: [],
       references,
       options,
       schema
@@ -51,11 +52,17 @@ export class SqlInsertStatement extends SqlSource {
   }
 
   get fields() {
-    return this.#state.record ? getFields(this.#state.record) : [];
+    const fields = new Set<string>();
+
+    for (const record of this.#state.records) {
+      getFields(record).forEach((field) => fields.add(field));
+    }
+
+    return [...fields];
   }
 
   get values() {
-    return this.#state.record ? getValues(this.#state.record) : [];
+    return this.#state.records.flatMap((record) => getValues(record));
   }
 
   get filters() {
@@ -98,7 +105,12 @@ export class SqlInsertStatement extends SqlSource {
   }
 
   record(record: SqlRecord) {
-    this.#state.record = record;
+    this.#state.records = [record];
+    return this;
+  }
+
+  records(records: SqlRecord[]) {
+    this.#state.records = records;
     return this;
   }
 
@@ -126,20 +138,33 @@ export class SqlInsertStatement extends SqlSource {
     return this as SqlInsertStatement & SqlSourceWithResults;
   }
 
-  conflict(columns: string[], record?: SqlRecord) {
+  /**
+   * Set the `ON CONFLICT` clause.
+   *
+   * @param columns Conflict target, without it any unique violation skips the record.
+   * @param record Update applied to the existing record, without it the record is skipped.
+   * @param filters Filters the existing record must match to be updated.
+   */
+  conflict(columns?: string[], record?: SqlRecord, filters?: SqlFilters) {
     const { conflict, schema, references, options } = this.#state;
 
     if (!conflict) {
-      this.#state.conflict = new SqlConflictClause(this, schema, references, options, columns, record);
-    } else if (record) {
-      conflict.apply(record);
+      this.#state.conflict = new SqlConflictClause(this, schema, references, options, columns, record, filters);
+    } else {
+      if (record) {
+        conflict.apply(record);
+      }
+
+      if (filters) {
+        conflict.where(filters);
+      }
     }
 
     return this;
   }
 
   build(): [string, unknown[]] {
-    const { table, alias, references, options, record, schema, sources, where, returning, conflict } = this.#state;
+    const { table, alias, references, options, records, schema, sources, where, returning, conflict } = this.#state;
 
     if (!table) {
       throw new MissingTableNameError();
@@ -155,17 +180,28 @@ export class SqlInsertStatement extends SqlSource {
         statement.push('AS', escapeSqlName(alias));
       }
 
-      const columns = escapeSqlNames(this.fields);
+      const fields = this.fields;
 
-      statement.push(columns.length ? `(${columns})` : 'DEFAULT');
+      // Records without columns insert the default values, which is one row per statement.
+      if (records.length > 1 && !fields.length) {
+        throw new EmptyRecordError();
+      }
 
-      const values = getValueReferences(this, record ?? {}, schema, {
+      statement.push(fields.length ? `(${escapeSqlNames(fields)})` : 'DEFAULT');
+
+      const context = {
         variables,
         references,
         options
-      });
+      };
 
       if (sources) {
+        if (records.length > 1) {
+          throw new MultipleRecordsError();
+        }
+
+        const values = getValueReferences(this, records[0] ?? {}, fields, schema, context);
+
         const [tableExpressions, tableVariables] = getSelectExpressions(this, references, sources);
 
         statement.push('SELECT', values);
@@ -188,8 +224,10 @@ export class SqlInsertStatement extends SqlSource {
       } else {
         statement.push('VALUES');
 
-        if (values.length) {
-          statement.push(`(${values})`);
+        if (fields.length) {
+          const rows = records.map((record) => `(${getValueReferences(this, record, fields, schema, context)})`);
+
+          statement.push(rows.join(', '));
         }
 
         if (where) {
@@ -218,15 +256,23 @@ export class SqlInsertStatement extends SqlSource {
   }
 }
 
-const getValueReferences = (source: SqlSource, record: SqlRecord, schema: ObjectSchema | undefined, context: SqlInsertContext): string => {
+const getValueReferences = (
+  source: SqlSource,
+  record: SqlRecord,
+  fields: string[],
+  schema: ObjectSchema | undefined,
+  context: SqlInsertContext
+): string => {
   const { variables, references, options } = context;
 
   const results = [];
 
-  for (const fieldName in record) {
+  for (const fieldName of fields) {
     const value = record[fieldName];
 
+    // A column another record sets takes its default in this one.
     if (value === undefined) {
+      results.push('DEFAULT');
       continue;
     }
 

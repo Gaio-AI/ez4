@@ -146,7 +146,7 @@ const selectsRelation = (select: AnyObject, relations: PgRelationRepositoryWithS
   return Object.keys(select).some((fieldKey) => select[fieldKey] && relations[`${table}.${fieldKey}`]);
 };
 
-const rewritesOtherTables = (data: SqlRecord, relations: PgRelationRepositoryWithSchema, table: string) => {
+export const rewritesOtherTables = (data: SqlRecord, relations: PgRelationRepositoryWithSchema, table: string) => {
   return Object.values(relations).some((fieldRelation) => {
     const fieldValue = fieldRelation.targetTable === table ? data[fieldRelation.targetAlias] : undefined;
 

@@ -1,13 +1,13 @@
-import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import type { DynamoDBDocumentClient, ExecuteStatementCommandInput } from '@aws-sdk/lib-dynamodb';
 import type { Table as DbTable, Query } from '@ez4/database';
 import type { ObjectSchema } from '@ez4/schema';
 import type { AnyObject } from '@ez4/utils';
 import type { InternalTableMetadata } from './types';
 
-import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
+import { ConditionalCheckFailedException, TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 
 import { getTransformedRecords } from '../client';
-import { executeStatement, executeTransaction } from './common/client';
+import { executeStatement, executeTransaction, logQueryError, TRANSACTION_BATCH_SIZE } from './common/client';
 import { isDuplicateItemError } from './utils/errors';
 import { UnsupportedAggregateError } from './errors';
 
@@ -146,12 +146,95 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     } as Query.UpsertOneResult<S, T>;
   }
 
-  async insertMany(query: Query.InsertManyInput<T>) {
+  async insertMany<S extends Query.InsertManySelectInput<T>>(query: Query.InsertManyInput<S, T>) {
     const { client, debug } = this.settings;
 
-    const transactions = await prepareInsertMany(this.name, this.schema, this.indexes, query);
+    const [transactions, records] = await prepareInsertMany(this.name, this.schema, this.indexes, query);
 
-    await executeTransaction(client, transactions, debug);
+    let insertedRecords = records;
+
+    if (query.skipDuplicates) {
+      insertedRecords = await this.insertSkippingDuplicates(transactions, records);
+    } else {
+      await executeTransaction(client, transactions, debug);
+    }
+
+    if (!query.select) {
+      return undefined as Query.InsertManyResult<S, T>;
+    }
+
+    // A transaction returns no items, and the items written are the ones sent.
+    return getTransformedRecords(insertedRecords, this.schema, query.select) as Query.InsertManyResult<S, T>;
+  }
+
+  // A transaction fails whole on an item that already exists, so the failed items that exist are left out and the
+  // others are sent again.
+  private async insertSkippingDuplicates(transactions: ExecuteStatementCommandInput[], records: AnyObject[]) {
+    const { client, debug } = this.settings;
+
+    const insertedRecords: AnyObject[] = [];
+
+    for (let offset = 0; offset < transactions.length; offset += TRANSACTION_BATCH_SIZE) {
+      let pending = transactions.slice(offset, offset + TRANSACTION_BATCH_SIZE).map((transaction, index) => {
+        return [transaction, records[offset + index]] as const;
+      });
+
+      while (pending.length) {
+        try {
+          await executeTransaction(
+            client,
+            pending.map(([transaction]) => transaction),
+            debug,
+            true
+          );
+
+          insertedRecords.push(...pending.map(([, record]) => record));
+          break;
+        } catch (error) {
+          const duplicates = await this.getExistingRecords(
+            error,
+            pending.map(([, record]) => record)
+          );
+
+          if (!duplicates.size) {
+            pending.forEach(([transaction]) => logQueryError(transaction, true));
+            throw error;
+          }
+
+          pending = pending.filter((_, index) => !duplicates.has(index));
+        }
+      }
+    }
+
+    return insertedRecords;
+  }
+
+  private async getExistingRecords(error: unknown, records: AnyObject[]) {
+    if (!(error instanceof TransactionCanceledException) || !error.CancellationReasons) {
+      return new Set<number>();
+    }
+
+    const failedIndexes = error.CancellationReasons.flatMap(({ Code }, index) => (Code && Code !== 'None' ? [index] : []));
+
+    const [[partitionKey, sortKey]] = this.indexes;
+
+    const existing = await Promise.all(
+      failedIndexes.map((index) => {
+        const record = records[index];
+
+        return this.findOne({
+          select: {
+            [partitionKey]: true
+          } as Query.StrictSelectInput<Query.SelectInput<T>, T>,
+          where: {
+            ...(sortKey && { [sortKey]: record[sortKey] }),
+            [partitionKey]: record[partitionKey]
+          } as Query.WhereInput<T, true>
+        });
+      })
+    );
+
+    return new Set(failedIndexes.filter((_, index) => !!existing[index]));
   }
 
   async updateMany<S extends Query.SelectInput<T>>(query: Query.UpdateManyInput<S, T>) {

@@ -211,6 +211,18 @@ export const testInsert = async ({ selfClient }: Service.Context<TestDatabase>) 
       }
     }
   });
+
+  // Insert many selects the table fields alone
+  await selfClient.tableB.insertMany({
+    select: {
+      id: true,
+      // @ts-expect-error Relations aren't selectable on insert many.
+      relation_a: {
+        value_a: true
+      }
+    },
+    data: []
+  });
 };
 
 export const testUpdate = async (client: TestDatabase['client']) => {

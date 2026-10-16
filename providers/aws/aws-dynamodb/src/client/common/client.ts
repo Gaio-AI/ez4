@@ -67,9 +67,16 @@ export const executeStatement = async (
   }
 };
 
-export const executeTransaction = async (client: DynamoDBDocumentClient, statements: ExecuteStatementCommandInput[], debug?: boolean) => {
+export const TRANSACTION_BATCH_SIZE = 100;
+
+export const executeTransaction = async (
+  client: DynamoDBDocumentClient,
+  statements: ExecuteStatementCommandInput[],
+  debug?: boolean,
+  noErrorLog?: boolean
+) => {
   const maxLength = statements.length;
-  const batchSize = 100;
+  const batchSize = TRANSACTION_BATCH_SIZE;
 
   for (let offset = 0; offset < maxLength; offset += batchSize) {
     const commandList = statements.slice(offset, offset + batchSize);
@@ -87,7 +94,9 @@ export const executeTransaction = async (client: DynamoDBDocumentClient, stateme
         commandList.forEach((command) => logQuerySuccess(command, consumption, true));
       }
     } catch (error) {
-      commandList.forEach((command) => logQueryError(command, true));
+      if (!noErrorLog) {
+        commandList.forEach((command) => logQueryError(command, true));
+      }
 
       throw error;
     }
@@ -111,7 +120,7 @@ const logQuerySuccess = (input: ExecuteStatementCommandInput, consumption: Consu
   });
 };
 
-const logQueryError = (input: ExecuteStatementCommandInput, transaction?: boolean) => {
+export const logQueryError = (input: ExecuteStatementCommandInput, transaction?: boolean) => {
   const parameters = getDebugParameters(input);
 
   console.error({
