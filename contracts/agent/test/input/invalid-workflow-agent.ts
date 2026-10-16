@@ -10,6 +10,7 @@ export declare class InvalidWorkflowAgent extends Agent.Workflow<
   { worker: BasicAgent; ghost: NotAnAgent }
 > {
   input: { issueId: string };
+  state: { round: number };
   agents: {
     worker: BasicAgent;
     ghost: NotAnAgent;

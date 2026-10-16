@@ -3,6 +3,7 @@ import type { BasicAgent } from './output-basic-agent';
 
 export declare class InvalidWorkflowSteps extends Agent.Workflow<{ issueId: string }, { round: number }, { worker: BasicAgent }> {
   input: { issueId: string };
+  state: { round: number };
   agents: {
     worker: BasicAgent;
   };

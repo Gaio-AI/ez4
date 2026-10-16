@@ -176,7 +176,7 @@ export namespace Agent {
   }
 
   export abstract class Workflow<I extends Input, S, A extends WorkflowAgents = WorkflowAgents> implements CommonService.Provider {
-    declare private readonly __state: S;
+    abstract readonly state: S;
     abstract readonly input: I;
     abstract readonly agents: A;
     abstract readonly handler: WorkflowHandler<Workflow<I, S, A>>;

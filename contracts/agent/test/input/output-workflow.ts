@@ -3,6 +3,7 @@ import type { BasicAgent } from './output-basic-agent';
 
 export declare class ReviewLoop extends Agent.Workflow<{ issueId: string }, { round: number }, { worker: BasicAgent }> {
   input: { issueId: string };
+  state: { round: number };
   agents: { worker: BasicAgent };
   maxSteps: 4;
   handler: typeof reviewLoopStep;

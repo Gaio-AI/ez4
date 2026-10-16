@@ -14,7 +14,7 @@ Introduce autonomous Agent contract with AWS ECS Fargate execution provider:
 
 - Declarative `Agent.Service` contract with schema reflection, typed hooks, resource bounds, and egress allowlists.
 - Contract values exported as enums: `AgentProvider`, `ClaudeModel`, `ClaudeTool`, `AgentToolsMode`, `AgentResultStatus`, `AgentErrorCode`, `WorkflowEventType` and `WorkflowRunStatus`. Hooks take `(request, context)` like other ez4 handlers.
-- Declarative `Agent.Workflow` state machines orchestrating multi-step execution flows across agents with typed step transitions, step limits, and start/result event processing.
+- Declarative `Agent.Workflow` state machines orchestrating multi-step execution flows across agents with typed step transitions, step limits, and start/result event processing; a workflow declares its `state` type next to `input`, so handlers read a typed state.
 - Shared `Agent.Workspace` git repositories cached on Amazon EFS with branch/commit handoff via custom refs (`refs/ez4/<agent>/<invocationId>`) and GitHub App or token authentication.
 - Isolated AWS Fargate task execution with per-agent task IAM roles, granting `AgentPermission` read access only to the resources an agent names within its deploy prefix, and `CodeArtifactRead` package installs from named `<domain>/<repository>` account repositories.
 - Egress network proxy using Squid and Cloud Map private DNS (`<base>.local`) enforcing per-agent domain allowlists: provider, workspace and permission hosts are allowed automatically, `egress` adds the rest.

@@ -131,6 +131,7 @@ Multi-step agent collaboration is declared using `Agent.Workflow`. Workflows coo
 ```typescript
 export declare class ReviewWorkflow extends Agent.Workflow<{ pullRequest: number }, { status: string }, { review: CodeReviewAgent }> {
   input: { pullRequest: number };
+  state: { status: string };
   agents: { review: CodeReviewAgent };
   maxSteps: 5;
   handler: typeof reviewStep;

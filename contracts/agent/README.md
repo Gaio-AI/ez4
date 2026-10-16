@@ -178,6 +178,7 @@ export interface WorkflowState {
 
 export declare class ReviewWorkflow extends Agent.Workflow<{ pullRequest: number }, WorkflowState, { review: CodeReviewAgent }> {
   input: { pullRequest: number };
+  state: WorkflowState;
   agents: { review: CodeReviewAgent };
   maxSteps: 5;
   handler: typeof reviewStep;
@@ -214,7 +215,7 @@ const { runId } = await reviewWorkflow.start({ pullRequest: 42 });
 
 // Check run status
 const run = await reviewWorkflow.status(runId);
-if (run?.status === 'completed') {
+if (run?.status === WorkflowRunStatus.Completed) {
   console.log('Workflow outcome:', run.outcome, run.state);
 }
 ```

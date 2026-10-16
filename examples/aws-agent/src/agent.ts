@@ -41,6 +41,7 @@ export async function prepareEcho(request: Agent.PrepareRequest<EchoInput>, cont
 
 export declare class EchoFlow extends Agent.Workflow<{ text: string }, { echoes: number }, { echo: EchoAgent }> {
   input: { text: string };
+  state: { echoes: number };
   agents: { echo: EchoAgent };
   maxSteps: 2;
   handler: typeof echoStep;
@@ -95,6 +96,7 @@ export declare class LogsAgent extends Agent.Service<LogsInput, LogsOutput> {
 
 export declare class LogsFlow extends Agent.Workflow<LogsInput, { reads: number }, { logs: LogsAgent }> {
   input: LogsInput;
+  state: { reads: number };
   agents: { logs: LogsAgent };
   maxSteps: 2;
   handler: typeof logsStep;
