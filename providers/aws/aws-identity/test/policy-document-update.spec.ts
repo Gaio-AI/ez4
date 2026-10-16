@@ -134,4 +134,87 @@ describe('policy document deploy-time update detection', () => {
     const preview = await handler.preview(candidate, current, { force: false });
     equal(preview, undefined);
   });
+
+  describe('when the plan can resolve the document', () => {
+    const makeCurrent = (): PolicyState => ({
+      type: PolicyServiceType,
+      entryId: 'policy-1',
+      dependencies: ['dep-1'],
+      parameters: {
+        policyName: 'test-policy',
+        policyDocument: baseDocument
+      },
+      result: {
+        policyArn: 'arn:aws:iam::123456789012:policy/test-policy',
+        currentVersion: 'v1',
+        resolvedDocument: updatedDocument,
+        versionHistory: ['v1']
+      }
+    });
+
+    const makeCandidate = (getPolicyDocument: PolicyParameters['getPolicyDocument']): PolicyState => ({
+      type: PolicyServiceType,
+      entryId: 'policy-1',
+      dependencies: ['dep-1'],
+      parameters: {
+        policyName: 'test-policy',
+        policyDocument: baseDocument,
+        getPolicyDocument
+      }
+    });
+
+    const options = { force: false, getDependencies: () => [] };
+
+    it('skips the preview update when the resolved document is the stored one', async () => {
+      const preview = await getPolicyHandler().preview(
+        makeCandidate(() => updatedDocument),
+        makeCurrent(),
+        options
+      );
+
+      equal(preview, undefined);
+    });
+
+    it('previews the document change when the resolved document differs from the stored one', async () => {
+      const preview = await getPolicyHandler().preview(
+        makeCandidate(() => getPolicyDocument('AllowEFS3')),
+        makeCurrent(),
+        options
+      );
+
+      ok(preview);
+      ok(preview.counts >= 1);
+      ok(preview.nested?.policyDocument);
+    });
+
+    it('hands the plan dependencies to getPolicyDocument', async () => {
+      const dependencies = [{ result: { fileSystemArn: 'arn:aws:efs:fs-3333' } }];
+
+      let seen: unknown;
+
+      await getPolicyHandler().preview(
+        makeCandidate((context) => {
+          seen = context.getDependencies();
+
+          return updatedDocument;
+        }),
+        makeCurrent(),
+        { force: false, getDependencies: () => dependencies as never }
+      );
+
+      equal(seen, dependencies);
+    });
+
+    it('previews an update when the document cannot be resolved yet', async () => {
+      const candidate = makeCandidate(() => {
+        throw new Error('Workspace file system or access point ARN is unavailable');
+      });
+
+      const preview = await getPolicyHandler().preview(candidate, makeCurrent(), options);
+
+      ok(preview);
+      ok(preview.counts >= 1);
+      equal(preview.update?.policyDocument, true);
+    });
+  });
 });

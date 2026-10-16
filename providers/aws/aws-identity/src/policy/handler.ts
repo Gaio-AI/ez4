@@ -1,7 +1,7 @@
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
-import type { StepContext, StepHandler } from '@ez4/state';
+import type { StepContext, StepHandler, StepOptions } from '@ez4/state';
 import type { PolicyDocument } from '../types/policy';
-import type { PolicyState, PolicyResult, PolicyParameters } from './types';
+import type { PolicyState, PolicyResult, PolicyParameters, PolicyContext } from './types';
 
 import { applyTagUpdates, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare, deepEqual } from '@ez4/utils';
@@ -22,9 +22,32 @@ const equalsResource = (candidate: PolicyState, current: PolicyState) => {
   return !!candidate.result && candidate.result.policyArn === current.result?.policyArn;
 };
 
-const previewResource = (candidate: PolicyState, current: PolicyState) => {
+const resolvePlannedDocument = (parameters: PolicyParameters, options: StepOptions) => {
+  const { getDependencies } = options;
+
+  if (!parameters.getPolicyDocument || !getDependencies) {
+    return undefined;
+  }
+
+  try {
+    return parameters.getPolicyDocument({ force: options.force, getDependencies });
+  } catch {
+    // A dependency the plan creates has no result yet, so the document is only known when it is applied.
+    return undefined;
+  }
+};
+
+const previewResource = (candidate: PolicyState, current: PolicyState, options: StepOptions) => {
   const currentDocument = current.result?.resolvedDocument ?? current.parameters.policyDocument;
-  const target = { ...candidate.parameters, getPolicyDocument: undefined, dependencies: candidate.dependencies };
+  const plannedDocument = resolvePlannedDocument(candidate.parameters, options);
+
+  const target = {
+    ...candidate.parameters,
+    policyDocument: plannedDocument ?? candidate.parameters.policyDocument,
+    getPolicyDocument: undefined,
+    dependencies: candidate.dependencies
+  };
+
   const source = {
     ...current.parameters,
     policyDocument: currentDocument,
@@ -34,7 +57,7 @@ const previewResource = (candidate: PolicyState, current: PolicyState) => {
 
   const changes = deepCompare(target, source);
 
-  if (candidate.parameters.getPolicyDocument) {
+  if (candidate.parameters.getPolicyDocument && !plannedDocument) {
     const hasDocChange = !!changes?.update?.policyDocument;
     return {
       name: target.policyName,
@@ -128,7 +151,7 @@ const deleteResource = async (current: PolicyState) => {
   }
 };
 
-export const resolvePolicyParameters = (parameters: PolicyParameters, context?: StepContext): PolicyParameters => {
+export const resolvePolicyParameters = (parameters: PolicyParameters, context?: PolicyContext): PolicyParameters => {
   const { getPolicyDocument, ...request } = parameters;
   return {
     ...request,

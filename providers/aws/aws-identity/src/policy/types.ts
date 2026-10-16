@@ -5,7 +5,12 @@ export const PolicyServiceName = 'AWS:IAM/Policy';
 
 export const PolicyServiceType = 'aws:iam.policy';
 
-export type PolicyParameters = CreateRequest & { getPolicyDocument?: (context: StepContext) => CreateRequest['policyDocument'] };
+/**
+ * What a policy document can read from the step, both while the plan previews it and while it is applied.
+ */
+export type PolicyContext = Pick<StepContext, 'force' | 'getDependencies'>;
+
+export type PolicyParameters = CreateRequest & { getPolicyDocument?: (context: PolicyContext) => CreateRequest['policyDocument'] };
 
 export type PolicyResult = ImportOrCreateResponse & {
   versionHistory: string[];
