@@ -53,7 +53,7 @@ describe('agent metadata parser and validation', () => {
         { url: 'https://github.com/acme/api.git', name: 'api', branch: 'main' },
         { url: 'https://github.com/acme/web.git', name: 'frontend', branch: 'develop' }
       ],
-      auth: { githubApp: 'acme/github-app' }
+      auth: { githubApp: { appId: '123', installationId: '456', privateKey: 'app-private-key' } }
     });
   });
 

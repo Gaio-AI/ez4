@@ -4,7 +4,17 @@ export interface WorkspaceRepo {
   readonly branch?: string;
 }
 
-export type WorkspaceAuth = { readonly githubApp: string } | { readonly token: string };
+/**
+ * GitHub App credentials. Usually bound to environment variables (`Environment.Variable<'NAME'>`);
+ * the provider stores them in a secret it manages and never in the task definition.
+ */
+export interface WorkspaceGithubApp {
+  readonly appId: string;
+  readonly installationId: string;
+  readonly privateKey: string;
+}
+
+export type WorkspaceAuth = { readonly githubApp: WorkspaceGithubApp } | { readonly token: string };
 
 export interface Workspace {
   readonly repos: WorkspaceRepo[];

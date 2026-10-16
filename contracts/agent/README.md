@@ -88,12 +88,18 @@ export declare class ReviewAgent extends Agent.Service<ReviewInput, ReviewOutput
   // Other required members omitted here.
   workspace: {
     repos: [{ url: 'https://github.com/acme/api.git' }, { url: 'https://github.com/acme/web.git'; name: 'frontend'; branch: 'develop' }];
-    auth: { githubApp: 'acme/github-app' };
+    auth: {
+      githubApp: {
+        appId: Environment.Variable<'GITHUB_APP_ID'>;
+        installationId: Environment.Variable<'GITHUB_APP_INSTALLATION_ID'>;
+        privateKey: Environment.Variable<'GITHUB_APP_PRIVATE_KEY'>;
+      };
+    };
   };
 }
 ```
 
-Repository names default to the URL's last path segment without `.git`; branches default to `main`. Names must be unique. Authentication accepts either `{ githubApp: 'secret-name' }` or `{ token: 'secret-name:jsonKey' }`. A caller can pass `Agent.WorkspaceRef[]` through `invoke` options, and hooks receive the repository paths and base commits in `request.workspace`. The finish hook also receives `refs`, which appear on `Agent.Result.workspace`.
+Repository names default to the URL's last path segment without `.git`; branches default to `main`. Names must be unique. Authentication accepts either a GitHub App, whose `appId`, `installationId` and `privateKey` usually come from environment variables, or `{ token: 'secret-name:jsonKey' }`. A caller can pass `Agent.WorkspaceRef[]` through `invoke` options, and hooks receive the repository paths and base commits in `request.workspace`. The finish hook also receives `refs`, which appear on `Agent.Result.workspace`.
 
 #### Lifecycle hooks
 

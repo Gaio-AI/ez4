@@ -30,7 +30,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
   - Caches bare git repositories on shared storage to avoid redundant full clones across invocations.
   - Per-agent container working trees are mounted at `/mnt/ez4-workspace`.
   - Handoff between agents tracks commit changes and branch state using custom invocation refs (`refs/ez4/<agent>/<invocationId>`).
-  - Supports repository authentication through GitHub Apps (`{ githubApp: 'secret-name' }`) or HTTPS personal access tokens (`{ token: 'secret-name' }` or `'secret-name:jsonKey'`).
+  - Supports repository authentication through GitHub Apps (`{ githubApp: { appId, installationId, privateKey } }`) or HTTPS personal access tokens (`{ token: 'secret-name' }` or `'secret-name:jsonKey'`). The GitHub App credentials go into a managed Secrets Manager secret (`<base>-<agent>-workspace`) whose value follows the declared credentials on every deploy; the task reads it as a container secret and the task definition never holds them.
 
 - **Agent Workflows**:
   - Declarative state machine orchestration across multiple `Agent.Service` instances.

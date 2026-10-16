@@ -10,6 +10,11 @@ export type SecretParameters = {
   secretName: string;
   description?: string;
   getSecretValue?: SecretValueCallback;
+  /**
+   * Hash of a declared value. When set, the secret value follows `getSecretValue` and a changed hash
+   * rewrites it; without it the value is only the initial one.
+   */
+  valueHash?: string;
   retain?: boolean;
   tags?: ResourceTags;
 };

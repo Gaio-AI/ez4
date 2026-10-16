@@ -29,6 +29,8 @@ export const getAgentRepositoryName = (agent: Pick<AgentService, 'name'>, option
 
 export const getAgentProxySecretName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
   `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}-proxy`;
+export const getAgentWorkspaceSecretName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
+  `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}-workspace`;
 export const getAgentTaskRoleName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
   `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}-task-role`;
 

@@ -19,6 +19,8 @@ export interface TaskDefOptions {
   region?: string;
   proxy?: { url: string; secretArn: string };
   providerSecrets?: Array<{ name: string; secretArn: string }>;
+  /** Secret ez4 manages with the workspace's GitHub App credentials. */
+  workspaceSecretArn?: string;
   workspace?: { fileSystemId: string; accessPointId: string };
   variables?: LinkedVariables;
 }
@@ -88,15 +90,9 @@ export const buildTaskDefinitionInput = (
 
   if (agent.workspace?.auth) {
     const auth = agent.workspace.auth;
-    if ('githubApp' in auth && auth.githubApp) {
-      const secretRef = String(auth.githubApp);
-      const arn = secretRef.startsWith('arn:')
-        ? secretRef
-        : secretRef.includes(':')
-          ? `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef.split(':')[0]}:${secretRef.split(':')[1]}::`
-          : `arn:aws:secretsmanager:${region}:${accountId}:secret:${secretRef}`;
-      if (!secrets.some((s) => s.name === 'EZ4_WORKSPACE_GITHUB_APP')) {
-        secrets.push({ name: 'EZ4_WORKSPACE_GITHUB_APP', valueFrom: arn });
+    if ('githubApp' in auth) {
+      if (options.workspaceSecretArn) {
+        secrets.push({ name: 'EZ4_WORKSPACE_GITHUB_APP', valueFrom: options.workspaceSecretArn });
       }
     } else if ('token' in auth && auth.token) {
       const secretRef = String(auth.token);
@@ -126,9 +122,10 @@ export const buildTaskDefinitionInput = (
   }
 
   if (agent.workspace) {
+    // Only the repositories: the credentials reach the container as secrets.
     environment.push({
       name: 'EZ4_AGENT_WORKSPACE',
-      value: JSON.stringify(agent.workspace)
+      value: JSON.stringify({ repos: agent.workspace.repos })
     });
   }
 

@@ -94,6 +94,7 @@ The Agent contract allows declaring autonomous LLM-powered services running on A
 ### Service Definition
 
 ```typescript
+import type { Environment } from '@ez4/common';
 import { Agent, AgentPermission, AgentProvider, AgentToolsMode, WorkflowEventType } from '@ez4/agent';
 
 export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
@@ -106,7 +107,13 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   };
   workspace: {
     repos: [{ url: 'https://github.com/acme/project.git' }];
-    auth: { githubApp: 'acme/github-app' };
+    auth: {
+      githubApp: {
+        appId: Environment.Variable<'GITHUB_APP_ID'>;
+        installationId: Environment.Variable<'GITHUB_APP_INSTALLATION_ID'>;
+        privateKey: Environment.Variable<'GITHUB_APP_PRIVATE_KEY'>;
+      };
+    };
   };
   egress: ['api.github.com'];
   permissions: {

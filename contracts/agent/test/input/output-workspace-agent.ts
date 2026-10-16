@@ -9,6 +9,6 @@ export declare class WorkspaceAgent extends Agent.Service<{ task: string }, { do
   tools: { mode: AgentToolsMode.Edit };
   workspace: {
     repos: [{ url: 'https://github.com/acme/api.git' }, { url: 'https://github.com/acme/web.git'; name: 'frontend'; branch: 'develop' }];
-    auth: { githubApp: 'acme/github-app' };
+    auth: { githubApp: { appId: '123'; installationId: '456'; privateKey: 'app-private-key' } };
   };
 }

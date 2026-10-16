@@ -54,7 +54,11 @@
         }
       ],
       "auth": {
-        "githubApp": "acme/github-app"
+        "githubApp": {
+          "appId": "123",
+          "installationId": "456",
+          "privateKey": "app-private-key"
+        }
       }
     }
   }

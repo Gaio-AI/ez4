@@ -69,12 +69,21 @@ export const getWorkspaceMetadata = (
   let auth: NonNullable<AgentService['workspace']>['auth'];
   if (fields.auth) {
     const authFields = objectMembers(fields.auth);
-    const githubApp = authFields?.githubApp && getPropertyString(authFields.githubApp);
+    const appFields = authFields?.githubApp && objectMembers(authFields.githubApp);
     const token = authFields?.token && getPropertyString(authFields.token);
-    if (!authFields || (githubApp === undefined) === (token === undefined) || Object.keys(authFields).length !== 1) {
+    if (!authFields || !!appFields === (token !== undefined) || Object.keys(authFields).length !== 1) {
       invalid('auth');
+    } else if (appFields) {
+      const appId = appFields.appId && getPropertyString(appFields.appId);
+      const installationId = appFields.installationId && getPropertyString(appFields.installationId);
+      const privateKey = appFields.privateKey && getPropertyString(appFields.privateKey);
+      if (appId && installationId && privateKey && Object.keys(appFields).length === 3) {
+        auth = { githubApp: { appId, installationId, privateKey } };
+      } else {
+        invalid('auth.githubApp');
+      }
     } else {
-      auth = githubApp !== undefined ? { githubApp } : { token: token! };
+      auth = { token: token! };
     }
   }
 

@@ -62,6 +62,33 @@ describe('Secrets Manager secret handler', () => {
     }
   });
 
+  it('assert :: an existing secret with a declared value is rewritten on update', async () => {
+    const sent: { name: string; input: unknown }[] = [];
+
+    setSecretsManagerClient({
+      send: async (command: { constructor: { name: string }; input: unknown }) => {
+        sent.push({ name: command.constructor.name, input: command.input });
+        return { ARN: 'arn:aws:secretsmanager:us-east-1:123:secret:app-x' };
+      }
+    } as unknown as SecretsManagerClient);
+
+    try {
+      const state: EntryStates = {};
+      const secret = createSecret(state, {
+        secretName: 'app',
+        valueHash: 'hash-2',
+        getSecretValue: async () => ({ KEY: 'rotated' })
+      });
+      const current = { ...secret, result: { secretArn: 'arn:aws:secretsmanager:us-east-1:123:secret:app-x' } };
+
+      await getSecretHandler().update(current, current, fakeContext());
+
+      deepEqual(sent.at(-1), { name: 'PutSecretValueCommand', input: { SecretId: 'app', SecretString: '{"KEY":"rotated"}' } });
+    } finally {
+      setSecretsManagerClient(null);
+    }
+  });
+
   it('assert :: an explicit put replaces the value of an existing secret', async () => {
     const sent: { name: string; input: unknown }[] = [];
 

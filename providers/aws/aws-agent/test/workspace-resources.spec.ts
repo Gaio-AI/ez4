@@ -42,7 +42,7 @@ describe('agent workspace resources', () => {
     instructions: 'workspace instructions',
     workspace: {
       repos: [{ url: 'https://github.com/acme/api.git', name: 'api', branch: 'main' }],
-      auth: { githubApp: 'acme/app' }
+      auth: { githubApp: { appId: '1', installationId: '2', privateKey: 'app-private-key' } }
     }
   } as AgentService;
 
@@ -138,7 +138,7 @@ describe('agent workspace resources', () => {
     deepEqual(
       getWorkspaceDomains({
         repos: [{ url: 'https://github.com/acme/api.git', name: 'api', branch: 'main' }],
-        auth: { githubApp: 'acme/app' }
+        auth: { githubApp: { appId: '1', installationId: '2', privateKey: 'app-private-key' } }
       }),
       ['api.github.com', 'github.com']
     );
@@ -151,6 +151,20 @@ describe('agent workspace resources', () => {
       { sourceVolume: 'workspace', containerPath: '/mnt/ez4-workspace', readOnly: false }
     ]);
     const env = input.containerDefinitions?.[0].environment ?? [];
-    equal(env.find((e) => e.name === 'EZ4_AGENT_WORKSPACE')?.value, JSON.stringify(workspaceAgent.workspace));
+    equal(env.find((e) => e.name === 'EZ4_AGENT_WORKSPACE')?.value, JSON.stringify({ repos: workspaceAgent.workspace!.repos }));
+  });
+
+  it('assert :: GitHub App credentials reach the task only through the managed secret', () => {
+    const input = buildAgentTaskDefinition(workspaceAgent, fakeContext({ fileSystemId: 'fs-1', accessPointId: 'fsap-1' }), undefined, undefined, undefined, {
+      baseName: 'ez4-test-stg-agents',
+      bucketName: 'bucket',
+      workspaceSecretArn: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ez4-test-stg-agents-workspace-agent-workspace-AbCdEf'
+    });
+    const container = input.containerDefinitions?.[0];
+    deepEqual(
+      container?.secrets?.find((secret) => secret.name === 'EZ4_WORKSPACE_GITHUB_APP')?.valueFrom,
+      'arn:aws:secretsmanager:us-east-1:123456789012:secret:ez4-test-stg-agents-workspace-agent-workspace-AbCdEf'
+    );
+    ok(!JSON.stringify(input).includes('app-private-key'));
   });
 });

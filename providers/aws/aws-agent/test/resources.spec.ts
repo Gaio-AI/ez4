@@ -300,4 +300,33 @@ describe('agent resources wiring', () => {
       'arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-own'
     );
   });
+
+  it('assert :: GitHub App credentials go into a managed secret the task definition depends on, never into state', async () => {
+    const state: EntryStates = {};
+    const agent = {
+      ...createAgentService('WorkspaceAgent'),
+      provider: AgentProvider.Claude,
+      model: 'm',
+      instructions: 'i',
+      workspace: {
+        repos: [{ name: 'api', url: 'https://github.com/acme/api.git', branch: 'main' }],
+        auth: { githubApp: { appId: '1', installationId: '2', privateKey: 'app-private-key' } }
+      }
+    } as never;
+    const context = makeContext();
+    const event = { state, service: agent, metadata: { WorkspaceAgent: agent }, options, context } as PrepareResourceEvent;
+    equal(await prepareAgentResources(event, ports), true);
+
+    const secret = Object.values(state).find(
+      (entry): entry is SecretState => isSecretState(entry) && entry.parameters.secretName === 'ez4-lab-agents-workspace-agent-workspace'
+    )!;
+    ok(secret.parameters.valueHash);
+    deepEqual(await secret.parameters.getSecretValue!(), {
+      GITHUB_APP_ID: '1',
+      GITHUB_APP_INSTALLATION_ID: '2',
+      GITHUB_APP_PRIVATE_KEY: 'app-private-key'
+    });
+    ok(context.getServiceState('WorkspaceAgent', options).dependencies.includes(secret.entryId));
+    ok(!JSON.stringify(state).includes('app-private-key'));
+  });
 });

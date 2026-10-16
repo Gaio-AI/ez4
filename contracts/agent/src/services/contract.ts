@@ -14,6 +14,7 @@ import type {
   Workspace as AgentWorkspace,
   WorkspaceRepo as AgentWorkspaceRepo,
   WorkspaceAuth as AgentWorkspaceAuth,
+  WorkspaceGithubApp as AgentWorkspaceGithubApp,
   WorkspaceRef as AgentWorkspaceRef,
   WorkspaceRequest as AgentWorkspaceRequest
 } from './workspace';
@@ -61,6 +62,7 @@ export namespace Agent {
   export type Workspace = AgentWorkspace;
   export type WorkspaceRepo = AgentWorkspaceRepo;
   export type WorkspaceAuth = AgentWorkspaceAuth;
+  export type WorkspaceGithubApp = AgentWorkspaceGithubApp;
   export type WorkspaceRef = AgentWorkspaceRef;
   export type WorkspaceRequest = AgentWorkspaceRequest;
   export type WorkflowAgents = AgentWorkflowAgents;

@@ -55,6 +55,7 @@ import {
   getAgentsNamespaceName,
   getAgentProxyUrl,
   getAgentProxySecretName,
+  getAgentWorkspaceSecretName,
   getProviderSecretName
 } from '../utils/names';
 import { buildDispatcherBundle, prepareDispatcher } from '../dispatch/resources';
@@ -130,6 +131,23 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     providerCredentialEntryId = providerCredential.entryId;
   }
 
+  // GitHub App credentials are declared values: they live in a secret ez4 manages and rewrites when they change.
+  const githubApp = service.workspace?.auth && 'githubApp' in service.workspace.auth ? service.workspace.auth.githubApp : undefined;
+  const workspaceCredential =
+    githubApp &&
+    createSecret(state, {
+      secretName: getAgentWorkspaceSecretName(service, options),
+      description: `EZ4 workspace GitHub App credentials for agent ${service.name}`,
+      valueHash: hashData(githubApp.appId, githubApp.installationId, githubApp.privateKey),
+      getSecretValue: () =>
+        Promise.resolve({
+          GITHUB_APP_ID: githubApp.appId,
+          GITHUB_APP_INSTALLATION_ID: githubApp.installationId,
+          GITHUB_APP_PRIVATE_KEY: githubApp.privateKey
+        }),
+      tags: options.tags
+    });
+
   const clusterName = getAgentClusterName(options);
   const bucketName = getAgentBucketName(options);
   const cluster = state[createEcsClusterStateId(clusterName)] ?? createEcsCluster(state, { clusterName, tags: options.tags });
@@ -139,8 +157,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   const workspaceSecrets: Record<string, string> = {};
   for (const agent of agents) {
     const auth = agent.workspace?.auth;
-    if (auth && 'githubApp' in auth && auth.githubApp) {
-      workspaceSecrets['EZ4_WORKSPACE_GITHUB_APP'] = String(auth.githubApp);
+    if (auth && 'githubApp' in auth) {
+      workspaceSecrets[`EZ4_WORKSPACE_${toKebabCase(agent.name)}`] = getAgentWorkspaceSecretName(agent, options);
     } else if (auth && 'token' in auth && auth.token) {
       workspaceSecrets['EZ4_WORKSPACE_TOKEN'] = String(auth.token);
     }
@@ -284,6 +302,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
       executionRole.entryId,
       credential.entryId,
       ...(providerCredentialEntryId ? [providerCredentialEntryId] : []),
+      ...(workspaceCredential ? [workspaceCredential.entryId] : []),
       ...workspaceDependencies
     ],
     {
@@ -320,6 +339,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
             providerSecrets.push({ name: providerAuth.envName, secretArn: providerCred.result.secretArn });
           }
         }
+        const workspaceSecretName = getAgentWorkspaceSecretName(service, options);
+        const workspaceSecretArn = allSecrets.find((s) => s.parameters.secretName === workspaceSecretName)?.result?.secretArn;
         const apDep = stepContext.getDependencies<AccessPointState>(AccessPointServiceType).at(0);
         const workspaceEfs = apDep?.result
           ? {
@@ -338,7 +359,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
             secretArn: proxySecretArn
           },
           ...(workspaceEfs ? { workspace: workspaceEfs } : {}),
-          ...(providerSecrets.length > 0 ? { providerSecrets } : {})
+          ...(providerSecrets.length > 0 ? { providerSecrets } : {}),
+          ...(workspaceSecretArn ? { workspaceSecretArn } : {})
         });
       }
     }

@@ -101,10 +101,15 @@ export const createSecretResource = async (parameters: SecretParameters, logger?
 
   const { secretName, description, tags } = parameters;
 
-  // The value is only the initial one: a generated credential must not rotate on every update, since whatever
-  // read it at start (a running proxy, an agent task) would no longer match it.
+  // A generated credential keeps its initial value: rotating it on every update would break whatever read it at
+  // start (a running proxy, an agent task). A declared value (`valueHash`) is rewritten instead.
   const existing = await findSecret(secretName);
   if (existing) {
+    const value = parameters.valueHash && (await serializeSecretValue(parameters));
+    if (value) {
+      logger?.update('Updating Secrets Manager secret value');
+      await getSecretsManagerClient().send(new PutSecretValueCommand({ SecretId: secretName, SecretString: value }));
+    }
     return existing;
   }
 
