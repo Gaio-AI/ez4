@@ -21,21 +21,21 @@
     "output": "ez4 output -e local.env"
   },
   "dependencies": {
-    "@ez4/aws-dynamodb": "^2.1.0",
-    "@ez4/aws-gateway": "^2.1.0",
-    "@ez4/aws-scheduler": "^2.1.0",
-    "@ez4/common": "^2.1.0",
-    "@ez4/database": "^2.1.0",
-    "@ez4/docs-topology": "^2.1.0",
-    "@ez4/docs-gateway": "^2.1.0",
-    "@ez4/factory": "^2.1.0",
-    "@ez4/gateway": "^2.1.0",
-    "@ez4/local-database": "^2.1.0",
-    "@ez4/local-gateway": "^2.1.0",
-    "@ez4/local-scheduler": "^2.1.0",
-    "@ez4/project": "^2.1.0",
-    "@ez4/scheduler": "^2.1.0",
-    "@ez4/schema": "^2.1.0",
-    "@ez4/validation": "^2.1.0"
+    "@ez4/aws-dynamodb": "^2.2.0",
+    "@ez4/aws-gateway": "^2.2.0",
+    "@ez4/aws-scheduler": "^2.2.0",
+    "@ez4/common": "^2.2.0",
+    "@ez4/database": "^2.2.0",
+    "@ez4/docs-topology": "^2.2.0",
+    "@ez4/docs-gateway": "^2.2.0",
+    "@ez4/factory": "^2.2.0",
+    "@ez4/gateway": "^2.2.0",
+    "@ez4/local-database": "^2.2.0",
+    "@ez4/local-gateway": "^2.2.0",
+    "@ez4/local-scheduler": "^2.2.0",
+    "@ez4/project": "^2.2.0",
+    "@ez4/scheduler": "^2.2.0",
+    "@ez4/schema": "^2.2.0",
+    "@ez4/validation": "^2.2.0"
   }
 }
