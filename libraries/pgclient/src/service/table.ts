@@ -1,12 +1,13 @@
 import type { TableIndex } from '@ez4/database/library';
 import type { Table as DbTable, Query } from '@ez4/database';
 import type { ObjectSchema } from '@ez4/schema';
-import type { IsArray } from '@ez4/utils';
+import type { AnyObject, IsArray } from '@ez4/utils';
 import type { PgRelationRepositoryWithSchema } from '../types/repository';
 import type { PgClientDriver, PgExecuteStatement, PgExecutionResult } from '../types/driver';
 import type { InternalTableMetadata } from '../types/table';
 
 import { DuplicateUniqueKeyError, MissingUniqueIndexError } from '@ez4/pgclient';
+import { Index } from '@ez4/database';
 
 import { tryExtractUniqueIndex } from './utils/indexes';
 
@@ -70,12 +71,49 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     return records[0] as Query.InsertOneResult<S, T>;
   }
 
+  private get primaryKey() {
+    return this.indexes.find((index) => index.type === Index.Primary)?.columns;
+  }
+
   async updateOne<S extends Query.SelectInput<T>>(query: Query.UpdateOneInput<S, T>) {
-    const statement = await prepareUpdateOne(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = await prepareUpdateOne(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryKey: this.primaryKey
+    });
 
     const { records } = await this.sendStatement(statement);
 
+    if (statement.reloadKey) {
+      const [record] = await this.findWrittenRecords(statement.reloadKey, records, query);
+
+      return record as Query.UpdateOneResult<S, T>;
+    }
+
     return records[0] as Query.UpdateOneResult<S, T>;
+  }
+
+  private async findWrittenRecords<S extends Query.SelectInput<T>>(
+    primaryKey: string[],
+    records: (AnyObject | undefined)[],
+    query: Pick<Query.UpdateOneInput<S, T>, 'select' | 'include'>
+  ) {
+    const keys = records.filter((record) => !!record);
+
+    if (!keys.length || !query.select) {
+      return [];
+    }
+
+    const where =
+      primaryKey.length === 1
+        ? { [primaryKey[0]]: { isIn: keys.map((key) => key[primaryKey[0]]) } }
+        : { OR: keys.map((key) => Object.fromEntries(primaryKey.map((column) => [column, key[column]]))) };
+
+    const result = await this.findMany({
+      select: query.select,
+      include: query.include,
+      where: where as Query.WhereInput<T>
+    });
+
+    return result.records as AnyObject[];
   }
 
   async findOne<S extends Query.SelectInput<T>>(query: Query.FindOneInput<S, T>) {
@@ -106,12 +144,14 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     const updateQuery = {
       select: query.select,
       include: query.include,
+      previous: query.previous,
       data: query.update,
       where: query.where,
       lock: query.lock
     };
 
     const updateStatement = await prepareUpdateOne(this.name, this.schema, this.relations, driver, updateQuery, {
+      primaryKey: this.primaryKey,
       flag: '__EZ4_OK'
     });
 
@@ -125,8 +165,12 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
       if (updateRecord?.__EZ4_OK) {
         delete updateRecord.__EZ4_OK;
 
+        const record = updateStatement.reloadKey
+          ? (await this.findWrittenRecords(updateStatement.reloadKey, [updateRecord], query))[0]
+          : updateRecord;
+
         return {
-          record: updateRecord,
+          record,
           inserted: false
         } as Query.UpsertOneResult<S, T>;
       }
@@ -162,15 +206,21 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   async updateMany<S extends Query.SelectInput<T>>(query: Query.UpdateManyInput<S, T>) {
-    const statement = await prepareUpdateMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = await prepareUpdateMany(this.name, this.schema, this.relations, this.context.driver, query, {
+      primaryKey: this.primaryKey
+    });
 
     const { records } = await this.sendStatement(statement);
 
-    if (query.select) {
-      return records as Query.UpdateManyResult<S, T>;
+    if (!query.select) {
+      return undefined as Query.UpdateManyResult<S, T>;
     }
 
-    return undefined as Query.UpdateManyResult<S, T>;
+    if (statement.reloadKey) {
+      return (await this.findWrittenRecords(statement.reloadKey, records, query)) as Query.UpdateManyResult<S, T>;
+    }
+
+    return records as Query.UpdateManyResult<S, T>;
   }
 
   async findMany<S extends Query.SelectInput<T>, C extends boolean = false>(query: Query.FindManyInput<S, C, T>) {

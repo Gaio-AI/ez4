@@ -51,7 +51,7 @@ export namespace TransactionModeUtils {
   };
 
   type UpdateOperationType<T extends TableMetadata> = {
-    update: Omit<Query.UpdateOneInput<Query.SelectInput<T>, T>, 'select' | 'include'>;
+    update: Omit<Query.UpdateOneInput<Query.SelectInput<T>, T>, 'select' | 'include' | 'previous'>;
   };
 
   type DeleteOperationType<T extends TableMetadata> = {

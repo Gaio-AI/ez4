@@ -1,15 +1,15 @@
-import type { SqlSourceWithResults, SqlRecord, SqlBuilder, SqlUpdateStatement } from '@ez4/pgsql';
+import type { SqlSourceWithResults, SqlRecord, SqlBuilder, SqlFilters, SqlUpdateStatement } from '@ez4/pgsql';
 import type { AnySchema, NumberSchema, ObjectSchema, UnionSchema } from '@ez4/schema';
 import type { AnyObject } from '@ez4/utils';
 import type { Query } from '@ez4/database';
 import type { PgRelationRepositoryWithSchema, PgRelationWithSchema } from '../types/repository';
 import type { InternalTableMetadata } from '../types/table';
 
-import { InvalidAtomicOperation, InvalidFieldSchemaError, InvalidRelationFieldError } from '@ez4/pgclient';
+import { InvalidAtomicOperation, InvalidFieldSchemaError, InvalidRelationFieldError, MissingPrimaryIndexError } from '@ez4/pgclient';
 import { getOptionalSchema, getSchemaProperty, isNumberSchema, isObjectSchema, isUnionSchema } from '@ez4/schema';
 import { isAnyObject, isEmptyObject, isNullish } from '@ez4/utils';
-import { SqlSelectStatement } from '@ez4/pgsql';
-import { Index } from '@ez4/database';
+import { SqlSelectStatement, escapeSqlName, mergeSqlAlias } from '@ez4/pgsql';
+import { Index, Order } from '@ez4/database';
 
 import { getConnectionSchema, isSingleRelationData } from './utils/relation';
 import { getWithSchemaValidation, isDynamicObjectField, isDynamicUnionField, validateRecordSchema } from '../utils/schema';
@@ -17,6 +17,7 @@ import { getSelectFields, getSelectFilters } from './select';
 
 export type UpdateQueryOptions = {
   flag?: string;
+  primaryKey?: string[];
 };
 
 export const prepareUpdateQuery = async <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
@@ -28,40 +29,56 @@ export const prepareUpdateQuery = async <T extends InternalTableMetadata, S exte
   options?: UpdateQueryOptions
 ) => {
   const updateRecord = await getUpdateRecord(builder, input.data, schema, relations, table);
-  const hasNoRecords = !isEmptyObject(updateRecord);
+  const hasRecord = !isEmptyObject(updateRecord);
 
-  const updateQuery = hasNoRecords
-    ? builder.update(schema).only(table).record(updateRecord).returning()
-    : builder.select(schema).from(table);
+  const updateQuery = hasRecord ? builder.update(schema).only(table).record(updateRecord).returning() : builder.select(schema).from(table);
 
   const queries: (SqlSelectStatement | SqlUpdateStatement)[] = [];
-  const columns = input.select ? Object.keys(input.select) : [];
+
+  let columns = input.select ? Object.keys(input.select) : [];
+  let previousQuery: SqlSelectStatement | undefined;
+  let reloadKey: string[] | undefined;
+
+  // Every part of the statement reads the tables as they were before it, so a relation the update rewrites in
+  // another table would come back stale: the statement returns the keys and the records are read again.
+  if (
+    input.select &&
+    !input.previous &&
+    selectsRelation(input.select, relations, table) &&
+    rewritesOtherTables(input.data, relations, table)
+  ) {
+    if (!options?.primaryKey?.length) {
+      throw new MissingPrimaryIndexError(table);
+    }
+
+    reloadKey = options.primaryKey;
+    columns = [...reloadKey];
+  }
 
   if (input.select) {
     if (updateQuery instanceof SqlSelectStatement) {
-      const selectFields = getSelectFields(builder, input.select, input.include, schema, relations, updateQuery, table);
+      const selectFields = reloadKey
+        ? getKeyFields(reloadKey)
+        : getSelectFields(builder, input.select, input.include, schema, relations, updateQuery, table);
 
       updateQuery.record(selectFields);
 
       if (input.lock) {
         updateQuery.lock();
       }
+    } else if (input.previous) {
+      previousQuery = preparePreviousQuery(builder, table, schema, relations, input.select, input, options?.primaryKey);
+
+      updateQuery.from(previousQuery.reference()).as('U');
+
+      queries.push(previousQuery);
+    } else if (reloadKey) {
+      // A copy: the relation updates add their columns to the returned list, which must not reach the table index.
+      updateQuery.returning([...reloadKey]);
     } else {
-      const selectQuery = builder.select(schema).from(table);
-      const selectFields = getSelectFields(builder, input.select, input.include, schema, relations, selectQuery, table);
+      const selectFields = getSelectFields(builder, input.select, input.include, schema, relations, updateQuery, table);
 
-      if (input.where) {
-        selectQuery.where(getSelectFilters(builder, input.where, relations, selectQuery, table));
-      }
-
-      if (input.lock) {
-        selectQuery.lock();
-      }
-
-      updateQuery.from(selectQuery.reference()).as('U');
-      selectQuery.record(selectFields);
-
-      queries.push(selectQuery);
+      updateQuery.returning(selectFields);
     }
   }
 
@@ -69,11 +86,14 @@ export const prepareUpdateQuery = async <T extends InternalTableMetadata, S exte
 
   queries.push(updateQuery, ...postUpdateQueries);
 
-  if (input.where) {
+  // The update writes the records the previous query locked, and no other, so they are the ones reported.
+  if (previousQuery) {
+    updateQuery.where(getPreviousKeyFilters(previousQuery, options?.primaryKey ?? []));
+  } else if (input.where) {
     updateQuery.where(getSelectFilters(builder, input.where, relations, updateQuery, table));
   }
 
-  if (input.select && (postUpdateQueries.length > 0 || !(updateQuery instanceof SqlSelectStatement))) {
+  if (input.select && (postUpdateQueries.length > 0 || previousQuery)) {
     const [firstQuery] = queries;
 
     queries.push(
@@ -93,8 +113,27 @@ export const prepareUpdateQuery = async <T extends InternalTableMetadata, S exte
 
   return {
     columns,
-    queries
+    queries,
+    reloadKey
   };
+};
+
+const selectsRelation = (select: AnyObject, relations: PgRelationRepositoryWithSchema, table: string) => {
+  return Object.keys(select).some((fieldKey) => select[fieldKey] && relations[`${table}.${fieldKey}`]);
+};
+
+const rewritesOtherTables = (data: SqlRecord, relations: PgRelationRepositoryWithSchema, table: string) => {
+  return Object.values(relations).some((fieldRelation) => {
+    const fieldValue = fieldRelation.targetTable === table ? data[fieldRelation.targetAlias] : undefined;
+
+    if (!isSingleRelationData(fieldValue)) {
+      return false;
+    }
+
+    const [relationValue, , relationInput] = getPostRelationValue(fieldValue, fieldRelation);
+
+    return relationValue !== undefined || relationInput !== undefined;
+  });
 };
 
 export const getUpdateRecord = async (
@@ -387,8 +426,77 @@ export const getAtomicObjectOperationUpdate = async (
   return undefined;
 };
 
+const preparePreviousQuery = <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
+  builder: SqlBuilder,
+  table: string,
+  schema: ObjectSchema,
+  relations: PgRelationRepositoryWithSchema,
+  select: Query.StrictSelectInput<S, T>,
+  input: Query.UpdateOneInput<S, T> | Query.UpdateManyInput<S, T>,
+  primaryKey: string[] | undefined
+) => {
+  if (!primaryKey?.length) {
+    throw new MissingPrimaryIndexError(table);
+  }
+
+  const previousQuery = builder.select(schema).from(table).as(builder.alias('R'));
+  const selectFields = getSelectFields(builder, select, input.include, schema, relations, previousQuery, table);
+
+  if (input.where) {
+    previousQuery.where(getSelectFilters(builder, input.where, relations, previousQuery, table));
+  }
+
+  // Locked in key order, so updates over the same records wait for each other instead of deadlocking, and a
+  // record another update changed meanwhile is read again, or left out when it no longer matches.
+  previousQuery.record(selectFields).order(getKeyOrder(primaryKey)).lock();
+
+  // The key is read unformatted under an alias of its own, so the update joins on the column type.
+  primaryKey.forEach((column, index) => {
+    previousQuery.rawColumn((source) => mergeSqlAlias(escapeSqlName(column), source?.alias), getKeyAlias(index));
+  });
+
+  return previousQuery;
+};
+
+const getPreviousKeyFilters = (previousQuery: SqlSelectStatement, primaryKey: string[]) => {
+  const filters: SqlFilters = {};
+
+  primaryKey.forEach((column, index) => {
+    filters[column] = previousQuery.reference(getKeyAlias(index));
+  });
+
+  return filters;
+};
+
+const getKeyOrder = (primaryKey: string[]) => {
+  const order: Record<string, Order> = {};
+
+  for (const column of primaryKey) {
+    order[column] = Order.Asc;
+  }
+
+  return order;
+};
+
+const getKeyFields = (primaryKey: string[]) => {
+  const fields: Record<string, boolean> = {};
+
+  for (const column of primaryKey) {
+    fields[column] = true;
+  }
+
+  return fields;
+};
+
+const getKeyAlias = (index: number) => {
+  return `__EZ4_KEY_${index}`;
+};
+
+// The record holds the relation when the foreign key is its own column, which is where the migration puts it: a unique
+// to unique relation is held by the table that declares it, so (re)connecting it rewrites that column instead of the
+// unique key of the related records.
 const isRelationHolder = (sourceIndex: Index | undefined, targetIndex: Index | undefined) => {
-  return sourceIndex === Index.Primary || (sourceIndex === Index.Unique && (!targetIndex || targetIndex === Index.Secondary));
+  return sourceIndex === Index.Primary || (sourceIndex === Index.Unique && targetIndex !== Index.Primary);
 };
 
 const getRelationValue = (fieldValue: AnyObject, fieldRelation: PgRelationWithSchema) => {

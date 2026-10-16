@@ -67,13 +67,9 @@ describe('update schema', () => {
 
     assert.equal(
       statement,
-      `WITH ` +
-        // Select
-        `"Q0" AS (SELECT "scalar", jsonb_build_object('scalar', "json"['scalar']) AS "json" FROM "ez4-test-update-schema"), ` +
-        // Update
-        `"Q1" AS (UPDATE ONLY "ez4-test-update-schema" AS "U" SET "scalar" = :0, "json"[:1] = :2 FROM "Q0") ` +
+      `UPDATE ONLY "ez4-test-update-schema" SET "scalar" = :0, "json"[:1] = :2 ` +
         // Return
-        `SELECT "scalar", "json" FROM "Q0"`
+        `RETURNING "scalar", jsonb_build_object('scalar', "json"['scalar']) AS "json"`
     );
 
     assert.deepEqual(variables, ['foo', 'scalar', 123]);

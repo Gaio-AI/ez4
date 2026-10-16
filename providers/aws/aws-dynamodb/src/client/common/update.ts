@@ -34,7 +34,7 @@ export const prepareUpdate = async <T extends InternalTableMetadata, S extends Q
   }
 
   if (query.select) {
-    statement.push('RETURNING ALL OLD *');
+    statement.push(query.previous ? 'RETURNING ALL OLD *' : 'RETURNING ALL NEW *');
   }
 
   return [statement.join(' '), variables];

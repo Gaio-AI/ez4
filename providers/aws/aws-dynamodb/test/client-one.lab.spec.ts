@@ -133,7 +133,7 @@ describe('dynamodb client (one operation)', { timeout: 60000 }, () => {
     });
 
     deepEqual(result, {
-      value: 'initial'
+      value: 'updated'
     });
   });
 
@@ -187,18 +187,18 @@ describe('dynamodb client (one operation)', { timeout: 60000 }, () => {
       }
     });
 
-    // Return the last value
+    // Return the value as written
     const update1Result = await dbClient.testTable.upsertOne(query);
 
     deepEqual(update1Result, {
       inserted: false,
       record: {
-        value: 'initial'
+        value: 'updated'
       }
     });
 
-    // Return the last value
-    const update2Result = await dbClient.testTable.upsertOne(query);
+    // Return the value as it was
+    const update2Result = await dbClient.testTable.upsertOne({ ...query, previous: true });
 
     deepEqual(update2Result, {
       inserted: false,

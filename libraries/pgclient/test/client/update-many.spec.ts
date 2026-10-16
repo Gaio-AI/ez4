@@ -4,6 +4,24 @@ import { beforeEach, describe, it } from 'node:test';
 import { deepEqual, equal } from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
+// The records come back in primary key order, which the random ids make arbitrary. They are sorted by a key that
+// ignores the order of object keys, which jsonb does not keep.
+const deepEqualUnordered = (actual: unknown[] | void, expected: unknown[]) => {
+  const getSortKey = (value: unknown): string => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+
+      return `{${entries.map(([key, entry]) => `${key}:${getSortKey(entry)}`).join(',')}}`;
+    }
+
+    return JSON.stringify(value);
+  };
+
+  const sort = (records: unknown[]) => [...records].sort((a, b) => getSortKey(a).localeCompare(getSortKey(b)));
+
+  deepEqual(sort(actual ?? []), sort(expected));
+};
+
 describe('client update many', async () => {
   const client = await makeSchemaClient();
 
@@ -87,13 +105,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         boolean: true
       }
     });
 
-    deepEqual(previous, [{ boolean: true }, { boolean: false }, { boolean: true }]);
+    deepEqualUnordered(previous, [{ boolean: true }, { boolean: false }, { boolean: true }]);
 
     const { records, total } = await client.ez4_test_table.findMany({
       count: true,
@@ -113,13 +132,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         integer: true
       }
     });
 
-    deepEqual(previous, [{ integer: 1 }, { integer: 22 }, { integer: 333 }]);
+    deepEqualUnordered(previous, [{ integer: 1 }, { integer: 22 }, { integer: 333 }]);
 
     const { records, total } = await client.ez4_test_table.findMany({
       count: true,
@@ -139,13 +159,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         decimal: true
       }
     });
 
-    deepEqual(previous, [{ decimal: 0.1 }, { decimal: 1.22 }, { decimal: 2.333 }]);
+    deepEqualUnordered(previous, [{ decimal: 0.1 }, { decimal: 1.22 }, { decimal: 2.333 }]);
 
     const { records, total } = await client.ez4_test_table.findMany({
       count: true,
@@ -165,13 +186,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         string: true
       }
     });
 
-    deepEqual(previous, [{ string: 'abc' }, { string: 'def' }, { string: 'ghi' }]);
+    deepEqualUnordered(previous, [{ string: 'abc' }, { string: 'def' }, { string: 'ghi' }]);
 
     const { records, total } = await client.ez4_test_table.findMany({
       count: true,
@@ -191,13 +213,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         datetime: true
       }
     });
 
-    deepEqual(previous, [
+    deepEqualUnordered(previous, [
       { datetime: '1991-04-23T23:59:30.000Z' },
       { datetime: '2011-11-02T13:30:00.000Z' },
       { datetime: '2024-07-01T08:00:00.000Z' }
@@ -221,13 +244,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         date: true
       }
     });
 
-    deepEqual(previous, [{ date: '1991-04-23' }, { date: '2011-11-02' }, { date: '2024-07-01' }]);
+    deepEqualUnordered(previous, [{ date: '1991-04-23' }, { date: '2011-11-02' }, { date: '2024-07-01' }]);
 
     const { records, total } = await client.ez4_test_table.findMany({
       count: true,
@@ -247,13 +271,14 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data,
       select: {
         time: true
       }
     });
 
-    deepEqual(previous, [{ time: '23:59:30.000Z' }, { time: '13:30:00.000Z' }, { time: '08:00:00.000Z' }]);
+    deepEqualUnordered(previous, [{ time: '23:59:30.000Z' }, { time: '13:30:00.000Z' }, { time: '08:00:00.000Z' }]);
 
     const { records, total } = await client.ez4_test_table.findMany({
       count: true,
@@ -276,6 +301,7 @@ describe('client update many', async () => {
     };
 
     const previous = await client.ez4_test_table.updateMany({
+      previous: true,
       data: input,
       select: {
         json: {
@@ -285,7 +311,7 @@ describe('client update many', async () => {
       }
     });
 
-    deepEqual(previous, [
+    deepEqualUnordered(previous, [
       {
         json: {
           boolean: true,
@@ -313,7 +339,7 @@ describe('client update many', async () => {
       }
     });
 
-    deepEqual(records, [
+    deepEqualUnordered(records, [
       {
         json: {
           ...input.json

@@ -9,6 +9,7 @@ import { isAnyArray } from '@ez4/utils';
 import { prepareDeleteOne, prepareInsertOne, prepareUpdateOne } from '../queries/queries';
 import { rollbackFailedTransaction } from '../utils/transaction';
 import { getRelationsWithSchema } from './relations';
+import { getPrimaryIndex } from './utils/indexes';
 import { Table } from './table';
 
 type TableType = Table<InternalTableMetadata>;
@@ -206,7 +207,11 @@ const prepareStaticTransaction = async <T extends Database.Service<any>>(
       }
 
       if ('update' in query) {
-        statements.push(await prepareUpdateOne(name, schema, relationsWithSchema, driver, query.update));
+        statements.push(
+          await prepareUpdateOne(name, schema, relationsWithSchema, driver, query.update, {
+            primaryKey: getPrimaryIndex(repositoryTable.indexes)
+          })
+        );
         continue;
       }
 

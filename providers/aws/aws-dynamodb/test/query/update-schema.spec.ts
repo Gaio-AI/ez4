@@ -79,8 +79,37 @@ describe('update schema', () => {
       }
     );
 
-    equal(statement, `UPDATE "ez4-test-update" SET "foo" = ? SET "bar" = ? WHERE "id" = ? RETURNING ALL OLD *`);
+    equal(statement, `UPDATE "ez4-test-update" SET "foo" = ? SET "bar" = ? WHERE "id" = ? RETURNING ALL NEW *`);
 
     deepEqual(variables, ['abc', 123, 'id']);
+  });
+
+  it('assert :: prepare update (with previous select)', async () => {
+    const [statement, variables] = await prepareUpdateQuery(
+      {
+        type: SchemaType.Object,
+        properties: {
+          foo: {
+            type: SchemaType.String
+          }
+        }
+      },
+      {
+        select: {
+          foo: true
+        },
+        previous: true,
+        data: {
+          foo: 'abc'
+        },
+        where: {
+          id: 'id'
+        } as any
+      }
+    );
+
+    equal(statement, `UPDATE "ez4-test-update" SET "foo" = ? WHERE "id" = ? RETURNING ALL OLD *`);
+
+    deepEqual(variables, ['abc', 'id']);
   });
 });

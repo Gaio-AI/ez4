@@ -74,13 +74,14 @@ export const prepareUpdateOne = async <T extends InternalTableMetadata, S extend
 ) => {
   const builder = createQueryBuilder(driver);
 
-  const { queries, columns } = await prepareUpdateQuery(builder, table, schema, relations, input, options);
+  const { queries, columns, reloadKey } = await prepareUpdateQuery(builder, table, schema, relations, input, options);
 
   const [statement, variables] = builder.with(queries).build();
 
   return {
     query: statement,
     variables,
+    reloadKey,
     metadata: {
       schema,
       relations,
@@ -176,17 +177,19 @@ export const prepareUpdateMany = async <T extends InternalTableMetadata, S exten
   schema: ObjectSchema,
   relations: PgRelationRepositoryWithSchema,
   driver: PgClientDriver,
-  input: Query.UpdateManyInput<S, T>
+  input: Query.UpdateManyInput<S, T>,
+  options?: UpdateQueryOptions
 ) => {
   const builder = createQueryBuilder(driver);
 
-  const { queries, columns } = await prepareUpdateQuery(builder, table, schema, relations, input);
+  const { queries, columns, reloadKey } = await prepareUpdateQuery(builder, table, schema, relations, input, options);
 
   const [statement, variables] = builder.with(queries).build();
 
   return {
     query: statement,
     variables,
+    reloadKey,
     metadata: {
       schema,
       relations,

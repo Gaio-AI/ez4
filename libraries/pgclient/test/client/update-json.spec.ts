@@ -21,6 +21,7 @@ describe('client update json', async () => {
 
   it('assert :: update with optional column', async () => {
     const previous = await client.ez4_test_table.updateOne({
+      previous: true,
       select: {
         json: true
       },

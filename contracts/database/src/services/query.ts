@@ -23,9 +23,15 @@ export namespace Query {
     lock?: LockModeUtils.Input<T>;
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
+    previous?: PreviousInput;
     data: Prettify<UpdateDataInput<T>>;
     where: WhereInput<T, true>;
   };
+
+  /**
+   * When `true`, `select` returns each record as it was before the write instead of as the write left it.
+   */
+  export type PreviousInput = boolean;
 
   export type FindOneInput<S extends AnyObject, T extends TableMetadata> = {
     lock?: LockModeUtils.Input<T>;
@@ -38,6 +44,7 @@ export namespace Query {
     lock?: LockModeUtils.Input<T>;
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
+    previous?: PreviousInput;
     update: Prettify<UpdateDataInput<T>>;
     insert: Prettify<InsertDataInput<T>>;
     where: WhereInput<T, true>;
@@ -57,6 +64,7 @@ export namespace Query {
     lock?: LockModeUtils.Input<T>;
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
+    previous?: PreviousInput;
     data: Prettify<UpdateDataInput<T>>;
     where?: WhereInput<T>;
   };

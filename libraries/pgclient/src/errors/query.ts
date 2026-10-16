@@ -4,6 +4,12 @@ export class MissingUniqueIndexError extends Error {
   }
 }
 
+export class MissingPrimaryIndexError extends Error {
+  constructor(public table: string) {
+    super(`Table '${table}' needs a primary index to select the records as they were before an update.`);
+  }
+}
+
 export class MissingFieldSchemaError extends Error {
   constructor(public field: string) {
     super(`Schema for field '${field}' is missing.`);

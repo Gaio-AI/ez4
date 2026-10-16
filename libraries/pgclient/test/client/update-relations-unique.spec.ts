@@ -139,7 +139,7 @@ describe('client update unique relations', async () => {
     deepEqual(result, {
       value: 'foo',
       relation_unique: {
-        value: 'bar'
+        value: 'bar-updated'
       }
     });
 
@@ -174,7 +174,7 @@ describe('client update unique relations', async () => {
     deepEqual(result, {
       value: 'foo',
       relation: {
-        value: 'bar'
+        value: 'bar-updated'
       }
     });
 
@@ -210,7 +210,7 @@ describe('client update unique relations', async () => {
       value: 'foo',
       relations: [
         {
-          value: 'bar'
+          value: 'bar-connected'
         }
       ]
     });
@@ -258,7 +258,7 @@ describe('client update unique relations', async () => {
     deepEqual(result, {
       value: 'foo',
       relation_unique: {
-        value: 'bar'
+        value: 'bar-connected'
       }
     });
 
@@ -266,6 +266,9 @@ describe('client update unique relations', async () => {
       value: 'bar-connected',
       relation: null
     });
+
+    // The previously related record keeps its own unique key.
+    deepEqual(await client.table_b.findOne({ select: { value: true }, where: { unique_b: uniqueId } }), { value: 'bar' });
   });
 
   it('assert :: update, connect and select relation (unique to primary)', async () => {
@@ -301,7 +304,7 @@ describe('client update unique relations', async () => {
     deepEqual(result, {
       value: 'foo',
       relation: {
-        value: 'bar'
+        value: 'bar-connected'
       }
     });
 
@@ -348,6 +351,9 @@ describe('client update unique relations', async () => {
       relations: [
         {
           value: 'bar'
+        },
+        {
+          value: 'bar-connected'
         }
       ]
     });
@@ -394,10 +400,8 @@ describe('client update unique relations', async () => {
     });
 
     deepEqual(result, {
-      value: 'foo',
-      relation_unique: {
-        value: 'bar'
-      }
+      value: 'foo-updated',
+      relation_unique: null
     });
 
     await assertTableCRelation(primaryId, {
@@ -407,6 +411,9 @@ describe('client update unique relations', async () => {
         value: 'bar'
       }
     });
+
+    // Disconnecting clears this record's foreign key, not the unique key of the related record.
+    deepEqual(await client.table_b.findOne({ select: { value: true }, where: { unique_b: uniqueId } }), { value: 'bar' });
 
     await assertTableBRelation(secondaryId, {
       value: 'bar',
@@ -438,10 +445,8 @@ describe('client update unique relations', async () => {
     });
 
     deepEqual(result, {
-      value: 'foo',
-      relation: {
-        value: 'bar'
-      }
+      value: 'foo-updated',
+      relation: null
     });
 
     await assertTableCRelation(primaryId, {
@@ -480,12 +485,8 @@ describe('client update unique relations', async () => {
     });
 
     deepEqual(result, {
-      value: 'foo',
-      relations: [
-        {
-          value: 'bar'
-        }
-      ]
+      value: 'foo-updated',
+      relations: []
     });
 
     await assertTableCRelations(primaryId, {

@@ -1,6 +1,7 @@
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import type { Table as DbTable, Query } from '@ez4/database';
 import type { ObjectSchema } from '@ez4/schema';
+import type { AnyObject } from '@ez4/utils';
 import type { InternalTableMetadata } from './types';
 
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
@@ -21,6 +22,8 @@ import {
   prepareExists,
   prepareCount
 } from './common/queries';
+
+const READ_BATCH_SIZE = 25;
 
 export type TableSettings = {
   client: DynamoDBDocumentClient;
@@ -130,6 +133,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     const record = await this.updateOne({
       where: query.where as Query.WhereInput<T>,
       select: query.select,
+      previous: query.previous,
       data: query.update
     });
 
@@ -156,11 +160,43 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
     await executeTransaction(client, transactions, debug);
 
-    if (records) {
-      return getTransformedRecords(records, this.schema, query.select) as Query.UpdateManyResult<S, T>;
+    if (!records) {
+      return undefined as Query.UpdateManyResult<S, T>;
     }
 
-    return undefined as Query.UpdateManyResult<S, T>;
+    const { select, previous } = query;
+
+    if (!select || previous) {
+      return getTransformedRecords(records, this.schema, select) as Query.UpdateManyResult<S, T>;
+    }
+
+    // A transaction returns no items, so each record is read again by its key once the write is done, a batch at a
+    // time to keep the reads within the table's throughput.
+    const [[partitionKey, sortKey]] = this.indexes;
+
+    const currentRecords: AnyObject[] = [];
+
+    for (let offset = 0; offset < records.length; offset += READ_BATCH_SIZE) {
+      const batch = await Promise.all(
+        records.slice(offset, offset + READ_BATCH_SIZE).map((record: AnyObject) => {
+          return this.findOne({
+            select,
+            where: {
+              ...(sortKey && { [sortKey]: record[sortKey] }),
+              [partitionKey]: record[partitionKey]
+            } as Query.WhereInput<T, true>
+          });
+        })
+      );
+
+      for (const record of batch) {
+        if (record) {
+          currentRecords.push(record);
+        }
+      }
+    }
+
+    return currentRecords as Query.UpdateManyResult<S, T>;
   }
 
   async findMany<S extends Query.SelectInput<T>, C extends boolean = false>(query: Query.FindManyInput<S, C, T>) {
