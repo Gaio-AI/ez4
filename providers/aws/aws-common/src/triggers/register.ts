@@ -5,9 +5,11 @@ import { tryCreateTrigger } from '@ez4/project/library';
 import { loadStateFile, saveStateFile } from '../common/state';
 import { deploy, report } from '../common/provider';
 import { acquireExclusiveLock, releaseExclusiveLock } from '../common/lock';
+import { prepareMfaSession } from '../common/session';
 
 export const registerTriggers = () => {
   tryCreateTrigger('@ez4/aws-common', {
+    'session:prepare': prepareMfaSession,
     'deploy:plan': planDeploy,
     'deploy:apply': applyDeploy,
     'deploy:lock': deployLock,

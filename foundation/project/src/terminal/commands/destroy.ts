@@ -9,7 +9,7 @@ import { warnUnsupportedFlags } from '../../utils/flags';
 import { loadState, saveState, assertStateUnchanged } from '../../utils/state';
 import { reportResourceChanges } from '../../deploy/changes';
 import { getDeployOptions } from '../../deploy/options';
-import { loadEnvironment } from '../../config/environment';
+import { loadEnvironment, prepareSession } from '../../config/environment';
 import { loadProviders } from '../../config/providers';
 import { loadProject } from '../../config/project';
 import { waitConfirmation } from '../../utils/prompt';
@@ -41,6 +41,8 @@ export const destroyCommand = async (input: InputOptions) => {
   if (input.environment) {
     loadEnvironment(input.environment);
   }
+
+  await prepareSession();
 
   warnUnsupportedFlags(input, {
     environment: true,
