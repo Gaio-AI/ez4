@@ -49,7 +49,7 @@ describe('proxy service and agent proxy environment', () => {
       EZ4_AGENT_NAME: 'Echo'
     };
 
-    applyProxyEnvironment(env);
+    applyProxyEnvironment(env, () => {});
 
     equal(env.HTTPS_PROXY, 'http://Echo:p%40ss@proxy.x.local:3128');
     equal(env.HTTP_PROXY, 'http://Echo:p%40ss@proxy.x.local:3128');
@@ -63,7 +63,29 @@ describe('proxy service and agent proxy environment', () => {
       EZ4_AGENT_NAME: 'Echo'
     };
 
-    applyProxyEnvironment(envNoUrl);
+    applyProxyEnvironment(envNoUrl, () => {});
     equal(envNoUrl.HTTPS_PROXY, undefined);
+  });
+
+  it('assert :: applyProxyEnvironment turns the proxy on for this process after the variables are set', () => {
+    const env: Record<string, string | undefined> = {
+      EZ4_AGENT_PROXY_URL: 'http://proxy.x.local:3128',
+      EZ4_AGENT_PROXY_PASSWORD: 'secret',
+      EZ4_AGENT_NAME: 'Echo'
+    };
+
+    const seen: (string | undefined)[] = [];
+
+    applyProxyEnvironment(env, () => seen.push(env.HTTPS_PROXY));
+
+    deepEqual(seen, ['http://Echo:secret@proxy.x.local:3128']);
+  });
+
+  it('assert :: applyProxyEnvironment leaves this process alone when the proxy is not configured', () => {
+    const seen: string[] = [];
+
+    applyProxyEnvironment({ EZ4_AGENT_NAME: 'Echo' }, () => seen.push('activated'));
+
+    deepEqual(seen, []);
   });
 });
