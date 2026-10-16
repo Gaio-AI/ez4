@@ -360,7 +360,7 @@ describe('select nested relations', () => {
     assert.equal(
       statement,
       `SELECT "R0"."id", ` +
-        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "S0"."id", 'column', "S0"."column") ORDER BY "S0"."column" DESC), '[]'::json) ` +
+        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "S0"."id") ORDER BY "S0"."column" DESC), '[]'::json) ` +
         /**/ `FROM "ez4-test-c" AS "S0" ` +
         /**/ `WHERE "S0"."column" > :0 AND "S0"."relation_b_id" = "R0"."relation_cb_id"` +
         `) AS "relation_cb" ` +
@@ -443,7 +443,7 @@ describe('select nested relations', () => {
     assert.equal(
       statement,
       `SELECT "R0"."id", ` +
-        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "id", 'column', "column") ORDER BY "column" DESC), '[]'::json) ` +
+        `(SELECT COALESCE(json_agg(jsonb_build_object('id', "id") ORDER BY "column" DESC), '[]'::json) ` +
         /**/ `FROM (` +
         /****/ `SELECT "S0"."id", "S0"."column" FROM "ez4-test-c" AS "S0" ` +
         /****/ `WHERE "S0"."column" > :0 AND "S0"."relation_b_id" = "R0"."relation_cb_id" ` +

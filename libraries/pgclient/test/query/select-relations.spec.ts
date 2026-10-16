@@ -242,10 +242,10 @@ describe('select relations', () => {
       `SELECT "R0"."id" FROM "ez4_test_table" AS "R0" WHERE "R0"."id" = :0 AND ` +
         // First relation
         `EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."id" = "R0"."relation1_id") AND ` +
-        // Second relation
-        `EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."relation2_id" != "R0"."id") AND ` +
         // Third relation
-        `NOT EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."relation1_id" != "R0"."id")`
+        `NOT (NOT EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."relation1_id" = "R0"."id")) AND ` +
+        // Second relation
+        `(NOT EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."relation2_id" = "R0"."id"))`
     );
 
     assert.deepEqual(variables, ['00000000-0000-1000-9000-000000000000']);

@@ -113,12 +113,9 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
         continue;
       }
 
+      // The aggregate orders by the table columns, so the order fields stay out of each related record.
       if (!relationIncludes || (!('skip' in relationIncludes) && !('take' in relationIncludes))) {
         const record = getSelectFields(builder, relationFields, null, sourceSchema, relations, relationQuery, sourceTable, true);
-
-        if (relationIncludes?.order) {
-          assignExtraSelectFields(record, relationIncludes.order);
-        }
 
         relationQuery.arrayColumn(record, {
           order: relationIncludes?.order
@@ -130,8 +127,9 @@ export const getSelectFields = <T extends InternalTableMetadata, S extends AnyOb
 
       const record = getSelectFields(builder, relationFields, null, sourceSchema, relations, relationQuery, sourceTable);
 
+      // The page is aggregated from a subquery, which has to return the order fields for the aggregate to sort
+      // by them, while each related record keeps only the selected fields.
       if (relationIncludes?.order) {
-        assignExtraSelectFields(relationFields, relationIncludes.order);
         assignExtraSelectFields(record, relationIncludes.order);
 
         relationQuery.order(relationIncludes.order);
@@ -189,6 +187,8 @@ export const getSelectFilters = (
 ) => {
   const result: SqlFilters = {};
 
+  const missingRelations: SqlFilters[] = [];
+
   for (const filterKey in filters) {
     if (filters[filterKey] === undefined) {
       continue;
@@ -221,27 +221,29 @@ export const getSelectFilters = (
 
         const relationQuery = builder.select(sourceSchema).from(sourceTable).rawColumn(1).as('T');
 
-        result[filterKey] = relationQuery;
-
         if (!source.alias) {
           source.as(builder.alias('R'));
         }
 
-        if (relationFilters) {
-          relationQuery.where({
-            ...relationFilters,
-            [sourceColumn]: source.reference(targetColumn)
-          });
+        relationQuery.where({
+          ...relationFilters,
+          [sourceColumn]: source.reference(targetColumn)
+        });
 
+        // A null filter asks for the records without a related one.
+        if (relationFilters === null) {
+          missingRelations.push({ NOT: { [filterKey]: relationQuery } });
           continue;
         }
 
-        relationQuery.where({
-          [sourceColumn]: {
-            not: source.reference(targetColumn)
-          }
-        });
+        result[filterKey] = relationQuery;
     }
+  }
+
+  // Joined through AND after the loop: a NOT of their own would replace the one the filters carry, and the
+  // filters' own AND is only built inside the loop.
+  if (missingRelations.length) {
+    result.AND = [...(result.AND ?? []), ...missingRelations];
   }
 
   return result;
