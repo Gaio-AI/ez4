@@ -5,7 +5,14 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { defaultGit } from '../src/workspace/git';
-import { checkoutWorkspace, publishWorkspace, pushWorkspaceBranch, refreshCache, withLock, type WorkspaceRuntime } from '../src/workspace/runtime';
+import {
+  checkoutWorkspace,
+  publishWorkspace,
+  pushWorkspaceBranch,
+  refreshCache,
+  withLock,
+  type WorkspaceRuntime
+} from '../src/workspace/runtime';
 
 const git = defaultGit;
 
@@ -164,8 +171,7 @@ describe('workspace :: runtime', () => {
 
   it('assert :: push lands the published head on the branch and the next round fast-forwards it', async () => {
     const { runtime, workdir, remote } = await setupWorkspace({ repos: ['api'] });
-    const remoteHead = async () =>
-      (await git(['rev-parse', 'refs/heads/agent/fix'], { cwd: join(remote, 'api.git') })).stdout.trim();
+    const remoteHead = async () => (await git(['rev-parse', 'refs/heads/agent/fix'], { cwd: join(remote, 'api.git') })).stdout.trim();
 
     const first = await checkoutWorkspace(runtime, workdir);
     await writeFile(join(first.repos.api.path, 'fix.txt'), 'fixed');
