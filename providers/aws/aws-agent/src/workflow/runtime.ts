@@ -114,11 +114,12 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   }
 
   // Rule 6: Otherwise call handler with { runId, step: run?.step ?? 0, state: run?.state, event }
+  // The result names the agent class, and the handler is typed by the key the workflow invoked it with.
   const request: Agent.WorkflowRequest<any> = {
     runId,
     step: run?.step ?? 0,
     state: run?.state,
-    event
+    event: event.type === WorkflowEventType.Result && run?.waitingFor ? { ...event, agent: run.waitingFor.agent } : event
   };
 
   const nextStep = await params.handler(request);
