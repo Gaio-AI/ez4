@@ -3,6 +3,7 @@ import type { StepState, StepHandlers, StepOptions } from '../types/step';
 import type { HydratedEntryState } from '../types/hydrate';
 
 import { CorruptedStateReferences, HandlerNotFoundError, EntriesNotFoundError } from './errors';
+import { getEntryDependencies } from './entry';
 import { hydrateState } from './hydrate';
 import { StepAction } from './step';
 
@@ -20,6 +21,8 @@ export const planSteps = async <E extends EntryState>(
   const deletionSteps: StepState[] = [];
 
   const newEntrySet = new Set<string>();
+
+  const rewrittenEntrySet = new Set<string>();
 
   let actionOrder = 0;
 
@@ -42,7 +45,16 @@ export const planSteps = async <E extends EntryState>(
         break;
       }
 
-      const nextSteps = await planPendingChanges(entries, newEntrySet, oldEntries, handlers, actionOrder++, stepOptions);
+      const nextSteps = await planPendingChanges(
+        entries,
+        newEntrySet,
+        rewrittenEntrySet,
+        newEntries,
+        oldEntries,
+        handlers,
+        actionOrder++,
+        stepOptions
+      );
 
       creationSteps.push(...nextSteps);
     }
@@ -94,9 +106,25 @@ const findPendingRemoval = <E extends EntryState>(entryList: HydratedEntryState<
   });
 };
 
+const getPreviewEntries = <E extends EntryState>(newEntries: EntryStates<E>, rewrittenSet: Set<string>) => {
+  const previewEntries: EntryStates<E> = { ...newEntries };
+
+  for (const entryId of rewrittenSet) {
+    const entry = previewEntries[entryId];
+
+    if (entry) {
+      previewEntries[entryId] = { ...entry, result: undefined };
+    }
+  }
+
+  return previewEntries;
+};
+
 const planPendingChanges = async <E extends EntryState<T>, T extends string>(
   entryList: E[],
   visitSet: Set<string>,
+  rewrittenSet: Set<string>,
+  newEntries: EntryStates<E>,
   oldEntries: EntryStates<E> | undefined,
   handlers: StepHandlers<E>,
   order: number,
@@ -117,18 +145,26 @@ const planPendingChanges = async <E extends EntryState<T>, T extends string>(
     visitSet.add(entryId);
 
     if (!current) {
+      rewrittenSet.add(entryId);
       stateList.push({ action: StepAction.Create, entryId, order });
       continue;
     }
 
     if (type !== current.type) {
+      rewrittenSet.add(entryId);
       stateList.push({ action: StepAction.Replace, entryId, order });
       continue;
     }
 
-    const preview = await handler.preview(candidate, current, options);
+    const preview = await handler.preview(candidate, current, {
+      ...options,
+      getDependencies: <D extends EntryState>(dependencyType?: D['type']) => {
+        return getEntryDependencies<D>(getPreviewEntries(newEntries, rewrittenSet), candidate, dependencyType);
+      }
+    });
 
     if (!handler.equals(candidate, current)) {
+      rewrittenSet.add(entryId);
       stateList.push({ action: StepAction.Replace, entryId, order, preview });
       continue;
     }

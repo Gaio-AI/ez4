@@ -42,6 +42,16 @@ export type StepOptions = {
    * Determines whether the current action has the `force` option enabled.
    */
   force: boolean;
+
+  /**
+   * Get the dependencies of the entry being previewed, if a `type` is given the resulting list
+   * is filtered by entry type. Each one carries the result it has in the current state, except
+   * the ones the plan creates or replaces, which have none yet.
+   *
+   * @param type Optional filter type.
+   * @returns Returns a list containing all matching entry dependencies.
+   */
+  getDependencies?: <E extends EntryState>(type?: E['type']) => E[];
 };
 
 /**

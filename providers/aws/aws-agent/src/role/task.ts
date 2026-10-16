@@ -1,7 +1,7 @@
-import type { EntryState, EntryStates, StepContext } from '@ez4/state';
+import type { EntryState, EntryStates } from '@ez4/state';
 import type { AgentService } from '@ez4/agent/library';
 import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
-import type { RoleState, PolicyState } from '@ez4/aws-identity';
+import type { RoleState, PolicyState, PolicyContext } from '@ez4/aws-identity';
 import type { FileSystemState, AccessPointState } from '@ez4/aws-efs';
 import { getServiceName } from '@ez4/project/library';
 import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
@@ -123,7 +123,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
     policyName,
     policyDocument: createPolicyDocument(grants),
     ...(workspaceArns && {
-      getPolicyDocument: (context: StepContext) => {
+      getPolicyDocument: (context: PolicyContext) => {
         const fileSystem = context
           .getDependencies<FileSystemState>(FileSystemServiceType)
           .find((entry) => entry.entryId === workspaceArns.fileSystem.entryId);
