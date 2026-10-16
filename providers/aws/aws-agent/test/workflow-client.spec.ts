@@ -6,7 +6,7 @@ import { SchemaType } from '@ez4/schema';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
 import { WorkflowClient } from '../src/workflow/client';
-import { getAgentBucketName } from '../src/utils/names';
+import { getAgentBucketName, getAgentsBaseName } from '../src/utils/names';
 
 interface ReviewInput {
   issueId: string;
@@ -147,8 +147,13 @@ describe('workflow client', () => {
     });
 
     await client.start({ issueId: 123 as unknown as string }, { runId: 'r1' });
-    equal(sqs.sent[0].QueueUrl, 'https://sqs/stg-agents-agents-code-agent-start');
-    equal(bucket.startsWith('stg-agents-agents-'), true);
+    equal(sqs.sent[0].QueueUrl, 'https://sqs/stg-agents-code-agent-start');
+    equal(bucket.startsWith('stg-agents-'), true);
     equal((await client.status('r1'))?.status, 'completed');
+  });
+
+  it('assert :: base name drops the agents suffix when the project is already agents', () => {
+    equal(getAgentsBaseName({ prefix: 'stg', projectName: 'agents' }), 'stg-agents');
+    equal(getAgentsBaseName({ prefix: 'stg', projectName: 'billing' }), 'stg-billing-agents');
   });
 });

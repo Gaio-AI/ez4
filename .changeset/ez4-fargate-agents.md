@@ -23,3 +23,4 @@ Introduce autonomous Agent contract with AWS ECS Fargate execution provider:
 - Idempotent EventBridge dispatcher routing completed agent results to FIFO caller queues.
 - Modular AWS library providers split into dedicated packages for reusable infrastructure management: `@ez4/aws-ecr`, `@ez4/aws-ecs`, `@ez4/aws-efs`, `@ez4/aws-cloudmap`, `@ez4/aws-events`, and `@ez4/aws-secret`.
 - `WorkflowClient.fromStage` builds a workflow client from the stage's `prefix`, `projectName` and `branchName` by resolving the start queue and state bucket by name, so scripts outside the deploy can start and read runs; `inputSchema` is optional.
+- Agent resources are named `<prefix>-<project>[-<branch>]-agents`; the `agents` suffix is left out when the project is already called `agents`.

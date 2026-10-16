@@ -5,8 +5,11 @@ import { toKebabCase } from '@ez4/utils';
 
 export type AgentsNameOptions = Pick<DeployOptions, 'prefix' | 'projectName'> & { branchName?: string };
 
+const AGENTS_SUFFIX = 'agents';
+
 export const getAgentsBaseName = (options: AgentsNameOptions) => {
-  const parts = [options.prefix, options.projectName, options.branchName, 'agents'];
+  const suffix = toKebabCase(options.projectName) === AGENTS_SUFFIX ? undefined : AGENTS_SUFFIX;
+  const parts = [options.prefix, options.projectName, options.branchName, suffix];
   return parts
     .filter((part): part is string => !!part)
     .map((part) => toKebabCase(part))
