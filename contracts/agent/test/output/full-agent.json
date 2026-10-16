@@ -1,0 +1,128 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "FullAgent": {
+    "type": "@ez4/agent",
+    "name": "FullAgent",
+    "context": {},
+    "file": "test/input/output-full-agent.ts",
+    "variables": {},
+    "services": {},
+    "provider": "claude",
+    "model": "claude-3-7-sonnet-latest",
+    "instructions": "You are an autonomous engineering agent.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        }
+      },
+      "identity": 1
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "identity": 1
+    },
+    "prepare": {
+      "name": "prepareAgent",
+      "file": "test/input/output-full-agent.ts",
+      "position": [
+        61,
+        1
+      ]
+    },
+    "finish": {
+      "name": "finishAgent",
+      "file": "test/input/output-full-agent.ts",
+      "position": [
+        65,
+        1
+      ]
+    },
+    "resources": {
+      "cpu": 1024,
+      "memory": 2048,
+      "storage": 50,
+      "timeout": 1800
+    },
+    "permissions": {
+      "grants": [
+        {
+          "permission": "logs-read",
+          "resources": [
+            "api-*",
+            "billing-worker"
+          ]
+        }
+      ],
+      "statements": [
+        {
+          "actions": [
+            "s3:GetObject"
+          ],
+          "resources": [
+            "arn:aws:s3:::my-bucket/*"
+          ]
+        }
+      ]
+    },
+    "tools": {
+      "mode": "edit",
+      "allowed": [
+        "Read",
+        "Grep",
+        "Glob"
+      ],
+      "disallowed": [
+        "AskUserQuestion"
+      ]
+    },
+    "image": {
+      "base": "public.ecr.aws/docker/library/node:24-bookworm-slim",
+      "aptPackages": [
+        "curl",
+        "git"
+      ],
+      "npmPackages": [
+        "typescript"
+      ]
+    },
+    "egress": [
+      "api.github.com",
+      ".anthropic.com"
+    ],
+    "secrets": {
+      "GITHUB_TOKEN": "github/token",
+      "API_KEY": "my-secret:KEY"
+    },
+    "mcpServers": {
+      "github": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-github"
+        ]
+      },
+      "remote": {
+        "url": "https://mcp.example.com",
+        "headers": {
+          "Authorization": "Bearer token"
+        }
+      }
+    }
+  }
+}

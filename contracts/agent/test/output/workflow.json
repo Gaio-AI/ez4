@@ -1,0 +1,70 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "BasicAgent": {
+    "type": "@ez4/agent",
+    "name": "BasicAgent",
+    "context": {},
+    "file": "test/input/output-basic-agent.ts",
+    "variables": {},
+    "services": {},
+    "provider": "claude",
+    "model": "claude-3-7-sonnet-latest",
+    "instructions": "You are a helpful assistant.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "identity": 1
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "response": {
+          "type": "string"
+        }
+      },
+      "identity": 1
+    }
+  },
+  "ReviewLoop": {
+    "type": "@ez4/agent-workflow",
+    "name": "ReviewLoop",
+    "context": {},
+    "file": "test/input/output-workflow.ts",
+    "variables": {},
+    "services": {},
+    "agents": {
+      "worker": "BasicAgent"
+    },
+    "maxSteps": 4,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issueId": {
+          "type": "string"
+        }
+      },
+      "identity": 1
+    },
+    "handler": {
+      "name": "reviewLoopStep",
+      "file": "test/input/output-workflow.ts",
+      "position": [
+        12,
+        1
+      ]
+    }
+  }
+}

@@ -74,6 +74,7 @@ Circular linked services are supported. EZ4 resolves linked contexts lazily and 
 
 ## All contracts
 
+- [Agent](../contracts/agent/README.md)
 - [Gateway](../contracts/gateway/README.md)
 - [Database](../contracts/database/README.md)
 - [Cache](../contracts/cache/README.md)
@@ -85,6 +86,106 @@ Circular linked services are supported. EZ4 resolves linked contexts lazily and 
 - [Email](../contracts/email/README.md)
 - [Validation](../contracts/validation/README.md)
 - [Factory](../contracts/factory/README.md)
+
+## Agent
+
+The Agent contract allows declaring autonomous LLM-powered services running on AWS ECS Fargate with dedicated IAM isolation, domain egress restrictions, shared git workspaces, and multi-agent workflow orchestration.
+
+### Service Definition
+
+```typescript
+import type { Environment } from '@ez4/common';
+import { Agent, AgentPermission, AgentProvider, AgentToolsMode, WorkflowEventType } from '@ez4/agent';
+
+export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
+  provider: AgentProvider.Claude;
+  model: 'claude-sonnet-4-5';
+  instructions: 'You are an autonomous code reviewer.';
+  tools: {
+    mode: AgentToolsMode.Readonly;
+    allowed: ['Read', 'Grep', 'Glob'];
+  };
+  workspace: {
+    repos: [{ url: 'https://github.com/acme/project.git' }];
+    auth: {
+      githubApp: {
+        appId: Environment.Variable<'GITHUB_APP_ID'>;
+        installationId: Environment.Variable<'GITHUB_APP_INSTALLATION_ID'>;
+        privateKey: Environment.Variable<'GITHUB_APP_PRIVATE_KEY'>;
+      };
+    };
+  };
+  egress: ['api.github.com'];
+  permissions: {
+    grants: [{ permission: AgentPermission.LogsRead; resources: ['api-*'] }];
+  };
+  resources: {
+    cpu: 1024;
+    memory: 2048;
+    timeout: 3600;
+  };
+}
+```
+
+### Git Workspaces
+
+Agents can declare a `workspace` containing one or more HTTPS git repositories with GitHub App or personal access token credentials. Repositories are cached as bare clones on shared Amazon EFS storage and mounted at `/mnt/ez4-workspace`. Changes between agent invocations are tracked and handed off via custom git refs (`refs/ez4/<agent>/<invocationId>`).
+
+### Workflows
+
+Multi-step agent collaboration is declared using `Agent.Workflow`. Workflows coordinate step-by-step executions across multiple agents with persistent state, step caps (`maxSteps`, 1..100, default 10), and start/result event processing:
+
+```typescript
+export declare class ReviewWorkflow extends Agent.Workflow<{ pullRequest: number }, { status: string }, { review: CodeReviewAgent }> {
+  input: { pullRequest: number };
+  state: { status: string };
+  agents: { review: CodeReviewAgent };
+  maxSteps: 5;
+  handler: typeof reviewStep;
+}
+
+export function reviewStep(
+  request: Agent.WorkflowRequest<ReviewWorkflow>
+): Agent.WorkflowStep<{ status: string }, { review: CodeReviewAgent }> {
+  if (request.event.type === WorkflowEventType.Start) {
+    return {
+      state: { status: 'reviewing' },
+      next: { invoke: 'review', input: { pullRequest: request.event.input.pullRequest } }
+    };
+  }
+  return {
+    state: { status: 'done' },
+    next: { complete: request.event.result.status }
+  };
+}
+```
+
+### Client Invocation
+
+Connected handlers can trigger individual agents or multi-step workflows:
+
+```typescript
+// Single agent invocation
+const { id } = await context.services.CodeReviewAgent.invoke({ pullRequest: 42 }, { correlation: JSON.stringify({ reviewId: 'rev-1' }) });
+
+// Workflow orchestration
+const { runId } = await context.services.ReviewWorkflow.start({ pullRequest: 42 });
+const run = await context.services.ReviewWorkflow.status(runId);
+```
+
+### Provider Architecture
+
+Agent infrastructure deployment is split across focused provider packages:
+
+- `@ez4/aws-agent`: Core Fargate execution provider, runtime entrypoint, egress proxy, and workflow runner.
+- `@ez4/local-agent`: Local development emulator stub.
+- `@ez4/aws-ecr`: ECR repository provisioning and Docker buildx image builds.
+- `@ez4/aws-ecs`: ECS Fargate cluster, task definition, and service management.
+- `@ez4/aws-efs`: Amazon EFS file system, mount targets, and access points for shared git workspaces.
+- `@ez4/aws-cloudmap`: Private DNS service discovery namespace for egress proxy routing.
+- `@ez4/aws-events`: EventBridge lifecycle rules and scheduled sweep dispatchers.
+- `@ez4/aws-secret`: Secrets Manager integration for provider and proxy credentials.
+- `@ez4/aws-vpc`: VPC subnet and security group tag discovery.
 
 ## What's next
 

@@ -1,0 +1,420 @@
+import type { AgentService } from '@ez4/agent/library';
+import { AgentProvider } from '@ez4/agent';
+import type { CredentialPorts } from '../auth/login';
+import type { LogGroupState } from '@ez4/aws-logs';
+import type { RoleState } from '@ez4/aws-identity';
+import type { ConnectResourceEvent, DeployOptions, PrepareResourceEvent } from '@ez4/project/library';
+import type { NetworkLookup } from '../network/discovery';
+import type { StepContext } from '@ez4/state';
+import type { EcrImageState, EcrRepositoryState } from '@ez4/aws-ecr';
+import type { EcsTaskDefState } from '@ez4/aws-ecs';
+import type { SecretState } from '@ez4/aws-secret';
+import type { AccessPointState, MountTargetState } from '@ez4/aws-efs';
+import { AccessPointServiceType, isMountTargetState, createFileSystemStateId, createAccessPointStateId } from '@ez4/aws-efs';
+import { prepareWorkspaceResources, type WorkspaceResources, AgentEfsNetworkTag, getWorkspaceFileSystemName } from '../workspace/resources';
+import { AgentNetworkTag } from '../network/discovery';
+import { isAgentService, isAgentWorkflowService } from '@ez4/agent/library';
+import { prepareWorkflowResources } from '../workflow/resources';
+import { createBucket, createBucketStateId } from '@ez4/aws-bucket';
+import { getAccountId, getRegion, RoleServiceType } from '@ez4/aws-identity';
+import { createLogGroup, LogGroupServiceType } from '@ez4/aws-logs';
+import { getDefaultVpcId, getTaggedSecurityGroupIds, getTaggedSubnetIds } from '@ez4/aws-vpc';
+import { linkEntryConnection, linkEntryDependency } from '@ez4/state';
+import { linkServiceContext } from '@ez4/project/library';
+import { hashData, hashObject, toKebabCase } from '@ez4/utils';
+
+import { buildAgentBundle } from '../runtime/bundle';
+import {
+  createEcsCluster,
+  createEcsClusterStateId,
+  createEcsService,
+  createEcsServiceStateId,
+  createEcsTaskDefinition,
+  EcsServiceServiceName
+} from '@ez4/aws-ecs';
+import { createEcrImage, createEcrRepository, createEcrRepositoryStateId, EcrImageServiceType } from '@ez4/aws-ecr';
+import { computeImageTag, generateDockerfile } from '../image/dockerfile';
+import { buildTaskDefinitionInput } from '../agent/taskdef';
+import { discoverAgentNetwork } from '../network/discovery';
+import { createSecret, createSecretStateId, SecretServiceType } from '@ez4/aws-secret';
+import { generateAgentPassword, generateHtpasswd } from '../proxy/auth';
+import { createNamespace, createNamespaceStateId, NamespaceServiceType, type NamespaceState } from '@ez4/aws-cloudmap';
+import { IncompleteResourceError } from '@ez4/aws-common';
+import { buildProxyTaskDefinitionInput, PROXY_IMAGE, PROXY_START_SCRIPT } from '../proxy/taskdef';
+import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
+import { ensureProviderCredential, getDefaultCredentialPorts } from '../auth/login';
+import { ProviderAuths } from '../auth/providers';
+import { buildAgentExecutionRole } from '../role/execution';
+import { buildAgentTaskRole } from '../role/task';
+import {
+  getAgentBucketName,
+  getAgentClusterName,
+  getAgentLogGroupName,
+  getAgentRepositoryName,
+  getAgentsBaseName,
+  getAgentsNamespaceName,
+  getAgentProxyUrl,
+  getAgentProxySecretName,
+  getAgentWorkspaceSecretName,
+  getProviderSecretName
+} from '../utils/names';
+import { buildDispatcherBundle, prepareDispatcher } from '../dispatch/resources';
+
+export type AgentResourcePorts = {
+  network: NetworkLookup;
+  bundle: (agent: AgentService, options: DeployOptions) => Promise<{ file: string; hash: string }>;
+  identity: () => Promise<{ region: string; accountId: string }>;
+  dispatcherBundle: () => Promise<string>;
+  credential: CredentialPorts;
+};
+
+const defaultPorts: AgentResourcePorts = {
+  network: { getDefaultVpcId, getTaggedSubnetIds, getTaggedSecurityGroupIds },
+  bundle: buildAgentBundle,
+  dispatcherBundle: buildDispatcherBundle,
+  identity: async () => {
+    const [region, accountId] = await Promise.all([getRegion(), getAccountId()]);
+    return { region, accountId };
+  },
+  credential: getDefaultCredentialPorts()
+};
+
+export const prepareAgentResources = async (event: PrepareResourceEvent, ports: AgentResourcePorts = defaultPorts): Promise<boolean> => {
+  const { state, service, metadata, options, context } = event;
+  if (isAgentWorkflowService(service)) {
+    await prepareWorkflowResources(state, service, metadata, context, options, { identity: ports.identity });
+    return true;
+  }
+  if (!isAgentService(service)) return false;
+  const { region, accountId } = await ports.identity();
+  const network = await discoverAgentNetwork(undefined, ports.network);
+
+  const agents = Object.values(event.metadata).filter(isAgentService);
+  // Every agent's credential exists before the proxy service, which mounts all of their hashes.
+  const credentials = agents.map((agent) => {
+    const secretName = getAgentProxySecretName(agent, options);
+    return (
+      state[createSecretStateId(secretName)] ??
+      createSecret(state, {
+        secretName,
+        description: `EZ4 egress proxy credentials for agent ${agent.name}`,
+        getSecretValue: () => {
+          const password = generateAgentPassword();
+          return Promise.resolve({
+            username: agent.name,
+            password,
+            htpasswd: generateHtpasswd({ [agent.name]: password }).trim()
+          });
+        },
+        tags: options.tags
+      })
+    );
+  });
+  const credential = credentials[agents.findIndex((agent) => agent.name === service.name)];
+
+  const provider = service.provider ?? AgentProvider.Claude;
+  const providerAuth = ProviderAuths[provider];
+  let providerCredentialEntryId: string | undefined;
+
+  if (providerAuth && !service.secrets?.[providerAuth.envName]) {
+    const secretName = getProviderSecretName(provider, options);
+    await ensureProviderCredential(provider, secretName, ports.credential, options.tags);
+    const providerSecretId = createSecretStateId(secretName);
+    const providerCredential =
+      state[providerSecretId] ??
+      createSecret(state, {
+        secretName,
+        description: `EZ4 agent provider credentials for ${provider}`,
+        retain: true,
+        tags: options.tags
+      });
+    providerCredentialEntryId = providerCredential.entryId;
+  }
+
+  // GitHub App credentials are declared values: they live in a secret ez4 manages and rewrites when they change.
+  const githubApp = service.workspace?.auth && 'githubApp' in service.workspace.auth ? service.workspace.auth.githubApp : undefined;
+  const workspaceCredential =
+    githubApp &&
+    createSecret(state, {
+      secretName: getAgentWorkspaceSecretName(service, options),
+      description: `EZ4 workspace GitHub App credentials for agent ${service.name}`,
+      valueHash: hashData(githubApp.appId, githubApp.installationId, githubApp.privateKey),
+      getSecretValue: () =>
+        Promise.resolve({
+          GITHUB_APP_ID: githubApp.appId,
+          GITHUB_APP_INSTALLATION_ID: githubApp.installationId,
+          GITHUB_APP_PRIVATE_KEY: githubApp.privateKey
+        }),
+      tags: options.tags
+    });
+
+  const clusterName = getAgentClusterName(options);
+  const bucketName = getAgentBucketName(options);
+  const cluster = state[createEcsClusterStateId(clusterName)] ?? createEcsCluster(state, { clusterName, tags: options.tags });
+  const bucket = state[createBucketStateId(bucketName)] ?? createBucket(state, { bucketName, tags: options.tags });
+  const executionRoleName = `${getAgentsBaseName(options)}-execution-role`;
+  const executionRoleId = hashData(RoleServiceType, executionRoleName);
+  const workspaceSecrets: Record<string, string> = {};
+  for (const agent of agents) {
+    const auth = agent.workspace?.auth;
+    if (auth && 'githubApp' in auth) {
+      workspaceSecrets[`EZ4_WORKSPACE_${toKebabCase(agent.name)}`] = getAgentWorkspaceSecretName(agent, options);
+    } else if (auth && 'token' in auth && auth.token) {
+      workspaceSecrets['EZ4_WORKSPACE_TOKEN'] = String(auth.token);
+    }
+  }
+
+  let workspaceResources: WorkspaceResources | undefined;
+  if (agents.some((agent) => !!agent.workspace)) {
+    const efsSecurityGroupIds = ports.network.findSecurityGroupsByTag
+      ? await ports.network.findSecurityGroupsByTag(AgentEfsNetworkTag, network.vpcId)
+      : ports.network.getTaggedSecurityGroupIds
+        ? await ports.network.getTaggedSecurityGroupIds(network.vpcId, AgentEfsNetworkTag)
+        : [];
+
+    let subnets: Array<{ subnetId: string; availabilityZone: string }>;
+    if (ports.network.findSubnetsByTag) {
+      const foundSubnets = await ports.network.findSubnetsByTag(AgentNetworkTag, network.vpcId);
+      subnets = foundSubnets.map((s, idx) => ({
+        subnetId: s.subnetId,
+        availabilityZone: s.availabilityZone ?? `az-${idx}`
+      }));
+    } else {
+      subnets = network.subnetIds.map((subnetId, idx) => ({
+        subnetId,
+        availabilityZone: `az-${idx}`
+      }));
+    }
+
+    workspaceResources = prepareWorkspaceResources(state, agents, options, {
+      subnets,
+      efsSecurityGroupIds: efsSecurityGroupIds ?? []
+    });
+  }
+
+  const executionSecrets = Object.assign(
+    {},
+    ...agents.map((agent) => agent.secrets ?? {}),
+    service.secrets ?? {},
+    workspaceSecrets,
+    providerAuth ? { [providerAuth.envName]: getProviderSecretName(provider, options) } : {},
+    ...agents.map((agent) => ({
+      [`EZ4_PROXY_${toKebabCase(agent.name)}`]: getAgentProxySecretName(agent, options)
+    }))
+  );
+  const executionRole =
+    (state[executionRoleId] as RoleState | undefined) ??
+    buildAgentExecutionRole(state, { ...service, secrets: executionSecrets }, options, region, accountId);
+  const namespaceName = getAgentsNamespaceName(options);
+  const namespace =
+    state[createNamespaceStateId(namespaceName)] ??
+    createNamespace(state, { namespaceName, vpcId: network.vpcId, serviceName: 'proxy', tags: options.tags });
+  const proxyServiceName = `${getAgentsBaseName(options)}-proxy`;
+  if (!state[createEcsServiceStateId(proxyServiceName)]) {
+    const proxyLogGroup = createLogGroup(state, { groupName: proxyServiceName, retention: 30, tags: options.tags });
+    const squidConfig = generateSquidConfig({
+      agents: agents.map((agent) => ({ agentName: agent.name, allowedDomains: getAgentEgressDomains(agent, region, accountId) }))
+    });
+    const proxyEntryId = createEcsServiceStateId(proxyServiceName);
+    createEcsService(state, [namespace, proxyLogGroup, executionRole, cluster, ...credentials], {
+      serviceName: proxyServiceName,
+      clusterName,
+      subnetIds: network.subnetIds,
+      securityGroupIds: network.proxySecurityGroupIds,
+      hash: hashData(PROXY_IMAGE, PROXY_START_SCRIPT, squidConfig, region, ...network.subnetIds, ...network.proxySecurityGroupIds),
+      tags: options.tags,
+      getTaskDefinition: (stepContext: StepContext) => {
+        const executionRoleArn = stepContext
+          .getDependencies<RoleState>(RoleServiceType)
+          .find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-execution-role'))?.result?.roleArn;
+        if (!executionRoleArn) {
+          throw new IncompleteResourceError(EcsServiceServiceName, proxyEntryId, 'executionRoleArn');
+        }
+        const credentialSecretArns = stepContext
+          .getDependencies<SecretState>(SecretServiceType)
+          .map((entry) => entry.result?.secretArn)
+          .filter((arn): arn is string => !!arn)
+          .sort();
+        return buildProxyTaskDefinitionInput({
+          baseName: getAgentsBaseName(options),
+          squidConfig,
+          credentialSecretArns,
+          executionRoleArn,
+          logGroupName: proxyServiceName,
+          region
+        });
+      },
+      getServiceRegistryArn: (stepContext: StepContext) => {
+        const registryArn = stepContext.getDependencies<NamespaceState>(NamespaceServiceType).at(0)?.result?.discoveryServiceArn;
+        if (!registryArn) {
+          throw new IncompleteResourceError(EcsServiceServiceName, proxyEntryId, 'registryArn');
+        }
+        return registryArn;
+      }
+    });
+  }
+  const linkedAgents = Object.values(service.services ?? {})
+    .map(({ reference }) => reference)
+    .filter((name) => !!name && isAgentService(event.metadata[name] ?? {}));
+  const taskRole = buildAgentTaskRole(state, service, options, accountId, linkedAgents, service.workspace ? workspaceResources : undefined);
+  const logGroup = createLogGroup(state, { groupName: getAgentLogGroupName(service, options), retention: 30, tags: options.tags });
+  const dispatcherGroupName = `${getAgentsBaseName(options)}-dispatcher`;
+  const dispatcherGroupId = hashData(LogGroupServiceType, dispatcherGroupName);
+  const dispatcherLogGroup =
+    (state[dispatcherGroupId] as LogGroupState | undefined) ??
+    createLogGroup(state, {
+      groupName: dispatcherGroupName,
+      retention: 30,
+      tags: options.tags
+    });
+  prepareDispatcher(state, options, {
+    region,
+    accountId,
+    bucketName,
+    clusterName,
+    logGroup: dispatcherLogGroup,
+    bundle: ports.dispatcherBundle
+  });
+  // The agent bundle and its image come in connect, once the linked services filled the agent's `context` and `variables`.
+  createEcrRepository(state, {
+    repositoryName: getAgentRepositoryName(service, options),
+    scanOnPush: true,
+    tags: options.tags
+  });
+
+  const workspaceDependencies: string[] = [];
+  if (service.workspace && workspaceResources) {
+    workspaceDependencies.push(workspaceResources.accessPoint.entryId);
+    const fsEntryId = workspaceResources.fileSystem.entryId;
+    const mountTargets = Object.values(state).filter(
+      (e): e is MountTargetState => !!e && isMountTargetState(e) && e.dependencies.includes(fsEntryId)
+    );
+    for (const mt of mountTargets) {
+      workspaceDependencies.push(mt.entryId);
+    }
+  }
+
+  const taskdef = createEcsTaskDefinition(
+    state,
+    [
+      logGroup.entryId,
+      taskRole.entryId,
+      executionRole.entryId,
+      credential.entryId,
+      ...(providerCredentialEntryId ? [providerCredentialEntryId] : []),
+      ...(workspaceCredential ? [workspaceCredential.entryId] : []),
+      ...workspaceDependencies
+    ],
+    {
+      family: service.name,
+      subnetIds: network.subnetIds,
+      securityGroupIds: network.securityGroupIds,
+      tags: options.tags,
+      // Everything known before linked services resolve; connect folds in the image tag and the variables.
+      hash: hashObject({
+        runtime: { resources: service.resources, secrets: service.secrets, workspace: service.workspace },
+        region,
+        proxyUrl: getAgentProxyUrl(options),
+        providerSecret: providerAuth?.envName,
+        subnetIds: network.subnetIds,
+        securityGroupIds: network.securityGroupIds
+      }),
+      getTaskDefinition: (stepContext: StepContext) => {
+        const imageDep = stepContext.getDependencies<EcrImageState>(EcrImageServiceType).at(0);
+        const imageUri = imageDep?.result?.imageUri ?? '';
+        const roles = stepContext.getDependencies<RoleState>(RoleServiceType);
+        const taskRoleArn = roles.find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-task-role'))?.result?.roleArn ?? '';
+        const executionRoleArn =
+          roles.find(({ parameters: roleParams }) => roleParams.roleName.endsWith('-execution-role'))?.result?.roleArn ?? '';
+        const logDep = stepContext.getDependencies<LogGroupState>(LogGroupServiceType).at(0);
+        const logGroupArn = logDep?.result?.groupArn ?? '';
+        const allSecrets = stepContext.getDependencies<SecretState>(SecretServiceType);
+        const proxyCred = allSecrets.find((s) => s.parameters.secretName === getAgentProxySecretName(service, options));
+        const proxySecretArn = proxyCred?.result?.secretArn ?? '';
+        const providerSecrets: Array<{ name: string; secretArn: string }> = [];
+        if (providerCredentialEntryId && providerAuth) {
+          const providerSecretName = getProviderSecretName(provider, options);
+          const providerCred = allSecrets.find((s) => s.parameters.secretName === providerSecretName);
+          if (providerCred?.result?.secretArn) {
+            providerSecrets.push({ name: providerAuth.envName, secretArn: providerCred.result.secretArn });
+          }
+        }
+        const workspaceSecretName = getAgentWorkspaceSecretName(service, options);
+        const workspaceSecretArn = allSecrets.find((s) => s.parameters.secretName === workspaceSecretName)?.result?.secretArn;
+        const apDep = stepContext.getDependencies<AccessPointState>(AccessPointServiceType).at(0);
+        const workspaceEfs = apDep?.result
+          ? {
+              fileSystemId: apDep.result.fileSystemId,
+              accessPointId: apDep.result.accessPointId
+            }
+          : undefined;
+        return buildTaskDefinitionInput(service, imageUri, taskRoleArn, executionRoleArn, logGroupArn, {
+          baseName: getAgentsBaseName(options),
+          bucketName,
+          region,
+          // Project, agent and linked-service variables reach the hooks' `context.variables` through the container environment.
+          variables: { ...options.variables, ...service.variables },
+          proxy: {
+            url: getAgentProxyUrl(options),
+            secretArn: proxySecretArn
+          },
+          ...(workspaceEfs ? { workspace: workspaceEfs } : {}),
+          ...(providerSecrets.length > 0 ? { providerSecrets } : {}),
+          ...(workspaceSecretArn ? { workspaceSecretArn } : {})
+        });
+      }
+    }
+  );
+  linkEntryConnection(state, taskdef.entryId, cluster.entryId);
+  linkEntryConnection(state, taskdef.entryId, bucket.entryId);
+  if (service.workspace && workspaceResources) {
+    linkEntryConnection(state, taskdef.entryId, workspaceResources.fileSystem.entryId);
+    linkEntryConnection(state, taskdef.entryId, workspaceResources.accessPoint.entryId);
+  }
+
+  context.setServiceState(service, options, taskdef);
+  return true;
+};
+
+export const connectAgentResources = async (event: ConnectResourceEvent, ports: Pick<AgentResourcePorts, 'bundle'> = defaultPorts) => {
+  const { state, service, options, context } = event;
+  if (isAgentWorkflowService(service)) {
+    linkServiceContext(state, context.getServiceState(service, options).entryId, service.context ?? {});
+    return;
+  }
+  if (!isAgentService(service)) return;
+  const taskdef = context.getServiceState(service, options) as EcsTaskDefState;
+  linkServiceContext(state, taskdef.entryId, service.context ?? {});
+
+  // The hooks bundle the clients of the agent's linked services, filled in only after prepare.
+  const bundle = await ports.bundle(service, options);
+  const dockerfile = generateDockerfile(service);
+  const repository = state[createEcrRepositoryStateId(getAgentRepositoryName(service, options))] as EcrRepositoryState;
+  const image = createEcrImage(state, repository, {
+    imageName: service.name,
+    dockerfile,
+    bundleFile: bundle.file,
+    bundleHash: bundle.hash,
+    imageTag: computeImageTag(dockerfile, bundle.hash)
+  });
+  linkEntryDependency(state, taskdef.entryId, image.entryId);
+  // A new image tag or variable registers a new revision.
+  taskdef.parameters.hash = hashObject({
+    definition: taskdef.parameters.hash,
+    imageTag: image.parameters.imageTag,
+    variables: { ...options.variables, ...service.variables }
+  });
+
+  linkEntryConnection(state, taskdef.entryId, createEcsClusterStateId(getAgentClusterName(options)));
+  linkEntryConnection(state, taskdef.entryId, createBucketStateId(getAgentBucketName(options)));
+  if (service.workspace) {
+    const fileSystemStateId = createFileSystemStateId(getWorkspaceFileSystemName(options));
+    if (state[fileSystemStateId]) {
+      linkEntryConnection(state, taskdef.entryId, fileSystemStateId);
+    }
+    const accessPointStateId = createAccessPointStateId(fileSystemStateId, getWorkspaceFileSystemName(options));
+    if (state[accessPointStateId]) {
+      linkEntryConnection(state, taskdef.entryId, accessPointStateId);
+    }
+  }
+};

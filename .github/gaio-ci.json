@@ -20,7 +20,15 @@
   ],
   "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
   "lint": "bash scripts/ci-build-once.sh && npm query .workspace | jq -r '.[].name' | xargs -P \"$(nproc)\" -I{} npm run lint -w {} --if-present && node --test scripts/ci-config.test.mjs",
-  "shared-inputs": ["package-lock.json", "package.json", ".nvmrc", ".npmrc", "tsconfig.base.json", "eslint.base.js", "scripts/ci-build-once.sh"],
+  "shared-inputs": [
+    "package-lock.json",
+    "package.json",
+    ".nvmrc",
+    ".npmrc",
+    "tsconfig.base.json",
+    "eslint.base.js",
+    "scripts/ci-build-once.sh"
+  ],
   "ignore": [".github/", "*.md"],
   "tasks": [
     {
@@ -69,19 +77,27 @@
       "name": "test-offline",
       "script": "test:offline",
       "packages": [
+        "@ez4/aws-agent",
         "@ez4/aws-aurora",
         "@ez4/aws-bucket",
         "@ez4/aws-cloudfront",
+        "@ez4/aws-cloudmap",
         "@ez4/aws-common",
         "@ez4/aws-dynamodb",
+        "@ez4/aws-ecr",
+        "@ez4/aws-ecs",
+        "@ez4/aws-efs",
+        "@ez4/aws-events",
         "@ez4/aws-function",
         "@ez4/aws-gateway",
         "@ez4/aws-identity",
         "@ez4/aws-logs",
         "@ez4/aws-queue",
         "@ez4/aws-scheduler",
+        "@ez4/aws-secret",
         "@ez4/aws-topic",
-        "@ez4/aws-valkey"
+        "@ez4/aws-valkey",
+        "@ez4/aws-vpc"
       ],
       "run": "npm run test:offline -w {package}",
       "prepare": { "*": "bash scripts/ci-build-once.sh" }

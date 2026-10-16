@@ -1,0 +1,65 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "WorkspaceAgent": {
+    "type": "@ez4/agent",
+    "name": "WorkspaceAgent",
+    "context": {},
+    "file": "test/input/output-workspace-agent.ts",
+    "variables": {},
+    "services": {},
+    "provider": "claude",
+    "model": "opus",
+    "instructions": "Work on the repos.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        }
+      },
+      "identity": 1
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "identity": 1
+    },
+    "tools": {
+      "mode": "edit"
+    },
+    "workspace": {
+      "repos": [
+        {
+          "url": "https://github.com/acme/api.git",
+          "name": "api",
+          "branch": "main"
+        },
+        {
+          "url": "https://github.com/acme/web.git",
+          "name": "frontend",
+          "branch": "develop"
+        }
+      ],
+      "auth": {
+        "githubApp": {
+          "appId": "123",
+          "installationId": "456",
+          "privateKey": "app-private-key"
+        }
+      }
+    }
+  }
+}

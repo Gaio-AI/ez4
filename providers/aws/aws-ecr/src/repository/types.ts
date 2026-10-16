@@ -1,0 +1,26 @@
+import type { ResourceTags } from '@ez4/aws-common';
+import type { EntryState } from '@ez4/state';
+
+export const EcrRepositoryServiceName = 'AWS:ECR/Repository';
+
+export const EcrRepositoryServiceType = 'aws:ecr.repository';
+
+export type EcrRepositoryParameters = {
+  repositoryName: string;
+  tags?: ResourceTags;
+  imageTagMutability?: 'MUTABLE' | 'IMMUTABLE';
+  scanOnPush?: boolean;
+  lifecyclePolicyText?: string;
+};
+
+export type EcrRepositoryResult = {
+  repositoryName: string;
+  repositoryArn: string;
+  repositoryUri: string;
+};
+
+export type EcrRepositoryState = EntryState & {
+  type: typeof EcrRepositoryServiceType;
+  parameters: EcrRepositoryParameters;
+  result?: EcrRepositoryResult;
+};

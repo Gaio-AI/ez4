@@ -1,5 +1,5 @@
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
-import type { StepHandler } from '@ez4/state';
+import type { StepContext, StepHandler } from '@ez4/state';
 import type { PolicyDocument } from '../types/policy';
 import type { PolicyState, PolicyResult, PolicyParameters } from './types';
 
@@ -23,10 +23,28 @@ const equalsResource = (candidate: PolicyState, current: PolicyState) => {
 };
 
 const previewResource = (candidate: PolicyState, current: PolicyState) => {
-  const target = { ...candidate.parameters, dependencies: candidate.dependencies };
-  const source = { ...current.parameters, dependencies: current.dependencies };
+  const currentDocument = current.result?.resolvedDocument ?? current.parameters.policyDocument;
+  const target = { ...candidate.parameters, getPolicyDocument: undefined, dependencies: candidate.dependencies };
+  const source = {
+    ...current.parameters,
+    policyDocument: currentDocument,
+    getPolicyDocument: undefined,
+    dependencies: current.dependencies
+  };
 
   const changes = deepCompare(target, source);
+
+  if (candidate.parameters.getPolicyDocument) {
+    const hasDocChange = !!changes?.update?.policyDocument;
+    return {
+      name: target.policyName,
+      counts: (changes?.counts ?? 0) + (hasDocChange ? 0 : 1),
+      update: {
+        ...changes?.update,
+        policyDocument: true
+      }
+    };
+  }
 
   if (!changes.counts) {
     return undefined;
@@ -38,16 +56,16 @@ const previewResource = (candidate: PolicyState, current: PolicyState) => {
   };
 };
 
-const replaceResource = async (candidate: PolicyState, current: PolicyState) => {
+const replaceResource = async (candidate: PolicyState, current: PolicyState, context: StepContext) => {
   if (current.result) {
     throw new ReplaceResourceError(PolicyServiceName, candidate.entryId, current.entryId);
   }
 
-  return createResource(candidate);
+  return createResource(candidate, context);
 };
 
-const createResource = (candidate: PolicyState): Promise<PolicyResult> => {
-  const { parameters } = candidate;
+const createResource = (candidate: PolicyState, context: StepContext): Promise<PolicyResult> => {
+  const parameters = resolvePolicyParameters(candidate.parameters, context);
 
   return OperationLogger.logExecution(PolicyServiceName, parameters.policyName, 'creation', async (logger) => {
     const importedPolicy = await importPolicy(logger, parameters.policyName);
@@ -58,7 +76,8 @@ const createResource = (candidate: PolicyState): Promise<PolicyResult> => {
       return {
         versionHistory,
         currentVersion,
-        policyArn
+        policyArn,
+        resolvedDocument: parameters.policyDocument
       };
     }
 
@@ -67,13 +86,15 @@ const createResource = (candidate: PolicyState): Promise<PolicyResult> => {
     return {
       versionHistory: [],
       currentVersion: response.currentVersion,
-      policyArn: response.policyArn
+      policyArn: response.policyArn,
+      resolvedDocument: parameters.policyDocument
     };
   });
 };
 
-const updateResource = (candidate: PolicyState, current: PolicyState) => {
-  const { result, parameters } = candidate;
+const updateResource = (candidate: PolicyState, current: PolicyState, context: StepContext) => {
+  const result = candidate.result ?? current.result;
+  const parameters = resolvePolicyParameters(candidate.parameters, context);
   const { policyName } = parameters;
 
   return OperationLogger.logExecution(PolicyServiceName, policyName, 'updates', async (logger) => {
@@ -81,9 +102,9 @@ const updateResource = (candidate: PolicyState, current: PolicyState) => {
       throw new CorruptedResourceError(PolicyServiceName, policyName);
     }
 
-    await checkTagUpdates(logger, result.policyArn, candidate.parameters, current.parameters);
+    await checkTagUpdates(logger, result.policyArn, parameters, current.parameters);
 
-    const newResult = await checkDocumentUpdates(logger, result, candidate.parameters, current.parameters);
+    const newResult = await checkDocumentUpdates(logger, result, parameters, current.parameters);
 
     return {
       ...result,
@@ -107,26 +128,37 @@ const deleteResource = async (current: PolicyState) => {
   }
 };
 
+export const resolvePolicyParameters = (parameters: PolicyParameters, context?: StepContext): PolicyParameters => {
+  const { getPolicyDocument, ...request } = parameters;
+  return {
+    ...request,
+    policyDocument: (context && getPolicyDocument?.(context)) ?? request.policyDocument
+  };
+};
+
+export const hasPolicyDocumentChanges = (candidate: PolicyParameters, current: PolicyParameters, result?: PolicyResult): boolean => {
+  const previousDocument = result?.resolvedDocument ?? current.policyDocument;
+  return !deepEqual(candidate.policyDocument, previousDocument);
+};
+
 const checkDocumentUpdates = async (
   logger: OperationLogLine,
   result: PolicyResult,
   candidate: PolicyParameters,
   current: PolicyParameters
 ) => {
-  const hasChanges = !deepEqual(candidate, current, {
-    exclude: {
-      policyName: true,
-      tags: true
-    }
-  });
+  const hasChanges = hasPolicyDocumentChanges(candidate, current, result);
 
   if (hasChanges) {
-    return createVersion(logger, result, candidate.policyDocument);
+    const updated = await createVersion(logger, result, candidate.policyDocument);
+    return { ...updated, resolvedDocument: candidate.policyDocument };
   }
 
-  return result;
+  return {
+    ...result,
+    resolvedDocument: candidate.policyDocument
+  };
 };
-
 const checkTagUpdates = async (logger: OperationLogLine, policyArn: Arn, candidate: PolicyParameters, current: PolicyParameters) => {
   await applyTagUpdates(
     candidate.tags,
