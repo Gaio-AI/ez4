@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-efs",
   "description": "EZ4: Self-managed AWS EFS provider",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
