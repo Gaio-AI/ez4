@@ -19,7 +19,7 @@ import {
   normalizeDomain,
   getAgentEgressDomains
 } from '../src/proxy/config';
-import { AgentPermission } from '@ez4/agent';
+import { AgentPermission, AgentProvider } from '@ez4/agent';
 import { generateHtpasswd, generateAgentPassword, md5Crypt } from '../src/proxy/auth';
 import {
   createSecret,
@@ -258,12 +258,12 @@ describe('proxy :: configuration and auth', () => {
     setSecretsManagerClient(null);
   });
   it('resolves agent egress domains as the provider hosts plus the declared egress', () => {
-    const domains = getAgentEgressDomains({ provider: 'claude', egress: ['github.com'] }, 'us-east-1', '123456789012');
+    const domains = getAgentEgressDomains({ provider: AgentProvider.Claude, egress: ['github.com'] }, 'us-east-1', '123456789012');
     for (const domain of ['api.anthropic.com', 'claude.ai', 'claude.com', 'platform.claude.com', 'console.anthropic.com']) {
       ok(domains.includes(domain), domain);
     }
     ok(domains.includes('github.com'));
-    const runtimeDomains = getAgentEgressDomains({ provider: 'claude' }, 'eu-west-1', '123456789012');
+    const runtimeDomains = getAgentEgressDomains({ provider: AgentProvider.Claude }, 'eu-west-1', '123456789012');
     ok(runtimeDomains.includes('ecs.eu-west-1.amazonaws.com'));
     ok(runtimeDomains.includes('sts.eu-west-1.amazonaws.com'));
     ok(runtimeDomains.includes('sts.amazonaws.com'));

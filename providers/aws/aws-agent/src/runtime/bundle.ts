@@ -3,6 +3,7 @@ import type { FunctionSignature } from '@ez4/common/library';
 import type { DeployOptions } from '@ez4/project/library';
 import type { AgentEntryDefinition } from './entry';
 
+import { AgentToolsMode } from '@ez4/agent';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -24,7 +25,7 @@ export const getAgentEntryDefinition = (agent: AgentService): AgentEntryDefiniti
     provider: agent.provider!,
     model: agent.model!,
     instructions: agent.instructions!,
-    tools: agent.tools ?? { mode: 'readonly' },
+    tools: agent.tools ?? { mode: AgentToolsMode.Readonly },
     mcpServers: agent.mcpServers ?? {},
     inputSchema: agent.inputSchema!,
     outputSchema: agent.outputSchema!,

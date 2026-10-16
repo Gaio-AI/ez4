@@ -1,4 +1,4 @@
-import type { Agent } from '@ez4/agent';
+import type { Agent, AgentProvider } from '@ez4/agent';
 
 export interface BasicInput {
   prompt: string;
@@ -9,7 +9,7 @@ export interface BasicOutput {
 }
 
 export declare class BasicAgent extends Agent.Service<BasicInput, BasicOutput> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'claude-3-7-sonnet-latest';
   instructions: 'You are a helpful assistant.';
   input: BasicInput;

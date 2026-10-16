@@ -1,4 +1,5 @@
 import type { AgentProvider, AgentProviderRequest, AgentProviderResponse } from '../types';
+import { AgentToolsMode } from '@ez4/agent';
 import { query as defaultQuery } from '@anthropic-ai/claude-agent-sdk';
 
 export interface ClaudeProviderOptions {
@@ -38,7 +39,7 @@ export class ClaudeAgentProvider implements AgentProvider {
     }
 
     const disallowedTools = ['AskUserQuestion', ...(request.tools.disallowed ?? [])];
-    const isEditMode = request.tools.mode === 'edit';
+    const isEditMode = request.tools.mode === AgentToolsMode.Edit;
     const permissionMode = isEditMode ? 'bypassPermissions' : 'dontAsk';
     const allowDangerouslySkipPermissions = isEditMode ? true : undefined;
 

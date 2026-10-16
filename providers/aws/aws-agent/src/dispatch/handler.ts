@@ -1,4 +1,5 @@
 import type { Agent } from '@ez4/agent';
+import { AgentErrorCode, AgentResultStatus } from '@ez4/agent';
 import { ECSClient, StopTaskCommand } from '@aws-sdk/client-ecs';
 import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
@@ -64,9 +65,9 @@ export const dispatchTaskStopped = async (event: unknown, ports: DispatchPorts):
     result = {
       id,
       agent,
-      status: 'failed',
+      status: AgentResultStatus.Failed,
       error: {
-        code: 'task_stopped',
+        code: AgentErrorCode.TaskStopped,
         message: `${stopped.stoppedReason ?? 'Task stopped unexpectedly'} (exit code: ${stopped.containers?.[0]?.exitCode ?? -1})`
       },
       correlation: invocation.correlation,
@@ -97,8 +98,8 @@ export const dispatchScheduledSweep = async (ports: DispatchPorts): Promise<void
     const result: Result = {
       id,
       agent,
-      status: 'timed_out',
-      error: { code: 'timeout', message: 'Agent invocation exceeded its deadline' },
+      status: AgentResultStatus.TimedOut,
+      error: { code: AgentErrorCode.Timeout, message: 'Agent invocation exceeded its deadline' },
       correlation: invocation.correlation,
       finishedAt: new Date(now).toISOString()
     };

@@ -1,7 +1,7 @@
-import type { Agent } from '@ez4/agent';
+import type { Agent, AgentProvider } from '@ez4/agent';
 
 export declare class UnsafeWorkspaceAgent extends Agent.Service<{ task: string }, { done: boolean }> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'opus';
   instructions: 'Work on repos';
   input: { task: string };

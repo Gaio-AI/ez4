@@ -1,4 +1,5 @@
 import type { Agent } from '@ez4/agent';
+import { WorkflowEventType, WorkflowRunStatus } from '@ez4/agent';
 
 export type WorkflowStore = {
   read(runId: string): Promise<{ run: Agent.WorkflowRun<unknown>; etag: string } | undefined>;
@@ -8,7 +9,9 @@ export type WorkflowStore = {
 
 export type WorkflowInvoker = (agent: string, input: unknown, options: Agent.InvokeOptions) => Promise<{ id: string }>;
 
-export type WorkflowMessage = { type: 'start'; runId: string; input: unknown } | { type: 'result'; result: Agent.Result<any> };
+export type WorkflowMessage =
+  | { type: WorkflowEventType.Start; runId: string; input: unknown }
+  | { type: WorkflowEventType.Result; result: Agent.Result<any> };
 
 export class WorkflowConflictError extends Error {
   constructor(message?: string) {
@@ -35,11 +38,11 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   let key: string;
   let event: Agent.WorkflowRequest<any>['event'];
 
-  if (params.message.type === 'start') {
+  if (params.message.type === WorkflowEventType.Start) {
     runId = params.message.runId;
     key = 'start';
     event = {
-      type: 'start',
+      type: WorkflowEventType.Start,
       input: params.message.input as Agent.Input
     };
   } else {
@@ -65,7 +68,7 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
     runId = parsed.runId;
     key = params.message.result.id;
     event = {
-      type: 'result',
+      type: WorkflowEventType.Result,
       agent: params.message.result.agent,
       result: params.message.result
     };
@@ -76,12 +79,12 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   const etag = stored?.etag;
 
   // Rule 1: Result for a run that does not exist → ignored
-  if (params.message.type === 'result' && !run) {
+  if (params.message.type === WorkflowEventType.Result && !run) {
     return 'ignored';
   }
 
   // Rule 2: Run completed/failed → ignored
-  if (run && (run.status === 'completed' || run.status === 'failed')) {
+  if (run && (run.status === WorkflowRunStatus.Completed || run.status === WorkflowRunStatus.Failed)) {
     return 'ignored';
   }
 
@@ -101,12 +104,12 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   }
 
   // Rule 4: Result with run.waitingFor?.id !== result.id → ignored
-  if (params.message.type === 'result' && run?.waitingFor?.id !== params.message.result.id) {
+  if (params.message.type === WorkflowEventType.Result && run?.waitingFor?.id !== params.message.result.id) {
     return 'ignored';
   }
 
   // Rule 5: Start with an existing run whose trigger is 'start' and no waitingFor → ignored
-  if (params.message.type === 'start' && run) {
+  if (params.message.type === WorkflowEventType.Start && run) {
     return 'ignored';
   }
 
@@ -124,7 +127,7 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   if ('complete' in nextStep.next) {
     const completedRun: Agent.WorkflowRun<unknown> = {
       runId,
-      status: 'completed',
+      status: WorkflowRunStatus.Completed,
       step: run?.step ?? 0,
       state: nextStep.state,
       outcome: nextStep.next.complete,
@@ -147,7 +150,7 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   if (nextStepNumber > params.maxSteps) {
     const failedRun: Agent.WorkflowRun<unknown> = {
       runId,
-      status: 'failed',
+      status: WorkflowRunStatus.Failed,
       step: currentStep,
       state: nextStep.state,
       reason: 'max_steps',
@@ -167,7 +170,7 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
   const invokeId = params.newId();
   const runningRun: Agent.WorkflowRun<unknown> = {
     runId,
-    status: 'running',
+    status: WorkflowRunStatus.Running,
     step: nextStepNumber,
     state: nextStep.state,
     trigger: key,
@@ -198,5 +201,5 @@ export const runWorkflowStep = async (params: RunWorkflowStepParameters): Promis
     workspace: nextStep.next.workspace
   });
 
-  return params.message.type === 'start' ? 'started' : 'advanced';
+  return params.message.type === WorkflowEventType.Start ? 'started' : 'advanced';
 };

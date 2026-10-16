@@ -1,4 +1,4 @@
-import type { Agent, AgentPermission } from '@ez4/agent';
+import type { Agent, AgentPermission, AgentProvider, AgentToolsMode } from '@ez4/agent';
 
 export interface FullInput {
   task: string;
@@ -9,13 +9,13 @@ export interface FullOutput {
 }
 
 export declare class FullAgent extends Agent.Service<FullInput, FullOutput> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'claude-3-7-sonnet-latest';
   instructions: 'You are an autonomous engineering agent.';
   input: FullInput;
   output: FullOutput;
   tools: {
-    mode: 'edit';
+    mode: AgentToolsMode.Edit;
     allowed: ['Read', 'Grep', 'Glob'];
     disallowed: ['AskUserQuestion'];
   };

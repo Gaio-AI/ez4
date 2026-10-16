@@ -10,6 +10,7 @@ import { join } from 'node:path';
 // The package bundler defines __MODULE_PATH; source imports in tests need it set.
 (globalThis as { __MODULE_PATH?: string }).__MODULE_PATH = join(import.meta.dirname, '../dist');
 
+import { AgentProvider } from '@ez4/agent';
 import { createAgentService } from '@ez4/agent/library';
 import {
   ensureProviderCredential,
@@ -74,7 +75,7 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    const result = await ensureProviderCredential('claude', 'ez4/agents/claude', ports);
+    const result = await ensureProviderCredential(AgentProvider.Claude, 'ez4/agents/claude', ports);
     equal(result.secretArn, 'arn:aws:secretsmanager:us-east-1:123:secret:ez4/agents/claude-AbCdEf');
     equal(runCalled, false);
   });
@@ -102,7 +103,7 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    const result = await ensureProviderCredential('claude', 'ez4/agents/claude', ports);
+    const result = await ensureProviderCredential(AgentProvider.Claude, 'ez4/agents/claude', ports);
     equal(result.secretArn, 'arn:aws:secretsmanager:us-east-1:123:secret:ez4/agents/claude-New123');
     deepEqual(runArgs, { command: 'claude', args: ['setup-token'] });
     deepEqual(storedSecret, {
@@ -126,7 +127,7 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    await rejects(ensureProviderCredential('claude', 'ez4/agents/claude', ports), (err: Error) => {
+    await rejects(ensureProviderCredential(AgentProvider.Claude, 'ez4/agents/claude', ports), (err: Error) => {
       ok(err instanceof ProviderLoginRequiredError);
       equal(err.secretName, 'ez4/agents/claude');
       equal(err.envName, 'CLAUDE_CODE_OAUTH_TOKEN');
@@ -161,7 +162,7 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    await rejects(ensureProviderCredential('claude', 'ez4/agents/claude', ports), /Invalid token format for claude/);
+    await rejects(ensureProviderCredential(AgentProvider.Claude, 'ez4/agents/claude', ports), /Invalid token format for claude/);
     equal(storeCalled, false);
   });
 
@@ -195,8 +196,8 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    const first: AgentService = { ...createAgentService('AgentOne'), provider: 'claude', model: 'claude-3-7-sonnet', instructions: 'i' };
-    const second: AgentService = { ...createAgentService('AgentTwo'), provider: 'claude', model: 'claude-3-7-sonnet', instructions: 'i' };
+    const first: AgentService = { ...createAgentService('AgentOne'), provider: AgentProvider.Claude, model: 'claude-3-7-sonnet', instructions: 'i' };
+    const second: AgentService = { ...createAgentService('AgentTwo'), provider: AgentProvider.Claude, model: 'claude-3-7-sonnet', instructions: 'i' };
     const metadata = { AgentOne: first, AgentTwo: second };
 
     for (const service of [first, second]) {
@@ -251,7 +252,7 @@ describe('provider login stored per stage and reused', () => {
 
     const agent: AgentService = {
       ...createAgentService('CustomSecretAgent'),
-      provider: 'claude',
+      provider: AgentProvider.Claude,
       model: 'claude-3-7-sonnet',
       instructions: 'i',
       secrets: {
@@ -300,7 +301,7 @@ describe('provider login stored per stage and reused', () => {
       }
     };
 
-    const result = await ensureProviderCredential('claude', 'ez4/agents/claude', ports);
+    const result = await ensureProviderCredential(AgentProvider.Claude, 'ez4/agents/claude', ports);
     equal(runCalled, true);
     equal(storeCalled, true);
     equal(result.secretArn, 'arn:aws:secretsmanager:us-east-1:123:secret:ez4/agents/claude-Existing');

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 
 // The package bundler defines __MODULE_PATH; source imports in tests need it set.
 (globalThis as { __MODULE_PATH?: string }).__MODULE_PATH = join(import.meta.dirname, '../dist');
+import { AgentProvider } from '@ez4/agent';
 import { createAgentService, type AgentService } from '@ez4/agent/library';
 import { createCronService } from '@ez4/scheduler/library';
 import { RoleServiceType, isRoleState } from '@ez4/aws-identity';
@@ -76,8 +77,8 @@ describe('agent resources wiring', () => {
   it('assert :: one cluster, bucket and execution role per project; per-agent entries', async () => {
     const state: EntryStates = {};
     const context = makeContext();
-    const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
-    const second = { ...createAgentService('ReviewAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
+    const first = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i' } as never;
+    const second = { ...createAgentService('ReviewAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i' } as never;
 
     const metadata = { EchoAgent: first, ReviewAgent: second };
 
@@ -122,7 +123,7 @@ describe('agent resources wiring', () => {
 
   it('assert :: a new agent bundle or variable changes the task definition hash, so deploy registers a new revision', async () => {
     const deployWith = async (bundleHash: string, variables: Record<string, string>) => {
-      const agent = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i', variables } as never;
+      const agent = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i', variables } as never;
       const state: EntryStates = {};
       const context = makeContext();
       const bundle = async () => ({ file: '/tmp/echo.mjs', hash: bundleHash });
@@ -140,7 +141,7 @@ describe('agent resources wiring', () => {
   });
 
   it('assert :: the agent bundle and task variables include what linked services add after prepare', async () => {
-    const agent = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i', variables: {} } as AgentService;
+    const agent = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i', variables: {} } as AgentService;
     const state: EntryStates = {};
     const context = makeContext();
     await prepareAgentResources({ state, service: agent, metadata: { EchoAgent: agent }, options, context } as PrepareResourceEvent, ports);
@@ -171,8 +172,8 @@ describe('agent resources wiring', () => {
   it('assert :: prepareAgentResources creates dispatcher function and events rules once', async () => {
     const state: EntryStates = {};
     const context = makeContext();
-    const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
-    const second = { ...createAgentService('ReviewAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
+    const first = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i' } as never;
+    const second = { ...createAgentService('ReviewAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i' } as never;
 
     const metadata = { EchoAgent: first, ReviewAgent: second };
 
@@ -187,8 +188,8 @@ describe('agent resources wiring', () => {
   it('assert :: proxy service, namespace, credentials and taskdef proxyUrl wiring for agents', async () => {
     const state: EntryStates = {};
     const context = makeContext();
-    const first = { ...createAgentService('EchoAgent'), provider: 'claude', model: 'm', instructions: 'i' } as never;
-    const second = { ...createAgentService('ReviewAgent'), provider: 'other', model: 'm', instructions: 'i' } as never;
+    const first = { ...createAgentService('EchoAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i' } as never;
+    const second = { ...createAgentService('ReviewAgent'), provider: AgentProvider.Claude, model: 'm', instructions: 'i' } as never;
     const metadata = { EchoAgent: first, ReviewAgent: second };
 
     for (const service of [first, second]) {
@@ -239,7 +240,7 @@ describe('agent resources wiring', () => {
     const state: EntryStates = {};
     const agent = {
       ...createAgentService('WorkspaceAgent'),
-      provider: 'claude',
+      provider: AgentProvider.Claude,
       model: 'm',
       instructions: 'i',
       workspace: { repos: [{ name: 'api', url: 'https://github.com/acme/api.git', branch: 'main' }] }

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import { ok, equal, deepEqual } from 'node:assert/strict';
-import { Agent } from '@ez4/agent';
+import { Agent, AgentProvider } from '@ez4/agent';
 import {
   ServiceType,
   WorkflowServiceType,
@@ -53,7 +53,7 @@ describe('agent contract types and scaffold', () => {
     }
 
     class TestAgentService extends Agent.Service<CustomInput, CustomOutput> {
-      provider = 'claude' as const;
+      provider = AgentProvider.Claude;
       model = 'claude-3-7-sonnet';
       instructions = 'Test agent instructions';
       input = {} as CustomInput;
@@ -61,7 +61,7 @@ describe('agent contract types and scaffold', () => {
     }
 
     const instance = new TestAgentService();
-    equal(instance.provider, 'claude');
+    equal(instance.provider, AgentProvider.Claude);
     equal(instance.model, 'claude-3-7-sonnet');
   });
 

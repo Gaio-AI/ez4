@@ -1,4 +1,4 @@
-import type { Agent } from '@ez4/agent';
+import type { Agent, AgentProvider } from '@ez4/agent';
 
 interface Input {
   task: string;
@@ -8,7 +8,7 @@ interface Output {
 }
 
 export declare class InvalidTools extends Agent.Service<Input, Output> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'test';
   instructions: 'test';
   input: Input;
@@ -18,7 +18,7 @@ export declare class InvalidTools extends Agent.Service<Input, Output> {
 }
 
 export declare class InvalidMcpServers extends Agent.Service<Input, Output> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'test';
   instructions: 'test';
   input: Input;
@@ -28,7 +28,7 @@ export declare class InvalidMcpServers extends Agent.Service<Input, Output> {
 }
 
 export declare class InvalidImage extends Agent.Service<Input, Output> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'test';
   instructions: 'test';
   input: Input;
@@ -38,7 +38,7 @@ export declare class InvalidImage extends Agent.Service<Input, Output> {
 }
 
 export declare class InvalidEgress extends Agent.Service<Input, Output> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'test';
   instructions: 'test';
   input: Input;
@@ -48,7 +48,7 @@ export declare class InvalidEgress extends Agent.Service<Input, Output> {
 }
 
 export declare class InvalidSecrets extends Agent.Service<Input, Output> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'test';
   instructions: 'test';
   input: Input;
@@ -58,7 +58,7 @@ export declare class InvalidSecrets extends Agent.Service<Input, Output> {
 }
 
 export declare class InvalidStatements extends Agent.Service<Input, Output> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'test';
   instructions: 'test';
   input: Input;

@@ -1,5 +1,6 @@
 import type { SQSEvent } from 'aws-lambda';
 import type { Agent } from '@ez4/agent';
+import { WorkflowEventType } from '@ez4/agent';
 import type { RunWorkflowStepParameters, WorkflowMessage, WorkflowStore, WorkflowInvoker } from './runtime';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { join } from 'node:path';
@@ -65,22 +66,22 @@ const createWorkflowStore = (bucket: string, workflow: string): WorkflowStore =>
 const parseWorkflowMessage = (body: string): WorkflowMessage => {
   const data = JSON.parse(body);
   if (data && typeof data === 'object') {
-    if (data.type === 'start') {
+    if (data.type === WorkflowEventType.Start) {
       return {
-        type: 'start',
+        type: WorkflowEventType.Start,
         runId: data.runId,
         input: data.input
       };
     }
-    if (data.type === 'result') {
+    if (data.type === WorkflowEventType.Result) {
       return {
-        type: 'result',
+        type: WorkflowEventType.Result,
         result: data.result
       };
     }
     if ('id' in data && 'agent' in data && 'status' in data) {
       return {
-        type: 'result',
+        type: WorkflowEventType.Result,
         result: data as unknown as Agent.Result<Agent.Service<Agent.Input, Agent.Output>>
       };
     }

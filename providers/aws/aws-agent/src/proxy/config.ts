@@ -1,3 +1,4 @@
+import { AgentProvider } from '@ez4/agent';
 import type { Agent } from '@ez4/agent';
 import type { SquidConfigOptions } from './types';
 import type { AgentService } from '@ez4/agent/library';
@@ -51,8 +52,8 @@ export const resolveAgentAllowedDomains = (agent: AgentDomainInput, region: stri
 /**
  * Hosts the provider CLI reaches with its OAuth token: the model API plus the account and token endpoints.
  */
-export const PROVIDER_DOMAINS: Record<Agent.ProviderName, string[]> = {
-  claude: ['api.anthropic.com', 'claude.ai', 'claude.com', 'platform.claude.com', 'console.anthropic.com']
+export const PROVIDER_DOMAINS: Record<AgentProvider, string[]> = {
+  [AgentProvider.Claude]: ['api.anthropic.com', 'claude.ai', 'claude.com', 'platform.claude.com', 'console.anthropic.com']
 };
 
 /** Domains an agent may reach through the proxy: its provider, workspace hosts, permissions, runtime AWS APIs and declared egress. */
@@ -65,8 +66,7 @@ export const getAgentEgressDomains = (
   domains.add(`ecs.${region}.amazonaws.com`);
   domains.add(`sts.${region}.amazonaws.com`);
   domains.add('sts.amazonaws.com');
-  // Metadata does not reject an unknown provider name, which then adds no provider host.
-  for (const domain of (agent.provider && PROVIDER_DOMAINS[agent.provider]) || []) domains.add(domain);
+  for (const domain of agent.provider ? PROVIDER_DOMAINS[agent.provider] : []) domains.add(domain);
   if (agent.workspace) {
     for (const domain of getWorkspaceDomains(agent.workspace)) {
       domains.add(domain);

@@ -3,6 +3,7 @@ import type { ObjectSchema } from '@ez4/schema';
 import type { Service as CommonService } from '@ez4/common';
 import type { AgentStorage } from './storage';
 import type { AgentProvider } from './types';
+import { AgentErrorCode, AgentResultStatus, AgentToolsMode } from '@ez4/agent';
 import { getJsonSchema } from '@ez4/agent/utils';
 import { validate, createValidatorContext, getErrorDetails } from '@ez4/validator';
 import { createArtifactsClient } from './artifacts';
@@ -73,8 +74,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       await writeResult(storage, agentName, invocationId, {
         id: invocationId,
         agent: agentName,
-        status: 'failed',
-        error: { code: 'invalid_input', message },
+        status: AgentResultStatus.Failed,
+        error: { code: AgentErrorCode.InvalidInput, message },
         correlation,
         finishedAt: new Date().toISOString()
       });
@@ -113,8 +114,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
         await writeResult(storage, agentName, invocationId, {
           id: invocationId,
           agent: agentName,
-          status: 'failed',
-          error: { code: 'hook_error', message },
+          status: AgentResultStatus.Failed,
+          error: { code: AgentErrorCode.HookError, message },
           correlation,
           finishedAt: new Date().toISOString()
         });
@@ -140,8 +141,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
         await writeResult(storage, agentName, invocationId, {
           id: invocationId,
           agent: agentName,
-          status: 'timed_out',
-          error: { code: 'timeout', message: 'Execution timed out' },
+          status: AgentResultStatus.TimedOut,
+          error: { code: AgentErrorCode.Timeout, message: 'Execution timed out' },
           correlation,
           finishedAt: new Date().toISOString()
         });
@@ -152,8 +153,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       await writeResult(storage, agentName, invocationId, {
         id: invocationId,
         agent: agentName,
-        status: 'failed',
-        error: { code: 'provider_error', message },
+        status: AgentResultStatus.Failed,
+        error: { code: AgentErrorCode.ProviderError, message },
         correlation,
         finishedAt: new Date().toISOString()
       });
@@ -164,8 +165,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       await writeResult(storage, agentName, invocationId, {
         id: invocationId,
         agent: agentName,
-        status: 'timed_out',
-        error: { code: 'timeout', message: 'Execution timed out' },
+        status: AgentResultStatus.TimedOut,
+        error: { code: AgentErrorCode.Timeout, message: 'Execution timed out' },
         correlation,
         finishedAt: new Date().toISOString()
       });
@@ -175,7 +176,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     let effectiveOutput = providerResponse.output;
     let workspaceRefs: Agent.WorkspaceRef[] | undefined;
 
-    if (workspace && workspaceRequest && tools.mode === 'edit') {
+    if (workspace && workspaceRequest && tools.mode === AgentToolsMode.Edit) {
       workspaceRefs = await publishWorkspace(workspace, workspaceRequest, agentName, invocationId);
     }
 
@@ -197,8 +198,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
         await writeResult(storage, agentName, invocationId, {
           id: invocationId,
           agent: agentName,
-          status: 'failed',
-          error: { code: 'hook_error', message },
+          status: AgentResultStatus.Failed,
+          error: { code: AgentErrorCode.HookError, message },
           correlation,
           finishedAt: new Date().toISOString()
         });
@@ -213,8 +214,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       await writeResult(storage, agentName, invocationId, {
         id: invocationId,
         agent: agentName,
-        status: 'failed',
-        error: { code: 'invalid_output', message },
+        status: AgentResultStatus.Failed,
+        error: { code: AgentErrorCode.InvalidOutput, message },
         correlation,
         finishedAt: new Date().toISOString()
       });
@@ -224,7 +225,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     await writeResult(storage, agentName, invocationId, {
       id: invocationId,
       agent: agentName,
-      status: 'succeeded',
+      status: AgentResultStatus.Succeeded,
       output: effectiveOutput,
       workspace: workspaceRefs,
       correlation,
@@ -237,8 +238,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       await writeResult(storage, agentName, invocationId, {
         id: invocationId,
         agent: agentName,
-        status: 'timed_out',
-        error: { code: 'timeout', message: 'Execution timed out' },
+        status: AgentResultStatus.TimedOut,
+        error: { code: AgentErrorCode.Timeout, message: 'Execution timed out' },
         correlation,
         finishedAt: new Date().toISOString()
       });
@@ -249,8 +250,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     await writeResult(storage, agentName, invocationId, {
       id: invocationId,
       agent: agentName,
-      status: 'failed',
-      error: { code: 'provider_error', message },
+      status: AgentResultStatus.Failed,
+      error: { code: AgentErrorCode.ProviderError, message },
       correlation,
       finishedAt: new Date().toISOString()
     });
@@ -269,7 +270,7 @@ const writeResult = async (
   const resultKey = `results/${agentName}/${invocationId}.json`;
 
   // The result goes to S3 for the caller; the log keeps the reason next to the task that failed.
-  if (result.status !== 'succeeded') {
+  if (result.status !== AgentResultStatus.Succeeded) {
     console.error(`Agent ${agentName} invocation ${invocationId} ${result.status}: ${result.error?.code} ${result.error?.message}`);
   }
 

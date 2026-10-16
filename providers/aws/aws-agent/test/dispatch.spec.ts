@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import { deepEqual, equal, ok, rejects } from 'node:assert/strict';
-import type { Agent } from '@ez4/agent';
+import { AgentResultStatus, type Agent } from '@ez4/agent';
 import { dispatchDecision, type DispatchPorts } from '../src/dispatch/handler';
 
 const agent = 'coder';
@@ -63,7 +63,7 @@ describe('dispatcher decisions', () => {
     const result: Agent.Result<Agent.Service<Agent.Input, Agent.Output>> = {
       id,
       agent,
-      status: 'succeeded',
+      status: AgentResultStatus.Succeeded,
       output: { patch: 'diff' },
       correlation: 'trace',
       finishedAt: now.toISOString()

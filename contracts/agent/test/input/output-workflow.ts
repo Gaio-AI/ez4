@@ -1,4 +1,4 @@
-import type { Agent } from '@ez4/agent';
+import { type Agent, WorkflowEventType } from '@ez4/agent';
 import type { BasicAgent } from './output-basic-agent';
 
 export declare class ReviewLoop extends Agent.Workflow<{ issueId: string }, { round: number }, { worker: BasicAgent }> {
@@ -10,7 +10,7 @@ export declare class ReviewLoop extends Agent.Workflow<{ issueId: string }, { ro
 
 export function reviewLoopStep(request: Agent.WorkflowRequest<ReviewLoop>): Agent.WorkflowStep<{ round: number }, { worker: BasicAgent }> {
   const event = request.event;
-  if (event.type === 'start') {
+  if (event.type === WorkflowEventType.Start) {
     return { state: { round: 0 }, next: { invoke: 'worker', input: { prompt: event.input.issueId } } };
   }
   return { state: { round: 1 }, next: { complete: 'done' } };

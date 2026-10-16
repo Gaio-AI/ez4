@@ -2,6 +2,7 @@ import type { FunctionSignature } from '@ez4/common/library';
 import type { ServiceMetadata } from '@ez4/project/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '../services/contract';
+import type { AgentProvider } from '../services/provider';
 
 import { createServiceMetadata } from '@ez4/project/library';
 
@@ -42,7 +43,7 @@ export type AgentService = Omit<ServiceMetadata, 'variables' | 'services'> &
     name: string;
     file?: string;
     description?: string;
-    provider?: Agent.ProviderName;
+    provider?: AgentProvider;
     model?: string;
     instructions?: string;
     tools?: Agent.Tools;

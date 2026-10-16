@@ -32,15 +32,32 @@ import type {
   WorkflowClient as AgentWorkflowClient
 } from './workflow';
 import type { AgentPermission } from './permissions';
+import type { AgentProvider } from './provider';
+
+/**
+ * Operating mode for agent execution tools.
+ */
+export const enum AgentToolsMode {
+  /**
+   * Allow editing tools with bypassed permissions.
+   */
+  Edit = 'edit',
+
+  /**
+   * Restrict tools to read-only operations.
+   */
+  Readonly = 'readonly'
+}
 
 export interface LinkOptions extends Record<string, unknown> {
   readonly replyTo?: string;
 }
 
 export namespace Agent {
-  export type ProviderName = 'claude';
+  export type ProviderName = AgentProvider;
   export type Status = ResultStatus;
   export type ErrorCode = ResultErrorCode;
+  export type ToolsMode = AgentToolsMode;
   export type Workspace = AgentWorkspace;
   export type WorkspaceRepo = AgentWorkspaceRepo;
   export type WorkspaceAuth = AgentWorkspaceAuth;
@@ -63,7 +80,7 @@ export namespace Agent {
   export interface Output {}
 
   export interface Tools {
-    readonly mode: 'edit' | 'readonly';
+    readonly mode: AgentToolsMode;
     readonly allowed?: string[];
     readonly disallowed?: string[];
   }

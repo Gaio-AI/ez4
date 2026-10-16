@@ -1,5 +1,4 @@
 import type { Service as CommonService } from '@ez4/common';
-import type { Service } from './contract';
 import type { WorkspaceRef, WorkspaceRequest } from './workspace';
 
 export interface Artifacts {
@@ -29,12 +28,7 @@ export interface FinishRequest<I, O> {
   readonly workspace?: WorkspaceRequest & { readonly refs: WorkspaceRef[] };
 }
 
-export type PrepareHook<I = unknown> = (
-  request: PrepareRequest<I>,
-  context: CommonService.Context<Service<any, any>>
-) => Promise<PrepareResult> | PrepareResult;
+// Like other ez4 handlers, a hook types its context with `Service.Context<TheAgent>`.
+export type PrepareHook<I = unknown> = (request: PrepareRequest<I>, context: CommonService.Context<any>) => Promise<PrepareResult> | PrepareResult;
 
-export type FinishHook<I = unknown, O = unknown> = (
-  request: FinishRequest<I, O>,
-  context: CommonService.Context<Service<any, any>>
-) => Promise<O> | O;
+export type FinishHook<I = unknown, O = unknown> = (request: FinishRequest<I, O>, context: CommonService.Context<any>) => Promise<O> | O;

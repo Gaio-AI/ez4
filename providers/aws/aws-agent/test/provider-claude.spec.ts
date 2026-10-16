@@ -1,4 +1,5 @@
 import type { AgentProviderRequest } from '../src/runtime/types';
+import { AgentToolsMode } from '@ez4/agent';
 import type { query } from '@anthropic-ai/claude-agent-sdk';
 import { describe, it } from 'node:test';
 import { equal, deepEqual, ok, rejects } from 'node:assert/strict';
@@ -53,7 +54,7 @@ describe('runtime :: claude provider', () => {
       prompt: 'Implement feature X',
       workdir: '/workspace',
       tools: {
-        mode: 'edit',
+        mode: AgentToolsMode.Edit,
         allowed: ['Bash', 'Read', 'Edit']
       },
       mcpServers: {
@@ -112,7 +113,7 @@ describe('runtime :: claude provider', () => {
       prompt: 'Review diff',
       workdir: '/workspace',
       tools: {
-        mode: 'readonly',
+        mode: AgentToolsMode.Readonly,
         allowed: ['Read', 'Grep', 'Glob']
       },
       mcpServers: {},
@@ -165,7 +166,7 @@ describe('runtime :: claude provider', () => {
           instructions: 'Test',
           prompt: 'test',
           workdir: '/tmp',
-          tools: { mode: 'readonly' },
+          tools: { mode: AgentToolsMode.Readonly },
           mcpServers: {},
           outputSchema: {},
           env: {},
@@ -201,7 +202,7 @@ describe('runtime :: claude provider', () => {
       instructions: 'Test',
       prompt: 'test',
       workdir: '/tmp',
-      tools: { mode: 'readonly' },
+      tools: { mode: AgentToolsMode.Readonly },
       mcpServers: {},
       outputSchema: {},
       env: {},

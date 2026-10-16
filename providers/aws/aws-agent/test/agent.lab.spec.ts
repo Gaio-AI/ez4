@@ -3,7 +3,7 @@ import { equal, ok } from 'node:assert/strict';
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { ECSClient } from '@aws-sdk/client-ecs';
 import { SchemaType } from '@ez4/schema';
-import type { Agent } from '@ez4/agent';
+import { AgentResultStatus, type Agent } from '@ez4/agent';
 import { Client } from '../src/client';
 
 describe('agent lab :: end-to-end integration', () => {
@@ -60,7 +60,7 @@ describe('agent lab :: end-to-end integration', () => {
     const simulatedResult: Agent.Result<EchoService> = {
       id: res.id,
       agent: 'EchoAgent',
-      status: 'succeeded',
+      status: AgentResultStatus.Succeeded,
       output: { echo: 'ping' },
       correlation: JSON.stringify({ traceId: 'abc' }),
       finishedAt: new Date().toISOString()

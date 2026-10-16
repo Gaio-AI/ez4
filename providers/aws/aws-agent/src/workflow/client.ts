@@ -5,6 +5,7 @@ import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { validate, getErrorDetails } from '@ez4/validator';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
+import { WorkflowEventType } from '@ez4/agent';
 import { getWorkflowStateKey } from '../utils/names';
 
 export interface WorkflowClientParameters {
@@ -30,7 +31,7 @@ export namespace WorkflowClient {
 
         const runId = options?.runId ?? randomUUID();
         const message = {
-          type: 'start',
+          type: WorkflowEventType.Start,
           runId,
           input
         };

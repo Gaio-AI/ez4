@@ -7,7 +7,7 @@ import type { EntryState } from '@ez4/state';
 import { Client } from '../src/client';
 import { SchemaType } from '@ez4/schema';
 import type { ObjectSchema } from '@ez4/schema';
-import type { Agent } from '@ez4/agent';
+import { AgentResultStatus, type Agent } from '@ez4/agent';
 import { prepareLinkedService } from '../src/triggers/client';
 import { InvalidReplyToError } from '@ez4/agent/library';
 import type { EventContext, DeployOptions, ServiceMetadata } from '@ez4/project/library';
@@ -185,7 +185,7 @@ describe('client :: agent client', () => {
     const mockResult: Agent.Result<TestService> = {
       id: 'inv-123',
       agent: 'worker-agent',
-      status: 'succeeded',
+      status: AgentResultStatus.Succeeded,
       output: { result: 'completed' },
       correlation: JSON.stringify({ step: 1 }),
       finishedAt: new Date().toISOString()

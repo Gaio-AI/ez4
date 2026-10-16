@@ -6,9 +6,24 @@ export type AgentsOf<W> = W extends Workflow<any, any, infer A> ? A : never;
 export type WorkflowInputOf<W> = W extends Workflow<infer I, any, any> ? I : never;
 export type StateOf<W> = W extends Workflow<any, infer S, any> ? S : never;
 
+/**
+ * Type of workflow event being processed.
+ */
+export const enum WorkflowEventType {
+  /**
+   * Workflow execution start event.
+   */
+  Start = 'start',
+
+  /**
+   * Agent execution result event.
+   */
+  Result = 'result'
+}
+
 export type WorkflowEvent<I, A extends WorkflowAgents> =
-  | { readonly type: 'start'; readonly input: I }
-  | { [K in keyof A & string]: { readonly type: 'result'; readonly agent: K; readonly result: Agent.Result<A[K]> } }[keyof A & string];
+  | { readonly type: WorkflowEventType.Start; readonly input: I }
+  | { [K in keyof A & string]: { readonly type: WorkflowEventType.Result; readonly agent: K; readonly result: Agent.Result<A[K]> } }[keyof A & string];
 
 export type WorkflowNext<A extends WorkflowAgents> =
   | {
@@ -32,11 +47,31 @@ export type WorkflowHandler<W extends Workflow<any, any, any>> = (
   context: CommonService.Context<W>
 ) => Promise<WorkflowStep<any, any>> | WorkflowStep<any, any>;
 
-export type WorkflowStatus = 'running' | 'completed' | 'failed';
+/**
+ * Execution status of a multi-agent workflow run.
+ */
+export const enum WorkflowRunStatus {
+  /**
+   * Workflow execution is in progress.
+   */
+  Running = 'running',
+
+  /**
+   * Workflow execution completed successfully.
+   */
+  Completed = 'completed',
+
+  /**
+   * Workflow execution failed.
+   */
+  Failed = 'failed'
+}
+
+export type WorkflowStatus = WorkflowRunStatus;
 
 export interface WorkflowRun<S> {
   runId: string;
-  status: WorkflowStatus;
+  status: WorkflowRunStatus;
   step: number;
   state?: S;
   outcome?: string;

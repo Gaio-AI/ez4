@@ -1,5 +1,5 @@
 import type { Environment, Service } from '@ez4/common';
-import { Agent, AgentPermission } from '@ez4/agent';
+import { Agent, AgentPermission, AgentProvider, AgentToolsMode, WorkflowEventType } from '@ez4/agent';
 
 export interface EchoInput {
   message: string;
@@ -10,13 +10,13 @@ export interface EchoOutput {
 }
 
 export declare class EchoAgent extends Agent.Service<EchoInput, EchoOutput> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'claude-sonnet-4-5';
   instructions: 'You are an echo agent. Return the input message in the echo field.';
   input: EchoInput;
   output: EchoOutput;
   tools: {
-    mode: 'readonly';
+    mode: AgentToolsMode.Readonly;
     allowed: ['Read'];
   };
   workspace: {
@@ -52,7 +52,7 @@ export function echoStep(
   request: Agent.WorkflowRequest<EchoFlow>,
   context: Service.Context<EchoFlow>
 ): Agent.WorkflowStep<{ echoes: number }, { echo: EchoAgent }> {
-  if (request.event.type === 'start') {
+  if (request.event.type === WorkflowEventType.Start) {
     const message = `${context.variables.ECHO_PREFIX}: ${request.event.input.text}`;
     return { state: { echoes: 0 }, next: { invoke: 'echo', input: { message } } };
   }
@@ -70,13 +70,13 @@ export interface LogsOutput {
 }
 
 export declare class LogsAgent extends Agent.Service<LogsInput, LogsOutput> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'claude-sonnet-4-5';
   instructions: 'For each log group in the input, run `aws logs tail <group> --since 1d --format short`. Return the text of every event you read in messages, without its timestamp, and every log group whose command failed with an access error in denied.';
   input: LogsInput;
   output: LogsOutput;
   tools: {
-    mode: 'readonly';
+    mode: AgentToolsMode.Readonly;
     allowed: ['Bash(aws logs tail:*)'];
   };
   image: {
@@ -101,7 +101,7 @@ export declare class LogsFlow extends Agent.Workflow<LogsInput, { reads: number 
 }
 
 export function logsStep(request: Agent.WorkflowRequest<LogsFlow>): Agent.WorkflowStep<{ reads: number }, { logs: LogsAgent }> {
-  if (request.event.type === 'start') {
+  if (request.event.type === WorkflowEventType.Start) {
     return { state: { reads: 0 }, next: { invoke: 'logs', input: request.event.input } };
   }
 

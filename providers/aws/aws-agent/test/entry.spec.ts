@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import { equal, throws, deepEqual } from 'node:assert/strict';
 import { SchemaType } from '@ez4/schema';
+import { AgentProvider, AgentToolsMode } from '@ez4/agent';
 
 import { readAgentEnvironment, startAgent, MissingAgentEnvironmentError } from '../src/runtime/entry';
 
@@ -8,10 +9,10 @@ const schema = { type: SchemaType.Object, properties: { text: { type: SchemaType
 
 const definition = {
   name: 'EchoAgent',
-  provider: 'claude' as const,
+  provider: AgentProvider.Claude,
   model: 'm',
   instructions: 'echo',
-  tools: { mode: 'readonly' as const },
+  tools: { mode: AgentToolsMode.Readonly },
   mcpServers: {},
   inputSchema: schema,
   outputSchema: schema,

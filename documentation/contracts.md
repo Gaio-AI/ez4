@@ -94,14 +94,14 @@ The Agent contract allows declaring autonomous LLM-powered services running on A
 ### Service Definition
 
 ```typescript
-import { Agent, AgentPermission } from '@ez4/agent';
+import { Agent, AgentPermission, AgentProvider, AgentToolsMode, WorkflowEventType } from '@ez4/agent';
 
 export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'claude-sonnet-4-5';
   instructions: 'You are an autonomous code reviewer.';
   tools: {
-    mode: 'readonly';
+    mode: AgentToolsMode.Readonly;
     allowed: ['Read', 'Grep', 'Glob'];
   };
   workspace: {
@@ -139,7 +139,7 @@ export declare class ReviewWorkflow extends Agent.Workflow<{ pullRequest: number
 export function reviewStep(
   request: Agent.WorkflowRequest<ReviewWorkflow>
 ): Agent.WorkflowStep<{ status: string }, { review: CodeReviewAgent }> {
-  if (request.event.type === 'start') {
+  if (request.event.type === WorkflowEventType.Start) {
     return {
       state: { status: 'reviewing' },
       next: { invoke: 'review', input: { pullRequest: request.event.input.pullRequest } }

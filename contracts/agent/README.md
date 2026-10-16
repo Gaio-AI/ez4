@@ -16,7 +16,7 @@ Agents run isolated containerized workloads driven by an LLM provider (such as C
 
 ```ts
 import type { Service } from '@ez4/common';
-import type { Agent, AgentPermission } from '@ez4/agent';
+import { Agent, AgentPermission, AgentProvider, AgentToolsMode } from '@ez4/agent';
 
 export interface ReviewInput {
   pullRequest: number;
@@ -28,7 +28,7 @@ export interface ReviewOutput {
 }
 
 export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOutput> {
-  provider: 'claude';
+  provider: AgentProvider.Claude;
   model: 'claude-sonnet-4-5';
   instructions: 'You are an autonomous code reviewer.';
 
@@ -36,7 +36,7 @@ export declare class CodeReviewAgent extends Agent.Service<ReviewInput, ReviewOu
   output: ReviewOutput;
 
   tools: {
-    mode: 'readonly';
+    mode: AgentToolsMode.Readonly;
     allowed: ['Read', 'Grep', 'Glob'];
   };
 
@@ -134,6 +134,7 @@ Connected handlers can trigger agent invocations using the generated client:
 
 ```ts
 import type { Service } from '@ez4/common';
+import { AgentResultStatus } from '@ez4/agent';
 import type { CodeReviewAgent } from './agent';
 
 export async function triggerReview(_request: any, { codeReviewAgent }: Service.Context<AnotherService>) {
@@ -142,7 +143,7 @@ export async function triggerReview(_request: any, { codeReviewAgent }: Service.
 
   // Poll or check execution result
   const result = await codeReviewAgent.result(id);
-  if (result?.status === 'succeeded') {
+  if (result?.status === AgentResultStatus.Succeeded) {
     console.log('Review completed:', result.output);
   }
 }
@@ -167,7 +168,7 @@ When execution completes (or fails/times out), the dispatcher delivers the agent
 Workflows orchestrate multi-step execution flows across autonomous agents. A workflow defines a strongly-typed input, persistent state, a set of agents, and a step handler:
 
 ```ts
-import type { Agent } from '@ez4/agent';
+import { Agent, WorkflowEventType } from '@ez4/agent';
 import type { Service } from '@ez4/common';
 import type { CodeReviewAgent } from './agent';
 
@@ -186,7 +187,7 @@ export function reviewStep(
   request: Agent.WorkflowRequest<ReviewWorkflow>,
   _context: Service.Context<ReviewWorkflow>
 ): Agent.WorkflowStep<WorkflowState, { review: CodeReviewAgent }> {
-  if (request.event.type === 'start') {
+  if (request.event.type === WorkflowEventType.Start) {
     return {
       state: { stepCount: 0 },
       next: {

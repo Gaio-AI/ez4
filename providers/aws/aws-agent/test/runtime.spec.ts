@@ -9,7 +9,7 @@ import type { AgentProvider, AgentProviderRequest, AgentProviderResponse } from 
 import { defaultGit } from '../src/workspace/git';
 import type { WorkspaceRuntime } from '../src/workspace/runtime';
 import { SchemaType, type ObjectSchema } from '@ez4/schema';
-import type { Agent } from '@ez4/agent';
+import { type Agent, AgentToolsMode } from '@ez4/agent';
 describe('runtime :: execution lifecycle', () => {
   type TestAgentService = Agent.Service<{ task: string }, { result: string }>;
 
@@ -67,7 +67,7 @@ describe('runtime :: execution lifecycle', () => {
       outputSchema,
       storage,
       provider: fakeProvider,
-      tools: { mode: 'edit' },
+      tools: { mode: AgentToolsMode.Edit },
       mcpServers: {},
       instructions: 'Do work',
       model: 'test-model',
@@ -138,7 +138,7 @@ describe('runtime :: execution lifecycle', () => {
           return { output: {} };
         }
       },
-      tools: { mode: 'readonly' },
+      tools: { mode: AgentToolsMode.Readonly },
       mcpServers: {},
       instructions: 'Test',
       model: 'test',
@@ -184,7 +184,7 @@ describe('runtime :: execution lifecycle', () => {
       outputSchema,
       storage,
       provider: throwingProvider,
-      tools: { mode: 'readonly' },
+      tools: { mode: AgentToolsMode.Readonly },
       mcpServers: {},
       instructions: 'Test',
       model: 'test',
@@ -230,7 +230,7 @@ describe('runtime :: execution lifecycle', () => {
       outputSchema,
       storage,
       provider: badOutputProvider,
-      tools: { mode: 'readonly' },
+      tools: { mode: AgentToolsMode.Readonly },
       mcpServers: {},
       instructions: 'Test',
       model: 'test',
@@ -282,7 +282,7 @@ describe('runtime :: execution lifecycle', () => {
       outputSchema,
       storage,
       provider: hangingProvider,
-      tools: { mode: 'readonly' },
+      tools: { mode: AgentToolsMode.Readonly },
       mcpServers: {},
       instructions: 'Test',
       model: 'test',
@@ -355,7 +355,7 @@ describe('runtime :: execution lifecycle', () => {
       outputSchema,
       storage,
       provider: fakeProvider,
-      tools: { mode: 'edit' },
+      tools: { mode: AgentToolsMode.Edit },
       mcpServers: {},
       instructions: 'test',
       model: 'test',
@@ -434,7 +434,7 @@ describe('runtime :: execution lifecycle', () => {
       outputSchema,
       storage,
       provider: fakeProvider,
-      tools: { mode: 'readonly' },
+      tools: { mode: AgentToolsMode.Readonly },
       mcpServers: {},
       instructions: 'test',
       model: 'test',
@@ -482,7 +482,7 @@ describe('runtime :: execution lifecycle', () => {
           return { output: { result: 'done' } };
         }
       },
-      tools: { mode: 'edit' },
+      tools: { mode: AgentToolsMode.Edit },
       mcpServers: {},
       instructions: 'Do work',
       model: 'test-model',

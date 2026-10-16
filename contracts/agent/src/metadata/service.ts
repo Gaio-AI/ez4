@@ -23,6 +23,8 @@ import { parseAgentHooks } from './hooks';
 import { validateResources } from './resources';
 import { validatePermissions } from './permissions';
 import { getWorkspaceMetadata } from './workspace';
+import { AgentToolsMode } from '../services/contract';
+import { AgentProvider } from '../services/provider';
 import { IncompleteServiceError } from '../errors/service';
 
 const objectMembers = (object: TypeObject): Record<string, ModelProperty> | undefined => {
@@ -61,7 +63,7 @@ const parseOptionalMembers = (
   if (members.tools) {
     const object = getPropertyObject(members.tools);
     const tools = object && objectMembers(object);
-    const mode = tools?.mode && getPropertyStringIn(tools.mode, ['edit', 'readonly']);
+    const mode = tools?.mode && getPropertyStringIn(tools.mode, [AgentToolsMode.Edit, AgentToolsMode.Readonly]);
     const allowed = tools?.allowed && stringList(tools.allowed);
     const disallowed = tools?.disallowed && stringList(tools.disallowed);
     if (!tools || !mode || (tools.allowed && !allowed) || (tools.disallowed && !disallowed)) {
@@ -164,7 +166,7 @@ export const getAgentServicesMetadata = (reflection: ReflectionTypes) => {
       }
     }
 
-    const provider = members.provider ? getPropertyString(members.provider) : undefined;
+    const provider = members.provider ? getPropertyStringIn(members.provider, [AgentProvider.Claude]) : undefined;
     const model = members.model ? getPropertyString(members.model) : undefined;
     const instructions = members.instructions ? getPropertyString(members.instructions) : undefined;
 
@@ -178,7 +180,7 @@ export const getAgentServicesMetadata = (reflection: ReflectionTypes) => {
       continue;
     }
 
-    service.provider = provider as Agent.ProviderName;
+    service.provider = provider as AgentProvider;
     service.model = model;
     service.instructions = instructions;
 

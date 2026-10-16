@@ -1,5 +1,5 @@
 import type { AgentService } from '@ez4/agent/library';
-import type { Agent } from '@ez4/agent';
+import { AgentProvider } from '@ez4/agent';
 import type { CredentialPorts } from '../auth/login';
 import type { LogGroupState } from '@ez4/aws-logs';
 import type { RoleState } from '@ez4/aws-identity';
@@ -111,7 +111,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
   });
   const credential = credentials[agents.findIndex((agent) => agent.name === service.name)];
 
-  const provider = (service.provider ?? 'claude') as Agent.ProviderName;
+  const provider = service.provider ?? AgentProvider.Claude;
   const providerAuth = ProviderAuths[provider];
   let providerCredentialEntryId: string | undefined;
 

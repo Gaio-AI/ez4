@@ -5,6 +5,7 @@ import { ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 import { validate, getErrorDetails } from '@ez4/validator';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
+import { AgentErrorCode, AgentResultStatus } from '@ez4/agent';
 import { AGENT_CONTAINER_NAME } from './agent/taskdef';
 
 export { WorkflowClient, type WorkflowClientParameters } from './workflow/client';
@@ -143,8 +144,8 @@ export namespace Client {
           const failedResult: Agent.Result<S> = {
             id,
             agent: parameters.agentName,
-            status: 'failed',
-            error: { code: 'task_stopped', message: reasons },
+            status: AgentResultStatus.Failed,
+            error: { code: AgentErrorCode.TaskStopped, message: reasons },
             correlation: invocationPayload.correlation,
             finishedAt: new Date().toISOString()
           };

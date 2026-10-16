@@ -1,4 +1,4 @@
-import type { Agent } from '@ez4/agent';
+import { AgentProvider } from '@ez4/agent';
 
 export type LoginIO = {
   /** Runs a command inheriting terminal IO (for browser login). */
@@ -18,8 +18,8 @@ export type ProviderAuth = {
   login: (io: LoginIO) => Promise<string>;
 };
 
-export const ProviderAuths: Record<Agent.ProviderName, ProviderAuth> = {
-  claude: {
+export const ProviderAuths: Record<AgentProvider, ProviderAuth> = {
+  [AgentProvider.Claude]: {
     envName: 'CLAUDE_CODE_OAUTH_TOKEN',
     pattern: /^sk-ant-oat01-[A-Za-z0-9_-]+$/,
     login: async (io: LoginIO): Promise<string> => {
@@ -35,8 +35,8 @@ export const ProviderAuths: Record<Agent.ProviderName, ProviderAuth> = {
       const answer = await io.prompt('Paste the token printed above, then press Enter on an empty line: ');
       // The token wraps across lines in the terminal; a paste keeps those breaks.
       const token = answer.replace(/\s+/g, '');
-      if (!ProviderAuths.claude.pattern.test(token)) {
-        throw new Error(`Invalid token format for claude: expected pattern ${ProviderAuths.claude.pattern}`);
+      if (!ProviderAuths[AgentProvider.Claude].pattern.test(token)) {
+        throw new Error(`Invalid token format for claude: expected pattern ${ProviderAuths[AgentProvider.Claude].pattern}`);
       }
       return token;
     }
