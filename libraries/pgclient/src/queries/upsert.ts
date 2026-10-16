@@ -25,7 +25,7 @@ export const prepareUpsertQuery = async <T extends InternalTableMetadata, S exte
   input: Query.UpsertOneInput<S, T>,
   conflictColumns: string[]
 ) => {
-  if (input.previous || !isConflictTarget(input, conflictColumns) || rewritesOtherTables(input.update, relations, table)) {
+  if (input.previous || rewritesOtherTables(input.update, relations, table)) {
     return undefined;
   }
 
@@ -39,7 +39,13 @@ export const prepareUpsertQuery = async <T extends InternalTableMetadata, S exte
     return undefined;
   }
 
+  // Checked on the record the insert writes, where a connected relation has already become its foreign key column.
   const insertRecord = await getInsertRecord(input.insert, schema, relations, preInsertQueries, table);
+
+  if (!isConflictTarget(input.where, insertRecord, conflictColumns)) {
+    return undefined;
+  }
+
   const updateRecord = await getUpdateRecord(builder, input.update, schema, relations, table);
 
   insertQuery.record(insertRecord);
@@ -75,17 +81,11 @@ export const prepareUpsertQuery = async <T extends InternalTableMetadata, S exte
 };
 
 // The conflict is the record the filters name only when the insert carries the same key, and a null never conflicts.
-const isConflictTarget = <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
-  input: Query.UpsertOneInput<S, T>,
-  conflictColumns: string[]
-) => {
-  const where: Record<string, unknown> = input.where;
-  const data: Record<string, unknown> = input.insert;
-
+const isConflictTarget = (where: SqlFilters, record: SqlFilters, conflictColumns: string[]) => {
   return conflictColumns.every((column) => {
     const value = where[column];
 
-    return !isNullish(value) && !isAnyObject(value) && data[column] === value;
+    return !isNullish(value) && !isAnyObject(value) && record[column] === value;
   });
 };
 

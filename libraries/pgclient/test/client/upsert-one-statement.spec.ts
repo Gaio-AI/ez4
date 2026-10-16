@@ -705,6 +705,56 @@ describe('client upsert one (relations)', () => {
     equal(driver.statements.length, 1);
   });
 
+  it('assert :: upsert one keyed by a column the insert connects through a relation', async () => {
+    const targetId = randomUUID();
+
+    await client.table_b.insertOne({
+      data: {
+        id_b: targetId,
+        value: 'related'
+      }
+    });
+
+    const upsert = (value: string) => {
+      return client.table_c.upsertOne({
+        select: {
+          value: true
+        },
+        insert: {
+          id_c: randomUUID(),
+          value,
+          relation: {
+            id_b: targetId
+          }
+        },
+        update: {
+          value
+        },
+        where: {
+          unique_1_id: targetId
+        }
+      });
+    };
+
+    driver.statements = [];
+
+    deepEqual(await upsert('first'), {
+      inserted: true,
+      record: {
+        value: 'first'
+      }
+    });
+
+    deepEqual(await upsert('second'), {
+      inserted: false,
+      record: {
+        value: 'second'
+      }
+    });
+
+    equal(driver.statements.length, 2);
+  });
+
   it('assert :: upsert one with a relation filter on the existing record', async () => {
     const sourceId = randomUUID();
     const targetId = randomUUID();
