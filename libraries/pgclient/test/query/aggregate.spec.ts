@@ -145,9 +145,9 @@ describe('aggregate query', () => {
     assert.equal(
       statement,
       `SELECT "R0"."status", COUNT(*) AS "total", ` +
-        `COUNT(*) FILTER (WHERE (NOT EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."id" = "R0"."parent_id"))) AS "orphans" ` +
+        `COUNT(*) FILTER (WHERE (NOT EXISTS (SELECT 1 FROM "ez4_test_table" AS "T0" WHERE "T0"."id" = "R0"."parent_id"))) AS "orphans" ` +
         `FROM "ez4_test_table" AS "R0" ` +
-        `WHERE EXISTS (SELECT 1 FROM "ez4_test_table" AS "T" WHERE "T"."status" = :0 AND "T"."id" = "R0"."parent_id") ` +
+        `WHERE EXISTS (SELECT 1 FROM "ez4_test_table" AS "T1" WHERE "T1"."status" = :0 AND "T1"."id" = "R0"."parent_id") ` +
         `GROUP BY "R0"."status" ORDER BY "total" DESC, "R0"."status" ASC`
     );
 
