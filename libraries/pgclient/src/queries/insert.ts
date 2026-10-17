@@ -23,9 +23,11 @@ import {
   getTargetCreationSchema,
   getSourceCreationSchema,
   getConnectionSchema,
+  isPostCreationRelation,
   isMultipleRelationData,
   isSingleRelationData,
-  isRelationalData
+  isRelationalData,
+  isRelationHolder
 } from './utils/relation';
 
 import { getFormattedColumn } from './utils/formats';
@@ -235,7 +237,7 @@ export const getInsertRecord = async (
       if (relationValue !== null) {
         await validateRecordSchema(fieldValue, relationSchema, fieldPath);
 
-        if (targetIndex !== Index.Primary) {
+        if (isRelationHolder(sourceIndex, targetIndex)) {
           record[targetColumn] = relationValue;
         }
       }
@@ -245,7 +247,7 @@ export const getInsertRecord = async (
 
     //  Will post-create relations.
     if (relationSchema) {
-      if (targetIndex === Index.Primary) {
+      if (isPostCreationRelation(sourceIndex, targetIndex)) {
         await validateRecordSchema(fieldValue, relationSchema, fieldPath);
         continue;
       }
@@ -533,7 +535,7 @@ const getRelationValue = (fieldValue: AnyObject, fieldRelation: PgRelationWithSc
   }
 
   // Will post-create relations.
-  if (targetIndex === Index.Primary || (targetIndex === Index.Unique && (!sourceIndex || sourceIndex === Index.Secondary))) {
+  if (isPostCreationRelation(sourceIndex, targetIndex)) {
     const relationSchema = getTargetCreationSchema(sourceSchema, sourceColumn);
 
     return [, relationSchema];
@@ -558,7 +560,7 @@ const getPreRelationValue = (fieldValue: AnyObject, fieldRelation: PgRelationWit
   }
 
   // Will post-create relations.
-  if (targetIndex === Index.Primary || (targetIndex === Index.Unique && (!sourceIndex || sourceIndex === Index.Secondary))) {
+  if (isPostCreationRelation(sourceIndex, targetIndex)) {
     return undefined;
   }
 
@@ -575,7 +577,7 @@ const getPostRelationValue = (fieldValue: AnyObject, fieldRelation: PgRelationWi
 
   // Will connect an existing relation.
   if (isEmptyObject(otherFields)) {
-    if (targetIndex === Index.Primary || !sourceIndex || sourceIndex === Index.Secondary) {
+    if (!isRelationHolder(sourceIndex, targetIndex)) {
       return [relationValue, relationColumn];
     }
 
@@ -583,7 +585,7 @@ const getPostRelationValue = (fieldValue: AnyObject, fieldRelation: PgRelationWi
   }
 
   // Will post-create relations.
-  if (targetIndex === Index.Primary || (targetIndex === Index.Unique && (!sourceIndex || sourceIndex === Index.Secondary))) {
+  if (isPostCreationRelation(sourceIndex, targetIndex)) {
     return [, , fieldValue];
   }
 

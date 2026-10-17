@@ -11,7 +11,7 @@ import { isAnyNumber, isAnyObject, isEmptyObject, isNullish } from '@ez4/utils';
 import { SqlSelectStatement, escapeSqlName, mergeSqlAlias } from '@ez4/pgsql';
 import { Index, Order } from '@ez4/database';
 
-import { getConnectionSchema, isSingleRelationData } from './utils/relation';
+import { getConnectionSchema, isRelationHolder, isSingleRelationData } from './utils/relation';
 import { getWithSchemaValidation, isDynamicObjectField, isDynamicUnionField, validateRecordSchema } from '../utils/schema';
 import { getSelectFields, getSelectFilters } from './select';
 
@@ -541,13 +541,6 @@ const getKeyFields = (primaryKey: string[]) => {
 
 export const getKeyAlias = (index: number) => {
   return `__EZ4_KEY_${index}`;
-};
-
-// The record holds the relation when the foreign key is its own column, which is where the migration puts it: a unique
-// to unique relation is held by the table that declares it, so (re)connecting it rewrites that column instead of the
-// unique key of the related records.
-const isRelationHolder = (sourceIndex: Index | undefined, targetIndex: Index | undefined) => {
-  return sourceIndex === Index.Primary || (sourceIndex === Index.Unique && targetIndex !== Index.Primary);
 };
 
 const getRelationValue = (fieldValue: AnyObject, fieldRelation: PgRelationWithSchema) => {
