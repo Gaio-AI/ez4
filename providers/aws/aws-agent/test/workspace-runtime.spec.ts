@@ -186,6 +186,21 @@ describe('workspace :: runtime', () => {
     deepEqual(await remoteHead(), secondRefs[0].head);
   });
 
+  it('assert :: only the push to the remote asks for a write token', async () => {
+    const { runtime, workdir } = await setupWorkspace({ repos: ['api'] });
+    const asked: (string | undefined)[] = [];
+    runtime.token = async (access) => void asked.push(access);
+
+    const request = await checkoutWorkspace(runtime, workdir);
+    await writeFile(join(request.repos.api.path, 'fix.txt'), 'fixed');
+    const refs = await publishWorkspace(runtime, request, 'Implement', 'inv-1');
+    const beforePush = [...asked];
+    await pushWorkspaceBranch(runtime, request, refs, 'api', 'agent/fix');
+
+    ok(beforePush.length > 0 && beforePush.every((access) => access !== 'write'), `checkout and publish asked for ${beforePush.join()}`);
+    deepEqual(asked.slice(beforePush.length), ['write']);
+  });
+
   it('assert :: push rejects a diverged branch, the workspace branch and an invalid name', async () => {
     const { runtime, workdir, remote } = await setupWorkspace({ repos: ['api'] });
     const first = await checkoutWorkspace(runtime, workdir);

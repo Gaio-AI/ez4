@@ -28,6 +28,21 @@ describe('workspace :: github app', () => {
     deepEqual(JSON.parse(requests[0].body), { permissions: { contents: 'read' } });
   });
 
+  it('assert :: installation token asks for write access when told to', async () => {
+    const bodies: unknown[] = [];
+    await mintInstallationToken({
+      appId: '1',
+      installationId: '2',
+      privateKeyPem: testKey,
+      access: 'write',
+      fetch: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ token: 'ghs_w' }), { status: 201 });
+      }
+    });
+    deepEqual(bodies, [{ permissions: { contents: 'write' } }]);
+  });
+
   it('assert :: createGitHubAppJwt creates a valid JWT structure', () => {
     const jwt = createGitHubAppJwt('123', testKey, 1_700_000_000);
     const parts = jwt.split('.');

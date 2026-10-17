@@ -69,15 +69,16 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
     return undefined;
   }
   const workspaceMeta = JSON.parse(env.EZ4_AGENT_WORKSPACE);
-  let token: (() => Promise<string | undefined>) | undefined;
+  let token: ((access?: 'read' | 'write') => Promise<string | undefined>) | undefined;
 
   if (env.EZ4_WORKSPACE_GITHUB_APP) {
     const { GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY } = JSON.parse(env.EZ4_WORKSPACE_GITHUB_APP);
-    token = () =>
+    token = (access) =>
       mintInstallationToken({
         appId: GITHUB_APP_ID,
         installationId: GITHUB_APP_INSTALLATION_ID,
-        privateKeyPem: GITHUB_APP_PRIVATE_KEY
+        privateKeyPem: GITHUB_APP_PRIVATE_KEY,
+        access
       });
   } else if (env.EZ4_WORKSPACE_TOKEN) {
     const secretToken = env.EZ4_WORKSPACE_TOKEN;
