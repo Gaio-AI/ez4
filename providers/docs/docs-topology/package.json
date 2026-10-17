@@ -1,7 +1,7 @@
 {
   "name": "@ez4/docs-topology",
   "description": "EZ4: Topology documentation generator",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
