@@ -10,6 +10,7 @@ import { prepareDeleteOne, prepareInsertOne, prepareUpdateOne } from '../queries
 import { rollbackFailedTransaction } from '../utils/transaction';
 import { getRelationsWithSchema } from './relations';
 import { getPrimaryIndex } from './utils/indexes';
+import { runInTransactionOrder } from './utils/order';
 import { Table } from './table';
 
 type TableType = Table<InternalTableMetadata>;
@@ -34,9 +35,11 @@ export namespace PgClient {
           query
         };
 
-        const { records } = await driver.executeStatement(statement, {
-          transactionId,
-          debug
+        const { records } = await runInTransactionOrder(transactionId, () => {
+          return driver.executeStatement(statement, {
+            transactionId,
+            debug
+          });
         });
 
         return records;
@@ -158,9 +161,11 @@ const executeStaticTransaction = async <T extends Database.Service<any>>(
   const statements = await prepareStaticTransaction<T>(driver, repository, operations);
 
   if (transactionId) {
-    const results = await driver.executeStatements(statements, {
-      transactionId,
-      debug
+    const results = await runInTransactionOrder(transactionId, () => {
+      return driver.executeStatements(statements, {
+        transactionId,
+        debug
+      });
     });
 
     return results.map(({ records }) => records);

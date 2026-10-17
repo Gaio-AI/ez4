@@ -7,6 +7,7 @@ import { prepareRelationTables, TestRelationRepository } from './common/relation
 
 import { beforeEach, describe, it } from 'node:test';
 import { deepEqual, equal, rejects } from 'node:assert/strict';
+import { setImmediate } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
 import { DuplicateUniqueKeyError } from '@ez4/pgclient';
@@ -390,6 +391,71 @@ const upsertOneTests = (dataApi: boolean) => () => {
         'RELEASE SAVEPOINT "ez4_upsert"'
       ]
     );
+
+    deepEqual(await findByEmail('baz@test.com'), {
+      counter: 1,
+      status: null,
+      json: null
+    });
+
+    equal(await client.ez4_test_unique.count({}), 2);
+  });
+
+  it('assert :: upsert one failing next to another upsert inside one transaction', async () => {
+    await upsertWithSlug(client, 'foo@test.com', 'shared');
+
+    const results = await client.transaction(async (transaction) => {
+      return Promise.allSettled([
+        upsertWithSlug(transaction, 'baz@test.com', 'other'),
+        upsertWithSlug(transaction, 'bar@test.com', 'shared')
+      ]);
+    });
+
+    deepEqual(results[0], { status: 'fulfilled', value: { inserted: true } });
+
+    equal(results[1].status === 'rejected' && results[1].reason instanceof DuplicateUniqueKeyError, true);
+
+    // The failed upsert undoes only its own statement, never the one that ran next to it.
+    deepEqual(await findByEmail('baz@test.com'), {
+      counter: 1,
+      status: null,
+      json: null
+    });
+
+    equal(await client.ez4_test_unique.count({}), 2);
+  });
+
+  it('assert :: upsert one failing next to another write inside one transaction', async () => {
+    await upsertWithSlug(client, 'foo@test.com', 'shared');
+
+    driver.statements = [];
+
+    const results = await client.transaction(async (transaction) => {
+      let settled = false;
+
+      const upsert = upsertWithSlug(transaction, 'bar@test.com', 'shared').finally(() => {
+        settled = true;
+      });
+
+      // Sent once the upsert has set its savepoint, where rolling back to it would also reach the insert.
+      while (!settled && !driver.statements.some(({ query }) => query.startsWith('SAVEPOINT'))) {
+        await setImmediate();
+      }
+
+      const insert = transaction.ez4_test_unique.insertOne({
+        data: {
+          id: randomUUID(),
+          email: 'baz@test.com',
+          counter: 1
+        }
+      });
+
+      return Promise.allSettled([upsert, insert]);
+    });
+
+    equal(results[0].status === 'rejected' && results[0].reason instanceof DuplicateUniqueKeyError, true);
+
+    equal(results[1].status, 'fulfilled');
 
     deepEqual(await findByEmail('baz@test.com'), {
       counter: 1,

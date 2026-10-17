@@ -12,6 +12,7 @@ import { isAnyNumber } from '@ez4/utils';
 
 import { takeRecordsCursor } from '../queries/utils/cursor';
 import { getPrimaryColumns, tryExtractUniqueIndex } from './utils/indexes';
+import { runInTransactionOrder } from './utils/order';
 import { UPSERT_INSERTED_FLAG } from '../queries/upsert';
 
 import {
@@ -39,8 +40,6 @@ type SendStatementResult<T> = IsArray<T> extends true ? PgExecutionResult[] : Pg
 
 const UPSERT_WRITTEN_FLAG = '__EZ4_OK';
 
-// Every upsert uses the same name: a release or rollback acts on the latest savepoint with it, while a name per upsert
-// breaks when two interleave on one transaction (releasing one also removes the savepoint the other set after it).
 const UPSERT_SAVEPOINT = 'ez4_upsert';
 
 const getUpsertResult = <S extends Query.SelectInput<T>, T extends InternalTableMetadata>(
@@ -69,6 +68,11 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   ) {}
 
   private async sendStatement<T extends PgExecuteStatement | PgExecuteStatement[]>(input: T): Promise<SendStatementResult<T>> {
+    return runInTransactionOrder(this.context.transactionId, () => this.executeStatement(input));
+  }
+
+  // Sends without waiting for the transaction's queue, for statements already running inside its turn.
+  private async executeStatement<T extends PgExecuteStatement | PgExecuteStatement[]>(input: T): Promise<SendStatementResult<T>> {
     const { transactionId, driver, debug } = this.context;
 
     if (!Array.isArray(input)) {
@@ -206,37 +210,42 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   // index fails instead of updating. Running the statement once more finds the record the other insert committed through
   // the target, and a duplicate key that persists is a different record.
   private async sendUpsertStatement(statement: PgExecuteStatement) {
+    const { transactionId } = this.context;
+
     // A failed statement aborts the whole transaction, and a savepoint undoes only the statement so it can run again.
     const savepoint = async (command: string) => {
-      if (this.context.transactionId) {
-        await this.sendStatement({ query: `${command} "${UPSERT_SAVEPOINT}"` });
+      if (transactionId) {
+        await this.executeStatement({ query: `${command} "${UPSERT_SAVEPOINT}"` });
       }
     };
 
-    await savepoint('SAVEPOINT');
+    // The savepoint holds the transaction's turn until it's released, so no other statement runs inside it.
+    return runInTransactionOrder(transactionId, async () => {
+      await savepoint('SAVEPOINT');
 
-    for (let attempt = 1; ; attempt++) {
-      try {
-        const result = await this.sendStatement(statement);
+      for (let attempt = 1; ; attempt++) {
+        try {
+          const result = await this.executeStatement(statement);
 
-        await savepoint('RELEASE SAVEPOINT');
-
-        return result;
-      } catch (error) {
-        if (!(error instanceof DuplicateUniqueKeyError)) {
-          throw error;
-        }
-
-        await savepoint('ROLLBACK TO SAVEPOINT');
-
-        // Undone and released, an upsert that keeps failing leaves the transaction usable.
-        if (attempt > 1) {
           await savepoint('RELEASE SAVEPOINT');
 
-          throw error;
+          return result;
+        } catch (error) {
+          if (!(error instanceof DuplicateUniqueKeyError)) {
+            throw error;
+          }
+
+          await savepoint('ROLLBACK TO SAVEPOINT');
+
+          // Undone and released, an upsert that keeps failing leaves the transaction usable.
+          if (attempt > 1) {
+            await savepoint('RELEASE SAVEPOINT');
+
+            throw error;
+          }
         }
       }
-    }
+    });
   }
 
   // The update runs first and the insert skips a conflict, so a record another call inserts meanwhile is updated on
