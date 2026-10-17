@@ -1,4 +1,6 @@
+import type { Client as DbClient } from '@ez4/database';
 import type { TestRelationDb } from './common/relation';
+import type { TestUniqueDb } from './common/unique';
 
 import { makeRecordingClient, makeUniqueClient, prepareUniqueTable } from './common/unique';
 import { prepareRelationTables, TestRelationRepository } from './common/relation';
@@ -11,6 +13,21 @@ import { DuplicateUniqueKeyError } from '@ez4/pgclient';
 
 const getFailures = (results: PromiseSettledResult<unknown>[]) => {
   return results.filter((result) => result.status === 'rejected').map((result) => `${result.reason}`);
+};
+
+// Resolves once every caller has arrived, so callers that each began a transaction first still race in the same instant.
+const makeBarrier = (size: number) => {
+  const { promise, resolve } = Promise.withResolvers<void>();
+
+  let arrived = 0;
+
+  return () => {
+    if (++arrived === size) {
+      resolve();
+    }
+
+    return promise;
+  };
 };
 
 const upsertOneTests = (dataApi: boolean) => () => {
@@ -49,6 +66,27 @@ const upsertOneTests = (dataApi: boolean) => () => {
         counter: true,
         status: true,
         json: true
+      },
+      where: {
+        email
+      }
+    });
+  };
+
+  // Keyed by email, while the record it inserts also fills the other unique index (tenant, slug).
+  const upsertWithSlug = (db: DbClient<TestUniqueDb>, email: string, slug = email) => {
+    return db.ez4_test_unique.upsertOne({
+      insert: {
+        id: randomUUID(),
+        email,
+        tenant: 'foo',
+        slug,
+        counter: 1
+      },
+      update: {
+        counter: {
+          increment: 1
+        }
       },
       where: {
         email
@@ -249,6 +287,117 @@ const upsertOneTests = (dataApi: boolean) => () => {
         json: null
       });
     }
+  });
+
+  it('assert :: upsert one concurrently colliding on another unique index', async () => {
+    for (let round = 0; round < 50; round++) {
+      const email = `key-${round}@test.com`;
+
+      const results = await Promise.allSettled(Array.from({ length: 4 }, () => upsertWithSlug(client, email)));
+
+      deepEqual(getFailures(results), []);
+
+      const inserted = results.filter((result) => result.status === 'fulfilled' && result.value.inserted);
+
+      equal(inserted.length, 1);
+
+      deepEqual(await findByEmail(email), {
+        counter: 4,
+        status: null,
+        json: null
+      });
+    }
+  });
+
+  it('assert :: upsert one concurrently colliding on another unique index inside transactions', async () => {
+    for (let round = 0; round < 50; round++) {
+      const email = `key-${round}@test.com`;
+
+      const arrive = makeBarrier(4);
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 4 }, () => {
+          return client.transaction(async (transaction) => {
+            await arrive();
+
+            const result = await upsertWithSlug(transaction, email);
+
+            // The transaction goes on after the upsert, which an aborted transaction refuses.
+            await transaction.ez4_test_unique.updateOne({
+              data: {
+                status: 'seen'
+              },
+              where: {
+                email
+              }
+            });
+
+            return result;
+          });
+        })
+      );
+
+      deepEqual(getFailures(results), []);
+
+      const inserted = results.filter((result) => result.status === 'fulfilled' && result.value.inserted);
+
+      equal(inserted.length, 1);
+
+      deepEqual(await findByEmail(email), {
+        counter: 4,
+        status: 'seen',
+        json: null
+      });
+    }
+  });
+
+  it('assert :: upsert one colliding with another record on another unique index', async () => {
+    await upsertWithSlug(client, 'foo@test.com', 'shared');
+
+    driver.statements = [];
+
+    await rejects(() => upsertWithSlug(client, 'bar@test.com', 'shared'), DuplicateUniqueKeyError);
+
+    // Tried once more only: the duplicate that persists is a different record.
+    equal(driver.statements.length, 2);
+
+    equal(await client.ez4_test_unique.count({}), 1);
+  });
+
+  it('assert :: upsert one colliding with another record inside a transaction', async () => {
+    await upsertWithSlug(client, 'foo@test.com', 'shared');
+
+    driver.statements = [];
+
+    await client.transaction(async (transaction) => {
+      await rejects(() => upsertWithSlug(transaction, 'bar@test.com', 'shared'), DuplicateUniqueKeyError);
+
+      // The failed upsert is undone on its own, and the transaction goes on.
+      await upsertWithSlug(transaction, 'baz@test.com', 'other');
+    });
+
+    deepEqual(
+      driver.statements.map(({ query }) => (query.startsWith('INSERT') ? 'INSERT' : query)),
+      [
+        'SAVEPOINT "ez4_upsert"',
+        'INSERT',
+        'ROLLBACK TO SAVEPOINT "ez4_upsert"',
+        'INSERT',
+        'ROLLBACK TO SAVEPOINT "ez4_upsert"',
+        'RELEASE SAVEPOINT "ez4_upsert"',
+        'SAVEPOINT "ez4_upsert"',
+        'INSERT',
+        'RELEASE SAVEPOINT "ez4_upsert"'
+      ]
+    );
+
+    deepEqual(await findByEmail('baz@test.com'), {
+      counter: 1,
+      status: null,
+      json: null
+    });
+
+    equal(await client.ez4_test_unique.count({}), 2);
   });
 
   it('assert :: upsert one with atomic increment from concurrent callers', async () => {

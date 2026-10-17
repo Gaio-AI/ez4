@@ -39,6 +39,10 @@ type SendStatementResult<T> = IsArray<T> extends true ? PgExecutionResult[] : Pg
 
 const UPSERT_WRITTEN_FLAG = '__EZ4_OK';
 
+// Every upsert uses the same name: a release or rollback acts on the latest savepoint with it, while a name per upsert
+// breaks when two interleave on one transaction (releasing one also removes the savepoint the other set after it).
+const UPSERT_SAVEPOINT = 'ez4_upsert';
+
 const getUpsertResult = <S extends Query.SelectInput<T>, T extends InternalTableMetadata>(
   query: Query.UpsertOneInput<S, T>,
   record: AnyObject | undefined,
@@ -169,7 +173,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     }
 
     for (let attempt = 1; ; attempt++) {
-      const { records } = await this.sendStatement(statement);
+      const { records } = await this.sendUpsertStatement(statement);
 
       const [record] = records;
 
@@ -194,6 +198,43 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
       if (existing) {
         return getUpsertResult<S, T>(query, existing, false);
+      }
+    }
+  }
+
+  // The conflict target arbitrates only its own unique index, so an insert racing another one into a different unique
+  // index fails instead of updating. Running the statement once more finds the record the other insert committed through
+  // the target, and a duplicate key that persists is a different record.
+  private async sendUpsertStatement(statement: PgExecuteStatement) {
+    // A failed statement aborts the whole transaction, and a savepoint undoes only the statement so it can run again.
+    const savepoint = async (command: string) => {
+      if (this.context.transactionId) {
+        await this.sendStatement({ query: `${command} "${UPSERT_SAVEPOINT}"` });
+      }
+    };
+
+    await savepoint('SAVEPOINT');
+
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const result = await this.sendStatement(statement);
+
+        await savepoint('RELEASE SAVEPOINT');
+
+        return result;
+      } catch (error) {
+        if (!(error instanceof DuplicateUniqueKeyError)) {
+          throw error;
+        }
+
+        await savepoint('ROLLBACK TO SAVEPOINT');
+
+        // Undone and released, an upsert that keeps failing leaves the transaction usable.
+        if (attempt > 1) {
+          await savepoint('RELEASE SAVEPOINT');
+
+          throw error;
+        }
       }
     }
   }
