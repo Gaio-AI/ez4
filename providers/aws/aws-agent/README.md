@@ -77,6 +77,7 @@ Agent tasks, workspaces, and the egress proxy discover existing VPC infrastructu
 - **Agents**: subnets and security group tagged `ez4:agents=true`.
 - **Workspaces**: security group tagged `ez4:agents-efs=true`.
 - **Proxy**: security group tagged `ez4:agents-proxy=true`.
+- **VPC access**: security group tagged `ez4:agents-vpc=true`, for the agents that declare `vpc: true`. It carries the egress to the private services they reach (the agents' own group only leaves for the proxy, the endpoints and the file system), and a missing group fails the deploy of such an agent. A variable of the agent that holds a URL to a private IPv4 address (`http://172.31.83.114:3100`) is added to `NO_PROXY`, so the request goes straight to the VPC instead of through the egress proxy.
 
 #### Permission
 

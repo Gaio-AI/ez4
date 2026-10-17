@@ -55,6 +55,7 @@ export type AgentService = Omit<ServiceMetadata, 'variables' | 'services'> &
     resources?: Agent.Resources;
     permissions?: Agent.Permissions;
     egress?: string[];
+    vpc?: boolean;
     secrets?: Record<string, string>;
     inputSchema?: ObjectSchema;
     outputSchema?: ObjectSchema;

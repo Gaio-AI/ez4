@@ -43,7 +43,9 @@ const ports = {
   network: {
     getDefaultVpcId: async () => 'vpc-1',
     getTaggedSubnetIds: async () => ['subnet-a', 'subnet-b'],
-    getTaggedSecurityGroupIds: async (_vpc: string, tag: { key: string }) => (tag.key === 'ez4:agents-proxy' ? ['sg-proxy'] : ['sg-agents'])
+    getTaggedSecurityGroupIds: async (_vpc: string, tag: { key: string }) => {
+      return { 'ez4:agents-proxy': ['sg-proxy'], 'ez4:agents-vpc': ['sg-vpc'] }[tag.key] ?? ['sg-agents'];
+    }
   },
   bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' }),
   identity: async () => ({ region: 'us-east-1', accountId: '123456789012' }),
@@ -176,6 +178,40 @@ describe('agent resources wiring', () => {
     const input = taskdef.parameters.getTaskDefinition({ getDependencies: () => [] } as unknown as StepContext);
     const environment = input.containerDefinitions?.[0]?.environment ?? [];
     ok(environment.some(({ name, value }) => name === 'LINKED_TAG' && value === 'linked'));
+  });
+
+  it('assert :: a vpc agent runs in the vpc security group and reaches the private hosts of its variables directly', async () => {
+    const makeAgent = (name: string, vpc: boolean) =>
+      ({ ...createAgentService(name), provider: AgentProvider.Claude, model: 'm', instructions: 'i', vpc, variables: {} }) as AgentService;
+
+    const reaching = makeAgent('ReaderAgent', true);
+    const plain = makeAgent('PlainAgent', false);
+    const state: EntryStates = {};
+    const context = makeContext();
+    const metadata = { ReaderAgent: reaching, PlainAgent: plain };
+
+    for (const service of [reaching, plain]) {
+      await prepareAgentResources({ state, service, metadata, options, context } as PrepareResourceEvent, ports);
+      service.context = { variables: { module: 'Environment', from: '@ez4/common', constructor: 'VariablesClient' } } as never;
+      service.variables = { LANGFUSE_BASE_URL: 'http://172.31.83.114:3100', PUBLIC_API: 'https://api.github.com' };
+      await connectAgentResources({ state, service, options, context } as ConnectResourceEvent, {
+        bundle: async () => ({ file: '/tmp/echo.mjs', hash: 'bundlehash' })
+      });
+    }
+
+    const readNoProxy = (name: string) => {
+      const taskdef = context.getServiceState(name, options) as EcsTaskDefState;
+      const input = taskdef.parameters.getTaskDefinition({ getDependencies: () => [] } as unknown as StepContext);
+      return input.containerDefinitions?.[0]?.environment?.find(({ name: variable }) => variable === 'NO_PROXY')?.value?.split(',') ?? [];
+    };
+
+    const securityGroups = (name: string) => (context.getServiceState(name, options) as EcsTaskDefState).parameters.securityGroupIds;
+
+    deepEqual(securityGroups('ReaderAgent'), ['sg-agents', 'sg-vpc']);
+    deepEqual(securityGroups('PlainAgent'), ['sg-agents']);
+    ok(readNoProxy('ReaderAgent').includes('172.31.83.114'));
+    ok(!readNoProxy('ReaderAgent').includes('api.github.com'));
+    ok(!readNoProxy('PlainAgent').includes('172.31.83.114'));
   });
 
   it('assert :: bucket keys use the agent name verbatim', () => {

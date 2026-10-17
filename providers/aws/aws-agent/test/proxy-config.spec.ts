@@ -16,6 +16,7 @@ import {
   generateSquidConfig,
   resolveAgentAllowedDomains,
   buildNoProxyList,
+  getPrivateHosts,
   normalizeDomain,
   getAgentEgressDomains
 } from '../src/proxy/config';
@@ -135,6 +136,32 @@ describe('proxy :: configuration and auth', () => {
     ok(noProxy.includes('.us-east-1.vpce.amazonaws.com'));
     ok(noProxy.includes('127.0.0.1'));
     ok(noProxy.includes('localhost'));
+  });
+
+  it('adds private hosts to the NO_PROXY list after the standard ones', () => {
+    const noProxy = buildNoProxyList('us-east-1', ['172.31.83.114']);
+    ok(noProxy.includes('172.31.83.114'));
+    ok(noProxy.includes('localhost'));
+    deepEqual(buildNoProxyList('us-east-1'), buildNoProxyList('us-east-1', []));
+  });
+
+  it('takes the private IPv4 hosts out of the URLs the variables hold', () => {
+    deepEqual(
+      getPrivateHosts({
+        LANGFUSE_BASE_URL: 'http://172.31.83.114:3100',
+        OTHER_SERVICE: 'https://10.0.4.7/api',
+        THIRD_SERVICE: 'http://192.168.1.20',
+        LANGFUSE_PUBLIC_KEY: 'pk-lf-123',
+        UNSET: 'unset',
+        PUBLIC_SERVICE: 'https://api.github.com',
+        PUBLIC_IP: 'http://8.8.8.8:80',
+        NOT_AN_URL: '172.31.83.114',
+        SAME_AGAIN: 'http://172.31.83.114:3001'
+      }),
+      ['10.0.4.7', '172.31.83.114', '192.168.1.20']
+    );
+    deepEqual(getPrivateHosts(undefined), []);
+    deepEqual(getPrivateHosts({ HOST: 'http://172.32.0.1', TOO_BIG: 'http://172.15.0.1', EDGE: 'http://172.16.0.1' }), ['172.16.0.1']);
   });
 
   it('generates htpasswd entries without storing raw passwords in configuration', () => {

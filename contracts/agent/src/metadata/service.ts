@@ -7,6 +7,7 @@ import {
   isClassDeclaration,
   getDeclarationDescription,
   getModelMembers,
+  getPropertyBoolean,
   getPropertyString,
   getPropertyStringIn,
   getPropertyStringList,
@@ -92,6 +93,12 @@ const parseOptionalMembers = (
     else service.egress = egress;
   }
 
+  if (members.vpc) {
+    const vpc = getPropertyBoolean(members.vpc);
+    if (vpc === undefined) invalid('vpc');
+    else service.vpc = vpc;
+  }
+
   if (members.secrets) {
     const secrets = stringMap(members.secrets);
     if (!secrets) invalid('secrets');
@@ -160,7 +167,8 @@ export const getAgentServicesMetadata = (reflection: ReflectionTypes) => {
     for (const member of getModelMembers(declaration, true)) {
       if (
         isModelProperty(member) &&
-        (!member.inherited || !['tools', 'mcpServers', 'image', 'egress', 'secrets', 'permissions', 'workspace'].includes(member.name))
+        (!member.inherited ||
+          !['tools', 'mcpServers', 'image', 'egress', 'vpc', 'secrets', 'permissions', 'workspace'].includes(member.name))
       ) {
         members[member.name] = member;
       }

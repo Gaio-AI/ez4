@@ -45,6 +45,12 @@ describe('agent metadata parser and validation', () => {
     deepEqual(isAgentWorkflowService(workflow), true);
   });
 
+  it('assert :: vpc agent keeps its flag', () => {
+    registerTriggers();
+    const { metadata } = buildMetadata(['./test/input/output-vpc-agent.ts']);
+    deepEqual((metadata.VpcAgent as AgentService).vpc, true);
+  });
+
   it('assert :: workspace repos are normalized', () => {
     registerTriggers();
     const { metadata } = buildMetadata(['./test/input/output-workspace-agent.ts']);
