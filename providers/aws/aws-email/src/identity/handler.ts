@@ -2,7 +2,7 @@ import type { StepContext, StepHandler } from '@ez4/state';
 import type { OperationLogLine } from '@ez4/aws-common';
 import type { IdentityState, IdentityResult, IdentityParameters } from './types';
 
-import { applyTagUpdates, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, applyTagUpdates, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
 import { importIdentity, createIdentity, deleteIdentity, tagIdentity, untagIdentity } from './client';
@@ -73,7 +73,7 @@ const updateResource = async (candidate: IdentityState, current: IdentityState) 
 const deleteResource = async (current: IdentityState, context: StepContext) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'Email identity', parameters.identity)) {
     return OperationLogger.logExecution(IdentityServiceName, parameters.identity, 'deletion', async (logger) => {
       await deleteIdentity(logger, parameters.identity);
     });

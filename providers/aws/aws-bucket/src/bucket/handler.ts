@@ -97,7 +97,7 @@ const updateResource = async (candidate: BucketState, current: BucketState, cont
   });
 };
 
-const deleteResource = async (current: BucketState) => {
+const deleteResource = async (current: BucketState, context: StepContext) => {
   const { result, parameters } = current;
 
   if (result) {
@@ -112,6 +112,8 @@ const deleteResource = async (current: BucketState) => {
 
       if (isEmpty) {
         await deleteBucket(logger, bucketName);
+      } else {
+        context.addWarning(`Bucket '${bucketName}' still holds objects, so it was kept.`);
       }
     });
   }

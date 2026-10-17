@@ -1,6 +1,6 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { EcsServiceResult, EcsServiceState } from './types';
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 import { upsertEcsService, deleteEcsService } from './client';
 import { EcsServiceServiceName } from './types';
@@ -54,7 +54,7 @@ export const getEcsServiceHandler = (): StepHandler<EcsServiceState> => ({
     return undefined;
   },
   delete: async (current, context) => {
-    if (current.result && context.force) {
+    if (current.result && allowForcedDeletion(context, 'ECS service', current.parameters.serviceName)) {
       return OperationLogger.logExecution(EcsServiceServiceName, current.parameters.serviceName, 'deletion', (logger) =>
         deleteEcsService(logger, current.parameters)
       );

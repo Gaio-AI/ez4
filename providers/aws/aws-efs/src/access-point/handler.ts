@@ -5,7 +5,13 @@ import type { AccessPointParameters, AccessPointResult, AccessPointState } from 
 import type { EfsClientPort } from '../filesystem/client';
 import { getEfsClient } from '../filesystem/client';
 
-import { CorruptedResourceError, IncompleteResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import {
+  allowForcedDeletion,
+  CorruptedResourceError,
+  IncompleteResourceError,
+  OperationLogger,
+  ReplaceResourceError
+} from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 import { createAccessPointResource, deleteAccessPointResource } from './client';
 import { FileSystemServiceType } from '../filesystem/types';
@@ -104,7 +110,7 @@ const deleteResource = async (
 ) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'EFS access point', parameters.accessPointName)) {
     return OperationLogger.logExecution(AccessPointServiceName, parameters.accessPointName, 'deletion', async (logger) => {
       await deleteFn(logger, result);
     });

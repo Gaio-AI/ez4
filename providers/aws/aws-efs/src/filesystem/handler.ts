@@ -3,7 +3,7 @@ import type { OperationLogLine } from '@ez4/aws-common';
 import type { FileSystemParameters, FileSystemResult, FileSystemState } from './types';
 import type { EfsClientPort } from './client';
 
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 import { createFileSystemResource, deleteFileSystemResource, getEfsClient } from './client';
 import { FileSystemServiceName } from './types';
@@ -91,7 +91,7 @@ const deleteResource = async (
 ) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'EFS file system', parameters.fileSystemName)) {
     return OperationLogger.logExecution(FileSystemServiceName, parameters.fileSystemName, 'deletion', async (logger) => {
       await deleteFn(logger, result);
     });

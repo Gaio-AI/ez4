@@ -14,6 +14,7 @@ export * from './common/bundler';
 export * from './common/packages';
 export * from './common/provider';
 export * from './common/logger';
+export * from './common/deletion';
 export * from './common/state';
 
 export * from './types/tags';
