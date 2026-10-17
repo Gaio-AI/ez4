@@ -26,7 +26,7 @@ import { IncompleteServiceError } from '../errors/service';
 import { IncorrectFifoModePropertyError } from '../errors/fifomode';
 import { IncorrectFairModePropertyError } from '../errors/fairmode';
 import { attachValidatorLinkedServices } from './utils/validator';
-import { getQueueSubscriptionsMetadata } from './subscription';
+import { getQueueSubscriptionsMetadata, validateQueueSubscriptions } from './subscription';
 import { getQueueDeadLetterMetadata } from './deadletter';
 import { getQueueFifoModeMetadata } from './fifomode';
 import { getQueueFairModeMetadata } from './fairmode';
@@ -149,7 +149,7 @@ export const getQueueServicesMetadata = (reflection: ReflectionTypes) => {
       continue;
     }
 
-    const validationErrors = validateModeProperties(declaration, service);
+    const validationErrors = [...validateModeProperties(declaration, service), ...validateQueueSubscriptions(service, fileName)];
 
     if (validationErrors.length) {
       errorList.push(...validationErrors);

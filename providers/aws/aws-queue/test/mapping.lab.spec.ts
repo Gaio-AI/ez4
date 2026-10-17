@@ -82,7 +82,8 @@ describe('queue mapping', { timeout: 90000 }, () => {
         minDelay: 5,
         maxDelay: 60
       },
-      parallelism: 1
+      parallelism: 1,
+      acknowledge: 'record'
     });
 
     const resource = createMapping(localState, queueResource, functionResource, {

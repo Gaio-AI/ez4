@@ -15,6 +15,7 @@ declare const __EZ4_MAX_ATTEMPTS: number;
 declare const __EZ4_MIN_BACKOFF: number;
 declare const __EZ4_MAX_BACKOFF: number;
 declare const __EZ4_PARALLELISM: number;
+declare const __EZ4_ACKNOWLEDGE: 'record' | 'batch';
 declare const __EZ4_CONTEXT: object;
 
 declare function dispatch(event: Queue.ServiceEvent<Queue.Message>, context: object): Promise<void>;
@@ -86,8 +87,10 @@ const processAllRecords = async (
   // The event source mapping deletes every record left out of the batch response, so a lone record
   // needs no delete of its own. In a longer batch each record is still deleted as soon as it's handled:
   // an invocation that dies on a later record hands the whole batch back, and what already ran must
-  // not run again.
-  const deleteEachRecord = records.length > 1;
+  // not run again. A batch acknowledge leaves every delete to the event source mapping, which takes
+  // them in batches instead of one request per record, and accepts that what already ran runs again
+  // when the invocation dies.
+  const deleteEachRecord = __EZ4_ACKNOWLEDGE !== 'batch' && records.length > 1;
 
   const groupTurns = new Map<string, Promise<void>>();
 

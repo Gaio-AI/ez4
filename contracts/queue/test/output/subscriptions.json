@@ -38,11 +38,12 @@
         "concurrency": 2,
         "batch": 5,
         "parallelism": 3,
+        "acknowledge": "batch",
         "handler": {
           "name": "testHandler",
           "file": "test/input/output-subscriptions.ts",
           "position": [
-            52,
+            55,
             1
           ]
         }
@@ -50,12 +51,13 @@
       {
         "runtime": "node24",
         "memory": 128,
+        "acknowledge": "record",
         "debug": true,
         "handler": {
           "name": "testHandler",
           "file": "test/input/output-subscriptions.ts",
           "position": [
-            52,
+            55,
             1
           ]
         },

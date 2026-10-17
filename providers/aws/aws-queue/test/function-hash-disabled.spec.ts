@@ -59,6 +59,7 @@ const getFunctionHash = (context: FunctionContext, references?: string[]) => {
       maxDelay: 60
     },
     parallelism: 1,
+    acknowledge: 'record',
     context,
     references
   });

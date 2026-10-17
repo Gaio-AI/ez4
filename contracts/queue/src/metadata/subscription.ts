@@ -1,7 +1,7 @@
 import type { AllType, ModelProperty, ReflectionTypes, TypeModel, TypeObject } from '@ez4/reflection';
 import type { MemberType } from '@ez4/common/library';
 import type { Incomplete } from '@ez4/utils';
-import type { QueueSubscription } from './types';
+import type { QueueImport, QueueService, QueueSubscription, QueueSubscriptionAcknowledge } from './types';
 
 import {
   InvalidServicePropertyError,
@@ -10,6 +10,8 @@ import {
   getObjectMembers,
   getModelMembers,
   getPropertyNumber,
+  getPropertyString,
+  getPropertyStringIn,
   getPropertyStringList,
   getPropertyBoolean,
   getPropertyTuple,
@@ -22,13 +24,41 @@ import {
 } from '@ez4/common/library';
 
 import { isModelProperty, isTypeObject, isTypeReference } from '@ez4/reflection';
-import { isObjectWith } from '@ez4/utils';
+import { isAnyNumber, isObjectWith } from '@ez4/utils';
 
-import { IncompleteSubscriptionError, IncorrectSubscriptionTypeError, InvalidSubscriptionTypeError } from '../errors/subscription';
+import {
+  IncompleteSubscriptionError,
+  IncorrectSubscriptionTypeError,
+  InvalidSubscriptionAcknowledgeError,
+  InvalidSubscriptionBatchError,
+  InvalidSubscriptionTypeError
+} from '../errors/subscription';
+
 import { getSubscriptionHandlerMetadata } from './handler';
+
+// An SQS event source mapping takes at most this many messages per batch from a FIFO queue.
+const MaxFifoBatchSize = 10;
 
 export const isQueueSubscriptionDeclaration = (type: AllType) => {
   return isModelDeclaration(type) && hasHeritageType(type, 'Queue.Subscription');
+};
+
+/**
+ * Check the subscription properties that depend on the queue they belong to, such as the largest
+ * batch a FIFO queue takes.
+ */
+export const validateQueueSubscriptions = (service: QueueService | QueueImport, fileName?: string) => {
+  const errorList: Error[] = [];
+
+  if (service.fifoMode) {
+    for (const { handler, batch } of service.subscriptions) {
+      if (isAnyNumber(batch) && batch > MaxFifoBatchSize) {
+        errorList.push(new InvalidSubscriptionBatchError(handler.name, batch, MaxFifoBatchSize, fileName));
+      }
+    }
+  }
+
+  return errorList;
 };
 
 export const getQueueSubscriptionsMetadata = (
@@ -121,6 +151,17 @@ const getTypeFromMembers = (
       case 'parallelism':
       case 'logRetention': {
         subscription[member.name] = getPropertyNumber(member);
+        break;
+      }
+
+      case 'acknowledge': {
+        const acknowledge = getPropertyStringIn<QueueSubscriptionAcknowledge>(member, ['record', 'batch']);
+
+        if (acknowledge) {
+          subscription.acknowledge = acknowledge;
+        } else {
+          errorList.push(new InvalidSubscriptionAcknowledgeError(getPropertyString(member) ?? 'unknown', type.file));
+        }
         break;
       }
 

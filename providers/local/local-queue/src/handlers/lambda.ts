@@ -43,6 +43,7 @@ export const processLambdaBatch = (
   const minBackoff = service.backoff?.minDelay ?? Defaults.MinBackoff;
   const maxBackoff = service.backoff?.maxDelay ?? Defaults.MaxBackoff;
   const parallelism = subscription.parallelism ?? Defaults.Parallelism;
+  const acknowledge = subscription.acknowledge ?? Defaults.Acknowledge;
 
   const servicesInUse = handler.references ? pickObject(services, handler.references) : services;
   const serviceClients = context.makeClients(servicesInUse);
@@ -169,8 +170,9 @@ export const processLambdaBatch = (
     const failedGroupIds = new Set<string>();
 
     // The event source mapping deletes every record left out of the batch response, so a lone record needs
-    // no delete of its own. In a longer batch each record is deleted as soon as it's handled.
-    const deleteEachRecord = messages.length > 1;
+    // no delete of its own. In a longer batch each record is deleted as soon as it's handled, unless a batch
+    // acknowledge leaves every delete to the end of the invocation.
+    const deleteEachRecord = acknowledge !== 'batch' && messages.length > 1;
 
     const groupTurns = new Map<string, Promise<void>>();
 
