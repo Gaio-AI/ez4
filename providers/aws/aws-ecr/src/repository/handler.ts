@@ -1,7 +1,7 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { EcrRepositoryResult, EcrRepositoryState } from './types';
 
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
 import { findRepository, createRepository, deleteRepository, setLifecyclePolicy, updateScanningConfiguration } from './client';
@@ -83,7 +83,7 @@ const updateResource = async (candidate: EcrRepositoryState, current: EcrReposit
 const deleteResource = async (current: EcrRepositoryState, context: StepContext) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'ECR repository', parameters.repositoryName)) {
     return OperationLogger.logExecution(EcrRepositoryServiceName, parameters.repositoryName, 'deletion', async (logger) => {
       await deleteRepository(logger, parameters.repositoryName);
     });

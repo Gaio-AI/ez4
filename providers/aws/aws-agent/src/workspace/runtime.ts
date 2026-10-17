@@ -12,7 +12,7 @@ export type WorkspaceRepoMeta = Required<Agent.WorkspaceRepo>;
 export type WorkspaceRuntime = {
   root: string;
   workspace: NonNullable<AgentService['workspace']>;
-  token?: () => Promise<string | undefined>;
+  token?: (access?: 'read' | 'write') => Promise<string | undefined>;
   git?: Git;
   now?: () => number;
 };
@@ -392,7 +392,7 @@ export const pushWorkspaceBranch = async (
     throw new Error(`Refusing to push the workspace branch '${branch}' of '${repoName}'`);
   }
 
-  const token = runtime.token ? await runtime.token() : undefined;
+  const token = runtime.token ? await runtime.token('write') : undefined;
   const env = token ? authEnv(repo.url, token) : undefined;
   const pushResult = await git(['push', repo.url, `${ref.head}:refs/heads/${branch}`], { cwd: repoDir, env });
 

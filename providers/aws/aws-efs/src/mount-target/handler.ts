@@ -5,7 +5,7 @@ import type { MountTargetParameters, MountTargetResult, MountTargetState } from 
 import type { EfsClientPort } from '../filesystem/client';
 import { getEfsClient } from '../filesystem/client';
 
-import { CorruptedResourceError, IncompleteResourceError, OperationLogger } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, IncompleteResourceError, OperationLogger } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 import { createMountTargetResource, deleteMountTargetResource } from './client';
 import { FileSystemServiceType } from '../filesystem/types';
@@ -111,7 +111,7 @@ const deleteResource = async (
 ) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'EFS mount target', parameters.subnetId)) {
     return OperationLogger.logExecution(MountTargetServiceName, parameters.subnetId, 'deletion', async (logger) => {
       await deleteFn(logger, result);
     });

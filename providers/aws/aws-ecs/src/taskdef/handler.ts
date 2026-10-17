@@ -1,6 +1,6 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { EcsTaskDefResult, EcsTaskDefState } from './types';
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 import { registerTaskDefinition, deregisterTaskDefinition, describeTaskDefinition } from './client';
 import { EcsTaskDefServiceName } from './types';
@@ -47,7 +47,7 @@ export const getEcsTaskDefHandler = (): StepHandler<EcsTaskDefState> => ({
     });
   },
   delete: async (current, context) => {
-    if (current.result && context.force) {
+    if (current.result && allowForcedDeletion(context, 'ECS task definition', current.parameters.family)) {
       return OperationLogger.logExecution(EcsTaskDefServiceName, current.parameters.family, 'deletion', async (logger) => {
         await deregisterTaskDefinition(logger, current.result!.taskDefinitionArn);
       });

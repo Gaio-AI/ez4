@@ -1,7 +1,7 @@
 import type { StepContext, StepHandler } from '@ez4/state';
 import type { EcsClusterResult, EcsClusterState } from './types';
 
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
 import { findCluster, createCluster, deleteCluster } from './client';
@@ -72,7 +72,7 @@ const updateResource = async (candidate: EcsClusterState, _current: EcsClusterSt
 const deleteResource = async (current: EcsClusterState, context: StepContext) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'ECS cluster', parameters.clusterName)) {
     return OperationLogger.logExecution(EcsClusterServiceName, parameters.clusterName, 'deletion', async (logger) => {
       await deleteCluster(logger, parameters.clusterName);
     });

@@ -47,6 +47,16 @@ export declare class InvalidEgress extends Agent.Service<Input, Output> {
   egress: [123];
 }
 
+export declare class InvalidVpc extends Agent.Service<Input, Output> {
+  provider: AgentProvider.Claude;
+  model: 'test';
+  instructions: 'test';
+  input: Input;
+  output: Output;
+  // @ts-expect-error malformed metadata should be reported by the parser
+  vpc: 'yes';
+}
+
 export declare class InvalidSecrets extends Agent.Service<Input, Output> {
   provider: AgentProvider.Claude;
   model: 'test';

@@ -171,6 +171,12 @@ export namespace Agent {
      * the workspace repository hosts and the AWS endpoints of its permissions.
      */
     readonly egress?: string[];
+    /**
+     * Lets the agent reach the services that only the VPC reaches, like the `vpc` of a route does for a function.
+     * The task gets the security group tagged `ez4:agents-vpc`, and a variable of the agent that holds a URL to a
+     * private IPv4 address (`http://10.0.0.5:3100`) is reached directly instead of through the egress proxy.
+     */
+    readonly vpc?: boolean;
     readonly secrets?: Record<string, string>;
     readonly variables?: LinkedVariables;
     readonly services?: Record<string, unknown>;

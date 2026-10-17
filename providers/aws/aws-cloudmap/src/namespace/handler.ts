@@ -2,7 +2,7 @@ import type { StepContext, StepHandler } from '@ez4/state';
 import type { NamespaceResult, NamespaceState, NamespaceParameters } from './types';
 import type { OperationLogLine } from '@ez4/aws-common';
 
-import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
+import { allowForcedDeletion, CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { deepCompare } from '@ez4/utils';
 
 import { createNamespaceResource as defaultCreate, deleteNamespaceResource as defaultDelete } from './client';
@@ -83,7 +83,7 @@ const deleteResource = async (
 ) => {
   const { result, parameters } = current;
 
-  if (result && context.force) {
+  if (result && allowForcedDeletion(context, 'Cloud Map namespace', parameters.namespaceName)) {
     return OperationLogger.logExecution(NamespaceServiceName, parameters.namespaceName, 'deletion', async (logger) => {
       await deleteFn(logger, result);
     });

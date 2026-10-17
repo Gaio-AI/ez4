@@ -35,13 +35,13 @@ import {
 import { createEcrImage, createEcrRepository, createEcrRepositoryStateId, EcrImageServiceType } from '@ez4/aws-ecr';
 import { computeImageTag, generateDockerfile } from '../image/dockerfile';
 import { buildTaskDefinitionInput } from '../agent/taskdef';
-import { discoverAgentNetwork } from '../network/discovery';
+import { discoverAgentNetwork, getAgentSecurityGroupIds } from '../network/discovery';
 import { createSecret, createSecretStateId, SecretServiceType } from '@ez4/aws-secret';
 import { generateAgentPassword, generateHtpasswd } from '../proxy/auth';
 import { createNamespace, createNamespaceStateId, NamespaceServiceType, type NamespaceState } from '@ez4/aws-cloudmap';
 import { IncompleteResourceError } from '@ez4/aws-common';
 import { buildProxyTaskDefinitionInput, PROXY_IMAGE, PROXY_START_SCRIPT } from '../proxy/taskdef';
-import { generateSquidConfig, getAgentEgressDomains } from '../proxy/config';
+import { buildNoProxyList, generateSquidConfig, getAgentEgressDomains, getPrivateHosts } from '../proxy/config';
 import { ensureProviderCredential, getDefaultCredentialPorts } from '../auth/login';
 import { ProviderAuths } from '../auth/providers';
 import { buildAgentExecutionRole } from '../role/execution';
@@ -294,6 +294,8 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     }
   }
 
+  const securityGroupIds = getAgentSecurityGroupIds(network, service.vpc);
+
   const taskdef = createEcsTaskDefinition(
     state,
     [
@@ -308,7 +310,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
     {
       family: service.name,
       subnetIds: network.subnetIds,
-      securityGroupIds: network.securityGroupIds,
+      securityGroupIds,
       tags: options.tags,
       // Everything known before linked services resolve; connect folds in the image tag and the variables.
       hash: hashObject({
@@ -317,7 +319,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
         proxyUrl: getAgentProxyUrl(options),
         providerSecret: providerAuth?.envName,
         subnetIds: network.subnetIds,
-        securityGroupIds: network.securityGroupIds
+        securityGroupIds
       }),
       getTaskDefinition: (stepContext: StepContext) => {
         const imageDep = stepContext.getDependencies<EcrImageState>(EcrImageServiceType).at(0);
@@ -354,6 +356,7 @@ export const prepareAgentResources = async (event: PrepareResourceEvent, ports: 
           region,
           // Project, agent and linked-service variables reach the hooks' `context.variables` through the container environment.
           variables: { ...options.variables, ...service.variables },
+          noProxy: buildNoProxyList(region, service.vpc ? getPrivateHosts({ ...options.variables, ...service.variables }) : []).join(','),
           proxy: {
             url: getAgentProxyUrl(options),
             secretArn: proxySecretArn

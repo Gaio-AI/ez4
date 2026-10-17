@@ -180,6 +180,16 @@ describe('workflow :: step runtime', () => {
     deepEqual(seen, ['failed']);
   });
 
+  it('assert :: the result event names the agent by the key the workflow invoked it with', async () => {
+    const seen: string[] = [];
+    const { run } = await harnessAfterStart();
+    await run({ type: WorkflowEventType.Result, result: { ...okResult('id-1', 'r1', 1), agent: 'WorkerAgent' } }, async (request) => {
+      if (request.event.type === WorkflowEventType.Result) seen.push(request.event.agent);
+      return { state: { rounds: 0 }, next: { complete: 'done' } };
+    });
+    deepEqual(seen, ['worker']);
+  });
+
   it('assert :: result for non-existent run is ignored', async () => {
     const { run } = harness();
     deepEqual(await run({ type: WorkflowEventType.Result, result: okResult('id-1', 'r-none', 1) }, loop), 'ignored');

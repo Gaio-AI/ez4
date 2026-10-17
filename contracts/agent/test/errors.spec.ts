@@ -19,7 +19,7 @@ describe('agent metadata errors', () => {
   });
 
   it('assert :: invalid optional agent members report agent and member', () => {
-    const errors = parseFile('invalid-optional-members', 6);
+    const errors = parseFile('invalid-optional-members', 7);
     deepEqual(
       errors.map((error) => {
         ok(error instanceof IncompleteServiceError);
@@ -30,6 +30,7 @@ describe('agent metadata errors', () => {
         ['InvalidMcpServers.mcpServers'],
         ['InvalidImage.image'],
         ['InvalidEgress.egress'],
+        ['InvalidVpc.vpc'],
         ['InvalidSecrets.secrets'],
         ['InvalidStatements.permissions.statements']
       ]

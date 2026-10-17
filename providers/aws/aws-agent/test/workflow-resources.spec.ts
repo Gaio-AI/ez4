@@ -88,6 +88,28 @@ describe('workflow resources and grants', () => {
     }
   });
 
+  it('assert :: the workflow function is hashed over the files its handler reaches, not only the template', async () => {
+    const state: EntryStates = {};
+    const reached = ['src/code/verdict.ts', 'src/code/linear.ts'];
+    const context: EventContext = { ...mockContext, getDependencyFiles: (file) => (file === workflowFixture.handler.file ? reached : []) };
+
+    await prepareWorkflowResources(state, workflowFixture, metadata, context, options, {
+      identity: async () => ({ region: 'us-east-1', accountId: '123' })
+    });
+
+    const [fn] = Object.values(state)
+      .filter((e): e is EntryState => !!e)
+      .filter(isFunctionState);
+    const [sourceFile, dependencies] = fn.parameters.getFunctionFiles();
+
+    equal(sourceFile, 'test/fixtures/workflow.ts');
+    deepEqual(dependencies.slice(0, 2), reached);
+    ok(
+      dependencies.some((file) => file.endsWith('lib/workflow.ts')),
+      'the template stays in the hash'
+    );
+  });
+
   it('assert :: workflow role runs only its declared agents', async () => {
     const grants = buildWorkflowGrants(workflowFixture, 'us-east-1', '123', options);
     const runTask = grants.find((g) => g.permissions.includes('ecs:RunTask'))!;

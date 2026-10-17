@@ -196,7 +196,10 @@ export const prepareWorkflowResources = async <E extends EntryState>(
       });
     },
     getFunctionFiles: () => {
-      return [workflow.handler?.file ?? templateFile, [templateFile]];
+      const handlerFile = workflow.handler?.file;
+      const handlerDependencies = handlerFile ? (context?.getDependencyFiles(handlerFile) ?? []) : [];
+
+      return [handlerFile ?? templateFile, [...handlerDependencies, templateFile]];
     },
     getFunctionHash: () => {
       return hashObject({

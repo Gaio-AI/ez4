@@ -20,10 +20,22 @@ export const mintInstallationToken = async (params: {
   appId: string;
   installationId: string;
   privateKeyPem: string;
+  /**
+   * What the token may do with the repository contents. Read is enough to clone and fetch; only the push of a finished
+   * branch asks for write.
+   */
+  access?: 'read' | 'write';
   fetch?: typeof fetch;
   now?: () => number;
 }): Promise<string> => {
-  const { appId, installationId, privateKeyPem, fetch: fetchFn = globalThis.fetch, now = () => Math.floor(Date.now() / 1000) } = params;
+  const {
+    appId,
+    installationId,
+    privateKeyPem,
+    access = 'read',
+    fetch: fetchFn = globalThis.fetch,
+    now = () => Math.floor(Date.now() / 1000)
+  } = params;
 
   const jwt = createGitHubAppJwt(appId, privateKeyPem, now());
   const response = await fetchFn(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
@@ -35,7 +47,7 @@ export const mintInstallationToken = async (params: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      permissions: { contents: 'read' }
+      permissions: { contents: access }
     })
   });
 

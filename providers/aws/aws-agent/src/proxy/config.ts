@@ -75,7 +75,27 @@ export const getAgentEgressDomains = (
   return Array.from(domains).sort();
 };
 
-export const buildNoProxyList = (region: string): string[] => {
+const PRIVATE_IPV4_URL = /^https?:\/\/((?:10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3})(?::\d+)?(?:[/?#]|$)/;
+
+/**
+ * Hosts of the private IPv4 addresses the variables point at (`http://172.31.83.114:3100`), which an agent with `vpc`
+ * reaches directly. The NO_PROXY list of the runtime has no CIDR, so each address is named.
+ */
+export const getPrivateHosts = (variables: Record<string, string> | undefined): string[] => {
+  const hosts = new Set<string>();
+
+  for (const value of Object.values(variables ?? {})) {
+    const host = PRIVATE_IPV4_URL.exec(value)?.[1];
+
+    if (host) {
+      hosts.add(host);
+    }
+  }
+
+  return Array.from(hosts).sort();
+};
+
+export const buildNoProxyList = (region: string, privateHosts: string[] = []): string[] => {
   return [
     'localhost',
     '127.0.0.1',
@@ -87,7 +107,8 @@ export const buildNoProxyList = (region: string): string[] => {
     `secretsmanager.${region}.amazonaws.com`,
     `api.ecr.${region}.amazonaws.com`,
     `dkr.ecr.${region}.amazonaws.com`,
-    `.${region}.vpce.amazonaws.com`
+    `.${region}.vpce.amazonaws.com`,
+    ...privateHosts
   ];
 };
 
