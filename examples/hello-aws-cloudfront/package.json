@@ -17,11 +17,11 @@
     "destroy": "ez4 destroy -e local.env"
   },
   "dependencies": {
-    "@ez4/aws-bucket": "^2.3.0",
-    "@ez4/aws-cloudfront": "^2.3.0",
-    "@ez4/common": "^2.3.0",
-    "@ez4/distribution": "^2.3.0",
-    "@ez4/project": "^2.3.0",
-    "@ez4/storage": "^2.3.0"
+    "@ez4/aws-bucket": "^2.4.0",
+    "@ez4/aws-cloudfront": "^2.4.0",
+    "@ez4/common": "^2.4.0",
+    "@ez4/distribution": "^2.4.0",
+    "@ez4/project": "^2.4.0",
+    "@ez4/storage": "^2.4.0"
   }
 }
