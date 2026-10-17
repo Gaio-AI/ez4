@@ -25,7 +25,13 @@ export const sendDataApiStatement = async (
   const inTransaction = !!options?.transactionId;
 
   // Inside a transaction the setting ends with it, otherwise it's reset before the connection goes back to the pool.
-  await setStatementTimeout(client, statementTimeout, inTransaction);
+  await setStatementTimeout(client, statementTimeout, inTransaction).catch((error) => {
+    // An aborted transaction refuses the setting, while the Data API still runs the statement: a rollback to a savepoint
+    // goes through, and anything else fails on its own.
+    if (!isAbortedTransactionError(error)) {
+      throw error;
+    }
+  });
 
   try {
     const result = await client.query({
@@ -55,6 +61,10 @@ export const sendDataApiStatement = async (
 
 const setStatementTimeout = (client: PoolClient, statementTimeout: number, isLocal: boolean) => {
   return client.query(`SELECT set_config('statement_timeout', $1, $2)`, [`${statementTimeout}`, isLocal]);
+};
+
+const isAbortedTransactionError = (error: unknown) => {
+  return error instanceof DatabaseError && error.code === '25P02';
 };
 
 const isStatementTimeoutError = (error: unknown): error is DatabaseError => {

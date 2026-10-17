@@ -62,6 +62,27 @@ describe('client data api statement timeout', () => {
     deepEqual(records, [{ statement_timeout: '1s' }]);
   });
 
+  it('assert :: rollback to savepoint in an aborted transaction', async () => {
+    const transactionId = await dataApiDriver.beginTransaction();
+
+    try {
+      await dataApiDriver.executeStatement({ query: 'SAVEPOINT "ez4_test"' }, { transactionId });
+
+      await rejects(dataApiDriver.executeStatement({ query: 'SELECT 1 / 0' }, { transactionId, noErrorLog: true }), {
+        message: 'division by zero'
+      });
+
+      // The Data API takes the rollback although the transaction is aborted, and the transaction goes on.
+      await dataApiDriver.executeStatement({ query: 'ROLLBACK TO SAVEPOINT "ez4_test"' }, { transactionId });
+
+      const { records } = await dataApiDriver.executeStatement({ query: 'SHOW statement_timeout' }, { transactionId });
+
+      deepEqual(records, [{ statement_timeout: '1s' }]);
+    } finally {
+      await dataApiDriver.rollbackTransaction(transactionId);
+    }
+  });
+
   it('assert :: statement timeout is not left on the connection', async () => {
     await dataApiDriver.executeStatement({ query: 'SELECT 1' });
 
