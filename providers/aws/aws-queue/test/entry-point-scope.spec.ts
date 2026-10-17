@@ -29,6 +29,7 @@ describe('queue entry point scope', () => {
       __EZ4_MIN_BACKOFF: 0,
       __EZ4_MAX_BACKOFF: 0,
       __EZ4_PARALLELISM: 1,
+      __EZ4_ACKNOWLEDGE: 'record',
       __EZ4_CONTEXT: {},
       dispatch: async () => {},
       handle: async () => {
@@ -76,6 +77,7 @@ describe('queue entry point scope', () => {
       '__EZ4_MIN_BACKOFF',
       '__EZ4_MAX_BACKOFF',
       '__EZ4_PARALLELISM',
+      '__EZ4_ACKNOWLEDGE',
       '__EZ4_CONTEXT',
       'dispatch',
       'handle'

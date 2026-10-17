@@ -68,6 +68,8 @@ export type QueueBackoff = {
   maxDelay: number;
 };
 
+export type QueueSubscriptionAcknowledge = 'record' | 'batch';
+
 export type QueueSubscription = {
   listener?: ServiceListener;
   handler: QueueSubscriptionHandler;
@@ -78,6 +80,7 @@ export type QueueSubscription = {
   logLevel?: LogLevel;
   concurrency?: number;
   parallelism?: number;
+  acknowledge?: QueueSubscriptionAcknowledge;
   batch?: number;
   memory?: number;
   files?: string[];

@@ -1,5 +1,5 @@
 import type { ContextSource, LinkedVariables } from '@ez4/project/library';
-import type { QueueMessageSchema } from '@ez4/queue/library';
+import type { QueueMessageSchema, QueueSubscriptionAcknowledge } from '@ez4/queue/library';
 import type { FunctionParameters } from '@ez4/aws-function';
 
 export type QueueFunction = {
@@ -30,5 +30,6 @@ export type QueueFunctionParameters = Omit<
   references?: string[];
   backoff: QueueBackoff;
   parallelism: number;
+  acknowledge: QueueSubscriptionAcknowledge;
   debug?: boolean;
 };

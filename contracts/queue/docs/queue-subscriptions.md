@@ -77,6 +77,8 @@ concurrency: 10;
 
 Maximum number of messages per handler invocation.
 
+- A FIFO queue takes at most `10` messages per batch.
+
 ```ts
 batch: 5;
 ```
@@ -85,8 +87,23 @@ batch: 5;
 
 Maximum number of messages one handler invocation processes at the same time. The default, `1`, processes them one after another. Messages from the same group in a FIFO queue still run in order. A message starts only while the invocation has time left for the slowest message so far; the ones it doesn't start go back to the queue.
 
+- It overlaps only the waits of work that doesn't share a connection.
+- When every message goes through the same single connection (a database client with a pool of one, for instance), the messages wait for each other on it, and a parallelism above `1` changes nothing.
+
 ```ts
 parallelism: 5;
+```
+
+#### Acknowledge (optional)
+
+How a handler invocation acknowledges the messages of its batch.
+
+- `record` (default): each message of a batch is deleted from the queue as soon as it's handled, so an invocation that dies on a later message doesn't run the earlier ones again.
+- `batch`: no message is deleted on its own. Once the invocation returns, the queue deletes the whole batch together, except the messages that failed or were handed back, which saves a delete request per message.
+- With `batch`, an invocation that dies (timeout, crash) or fails after some messages ran gets the whole batch back: those messages run again, each one spending another attempt toward the dead-letter queue. Use it only with idempotent handlers.
+
+```ts
+acknowledge: 'batch';
 ```
 
 #### Log retention (optional)

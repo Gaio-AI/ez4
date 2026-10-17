@@ -318,6 +318,104 @@ describe('local queue batches', () => {
     ]);
   });
 
+  it('assert :: a message handled before the batch reaches its timeout is consumed', async (t) => {
+    const clock = useTestClock(t);
+    const probe = useQueueProbe(t);
+    const gate = createGate();
+
+    probe.setHandler(({ message, attempt }) => (message.id === 'b' && attempt === 1 ? gate.promise : undefined));
+
+    const queue = registerQueue(t, getQueueService('recordAcknowledgeQueue', { timeout: 2 }));
+
+    await queue.client.sendMessage({ id: 'a' });
+    await queue.client.sendMessage({ id: 'b' });
+
+    await queue.start();
+
+    await waitFor(() => probe.requests.length === 2);
+
+    await clock.advance(2000);
+
+    deepEqual(probe.getRuns(), [
+      ['a', 1],
+      ['b', 1],
+      ['b', 2]
+    ]);
+
+    await QueueTester.waitForDrain('recordAcknowledgeQueue');
+
+    gate.open();
+
+    await settle();
+  });
+
+  it('assert :: with batch acknowledge a batch that reaches its timeout hands back the messages it handled', async (t) => {
+    const clock = useTestClock(t);
+    const probe = useQueueProbe(t);
+    const gate = createGate();
+
+    probe.setHandler(({ message, attempt }) => (message.id === 'b' && attempt === 1 ? gate.promise : undefined));
+
+    const queue = registerQueue(
+      t,
+      getQueueService('batchAcknowledgeQueue', {
+        subscriptions: [getProbeSubscription({ acknowledge: 'batch' })],
+        timeout: 2
+      })
+    );
+
+    await queue.client.sendMessage({ id: 'a' });
+    await queue.client.sendMessage({ id: 'b' });
+
+    await queue.start();
+
+    await waitFor(() => probe.requests.length === 2);
+
+    await clock.advance(2000);
+
+    deepEqual(probe.getRuns(), [
+      ['a', 1],
+      ['b', 1],
+      ['a', 2],
+      ['b', 2]
+    ]);
+
+    await QueueTester.waitForDrain('batchAcknowledgeQueue');
+
+    gate.open();
+
+    await settle();
+  });
+
+  it('assert :: with batch acknowledge the messages of a finished batch are deleted when it ends', async (t) => {
+    const clock = useTestClock(t);
+    const probe = useQueueProbe(t);
+
+    const queue = registerQueue(
+      t,
+      getQueueService('batchDeleteQueue', {
+        subscriptions: [getProbeSubscription({ acknowledge: 'batch' })],
+        timeout: 2
+      })
+    );
+
+    await queue.client.sendMessage({ id: 'a' });
+    await queue.client.sendMessage({ id: 'b' });
+
+    await queue.start();
+
+    await waitFor(() => probe.events.some(({ type }) => type === 'end'));
+
+    await clock.advance(60_000);
+
+    deepEqual(probe.getRuns(), [
+      ['a', 1],
+      ['b', 1]
+    ]);
+
+    await QueueTester.waitForDrain('batchDeleteQueue');
+  });
+
   it('assert :: shutdown stops the pollers and their timers', async (t) => {
     const clock = useTestClock(t);
     const probe = useQueueProbe(t);

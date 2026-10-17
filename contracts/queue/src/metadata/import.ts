@@ -24,7 +24,7 @@ import { isAnyNumber, isObjectWith } from '@ez4/utils';
 
 import { IncompleteServiceError } from '../errors/service';
 import { attachValidatorLinkedServices } from './utils/validator';
-import { getQueueSubscriptionsMetadata } from './subscription';
+import { getQueueSubscriptionsMetadata, validateQueueSubscriptions } from './subscription';
 import { getQueueDeadLetterMetadata } from './deadletter';
 import { getQueueFifoModeMetadata } from './fifomode';
 import { getQueueFairModeMetadata } from './fairmode';
@@ -161,6 +161,13 @@ export const getQueueImportsMetadata = (reflection: ReflectionTypes) => {
 
     if (!isCompleteService(service)) {
       errorList.push(new IncompleteServiceError([...properties], fileName));
+      continue;
+    }
+
+    const validationErrors = validateQueueSubscriptions(service, fileName);
+
+    if (validationErrors.length) {
+      errorList.push(...validationErrors);
       continue;
     }
 

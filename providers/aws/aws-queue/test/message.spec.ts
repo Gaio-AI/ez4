@@ -45,6 +45,7 @@ const runtimeGlobals = {
   __EZ4_MIN_BACKOFF: 5,
   __EZ4_MAX_BACKOFF: 5,
   __EZ4_PARALLELISM: 1,
+  __EZ4_ACKNOWLEDGE: 'record',
   __EZ4_CONTEXT: {},
   handle: async (request: Queue.Incoming<{ id: string }>) => {
     const { id } = request.message;
@@ -149,6 +150,7 @@ describe('aws queue message handler', () => {
     maxRunning = 0;
 
     runtime.__EZ4_PARALLELISM = 1;
+    runtime.__EZ4_ACKNOWLEDGE = 'record';
 
     mock.method(SQSClient.prototype, 'send', async (command: unknown) => {
       if (command instanceof DeleteMessageCommand) {
@@ -309,5 +311,61 @@ describe('aws queue message handler', () => {
     await sqsEntryPoint(makeEvent(makeRecord('a'), makeRecord('b')), shortContext);
 
     deepEqual(timeoutTraces.sort(), ['a:trace-a:session-a', 'b:trace-b:session-b']);
+  });
+
+  it('assert :: with batch acknowledge a longer batch leaves every delete to the event source mapping', async () => {
+    runtime.__EZ4_ACKNOWLEDGE = 'batch';
+    failingMessages.add('b');
+    retryingMessages.add('c');
+
+    const event = makeEvent(makeRecord('a'), makeRecord('b'), makeRecord('c'), makeRecord('d'));
+
+    const response = await sqsEntryPoint(event, context);
+
+    deepEqual(response, { batchItemFailures: [{ itemIdentifier: 'message-b' }, { itemIdentifier: 'message-c' }] });
+    deepEqual(handledMessages, ['a', 'b', 'c', 'd']);
+    deepEqual(sentCommands, ['visibility receipt-b 5', 'visibility receipt-c 30']);
+  });
+
+  it('assert :: with batch acknowledge records running side by side send no delete', async () => {
+    runtime.__EZ4_ACKNOWLEDGE = 'batch';
+    runtime.__EZ4_PARALLELISM = 2;
+    handlerDelay = 20;
+
+    const response = await sqsEntryPoint(makeEvent(makeRecord('a'), makeRecord('b'), makeRecord('c')), context);
+
+    deepEqual(response, { batchItemFailures: [] });
+    deepEqual(handledMessages, ['a', 'b', 'c']);
+    deepEqual(sentCommands, []);
+    equal(maxRunning, 2);
+  });
+
+  it('assert :: with batch acknowledge a failed record still holds back the rest of its group', async () => {
+    runtime.__EZ4_ACKNOWLEDGE = 'batch';
+    failingMessages.add('a');
+
+    const event = makeEvent(makeRecord('a', 'group-1'), makeRecord('b', 'group-1'), makeRecord('c', 'group-2'));
+
+    const response = await sqsEntryPoint(event, context);
+
+    deepEqual(response, { batchItemFailures: [{ itemIdentifier: 'message-a' }, { itemIdentifier: 'message-b' }] });
+    deepEqual(handledMessages, ['a', 'c']);
+    deepEqual(sentCommands, ['visibility receipt-a 5']);
+  });
+
+  it('assert :: with batch acknowledge a record the invocation has no time left for is handed back unstarted', async () => {
+    runtime.__EZ4_ACKNOWLEDGE = 'batch';
+    handlerDelay = 20;
+
+    const shortContext = {
+      ...context,
+      getRemainingTimeInMillis: () => 1_015
+    };
+
+    const response = await sqsEntryPoint(makeEvent(makeRecord('a'), makeRecord('b')), shortContext);
+
+    deepEqual(response, { batchItemFailures: [{ itemIdentifier: 'message-b' }] });
+    deepEqual(handledMessages, ['a']);
+    deepEqual(sentCommands, []);
   });
 });

@@ -1,7 +1,14 @@
 import { ok, equal, deepEqual } from 'assert/strict';
 import { describe, it } from 'node:test';
 
-import { IncompleteSubscriptionError, IncorrectSubscriptionTypeError, InvalidSubscriptionTypeError } from '@ez4/queue/library';
+import {
+  IncompleteSubscriptionError,
+  IncorrectSubscriptionTypeError,
+  InvalidSubscriptionAcknowledgeError,
+  InvalidSubscriptionBatchError,
+  InvalidSubscriptionTypeError
+} from '@ez4/queue/library';
+
 import { InvalidServicePropertyError } from '@ez4/common/library';
 import { registerTriggers } from '@ez4/queue/library';
 
@@ -37,5 +44,25 @@ describe('queue subscription metadata errors', () => {
 
     ok(error1 instanceof InvalidServicePropertyError);
     deepEqual(error1.propertyName, 'invalid_property');
+  });
+
+  it('assert :: invalid subscription acknowledge', () => {
+    const [error1] = parseFile('invalid-subscription-acknowledge', 1);
+
+    ok(error1 instanceof InvalidSubscriptionAcknowledgeError);
+    equal(error1.property, 'acknowledge');
+    equal(error1.value, 'message');
+  });
+
+  it('assert :: invalid subscription batch (fifo queue)', () => {
+    const [error1, error2] = parseFile('invalid-subscription-batch', 2);
+
+    ok(error1 instanceof InvalidSubscriptionBatchError);
+    equal(error1.handlerName, 'otherHandler');
+    equal(error1.value, '11');
+
+    ok(error2 instanceof InvalidSubscriptionBatchError);
+    equal(error2.handlerName, 'testHandler');
+    equal(error2.value, '11');
   });
 });

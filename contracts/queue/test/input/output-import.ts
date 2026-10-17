@@ -59,6 +59,7 @@ export declare class TestImport1Queue extends Queue.Import<TestUnorderedQueue> {
   subscriptions: [
     Queue.UseSubscription<{
       handler: typeof testHandler;
+      acknowledge: 'batch';
     }>
   ];
 

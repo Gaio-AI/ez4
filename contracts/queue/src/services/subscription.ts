@@ -19,7 +19,7 @@ export interface QueueSubscription<T extends QueueMessage> {
   readonly handler: QueueSubscriptionHandler<T>;
 
   /**
-   * Maximum number of messages per handler invocation.
+   * Maximum number of messages per handler invocation. A FIFO queue takes at most 10.
    */
   readonly batch?: number;
 
@@ -31,8 +31,25 @@ export interface QueueSubscription<T extends QueueMessage> {
   /**
    * Maximum number of messages one handler execution processes at the same time. Messages from the
    * same group in a FIFO queue still run one after another.
+   *
+   * It overlaps only the waits of work that doesn't share a connection: when every message goes
+   * through the same single connection (a database client with a pool of one, for instance), the
+   * messages wait for each other on it and a parallelism above one changes nothing.
    */
   readonly parallelism?: number;
+
+  /**
+   * How a handler execution acknowledges the messages of its batch.
+   *
+   * - `record` (default): each message of a batch is deleted from the queue as soon as it's
+   *   handled, so an execution that dies on a later message doesn't run the earlier ones again.
+   * - `batch`: no message is deleted on its own; once the execution returns, the queue deletes the
+   *   whole batch together, except the messages that failed or were handed back. It saves a delete
+   *   request per message, but an execution that dies (timeout, crash) or fails after some messages
+   *   ran gets the whole batch back: those messages run again, each one spending another attempt
+   *   toward the dead-letter queue. Only for idempotent handlers.
+   */
+  readonly acknowledge?: 'record' | 'batch';
 
   /**
    * Variables associated to the subscription.

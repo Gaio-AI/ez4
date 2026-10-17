@@ -20,6 +20,7 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
       concurrency: 2;
       batch: 5;
       parallelism: 3;
+      acknowledge: 'batch';
     }>,
 
     // Subscription reference.
@@ -38,6 +39,8 @@ declare class TestSubscription implements Queue.Subscription<TestMessage> {
   runtime: RuntimeType.Node24;
 
   memory: 128;
+
+  acknowledge: 'record';
 
   files: ['path/to/file-a.txt', 'path/to/file-b.json'];
 

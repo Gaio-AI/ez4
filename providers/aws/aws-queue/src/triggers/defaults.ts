@@ -1,3 +1,5 @@
+import type { QueueSubscriptionAcknowledge } from '@ez4/queue/library';
+
 import { FunctionDefaults } from '@ez4/aws-function';
 
 export namespace Defaults {
@@ -60,6 +62,11 @@ export namespace Defaults {
    * Default number of messages one handler execution processes at the same time.
    */
   export const Parallelism = 1;
+
+  /**
+   * Default acknowledge of the messages one handler execution processes.
+   */
+  export const Acknowledge: QueueSubscriptionAcknowledge = 'record';
 
   /**
    * Default queue delay.

@@ -89,6 +89,7 @@
     },
     "subscriptions": [
       {
+        "acknowledge": "batch",
         "handler": {
           "name": "testHandler",
           "file": "test/input/output-import.ts",

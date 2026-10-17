@@ -1,3 +1,4 @@
+import type { QueueFunctionParameters } from '@ez4/aws-queue';
 import type { EntryStates } from '@ez4/state';
 
 import { describe, it } from 'node:test';
@@ -11,7 +12,9 @@ import { createLogGroup } from '@ez4/aws-logs';
 
 import { getRoleDocument } from './common/role';
 
-const getFunctionHash = (parallelism: number) => {
+type HashParameters = Partial<Pick<QueueFunctionParameters, 'parallelism' | 'acknowledge'>>;
+
+const getFunctionHash = ({ parallelism = 1, acknowledge = 'record' }: HashParameters) => {
   const localState: EntryStates = {};
 
   const roleResource = createRole(localState, [], {
@@ -41,7 +44,8 @@ const getFunctionHash = (parallelism: number) => {
       minDelay: 5,
       maxDelay: 60
     },
-    parallelism
+    parallelism,
+    acknowledge
   });
 
   return functionResource.parameters.getFunctionHash();
@@ -49,6 +53,10 @@ const getFunctionHash = (parallelism: number) => {
 
 describe('queue function hash', () => {
   it('assert :: a new parallelism rebundles the function', async () => {
-    notEqual(await getFunctionHash(1), await getFunctionHash(3));
+    notEqual(await getFunctionHash({ parallelism: 1 }), await getFunctionHash({ parallelism: 3 }));
+  });
+
+  it('assert :: a new acknowledge rebundles the function', async () => {
+    notEqual(await getFunctionHash({ acknowledge: 'record' }), await getFunctionHash({ acknowledge: 'batch' }));
   });
 });
