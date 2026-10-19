@@ -2,6 +2,7 @@ import type { PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
 
 import { getDatabaseName } from '@ez4/pgclient/utils';
 import { getTableRepository } from '@ez4/pgclient/library';
+import { validateRepositoryNames } from '@ez4/pgmigration';
 import { PaginationMode } from '@ez4/database';
 
 import { createCluster } from '../cluster/service';
@@ -35,6 +36,10 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
     throw new UnsupportedPaginationModeError(engine.paginationMode);
   }
 
+  const repository = getTableRepository(service.tables);
+
+  validateRepositoryNames(repository);
+
   const clusterState = createCluster(state, {
     clusterName: getClusterName(service, options),
     branchMode: !!options.branchName,
@@ -55,7 +60,7 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
   });
 
   const migrationState = createMigration(state, clusterState, instanceState, {
-    repository: getTableRepository(service.tables),
+    repository,
     database: getDatabaseName(service, options)
   });
 

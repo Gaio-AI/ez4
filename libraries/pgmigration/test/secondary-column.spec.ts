@@ -255,7 +255,8 @@ describe('migration :: secondary column tests', () => {
         indexes: [
           getRebuildIndexStatement('table_replacement_sk'),
           {
-            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_replacement_sk" ON "table" USING BTREE ("replacement")'
+            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_replacement_sk" ON "table" USING BTREE ("replacement")',
+            concurrent: true
           }
         ]
       },
@@ -270,7 +271,8 @@ describe('migration :: secondary column tests', () => {
         relations: [],
         indexes: [
           {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_secondary_sk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_secondary_sk"',
+            concurrent: true
           }
         ]
       }

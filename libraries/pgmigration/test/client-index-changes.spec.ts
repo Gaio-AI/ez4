@@ -66,7 +66,7 @@ describe('migration :: client index changes tests', async () => {
   };
 
   before(async () => {
-    for (const table of ['index_pk_swap', 'index_invalid', 'index_column_rename', 'index_type_change']) {
+    for (const table of ['index_pk_swap', 'index_pk_swap_long', 'index_invalid', 'index_column_rename', 'index_type_change']) {
       await client.rawQuery(`DROP TABLE IF EXISTS "${table}"`);
     }
   });
@@ -100,6 +100,43 @@ describe('migration :: client index changes tests', async () => {
     const [{ total }] = await client.rawQuery(`SELECT count(*)::int AS total FROM "index_pk_swap"`);
 
     equal(total, 2);
+  });
+
+  it('assert :: replace primary key with a long name', async () => {
+    const columns = textColumns('first_column_with_a_long_name', 'second_column_with_a_long_name');
+
+    const repositoryV1 = getRepository('index_pk_swap_long', columns, [
+      {
+        name: 'first_column_with_a_long_name:second_column_with_a_long_name',
+        type: Index.Primary,
+        columns: ['first_column_with_a_long_name', 'second_column_with_a_long_name']
+      }
+    ]);
+
+    const repositoryV2 = getRepository('index_pk_swap_long', columns, [
+      {
+        name: 'second_column_with_a_long_name:first_column_with_a_long_name',
+        type: Index.Primary,
+        columns: ['second_column_with_a_long_name', 'first_column_with_a_long_name']
+      }
+    ]);
+
+    await runMigration(client, getCreateQueries(repositoryV1));
+
+    await runSteps(repositoryV2, repositoryV1);
+
+    deepEqual(
+      (await getIndexes('index_pk_swap_long')).map(({ primary, valid, definition }) => ({ primary, valid, definition })),
+      [
+        {
+          primary: true,
+          valid: true,
+          definition:
+            'CREATE UNIQUE INDEX index_pk_swap_long_second_column_with_a_long_name_first_column_ ' +
+            'ON public.index_pk_swap_long USING btree (second_column_with_a_long_name, first_column_with_a_long_name)'
+        }
+      ]
+    );
   });
 
   it('assert :: rebuild an index left invalid', async () => {

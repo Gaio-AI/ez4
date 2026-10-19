@@ -3,8 +3,9 @@ import type { PgMigrationQueries, PgMigrationStatement, PgValidationStatement } 
 import type { PgTableRepository } from '@ez4/pgclient/library';
 
 import { getDeleteQueries, getUpdateStepQueries } from '@ez4/pgmigration';
-import { MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
+import { getMigrationQuery, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
 import { Client } from '@ez4/pgclient/driver';
+import { Wait } from '@ez4/utils';
 
 import { MissingConnectionStringError } from '../common/errors';
 
@@ -67,8 +68,8 @@ const applyStepQueries = async (context: ApplyContext, oldRepository: PgTableRep
 };
 
 const runAllStatements = async (client: DbClient<Database.Service<any>>, statements: PgMigrationStatement[]) => {
-  for (const query of statements) {
-    await runStatement(client, query);
+  for (const statement of statements) {
+    await runStatement(client, { ...statement, query: getMigrationQuery(statement) });
   }
 };
 
@@ -101,7 +102,28 @@ const runStatement = async (client: DbClient<Database.Service<any>>, statement: 
     }
   }
 
-  await client.rawQuery(query);
+  await Wait.until(
+    async () => {
+      try {
+        return await client.rawQuery(query);
+      } catch (error) {
+        if (isLockTimeoutError(error)) {
+          return Wait.RetryAttempt;
+        }
+
+        throw error;
+      }
+    },
+    {
+      minDelay: 1,
+      maxDelay: 15,
+      attempts: 10
+    }
+  );
 
   return true;
+};
+
+const isLockTimeoutError = (error: unknown) => {
+  return error instanceof Error && Reflect.get(error, 'code') === '55P03';
 };

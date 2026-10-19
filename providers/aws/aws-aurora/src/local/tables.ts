@@ -4,13 +4,20 @@ import type { PgTableRepository } from '@ez4/pgclient/library';
 import type { ServeOptions } from '@ez4/project/library';
 import type { ClientConnection } from '@ez4/pgclient';
 
-import { DatabaseQueries, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
-import { getUpdateStepQueries } from '@ez4/pgmigration';
+import {
+  DatabaseQueries,
+  getMigrationQuery,
+  MigrationAssertionFailedError,
+  MigrationValidationFailedError
+} from '@ez4/pgmigration/library';
+import { getUpdateStepQueries, validateRepositoryNames } from '@ez4/pgmigration';
 import { Client } from '@ez4/pgclient/driver';
 
 import { loadRepositoryState, saveRepositoryState } from './state';
 
 export const createAllTables = async (connection: ClientConnection, repository: PgTableRepository, options: ServeOptions) => {
+  validateRepositoryNames(repository);
+
   await ensureDatabase(connection);
 
   const { database } = connection;
@@ -54,8 +61,8 @@ const ensureDatabase = async (connection: ClientConnection) => {
 };
 
 const runAllStatements = async (client: DbClient<Database.Service<any>>, statements: PgMigrationStatement[]) => {
-  for (const query of statements) {
-    await runStatement(client, query);
+  for (const statement of statements) {
+    await runStatement(client, { ...statement, query: getMigrationQuery(statement) });
   }
 };
 

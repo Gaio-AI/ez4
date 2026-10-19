@@ -3,6 +3,12 @@ export type PgMigrationStatement = {
   check?: string;
   assert?: string;
   query: string;
+
+  /**
+   * Whether the query runs concurrently (`CREATE INDEX CONCURRENTLY`), which can't run inside a
+   * transaction block.
+   */
+  concurrent?: boolean;
 };
 
 export type PgValidationStatement = {

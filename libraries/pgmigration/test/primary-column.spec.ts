@@ -204,6 +204,7 @@ describe('migration :: primary column tests', () => {
           {
             assert: 'SELECT 1 FROM "table" WHERE "replacement" IS NOT null GROUP BY "replacement" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_replacement_tmp_pk" ON "table" USING BTREE ("replacement")',
+            concurrent: true,
             name: 'table_replacement_tmp_pk'
           }
         ]

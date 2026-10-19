@@ -103,7 +103,8 @@ describe('migration :: delete index tests', () => {
         relations: [],
         indexes: [
           {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"',
+            concurrent: true
           }
         ]
       }
@@ -145,7 +146,8 @@ describe('migration :: delete index tests', () => {
         relations: [],
         indexes: [
           {
-            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`
+            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`,
+            concurrent: true
           }
         ]
       }
