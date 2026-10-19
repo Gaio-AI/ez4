@@ -116,23 +116,11 @@ export const getUpdateStepQueries = (target: PgTableRepository, source: PgTableR
         steps.cleanup.constraints.push(...ConstraintQuery.prepareDelete(builder, table, targetColumns.remove));
       }
 
-      if (indexChanges?.create) {
-        combineQueries(steps.rollout, IndexQueries.prepareCreate(builder, table, targetSchema, indexChanges.create));
-      }
-
-      if (indexChanges?.nested) {
-        combineQueries(
-          steps.rollout,
-          IndexQueries.prepareUpdate(builder, table, targetSchema, sourceIndexes, targetIndexes, indexChanges.nested)
+      if (indexChanges) {
+        combineSteps(
+          steps,
+          IndexQueries.prepareChanges(builder, table, targetSchema, sourceIndexes, targetIndexes, indexChanges, targetColumns?.rename ?? {})
         );
-      }
-
-      if (indexChanges?.rename) {
-        combineQueries(steps.rollout, IndexQueries.prepareRenameColumns(builder, table, targetIndexes, indexChanges.rename));
-      }
-
-      if (indexChanges?.remove) {
-        combineQueries(steps.cleanup, IndexQueries.prepareDelete(builder, table, indexChanges.remove));
       }
 
       if (relationChanges?.create) {

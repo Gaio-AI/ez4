@@ -152,6 +152,117 @@ export const getIndexInvalidQuery = (builder: SqlBuilder, name: string) => {
   return query;
 };
 
+// Skips the drop of an index unless a failed concurrent build left it invalid: `IF NOT EXISTS` would keep
+// that index forever. One still being built is invalid too, and dropping it would only wait for the build.
+export const getCheckIndexRebuildQuery = (builder: SqlBuilder, name: string) => {
+  const invalidIndex = builder
+    .select()
+    .rawColumn(1)
+    .from('pg_index')
+    .where({
+      indexrelid: builder.rawValue(`to_regclass(${builder.rawString(`"${name}"`).build()})`),
+      OR: [
+        {
+          indisvalid: builder.rawValue('false')
+        },
+        {
+          indisready: builder.rawValue('false')
+        }
+      ]
+    });
+
+  const runningBuild = builder
+    .select()
+    .rawColumn(1)
+    .from('pg_stat_activity')
+    .where({
+      state: builder.rawString('active'),
+      pid: {
+        not: builder.rawValue('pg_backend_pid()')
+      },
+      query: {
+        contains: builder.rawString(`"${name}"`),
+        insensitive: true
+      }
+    });
+
+  const [query] = builder
+    .select()
+    .rawColumn(1)
+    .where({
+      OR: [
+        {
+          NOT: {
+            exists: invalidIndex
+          }
+        },
+        {
+          exists: runningBuild
+        }
+      ]
+    })
+    .build();
+
+  return query;
+};
+
+export const getCheckIndexMissingQuery = (builder: SqlBuilder, name: string) => {
+  const [query] = builder
+    .select()
+    .rawColumn(1)
+    .where({
+      NOT: {
+        exists: builder
+          .select()
+          .rawColumn(1)
+          .from('pg_class')
+          .where({
+            relname: builder.rawString(name),
+            relkind: builder.rawString('i')
+          })
+      }
+    })
+    .build();
+
+  return query;
+};
+
+// The swap takes the temporary index over as a constraint of the same name, and renaming that constraint
+// renames the index too: either way the swap already ran.
+export const getCheckPrimaryKeySwappedQuery = (builder: SqlBuilder, name: string) => {
+  const [query] = builder
+    .select()
+    .rawColumn(1)
+    .where({
+      OR: [
+        {
+          exists: builder
+            .select()
+            .rawColumn(1)
+            .from('pg_constraint')
+            .where({
+              conname: builder.rawString(name)
+            })
+        },
+        {
+          NOT: {
+            exists: builder
+              .select()
+              .rawColumn(1)
+              .from('pg_class')
+              .where({
+                relname: builder.rawString(name),
+                relkind: builder.rawString('i')
+              })
+          }
+        }
+      ]
+    })
+    .build();
+
+  return query;
+};
+
 export const getCheckUniqueRecordsQuery = (builder: SqlBuilder, table: string, columns: string[]) => {
   const filters = columns.reduce<SqlFilters>((filters, column) => {
     filters[column] = { isNull: false };
