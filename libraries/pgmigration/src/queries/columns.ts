@@ -69,7 +69,11 @@ export namespace ColumnQuery {
       const hasLengthChanged = definitionChanges.some((change) => isAnyNumber(change?.maxLength));
 
       if (hasTypeChanged || hasLengthChanged) {
-        query.type(getColumnType(columnSchema, false));
+        const columnType = getColumnType(columnSchema, false);
+
+        // An explicit cast to varchar(n) truncates longer values, while the assignment cast rejects
+        // them, and every type has an assignment cast to a string type.
+        query.type(columnType, !columnType.startsWith('varchar('));
       }
 
       if (!columnIsPrimary && hasNullityChanged) {

@@ -753,7 +753,7 @@ describe('migration :: update column tests', () => {
         tables: [
           {
             check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE "column_name" = 'bounded' AND "table_name" = 'table')`,
-            query: 'ALTER TABLE IF EXISTS "table" ALTER COLUMN "bounded" TYPE varchar(20) USING "bounded"::varchar(20)'
+            query: 'ALTER TABLE IF EXISTS "table" ALTER COLUMN "bounded" TYPE varchar(20)'
           }
         ],
         constraints: [],
@@ -804,7 +804,58 @@ describe('migration :: update column tests', () => {
         tables: [
           {
             check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE "column_name" = 'longer' AND "table_name" = 'table')`,
-            query: 'ALTER TABLE IF EXISTS "table" ALTER COLUMN "longer" TYPE varchar(100) USING "longer"::varchar(100)'
+            query: 'ALTER TABLE IF EXISTS "table" ALTER COLUMN "longer" TYPE varchar(100)'
+          }
+        ],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
+  it('assert :: alter table (decrease column maximum length)', () => {
+    const sourceTable = getDatabaseTables({
+      shorter: {
+        type: SchemaType.String,
+        definitions: {
+          maxLength: 100
+        }
+      }
+    });
+
+    const targetTable = getDatabaseTables({
+      shorter: {
+        type: SchemaType.String,
+        definitions: {
+          maxLength: 20
+        }
+      }
+    });
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE "column_name" = 'shorter' AND "table_name" = 'table')`,
+            query: 'ALTER TABLE IF EXISTS "table" ALTER COLUMN "shorter" TYPE varchar(20)'
           }
         ],
         constraints: [],
