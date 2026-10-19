@@ -85,6 +85,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     const artifacts = createArtifactsClient(storage, agentName, invocationId);
     let effectivePrompt = typeof envelope.input === 'string' ? envelope.input : JSON.stringify(envelope.input);
     let effectiveWorkdir = workdir;
+    let effectiveInstructions = instructions;
     let workspaceRequest: Agent.WorkspaceRequest | undefined;
 
     if (workspace) {
@@ -109,6 +110,9 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
         if (prepareResult?.workdir) {
           effectiveWorkdir = prepareResult.workdir;
         }
+        if (prepareResult?.instructions) {
+          effectiveInstructions = `${instructions}\n\n${prepareResult.instructions}`;
+        }
       } catch (prepErr: unknown) {
         const message = prepErr instanceof Error ? prepErr.message : String(prepErr);
         await writeResult(storage, agentName, invocationId, {
@@ -127,7 +131,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     try {
       providerResponse = await provider.run({
         model,
-        instructions,
+        instructions: effectiveInstructions,
         prompt: effectivePrompt,
         workdir: effectiveWorkdir,
         tools,

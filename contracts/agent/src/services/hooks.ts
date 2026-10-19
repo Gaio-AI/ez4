@@ -17,6 +17,11 @@ export interface PrepareRequest<I> {
 export interface PrepareResult {
   readonly prompt: string;
   readonly workdir?: string;
+  /**
+   * Text added to the agent's `instructions`, after a blank line, for this run only: the context every run of the
+   * agent needs but that the declared `instructions` cannot compute, such as a registry of skills.
+   */
+  readonly instructions?: string;
 }
 
 /**
