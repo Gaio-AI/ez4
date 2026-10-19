@@ -20,3 +20,7 @@ export const isDuplicateUniqueKeyException = (error: unknown) => {
 export const isDeadlockException = (error: unknown) => {
   return error instanceof DatabaseErrorException && getSqlState(error) === '40P01';
 };
+
+export const isLockTimeoutException = (error: unknown) => {
+  return error instanceof DatabaseErrorException && getSqlState(error) === '55P03';
+};

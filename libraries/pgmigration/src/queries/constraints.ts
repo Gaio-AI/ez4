@@ -7,7 +7,7 @@ import { isEnumSchema, isScalarSchema, SchemaType } from '@ez4/schema';
 import { escapeSqlText } from '@ez4/pgsql';
 import { isNotNullish } from '@ez4/utils';
 
-import { getConstraintName } from '../utils/naming';
+import { getConstraintName, getTemporaryName } from '../utils/naming';
 
 import {
   getCheckConstraintExistsQuery,
@@ -163,12 +163,18 @@ export namespace ConstraintQuery {
     return statements;
   };
 
+  export const getNames = (table: string, columns: Record<string, AnySchema>) => {
+    return Object.keys(columns)
+      .filter((columnName) => isConstrainedSchema(columns[columnName]))
+      .map((columnName) => getConstraintName(table, columnName));
+  };
+
   // The new check is created and validated under a temporary name, and it replaces the current one
   // only once validated: while a validation is still running (or has failed) the current check
   // stays and the step fails, and a step run again skips whatever is already done.
   const prepareSwap = (builder: SqlBuilder, statements: ConstraintQueries, table: string, column: string, filters: SqlFilters) => {
-    const tmpName = getConstraintName(table, `${column}_tmp`);
     const newName = getConstraintName(table, column);
+    const tmpName = getTemporaryName(newName);
 
     statements.constraints.push(
       {

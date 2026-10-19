@@ -2,11 +2,11 @@ import type { PgMigrationQueries, PgMigrationStatement } from '@ez4/pgmigration/
 import type { PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
 
-import { DatabaseQueries, MigrationAssertionFailedError } from '@ez4/pgmigration/library';
+import { DatabaseQueries, getMigrationQuery, MigrationAssertionFailedError } from '@ez4/pgmigration/library';
 import { StatementTimeoutException } from '@aws-sdk/client-rds-data';
 import { Wait } from '@ez4/utils';
 
-import { isDeadlockException } from '../client/errors';
+import { isDeadlockException, isLockTimeoutException } from '../client/errors';
 import { ApiClientDriver } from '../client/drivers/api';
 import { MigrationFailedError } from './errors';
 
@@ -77,7 +77,7 @@ const executeMigrationStatements = async (driver: ApiClientDriver, statements: P
 
   for (const statement of statements) {
     try {
-      await executeMigrationStatement(driver, statement, options);
+      await executeMigrationStatement(driver, { ...statement, query: getMigrationQuery(statement) }, options);
     } catch (error) {
       errors.push(`${error}`);
     }
@@ -89,16 +89,10 @@ const executeMigrationStatements = async (driver: ApiClientDriver, statements: P
 };
 
 const executeMigrationStatement = async (driver: ApiClientDriver, statement: PgMigrationStatement, options?: PgExecuteOptions) => {
-  const { name, check, assert, ...query } = statement;
+  const { name, check, assert, query } = statement;
 
-  if (assert) {
-    const { records } = await driver.executeStatement({ query: assert }, options);
-
-    const [shouldFail] = records;
-
-    if (shouldFail) {
-      throw new MigrationAssertionFailedError(name);
-    }
+  if (assert && (await isAssertionFailed(driver, assert, options))) {
+    throw new MigrationAssertionFailedError(name);
   }
 
   if (check) {
@@ -112,7 +106,7 @@ const executeMigrationStatement = async (driver: ApiClientDriver, statement: PgM
   }
 
   try {
-    await executeWithDeadlockRetry(driver, query, options);
+    await executeWithRetry(driver, { query }, options);
   } catch (error) {
     if (!(error instanceof StatementTimeoutException)) {
       throw error;
@@ -122,7 +116,23 @@ const executeMigrationStatement = async (driver: ApiClientDriver, statement: PgM
   return true;
 };
 
-const executeWithDeadlockRetry = (driver: ApiClientDriver, query: PgExecuteStatement, options?: PgExecuteOptions) => {
+// An assert only fails the migration before the statement does: the statement, or the validation after it,
+// fails on the same records. So an assert that can't finish in time (a scan of a large table) is skipped.
+const isAssertionFailed = async (driver: ApiClientDriver, assert: string, options?: PgExecuteOptions) => {
+  try {
+    const { records } = await driver.executeStatement({ query: assert }, options);
+
+    return records.length > 0;
+  } catch (error) {
+    if (error instanceof StatementTimeoutException) {
+      return false;
+    }
+
+    throw error;
+  }
+};
+
+const executeWithRetry = (driver: ApiClientDriver, query: PgExecuteStatement, options?: PgExecuteOptions) => {
   return Wait.until(
     async () => {
       try {
@@ -131,7 +141,7 @@ const executeWithDeadlockRetry = (driver: ApiClientDriver, query: PgExecuteState
           noTimeout: true
         });
       } catch (error) {
-        if (isDeadlockException(error)) {
+        if (isDeadlockException(error) || isLockTimeoutException(error)) {
           return Wait.RetryAttempt;
         }
 
@@ -140,8 +150,8 @@ const executeWithDeadlockRetry = (driver: ApiClientDriver, query: PgExecuteState
     },
     {
       minDelay: 1,
-      maxDelay: 5,
-      attempts: 5
+      maxDelay: 15,
+      attempts: 10
     }
   );
 };

@@ -1,6 +1,8 @@
 export * from './errors/assertion';
 export * from './errors/validation';
+export * from './errors/naming';
 export * from './utils/repository';
+export * from './utils/lock';
 export * from './types/query';
 
 export * from './queries/database';

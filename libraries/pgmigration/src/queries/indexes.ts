@@ -8,7 +8,7 @@ import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 import { deepEqual } from '@ez4/utils';
 
-import { getPrimaryKeyName, getSecondaryKeyName, getUniqueKeyName } from '../utils/naming';
+import { getPrimaryKeyName, getSecondaryKeyName, getTemporaryName, getUniqueKeyName } from '../utils/naming';
 
 import {
   getCheckConstraintExistsQuery,
@@ -37,60 +37,65 @@ export namespace IndexQueries {
     };
 
     for (const indexKey in indexes) {
-      const { columns, type, name: indexName } = indexes[indexKey];
+      const index = indexes[indexKey];
 
-      switch (type) {
+      switch (index.type) {
         default:
           throw new Error(`Unsupported index type.`);
 
         case Index.Primary: {
-          const name = getPrimaryKeyName(table, indexName);
+          const name = getPrimaryKeyName(table, index.name);
 
           statements.constraints.push({
             check: getCheckConstraintExistsQuery(builder, name),
-            query: builder.table(table).alter().existing().constraint(name).primary(columns).build()
+            query: builder.table(table).alter().existing().constraint(name).primary(index.columns).build()
           });
 
           break;
         }
 
-        case Index.Unique: {
-          const name = getUniqueKeyName(table, indexName);
-          const type = getIndexType(columns, schema);
-
-          statements.indexes.push(getRebuildStatement(builder, name), {
-            assert: getCheckUniqueRecordsQuery(builder, table, columns),
-            query: builder.index(name).create(table, columns).type(type).unique().concurrent().missing().build(),
-            name
-          });
-
-          statements.validations.push({
-            check: getIndexInvalidQuery(builder, name),
-            retry: getCheckRunningValidationQuery(builder, name),
-            name
-          });
-
-          break;
-        }
-
+        case Index.Unique:
         case Index.Secondary: {
-          const name = getSecondaryKeyName(table, indexName);
-          const type = getIndexType(columns, schema);
-
-          statements.indexes.push(getRebuildStatement(builder, name), {
-            query: builder.index(name).create(table, columns).type(type).concurrent().missing().build()
-          });
-
-          statements.validations.push({
-            check: getIndexInvalidQuery(builder, name),
-            retry: getCheckRunningValidationQuery(builder, name),
-            name
-          });
-
+          combineQueries(statements, prepareIndex(builder, table, schema, index, getIndexName(table, index)));
           break;
         }
       }
     }
+
+    return statements;
+  };
+
+  // Builds a unique or secondary index under the given name.
+  const prepareIndex = (builder: SqlBuilder, table: string, schema: ObjectSchema, index: PgTableIndex, name: string) => {
+    const statements: IndexMigrationQueries = {
+      constraints: [],
+      validations: [],
+      indexes: []
+    };
+
+    const { columns } = index;
+
+    const query = builder.index(name).create(table, columns).type(getIndexType(columns, schema)).concurrent().missing();
+
+    if (index.type === Index.Unique) {
+      statements.indexes.push(getRebuildStatement(builder, name), {
+        assert: getCheckUniqueRecordsQuery(builder, table, columns),
+        query: query.unique().build(),
+        concurrent: true,
+        name
+      });
+    } else {
+      statements.indexes.push(getRebuildStatement(builder, name), {
+        query: query.build(),
+        concurrent: true
+      });
+    }
+
+    statements.validations.push({
+      check: getIndexInvalidQuery(builder, name),
+      retry: getCheckRunningValidationQuery(builder, name),
+      name
+    });
 
     return statements;
   };
@@ -220,11 +225,13 @@ export namespace IndexQueries {
       return steps;
     }
 
-    const temporaryName = getPrimaryKeyName(table, `${targetKey.name}_tmp`);
+    const targetName = getPrimaryKeyName(table, targetKey.name);
+    const temporaryName = getTemporaryName(targetName);
 
     steps.rollout.indexes.push(getRebuildStatement(builder, temporaryName), {
       assert: getCheckUniqueRecordsQuery(builder, table, targetKey.columns),
       query: builder.index(temporaryName).create(table, targetKey.columns).type('BTREE').unique().concurrent().missing().build(),
+      concurrent: true,
       name: temporaryName
     });
 
@@ -242,8 +249,6 @@ export namespace IndexQueries {
 
     swapQuery.constraint(temporaryName).primary(targetKey.columns).index(temporaryName);
 
-    const targetName = getPrimaryKeyName(table, targetKey.name);
-
     steps.cleanup.constraints.push(
       {
         check: getCheckPrimaryKeySwappedQuery(builder, temporaryName),
@@ -256,6 +261,18 @@ export namespace IndexQueries {
     );
 
     return steps;
+  };
+
+  /**
+   * Names of the indexes of a table, and of the constraints among them (the primary key is both).
+   */
+  export const getNames = (table: string, indexes: PgIndexRepository) => {
+    const allIndexes = Object.values(indexes);
+
+    return {
+      constraints: allIndexes.filter(({ type }) => type === Index.Primary).map((index) => getIndexName(table, index)),
+      indexes: allIndexes.map((index) => getIndexName(table, index))
+    };
   };
 
   // The primary key is replaced on its own (see `preparePrimaryKey`), so it's left out of the other changes.
@@ -288,21 +305,20 @@ export namespace IndexQueries {
   ) => {
     const steps = getIndexSteps();
 
-    const temporaryIndex = { ...targetIndex, name: `${targetIndex.name}_tmp` };
+    const targetName = getIndexName(table, targetIndex);
+    const temporaryName = getTemporaryName(targetName);
 
-    const temporaryName = getIndexName(table, temporaryIndex);
-    const sourceName = getIndexName(table, sourceIndex);
-
-    combineQueries(steps.rollout, prepareCreate(builder, table, schema, { [temporaryIndex.name]: temporaryIndex }));
+    combineQueries(steps.rollout, prepareIndex(builder, table, schema, targetIndex, temporaryName));
 
     // Once the temporary index is renamed, the index with the current name is the new one.
     steps.cleanup.indexes.push(
       {
         check: getCheckIndexMissingQuery(builder, temporaryName),
-        query: builder.index(sourceName).drop().existing().concurrent().build()
+        query: builder.index(getIndexName(table, sourceIndex)).drop().existing().concurrent().build(),
+        concurrent: true
       },
       {
-        query: builder.index(temporaryName).rename(getIndexName(table, targetIndex)).existing().build()
+        query: builder.index(temporaryName).rename(targetName).existing().build()
       }
     );
 
@@ -329,7 +345,8 @@ export namespace IndexQueries {
   const getRebuildStatement = (builder: SqlBuilder, name: string) => {
     return {
       check: getCheckIndexRebuildQuery(builder, name),
-      query: builder.index(name).drop().existing().concurrent().build()
+      query: builder.index(name).drop().existing().concurrent().build(),
+      concurrent: true
     };
   };
 
@@ -489,7 +506,8 @@ export namespace IndexQueries {
           const query = builder.index(name).drop().existing().concurrent();
 
           statements.indexes.push({
-            query: query.build()
+            query: query.build(),
+            concurrent: true
           });
 
           break;
@@ -500,7 +518,8 @@ export namespace IndexQueries {
           const query = builder.index(name).drop().existing().concurrent();
 
           statements.indexes.push({
-            query: query.build()
+            query: query.build(),
+            concurrent: true
           });
 
           break;

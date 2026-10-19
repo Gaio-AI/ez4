@@ -73,6 +73,7 @@ describe('migration :: update index tests', () => {
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("column")',
+            concurrent: true,
             name: 'table_index_uk'
           }
         ]
@@ -113,7 +114,8 @@ describe('migration :: update index tests', () => {
         indexes: [
           getRebuildIndexStatement('table_index_sk'),
           {
-            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")'
+            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")',
+            concurrent: true
           }
         ]
       },
@@ -155,6 +157,7 @@ describe('migration :: update index tests', () => {
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column")',
+            concurrent: true,
             name: 'table_index_tmp_pk'
           }
         ]
@@ -166,7 +169,8 @@ describe('migration :: update index tests', () => {
         relations: [],
         indexes: [
           {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"',
+            concurrent: true
           }
         ]
       }
@@ -195,7 +199,8 @@ describe('migration :: update index tests', () => {
         indexes: [
           getRebuildIndexStatement('table_index_sk'),
           {
-            query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")`
+            query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")`,
+            concurrent: true
           }
         ]
       },
@@ -206,7 +211,8 @@ describe('migration :: update index tests', () => {
         relations: [],
         indexes: [
           {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"',
+            concurrent: true
           }
         ]
       }
@@ -237,6 +243,7 @@ describe('migration :: update index tests', () => {
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("column")',
+            concurrent: true,
             name: 'table_index_uk'
           }
         ]
@@ -248,7 +255,8 @@ describe('migration :: update index tests', () => {
         relations: [],
         indexes: [
           {
-            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`
+            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`,
+            concurrent: true
           }
         ]
       }
@@ -279,6 +287,7 @@ describe('migration :: update index tests', () => {
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column")',
+            concurrent: true,
             name: 'table_index_tmp_pk'
           }
         ]
@@ -290,7 +299,8 @@ describe('migration :: update index tests', () => {
         relations: [],
         indexes: [
           {
-            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`
+            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`,
+            concurrent: true
           }
         ]
       }
@@ -322,6 +332,7 @@ describe('migration :: update index tests', () => {
             assert:
               'SELECT 1 FROM "table" WHERE "column" IS NOT null AND "other" IS NOT null GROUP BY "column", "other" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column", "other")',
+            concurrent: true,
             name: 'table_index_tmp_pk'
           }
         ]
@@ -361,6 +372,7 @@ describe('migration :: update index tests', () => {
             assert:
               'SELECT 1 FROM "table" WHERE "column" IS NOT null AND "other" IS NOT null GROUP BY "column", "other" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_uk" ON "table" USING BTREE ("column", "other")',
+            concurrent: true,
             name: 'table_index_tmp_uk'
           }
         ]
@@ -373,7 +385,8 @@ describe('migration :: update index tests', () => {
         indexes: [
           {
             check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_class" WHERE "relname" = 'table_index_tmp_uk' AND "relkind" = 'i')`,
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"',
+            concurrent: true
           },
           {
             query: 'ALTER INDEX IF EXISTS "table_index_tmp_uk" RENAME TO "table_index_uk"'
@@ -405,7 +418,8 @@ describe('migration :: update index tests', () => {
         indexes: [
           getRebuildIndexStatement('table_index_tmp_sk'),
           {
-            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_sk" ON "table" USING BTREE ("column", "other")'
+            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_sk" ON "table" USING BTREE ("column", "other")',
+            concurrent: true
           }
         ]
       },
@@ -417,7 +431,8 @@ describe('migration :: update index tests', () => {
         indexes: [
           {
             check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_class" WHERE "relname" = 'table_index_tmp_sk' AND "relkind" = 'i')`,
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"',
+            concurrent: true
           },
           {
             query: 'ALTER INDEX IF EXISTS "table_index_tmp_sk" RENAME TO "table_index_sk"'
@@ -574,7 +589,8 @@ describe('migration :: update index tests', () => {
         indexes: [
           getRebuildIndexStatement('table_index_renamed_sk'),
           {
-            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_renamed_sk" ON "table" USING BTREE ("column", "other")'
+            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_renamed_sk" ON "table" USING BTREE ("column", "other")',
+            concurrent: true
           }
         ]
       },
@@ -585,7 +601,8 @@ describe('migration :: update index tests', () => {
         relations: [],
         indexes: [
           {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"'
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"',
+            concurrent: true
           }
         ]
       }

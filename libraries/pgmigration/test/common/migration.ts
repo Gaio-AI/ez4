@@ -1,7 +1,7 @@
 import type { PgMigrationQueries, PgMigrationStatement, PgValidationStatement } from '@ez4/pgmigration/library';
 import type { Database, Client as DbClient } from '@ez4/database';
 
-import { MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
+import { getMigrationQuery, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
 
 export const runMigration = async (client: DbClient<Database.Service<any>>, queries: PgMigrationQueries) => {
   await runStatements(client, [...queries.tables, ...queries.constraints, ...queries.indexes, ...queries.relations]);
@@ -10,7 +10,9 @@ export const runMigration = async (client: DbClient<Database.Service<any>>, quer
 };
 
 const runStatements = async (client: DbClient<Database.Service<any>>, statements: PgMigrationStatement[]) => {
-  for (const { name, assert, check, query } of statements) {
+  for (const statement of statements) {
+    const { name, assert, check } = statement;
+
     if (assert) {
       const [shouldFail] = await client.rawQuery(assert);
 
@@ -27,7 +29,7 @@ const runStatements = async (client: DbClient<Database.Service<any>>, statements
       }
     }
 
-    await client.rawQuery(query);
+    await client.rawQuery(getMigrationQuery(statement));
   }
 };
 

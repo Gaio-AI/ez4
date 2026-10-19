@@ -59,7 +59,9 @@ const newRepository = getRepository(['id', 'status']);
 
 const validateIndexQuery = `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'items_status_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`;
 const validateRetryQuery = `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"items_status_sk"' || '%' LIMIT 1`;
-const dropColumnQuery = `ALTER TABLE IF EXISTS "items" DROP COLUMN IF EXISTS "legacy"`;
+const dropColumnQuery =
+  `DO $ez4$ BEGIN PERFORM set_config('lock_timeout', '5s', true); ` +
+  `ALTER TABLE IF EXISTS "items" DROP COLUMN IF EXISTS "legacy"; END $ez4$`;
 
 const buildState = (repository: PgTableRepository, version: string, failAlias?: boolean): EntryStates<TestState> => ({
   cluster: {

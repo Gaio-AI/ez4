@@ -10,7 +10,7 @@ import { isNullish } from '@ez4/utils';
 import { Index } from '@ez4/database';
 
 import { isOptionalColumn } from '../utils/columns';
-import { getRelationName } from '../utils/naming';
+import { getRelationName, getTemporaryName } from '../utils/naming';
 
 import {
   getCheckConstraintExistsQuery,
@@ -93,8 +93,8 @@ export namespace RelationQuery {
       const columnSchema = targetSchema.properties[relation.targetColumn];
       const columnOptional = isOptionalColumn(columnSchema);
 
-      const tmpName = getRelationName(table, `${targetAlias}_tmp`);
       const newName = getRelationName(table, targetAlias);
+      const tmpName = getTemporaryName(newName);
 
       steps.rollout.relations.push(
         {
@@ -164,7 +164,7 @@ export namespace RelationQuery {
       const targetSchema = columns[targetRelation.targetColumn];
       const targetOptional = !!targetSchema && isOptionalColumn(targetSchema);
 
-      const tmpName = getRelationName(table, `${targetAlias}_tmp`);
+      const tmpName = getTemporaryName(newName);
 
       steps.rollout.relations.push(
         {
@@ -238,6 +238,12 @@ export namespace RelationQuery {
     }
 
     return statements;
+  };
+
+  export const getNames = (table: string, relations: PgRelationRepository) => {
+    return Object.keys(relations)
+      .filter((targetAlias) => !isNotRealRelation(relations[targetAlias]))
+      .map((targetAlias) => getRelationName(table, targetAlias));
   };
 
   const isNotRealRelation = (relation: PgRelationMetadata) => {
