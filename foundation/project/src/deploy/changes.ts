@@ -174,13 +174,23 @@ const formatReportChanges = (changes: ObjectComparison, values: AnyObject, path?
   if (changes.nested) {
     for (const property in changes.nested) {
       const newValue = changes.nested[property];
-      const oldValue = values[property];
+      const oldValue = values[getPreviousName(changes, property)];
 
       output.push(...formatReportChanges(newValue, oldValue, getOutputName(property)));
     }
   }
 
   return output;
+};
+
+const getPreviousName = (changes: ObjectComparison, property: string) => {
+  for (const previousName in changes.rename) {
+    if (changes.rename[previousName] === property) {
+      return previousName;
+    }
+  }
+
+  return property;
 };
 
 const getMaxPropertyLength = (object: AnyObject) => {
