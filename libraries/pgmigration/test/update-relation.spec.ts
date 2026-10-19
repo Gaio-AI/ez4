@@ -293,6 +293,94 @@ describe('migration :: update relation tests', () => {
     });
   });
 
+  it('assert :: update relation target index (same foreign key)', () => {
+    const sourceTable = getDatabaseTables(false);
+    const baseTarget = getDatabaseTables(false);
+
+    const targetTable = {
+      ...baseTarget,
+      table_a: {
+        ...baseTarget.table_a,
+        relations: {
+          relation: {
+            ...baseTarget.table_a.relations.relation,
+            targetIndex: undefined
+          }
+        }
+      }
+    };
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
+  it('assert :: update relation source index (same foreign key)', () => {
+    const sourceTable = getDatabaseTables(false);
+    const baseTarget = getDatabaseTables(false);
+
+    const targetTable = {
+      ...baseTarget,
+      table_a: {
+        ...baseTarget.table_a,
+        relations: {
+          relation: {
+            ...baseTarget.table_a.relations.relation,
+            sourceIndex: Index.Unique
+          }
+        }
+      }
+    };
+
+    const steps = getUpdateStepQueries(targetTable, sourceTable);
+
+    deepEqual(steps, {
+      prepare: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      rollout: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      },
+      cleanup: {
+        tables: [],
+        constraints: [],
+        validations: [],
+        relations: [],
+        indexes: []
+      }
+    });
+  });
+
   it('assert :: rename relation (with table rename)', () => {
     const sourceTable = getDatabaseTables(false);
 
