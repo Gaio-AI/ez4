@@ -155,15 +155,21 @@ export namespace RelationQuery {
         continue;
       }
 
+      // The indexes of a relation decide whether it has a foreign key, but not what the key is: a change that
+      // keeps the key (such as dropping the index that supports its column) leaves the constraint in place.
+      if (!isNotRealRelation(sourceRelation) && isSameForeignKey(sourceRelation, targetRelation)) {
+        continue;
+      }
+
       const targetSchema = columns[targetRelation.targetColumn];
-      const targetRequired = !!(targetSchema?.optional ?? targetSchema?.nullable);
+      const targetOptional = !!targetSchema && isOptionalColumn(targetSchema);
 
       const tmpName = getRelationName(table, `${targetAlias}_tmp`);
 
       steps.rollout.relations.push(
         {
           check: getCheckConstraintExistsQuery(builder, tmpName),
-          query: getCreateQuery(builder, table, tmpName, targetRelation, targetRequired).build()
+          query: getCreateQuery(builder, table, tmpName, targetRelation, targetOptional).build()
         },
         {
           check: getCheckConstraintValidQuery(builder, tmpName),
@@ -238,6 +244,14 @@ export namespace RelationQuery {
     const { sourceIndex, targetIndex } = relation;
 
     return !sourceIndex || sourceIndex === Index.Secondary || targetIndex === Index.Primary;
+  };
+
+  const isSameForeignKey = (relation: PgRelationMetadata, otherRelation: PgRelationMetadata) => {
+    return (
+      relation.sourceTable === otherRelation.sourceTable &&
+      relation.sourceColumn === otherRelation.sourceColumn &&
+      relation.targetColumn === otherRelation.targetColumn
+    );
   };
 
   const getDeleteQuery = (builder: SqlBuilder, table: string, name: string) => {
