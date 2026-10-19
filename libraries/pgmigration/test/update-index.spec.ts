@@ -9,6 +9,8 @@ import { getTableRepository } from '@ez4/pgclient/library';
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
+import { getIndexValidation, getPrimaryKeySwapStatements, getRebuildIndexStatement } from './common/indexes';
+
 describe('migration :: update index tests', () => {
   const getDatabaseTables = (properties: ObjectSchemaProperties, indexes: TableIndex[] = []) => {
     return getTableRepository([
@@ -63,20 +65,11 @@ describe('migration :: update index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_pk"'
-          }
-        ],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
-            name: 'table_index_uk'
-          }
-        ],
+        constraints: [],
+        validations: [getIndexValidation('table_index_uk')],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_uk'),
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("column")',
@@ -86,7 +79,11 @@ describe('migration :: update index tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: [
+          {
+            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_pk"'
+          }
+        ],
         validations: [],
         relations: [],
         indexes: []
@@ -110,20 +107,11 @@ describe('migration :: update index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_pk"'
-          }
-        ],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
-            name: 'table_index_sk'
-          }
-        ],
+        constraints: [],
+        validations: [getIndexValidation('table_index_sk')],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_sk'),
           {
             query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")'
           }
@@ -131,7 +119,11 @@ describe('migration :: update index tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: [
+          {
+            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_pk"'
+          }
+        ],
         validations: [],
         relations: [],
         indexes: []
@@ -155,12 +147,21 @@ describe('migration :: update index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
+        constraints: [],
+        validations: [getIndexValidation('table_index_tmp_pk')],
+        relations: [],
+        indexes: [
+          getRebuildIndexStatement('table_index_tmp_pk'),
           {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_pk'`,
-            query: 'ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_index_pk" PRIMARY KEY ("column")'
+            assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column")',
+            name: 'table_index_tmp_pk'
           }
-        ],
+        ]
+      },
+      cleanup: {
+        tables: [],
+        constraints: getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk'),
         validations: [],
         relations: [],
         indexes: [
@@ -168,13 +169,6 @@ describe('migration :: update index tests', () => {
             query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
           }
         ]
-      },
-      cleanup: {
-        tables: [],
-        constraints: [],
-        validations: [],
-        relations: [],
-        indexes: []
       }
     });
   });
@@ -196,18 +190,10 @@ describe('migration :: update index tests', () => {
       rollout: {
         tables: [],
         constraints: [],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
-            name: 'table_index_sk'
-          }
-        ],
+        validations: [getIndexValidation('table_index_sk')],
         relations: [],
         indexes: [
-          {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
-          },
+          getRebuildIndexStatement('table_index_sk'),
           {
             query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")`
           }
@@ -218,7 +204,11 @@ describe('migration :: update index tests', () => {
         constraints: [],
         validations: [],
         relations: [],
-        indexes: []
+        indexes: [
+          {
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
+          }
+        ]
       }
     });
   });
@@ -240,18 +230,10 @@ describe('migration :: update index tests', () => {
       rollout: {
         tables: [],
         constraints: [],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
-            name: 'table_index_uk'
-          }
-        ],
+        validations: [getIndexValidation('table_index_uk')],
         relations: [],
         indexes: [
-          {
-            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`
-          },
+          getRebuildIndexStatement('table_index_uk'),
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("column")',
@@ -264,7 +246,11 @@ describe('migration :: update index tests', () => {
         constraints: [],
         validations: [],
         relations: [],
-        indexes: []
+        indexes: [
+          {
+            query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`
+          }
+        ]
       }
     });
   });
@@ -285,12 +271,21 @@ describe('migration :: update index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
+        constraints: [],
+        validations: [getIndexValidation('table_index_tmp_pk')],
+        relations: [],
+        indexes: [
+          getRebuildIndexStatement('table_index_tmp_pk'),
           {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_pk'`,
-            query: 'ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_index_pk" PRIMARY KEY ("column")'
+            assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column")',
+            name: 'table_index_tmp_pk'
           }
-        ],
+        ]
+      },
+      cleanup: {
+        tables: [],
+        constraints: getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk'),
         validations: [],
         relations: [],
         indexes: [
@@ -298,13 +293,6 @@ describe('migration :: update index tests', () => {
             query: `DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"`
           }
         ]
-      },
-      cleanup: {
-        tables: [],
-        constraints: [],
-        validations: [],
-        relations: [],
-        indexes: []
       }
     });
   });
@@ -325,22 +313,22 @@ describe('migration :: update index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_pk"'
-          },
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_pk'`,
-            query: 'ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_index_pk" PRIMARY KEY ("column", "other")'
-          }
-        ],
-        validations: [],
+        constraints: [],
+        validations: [getIndexValidation('table_index_tmp_pk')],
         relations: [],
-        indexes: []
+        indexes: [
+          getRebuildIndexStatement('table_index_tmp_pk'),
+          {
+            assert:
+              'SELECT 1 FROM "table" WHERE "column" IS NOT null AND "other" IS NOT null GROUP BY "column", "other" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column", "other")',
+            name: 'table_index_tmp_pk'
+          }
+        ]
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk', 'table_index_pk'),
         validations: [],
         relations: [],
         indexes: []
@@ -365,23 +353,15 @@ describe('migration :: update index tests', () => {
       rollout: {
         tables: [],
         constraints: [],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
-            name: 'table_index_uk'
-          }
-        ],
+        validations: [getIndexValidation('table_index_tmp_uk')],
         relations: [],
         indexes: [
-          {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
-          },
+          getRebuildIndexStatement('table_index_tmp_uk'),
           {
             assert:
               'SELECT 1 FROM "table" WHERE "column" IS NOT null AND "other" IS NOT null GROUP BY "column", "other" HAVING COUNT(*) > 1 LIMIT 1',
-            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("column", "other")',
-            name: 'table_index_uk'
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_uk" ON "table" USING BTREE ("column", "other")',
+            name: 'table_index_tmp_uk'
           }
         ]
       },
@@ -390,7 +370,15 @@ describe('migration :: update index tests', () => {
         constraints: [],
         validations: [],
         relations: [],
-        indexes: []
+        indexes: [
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_class" WHERE "relname" = 'table_index_tmp_uk' AND "relkind" = 'i')`,
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
+          },
+          {
+            query: 'ALTER INDEX IF EXISTS "table_index_tmp_uk" RENAME TO "table_index_uk"'
+          }
+        ]
       }
     });
   });
@@ -412,20 +400,12 @@ describe('migration :: update index tests', () => {
       rollout: {
         tables: [],
         constraints: [],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
-            name: 'table_index_sk'
-          }
-        ],
+        validations: [getIndexValidation('table_index_tmp_sk')],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_tmp_sk'),
           {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"'
-          },
-          {
-            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column", "other")'
+            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_sk" ON "table" USING BTREE ("column", "other")'
           }
         ]
       },
@@ -434,7 +414,15 @@ describe('migration :: update index tests', () => {
         constraints: [],
         validations: [],
         relations: [],
-        indexes: []
+        indexes: [
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_class" WHERE "relname" = 'table_index_tmp_sk' AND "relkind" = 'i')`,
+            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"'
+          },
+          {
+            query: 'ALTER INDEX IF EXISTS "table_index_tmp_sk" RENAME TO "table_index_sk"'
+          }
+        ]
       }
     });
   });
@@ -584,6 +572,7 @@ describe('migration :: update index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_renamed_sk'),
           {
             query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_renamed_sk" ON "table" USING BTREE ("column", "other")'
           }
@@ -771,15 +760,7 @@ describe('migration :: update index tests', () => {
             query: 'ALTER TABLE IF EXISTS "table" RENAME COLUMN "column" TO "renamed_column"'
           }
         ],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_pk"'
-          },
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_pk'`,
-            query: 'ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_index_pk" PRIMARY KEY ("renamed_column")'
-          }
-        ],
+        constraints: [],
         validations: [],
         relations: [],
         indexes: []
@@ -827,24 +808,9 @@ describe('migration :: update index tests', () => {
           }
         ],
         constraints: [],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_uk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_uk"' || '%' LIMIT 1`,
-            name: 'table_index_uk'
-          }
-        ],
+        validations: [],
         relations: [],
-        indexes: [
-          {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_uk"'
-          },
-          {
-            assert: 'SELECT 1 FROM "table" WHERE "renamed_column" IS NOT null GROUP BY "renamed_column" HAVING COUNT(*) > 1 LIMIT 1',
-            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("renamed_column")',
-            name: 'table_index_uk'
-          }
-        ]
+        indexes: []
       },
       cleanup: {
         tables: [],
@@ -889,22 +855,9 @@ describe('migration :: update index tests', () => {
           }
         ],
         constraints: [],
-        validations: [
-          {
-            check: `SELECT 1 FROM "pg_index" WHERE "indexrelid" = 'table_index_sk'::regclass AND ("indisvalid" = false OR "indisready" = false)`,
-            retry: `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"table_index_sk"' || '%' LIMIT 1`,
-            name: 'table_index_sk'
-          }
-        ],
+        validations: [],
         relations: [],
-        indexes: [
-          {
-            query: 'DROP INDEX CONCURRENTLY IF EXISTS "table_index_sk"'
-          },
-          {
-            query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("renamed_column")'
-          }
-        ]
+        indexes: []
       },
       cleanup: {
         tables: [],

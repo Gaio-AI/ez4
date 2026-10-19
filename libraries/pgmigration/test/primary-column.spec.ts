@@ -9,6 +9,8 @@ import { getTableRepository } from '@ez4/pgclient/library';
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
+import { getIndexValidation, getPrimaryKeySwapStatements, getRebuildIndexStatement } from './common/indexes';
+
 describe('migration :: primary column tests', () => {
   const getDatabaseTables = (properties: ObjectSchemaProperties, indexes: TableIndex[] = []) => {
     return getTableRepository([
@@ -130,7 +132,7 @@ describe('migration :: primary column tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_renamed_id_pk'`,
-            query: 'ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_renamed_id_pk" PRIMARY KEY ("renamed_id")'
+            query: 'ALTER TABLE IF EXISTS "table" RENAME CONSTRAINT "table_id_pk" TO "table_renamed_id_pk"'
           }
         ],
         validations: [],
@@ -139,11 +141,7 @@ describe('migration :: primary column tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_id_pk"'
-          }
-        ],
+        constraints: [],
         validations: [],
         relations: [],
         indexes: []
@@ -198,15 +196,17 @@ describe('migration :: primary column tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_replacement_pk'`,
-            query: 'ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_replacement_pk" PRIMARY KEY ("replacement")'
-          }
-        ],
-        validations: [],
+        constraints: [],
+        validations: [getIndexValidation('table_replacement_tmp_pk')],
         relations: [],
-        indexes: []
+        indexes: [
+          getRebuildIndexStatement('table_replacement_tmp_pk'),
+          {
+            assert: 'SELECT 1 FROM "table" WHERE "replacement" IS NOT null GROUP BY "replacement" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_replacement_tmp_pk" ON "table" USING BTREE ("replacement")',
+            name: 'table_replacement_tmp_pk'
+          }
+        ]
       },
       cleanup: {
         tables: [
@@ -214,11 +214,7 @@ describe('migration :: primary column tests', () => {
             query: 'ALTER TABLE IF EXISTS "table" DROP COLUMN IF EXISTS "id"'
           }
         ],
-        constraints: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_id_pk"'
-          }
-        ],
+        constraints: getPrimaryKeySwapStatements('table', 'table_replacement_tmp_pk', 'table_replacement_pk', 'table_id_pk'),
         validations: [],
         relations: [],
         indexes: []

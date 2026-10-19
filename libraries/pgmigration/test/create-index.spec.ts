@@ -9,6 +9,8 @@ import { getTableRepository } from '@ez4/pgclient/library';
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
+import { getIndexValidation, getPrimaryKeySwapStatements, getRebuildIndexStatement } from './common/indexes';
+
 describe('migration :: create index tests', () => {
   const getDatabaseTables = (properties: ObjectSchemaProperties, indexes: TableIndex[] = []) => {
     return getTableRepository([
@@ -68,19 +70,21 @@ describe('migration :: create index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_pk'`,
-            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_index_pk" PRIMARY KEY ("column")`
-          }
-        ],
-        validations: [],
+        constraints: [],
+        validations: [getIndexValidation('table_index_tmp_pk')],
         relations: [],
-        indexes: []
+        indexes: [
+          getRebuildIndexStatement('table_index_tmp_pk'),
+          {
+            assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column")',
+            name: 'table_index_tmp_pk'
+          }
+        ]
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk'),
         validations: [],
         relations: [],
         indexes: []
@@ -121,6 +125,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_uk'),
           {
             assert: 'SELECT 1 FROM "table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_uk" ON "table" USING BTREE ("column")',
@@ -171,6 +176,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_sk'),
           {
             query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column")`
           }
@@ -209,19 +215,23 @@ describe('migration :: create index tests', () => {
       },
       rollout: {
         tables: [],
-        constraints: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_pk'`,
-            query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_index_pk" PRIMARY KEY ("column_a", "column_b")`
-          }
-        ],
-        validations: [],
+        constraints: [],
+        validations: [getIndexValidation('table_index_tmp_pk')],
         relations: [],
-        indexes: []
+        indexes: [
+          getRebuildIndexStatement('table_index_tmp_pk'),
+          {
+            assert:
+              'SELECT 1 FROM "table" WHERE "column_a" IS NOT null AND "column_b" IS NOT null ' +
+              'GROUP BY "column_a", "column_b" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "table_index_tmp_pk" ON "table" USING BTREE ("column_a", "column_b")',
+            name: 'table_index_tmp_pk'
+          }
+        ]
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk'),
         validations: [],
         relations: [],
         indexes: []
@@ -262,6 +272,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_uk'),
           {
             assert:
               'SELECT 1 FROM "table" WHERE "column_a" IS NOT null AND "column_b" IS NOT null GROUP BY "column_a", "column_b" HAVING COUNT(*) > 1 LIMIT 1',
@@ -313,6 +324,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_sk'),
           {
             query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING BTREE ("column_a", "column_b")`
           }
@@ -361,6 +373,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('table_index_sk'),
           {
             query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_index_sk" ON "table" USING GIN ("column")`
           }
@@ -410,19 +423,21 @@ describe('migration :: create index tests', () => {
             query: 'ALTER TABLE IF EXISTS "table" RENAME TO "renamed_table"'
           }
         ],
-        constraints: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'renamed_table_index_pk'`,
-            query: 'ALTER TABLE IF EXISTS "renamed_table" ADD CONSTRAINT "renamed_table_index_pk" PRIMARY KEY ("column")'
-          }
-        ],
-        validations: [],
+        constraints: [],
+        validations: [getIndexValidation('renamed_table_index_tmp_pk')],
         relations: [],
-        indexes: []
+        indexes: [
+          getRebuildIndexStatement('renamed_table_index_tmp_pk'),
+          {
+            assert: 'SELECT 1 FROM "renamed_table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
+            query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "renamed_table_index_tmp_pk" ON "renamed_table" USING BTREE ("column")',
+            name: 'renamed_table_index_tmp_pk'
+          }
+        ]
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: getPrimaryKeySwapStatements('renamed_table', 'renamed_table_index_tmp_pk', 'renamed_table_index_pk'),
         validations: [],
         relations: [],
         indexes: []
@@ -474,6 +489,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('renamed_table_index_uk'),
           {
             assert: 'SELECT 1 FROM "renamed_table" WHERE "column" IS NOT null GROUP BY "column" HAVING COUNT(*) > 1 LIMIT 1',
             query: 'CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "renamed_table_index_uk" ON "renamed_table" USING BTREE ("column")',
@@ -535,6 +551,7 @@ describe('migration :: create index tests', () => {
         ],
         relations: [],
         indexes: [
+          getRebuildIndexStatement('renamed_table_index_sk'),
           {
             query: 'CREATE INDEX CONCURRENTLY IF NOT EXISTS "renamed_table_index_sk" ON "renamed_table" USING BTREE ("column")'
           }
