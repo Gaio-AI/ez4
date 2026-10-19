@@ -45,9 +45,11 @@ describe('runtime :: execution lifecycle', () => {
     });
 
     let receivedPrompt = '';
+    let receivedInstructions = '';
     const fakeProvider: AgentProvider = {
       run: async (req: AgentProviderRequest): Promise<AgentProviderResponse> => {
         receivedPrompt = req.prompt;
+        receivedInstructions = req.instructions;
         return {
           output: { result: `processed: ${req.prompt}` }
         };
@@ -76,7 +78,7 @@ describe('runtime :: execution lifecycle', () => {
         prepareCalled = true;
         await req.artifacts.put('state.txt', 'started');
         const typedInput = req.input as { task: string };
-        return { prompt: `custom prompt for ${typedInput.task}` };
+        return { prompt: `custom prompt for ${typedInput.task}`, instructions: 'Skills: commit' };
       },
       finish: async (_req, context) => {
         finishContext = context;
@@ -93,6 +95,7 @@ describe('runtime :: execution lifecycle', () => {
     equal(prepareContext, linkedContext);
     equal(finishContext, linkedContext);
     equal(receivedPrompt, 'custom prompt for hello');
+    equal(receivedInstructions, 'Do work\n\nSkills: commit');
 
     const resultRaw = await storage.readJson<Agent.Result<TestAgentService>>(`results/${agentName}/${invocationId}.json`);
     equal(resultRaw.id, invocationId);

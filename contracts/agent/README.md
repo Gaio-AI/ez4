@@ -129,7 +129,9 @@ export async function prepareReview(
 
   return {
     prompt: `Review pull request #${input.pullRequest}. Analyze changes and identify issues.`,
-    workdir
+    workdir,
+    // Optional: added to the declared `instructions` for this run only.
+    instructions: 'Skills available: ...'
   };
 }
 
