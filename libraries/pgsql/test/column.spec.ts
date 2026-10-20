@@ -76,6 +76,17 @@ describe('sql column tests', () => {
     );
   });
 
+  it('assert :: alter table (alter column type without cast)', () => {
+    const query = sql.table('table').alter();
+
+    query.column('foo').type('varchar(20)', false);
+    query.column('bar').type('integer', true);
+
+    const statement = query.build();
+
+    equal(statement, `ALTER TABLE "table" ALTER COLUMN "foo" TYPE varchar(20), ALTER COLUMN "bar" TYPE integer USING "bar"::integer`);
+  });
+
   it('assert :: alter table (alter nullable columns)', () => {
     const query = sql.table('table').alter();
 

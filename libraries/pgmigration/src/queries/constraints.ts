@@ -80,10 +80,11 @@ export namespace ConstraintQuery {
       const switchValues = getSwitchValues(sourceColumn, targetColumn);
 
       // Rollout runs before the new code goes live, so it widens the check to the values both
-      // versions of the code write.
+      // versions of the code write. Those include every value of the current check, so no row
+      // can fail the new one and the swap skips the table scan that looks for such rows.
       if (!isSameValues(switchValues, sourceValues)) {
         if (switchValues) {
-          prepareSwap(builder, steps.rollout, table, columnName, getValueListFilters(builder, columnName, switchValues));
+          prepareSwap(builder, steps.rollout, table, columnName, getValueListFilters(builder, columnName, switchValues), false);
         } else {
           steps.rollout.constraints.push({
             query: getDeleteQuery(builder, table, getConstraintName(table, columnName)).build()
@@ -93,7 +94,7 @@ export namespace ConstraintQuery {
 
       // Cleanup runs after the old code is gone, so the check narrows to the new values only there.
       if (isConstrainedSchema(targetColumn) && !isSameValues(targetValues, switchValues)) {
-        prepareSwap(builder, steps.cleanup, table, columnName, getConstraintFilters(builder, columnName, targetColumn));
+        prepareSwap(builder, steps.cleanup, table, columnName, getConstraintFilters(builder, columnName, targetColumn), true);
       }
     }
 
@@ -172,14 +173,23 @@ export namespace ConstraintQuery {
   // The new check is created and validated under a temporary name, and it replaces the current one
   // only once validated: while a validation is still running (or has failed) the current check
   // stays and the step fails, and a step run again skips whatever is already done.
-  const prepareSwap = (builder: SqlBuilder, statements: ConstraintQueries, table: string, column: string, filters: SqlFilters) => {
+  const prepareSwap = (
+    builder: SqlBuilder,
+    statements: ConstraintQueries,
+    table: string,
+    column: string,
+    filters: SqlFilters,
+    assertRecords: boolean
+  ) => {
     const newName = getConstraintName(table, column);
     const tmpName = getTemporaryName(newName);
 
     statements.constraints.push(
       {
         check: getCheckConstraintExistsQuery(builder, tmpName),
-        assert: getCheckConstraintRecordsQuery(builder, table, filters),
+        ...(assertRecords && {
+          assert: getCheckConstraintRecordsQuery(builder, table, filters)
+        }),
         query: getCreateQuery(builder, table, tmpName, filters).build(),
         name: newName
       },

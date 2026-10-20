@@ -10,6 +10,7 @@ export class SqlAlterColumnClause {
     required?: boolean;
     value?: string | null;
     type?: string;
+    cast?: boolean;
   };
 
   constructor(table: SqlAlterTableClause, name: string) {
@@ -31,8 +32,9 @@ export class SqlAlterColumnClause {
     return !this.#state.type && this.#state.value === undefined && this.#state.required === undefined;
   }
 
-  type(type?: string) {
+  type(type?: string, cast = true) {
     this.#state.type = type;
+    this.#state.cast = cast;
     return this;
   }
 
@@ -52,7 +54,7 @@ export class SqlAlterColumnClause {
   }
 
   build() {
-    const { table, name, type, required, value } = this.#state;
+    const { table, name, type, cast, required, value } = this.#state;
 
     if (!table.building) {
       return table.build();
@@ -64,7 +66,14 @@ export class SqlAlterColumnClause {
     const clauses = [];
 
     if (type) {
-      clauses.push([...base, 'TYPE', type, 'USING', `${columnName}::${type}`]);
+      const clause = [...base, 'TYPE', type];
+
+      // Without an explicit cast Postgres converts the column with its assignment cast.
+      if (cast) {
+        clause.push('USING', `${columnName}::${type}`);
+      }
+
+      clauses.push(clause);
     }
 
     if (value) {

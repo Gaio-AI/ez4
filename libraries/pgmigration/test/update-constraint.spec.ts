@@ -72,7 +72,6 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('foo', '123', 'bar', '456') LIMIT 1`,
             query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo', '123', 'bar', '456')) NOT VALID`,
             name: 'table_column_ck'
           },
@@ -245,7 +244,6 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('foo', 'bar', '123') LIMIT 1`,
             query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo', 'bar', '123')) NOT VALID`,
             name: 'table_column_ck'
           },
@@ -371,6 +369,73 @@ describe('migration :: update constraint tests', () => {
     });
   });
 
+  it('assert :: update (records asserted only for a narrower check)', async () => {
+    const sourceTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 'bar'
+          }
+        ]
+      }
+    });
+
+    const addedTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          },
+          {
+            value: 'bar'
+          },
+          {
+            value: 'baz'
+          }
+        ]
+      }
+    });
+
+    const removedTable = getDatabaseTables({
+      column: {
+        type: SchemaType.Enum,
+        options: [
+          {
+            value: 'foo'
+          }
+        ]
+      }
+    });
+
+    const [rolloutCreate] = getUpdateStepQueries(addedTable, sourceTable).rollout.constraints;
+    const [cleanupCreate] = getUpdateStepQueries(removedTable, sourceTable).cleanup.constraints;
+
+    deepEqual(
+      {
+        rolloutCreate,
+        cleanupCreate
+      },
+      {
+        rolloutCreate: {
+          check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+          query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo', 'bar', 'baz')) NOT VALID`,
+          name: 'table_column_ck'
+        },
+        cleanupCreate: {
+          check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
+          assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('foo') LIMIT 1`,
+          query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('foo')) NOT VALID`,
+          name: 'table_column_ck'
+        }
+      }
+    );
+  });
+
   it('assert :: update (with literal boolean column type)', async () => {
     const sourceTable = getDatabaseTables({
       column: {
@@ -405,7 +470,6 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: 'SELECT 1 FROM "table" WHERE NOT "column" IN (false, true) LIMIT 1',
             query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN (false, true)) NOT VALID`,
             name: 'table_column_ck'
           },
@@ -509,7 +573,6 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: 'SELECT 1 FROM "table" WHERE NOT "column" IN (456, 123) LIMIT 1',
             query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN (456, 123)) NOT VALID`,
             name: 'table_column_ck'
           },
@@ -613,7 +676,6 @@ describe('migration :: update constraint tests', () => {
         constraints: [
           {
             check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_column_tmp_ck'`,
-            assert: `SELECT 1 FROM "table" WHERE NOT "column" IN ('bar', 'foo') LIMIT 1`,
             query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_column_tmp_ck" CHECK ("column" IN ('bar', 'foo')) NOT VALID`,
             name: 'table_column_ck'
           },
