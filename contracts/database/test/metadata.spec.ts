@@ -28,6 +28,7 @@ describe('database service metadata', () => {
   it('assert :: database scalability', () => testFile('scalability'));
   it('assert :: table schema', () => testFile('schema'));
   it('assert :: table indexes', () => testFile('indexes'));
+  it('assert :: table index options', () => testFile('index-options'));
   it('assert :: table relations', () => testFile('relations'));
   it('assert :: table relation options', () => testFile('relation-options'));
   it('assert :: table stream', () => testFile('stream'));

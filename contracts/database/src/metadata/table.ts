@@ -167,10 +167,16 @@ const validateIndexes = (type: TypeObject | TypeModel, indexes: TableIndex[], sc
   const allColumns = schema.properties;
   const errorList = [];
 
-  for (const { name, columns } of indexes) {
-    const hasMissing = columns.some((columnName) => !allColumns[columnName]);
+  for (const { name, columns, options } of indexes) {
+    const referencedColumns = [...columns, ...(options?.include ?? []), ...Object.keys(options?.where ?? {})];
 
-    if (hasMissing) {
+    // An index sorts only its own columns.
+    const orderedColumns = Object.keys(options?.order ?? {});
+
+    const hasMissing = referencedColumns.some((columnName) => !allColumns[columnName]);
+    const hasForeignOrder = orderedColumns.some((columnName) => !columns.includes(columnName));
+
+    if (hasMissing || hasForeignOrder) {
       errorList.push(new InvalidIndexReferenceError(name, type.file));
     }
   }

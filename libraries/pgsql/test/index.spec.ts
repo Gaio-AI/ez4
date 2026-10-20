@@ -50,6 +50,25 @@ describe('sql index tests', () => {
     equal(statement, `CREATE INDEX "index" ON "table" USING GIN ("foo", "bar", "baz")`);
   });
 
+  it('assert :: create index (with options)', () => {
+    const query = sql
+      .index('index')
+      .create('table', ['foo', 'bar'])
+      .order({ bar: 'desc' })
+      .include(['baz'])
+      .where({ deleted_at: null, status: sql.rawValue(`'active'`) })
+      .unique()
+      .nullsNotDistinct();
+
+    const statement = query.build();
+
+    equal(
+      statement,
+      `CREATE UNIQUE INDEX "index" ON "table" ("foo", "bar" DESC) INCLUDE ("baz") NULLS NOT DISTINCT ` +
+        `WHERE "deleted_at" IS null AND "status" = 'active'`
+    );
+  });
+
   it('assert :: rename index', () => {
     const query = sql.index('index').rename('renamed');
 

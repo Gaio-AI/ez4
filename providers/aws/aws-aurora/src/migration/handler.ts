@@ -2,7 +2,7 @@ import type { StepContext, StepHandler } from '@ez4/state';
 import type { MigrationState, MigrationResult } from './types';
 
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
-import { getCreateQueries, getUnindexedForeignKeys, getUpdateStepQueries } from '@ez4/pgmigration';
+import { getCreateQueries, getMigrationWarnings, getUpdateStepQueries } from '@ez4/pgmigration';
 import { Logger } from '@ez4/logger';
 import { getTableRepositoryChanges } from '@ez4/pgmigration/library';
 import { deepCompare } from '@ez4/utils';
@@ -33,10 +33,8 @@ const previewResource = (candidate: MigrationState, current: MigrationState) => 
 
   const databaseChanges = getTableRepositoryChanges(targetRepository, sourceRepository);
 
-  for (const { table, column, sourceTable } of getUnindexedForeignKeys(targetRepository, sourceRepository)) {
-    Logger.warn(
-      `Foreign key ${table}.${column} has no index led by ${column}: deleting or updating a record of ${sourceTable} scans ${table}.`
-    );
+  for (const warning of getMigrationWarnings(targetRepository, sourceRepository)) {
+    Logger.warn(warning);
   }
 
   const resourceChanges = deepCompare(

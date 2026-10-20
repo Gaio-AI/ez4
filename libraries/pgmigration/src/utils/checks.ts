@@ -1,5 +1,7 @@
 import type { SqlBuilder, SqlFilters } from '@ez4/pgsql';
 
+import { isEmptyObject } from '@ez4/utils';
+
 export const getCheckDatabaseExistsQuery = (builder: SqlBuilder, database: string) => {
   const [query] = builder
     .select()
@@ -263,11 +265,26 @@ export const getCheckPrimaryKeySwappedQuery = (builder: SqlBuilder, name: string
   return query;
 };
 
-export const getCheckUniqueRecordsQuery = (builder: SqlBuilder, table: string, columns: string[]) => {
-  const filters = columns.reduce<SqlFilters>((filters, column) => {
-    filters[column] = { isNull: false };
+/**
+ * Finds records that the unique index would take as duplicates: among the ones the index covers (its
+ * `where`), and, unless nulls are not distinct, leaving out those with a null column.
+ */
+export const getCheckUniqueRecordsQuery = (
+  builder: SqlBuilder,
+  table: string,
+  columns: string[],
+  options?: { where?: SqlFilters; nullsNotDistinct?: boolean }
+) => {
+  const columnFilters = columns.reduce<SqlFilters>((filters, column) => {
+    if (!options?.nullsNotDistinct) {
+      filters[column] = { isNull: false };
+    }
+
     return filters;
   }, {});
+
+  const filters: SqlFilters =
+    options?.where && !isEmptyObject(columnFilters) ? { AND: [options.where, columnFilters] } : (options?.where ?? columnFilters);
 
   const [query] = builder
     .select()

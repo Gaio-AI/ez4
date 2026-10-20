@@ -67,6 +67,14 @@ describe('migration :: unindexed foreign key tests', () => {
     deepEqual(getUnindexedForeignKeys(getRepository([otherIndex]), getRepository([], false)), unindexedKey);
   });
 
+  it('assert :: new foreign key led by a partial index of its rows with a key', () => {
+    const keyIndex: TableIndex = { ...singleIndex, options: { where: { b_id: { not: null } } } };
+    const otherPartialIndex: TableIndex = { ...singleIndex, options: { where: { created_at: null } } };
+
+    deepEqual(getUnindexedForeignKeys(getRepository([keyIndex]), getRepository([], false)), []);
+    deepEqual(getUnindexedForeignKeys(getRepository([otherPartialIndex]), getRepository([], false)), unindexedKey);
+  });
+
   it('assert :: foreign key losing its index', () => {
     deepEqual(getUnindexedForeignKeys(getRepository([]), getRepository([singleIndex])), unindexedKey);
   });

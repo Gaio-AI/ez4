@@ -24,6 +24,16 @@ export class InvalidIndexTypeError extends TypeError {
   }
 }
 
+export class InvalidIndexOptionError extends TypeError {
+  constructor(
+    public indexName: string,
+    public indexOption: string,
+    fileName?: string
+  ) {
+    super(`Index ${indexName} has an invalid ${indexOption} option.`, fileName);
+  }
+}
+
 export class InvalidIndexReferenceError extends TypeError {
   constructor(
     public indexName: string,

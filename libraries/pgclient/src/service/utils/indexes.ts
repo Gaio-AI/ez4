@@ -24,7 +24,8 @@ export const tryExtractUniqueIndex = (indexes: TableIndex[], fields: AnyObject) 
   const allFields = Object.keys(fields);
 
   for (const index of indexes) {
-    if (index.type !== Index.Primary && index.type !== Index.Unique) {
+    // A partial unique index can't be the conflict target of an upsert without its predicate.
+    if ((index.type !== Index.Primary && index.type !== Index.Unique) || index.options?.where) {
       continue;
     }
 

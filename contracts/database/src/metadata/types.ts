@@ -54,10 +54,29 @@ export type DatabaseScalability = {
   maxCapacity: number;
 };
 
+export type IndexMethod = 'btree' | 'hash' | 'gin' | 'gist' | 'brin';
+
+export type IndexOrder = 'asc' | 'desc';
+
+/**
+ * Literal filters on the table columns, as the `where` of a query takes them.
+ */
+export type TableIndexFilters = Record<string, unknown>;
+
+export type TableIndexOptions = {
+  name?: string;
+  where?: TableIndexFilters;
+  include?: string[];
+  order?: Record<string, IndexOrder>;
+  nullsNotDistinct?: boolean;
+  method?: IndexMethod;
+};
+
 export type TableIndex = {
   name: string;
   columns: string[];
   type: Index;
+  options?: TableIndexOptions;
 };
 
 export type RelationDeleteAction = 'cascade' | 'set null' | 'restrict' | 'no action';

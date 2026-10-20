@@ -76,6 +76,25 @@ describe('index utils', () => {
     deepEqual(index, indexes[3]);
   });
 
+  it('assert :: skip partial unique index', () => {
+    const partialIndexes = [
+      {
+        columns: ['alias'],
+        name: 'alias',
+        type: Index.Unique,
+        options: {
+          where: { deleted_at: null }
+        }
+      }
+    ];
+
+    const index = tryExtractUniqueIndex(partialIndexes, {
+      alias: 'foo'
+    });
+
+    deepEqual(index, undefined);
+  });
+
   it('assert :: extract incomplete primary index (undefined expected)', () => {
     const index = tryExtractUniqueIndex(indexes, {
       another: 'foo',
