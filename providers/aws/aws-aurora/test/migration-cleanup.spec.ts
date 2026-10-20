@@ -283,6 +283,68 @@ describe('aurora migration cleanup', () => {
     deepEqual(state.migration?.result, { clusterArn, secretArn });
   });
 
+  it('assert :: cleanup drops a foreign key before the key it references', async (t) => {
+    const events: string[] = [];
+
+    mockDataApi(t, events);
+
+    const getRelatedRepository = (related: boolean): PgTableRepository => ({
+      ...newRepository,
+      owners: {
+        name: 'owners',
+        relations: {},
+        indexes: {
+          id: { name: 'id', columns: ['id'], type: Index.Primary },
+          ...(related && {
+            email: { name: 'email', columns: ['email'], type: Index.Unique }
+          })
+        },
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: { type: SchemaType.String },
+            email: { type: SchemaType.String }
+          }
+        }
+      },
+      pets: {
+        name: 'pets',
+        indexes: {
+          id: { name: 'id', columns: ['id'], type: Index.Primary }
+        },
+        relations: {
+          ...(related && {
+            owner: { sourceTable: 'owners', sourceColumn: 'email', sourceIndex: Index.Unique, targetColumn: 'owner_email' }
+          })
+        },
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: { type: SchemaType.String },
+            owner_email: { type: SchemaType.String }
+          }
+        }
+      }
+    });
+
+    const { errors } = await deploy(
+      events,
+      buildState(getRelatedRepository(false), 'v2'),
+      saveState(buildState(getRelatedRepository(true), 'v1'))
+    );
+
+    deepEqual(
+      events.filter((event) => event.includes('DROP ')),
+      [
+        `DO $ez4$ BEGIN PERFORM set_config('lock_timeout', '5s', true); ` +
+          `ALTER TABLE IF EXISTS "pets" DROP CONSTRAINT IF EXISTS "pets_owner_fk"; END $ez4$`,
+        'DROP INDEX CONCURRENTLY IF EXISTS "owners_email_uk"'
+      ]
+    );
+
+    deepEqual(errors, []);
+  });
+
   it('assert :: cleanup on the next deploy after the code switch', async (t) => {
     const events: string[] = [];
 

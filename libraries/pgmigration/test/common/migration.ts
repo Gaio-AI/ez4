@@ -1,10 +1,19 @@
-import type { PgMigrationQueries, PgMigrationStatement, PgValidationStatement } from '@ez4/pgmigration/library';
+import type { PgMigrationQueries, PgMigrationStatement, PgMigrationStep, PgValidationStatement } from '@ez4/pgmigration/library';
 import type { Database, Client as DbClient } from '@ez4/database';
 
-import { getMigrationQuery, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
+import {
+  getMigrationQuery,
+  getStepStatements,
+  MigrationAssertionFailedError,
+  MigrationValidationFailedError
+} from '@ez4/pgmigration/library';
 
-export const runMigration = async (client: DbClient<Database.Service<any>>, queries: PgMigrationQueries) => {
-  await runStatements(client, [...queries.tables, ...queries.constraints, ...queries.indexes, ...queries.relations]);
+export const runMigration = async (
+  client: DbClient<Database.Service<any>>,
+  queries: PgMigrationQueries,
+  step: PgMigrationStep = 'prepare'
+) => {
+  await runStatements(client, getStepStatements(queries, step));
 
   await runValidations(client, queries.validations);
 };

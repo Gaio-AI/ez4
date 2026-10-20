@@ -3,7 +3,7 @@ import type { MigrationState, MigrationResult } from './types';
 
 import { getMigrationStatements, getMigrationWarnings, getUpdateStepQueries } from '@ez4/pgmigration';
 import { Logger } from '@ez4/logger';
-import { getTableRepositoryChanges } from '@ez4/pgmigration/library';
+import { getStepStatements, getTableRepositoryChanges } from '@ez4/pgmigration/library';
 import { CorruptedResourceError, OperationLogger } from '@ez4/aws-common';
 import { deepCompare, isEmptyObject } from '@ez4/utils';
 
@@ -120,16 +120,16 @@ const updateResource = (candidate: MigrationState, current: MigrationState, cont
         envName
       };
 
-      await updateTables(connectionData, steps.prepare);
+      await updateTables(connectionData, getStepStatements(steps.prepare, 'prepare'));
 
       context.postAction(() =>
         OperationLogger.logExecution(MigrationServiceName, database, 'rollout', async () => {
-          await updateTables(connectionData, steps.rollout);
+          await updateTables(connectionData, getStepStatements(steps.rollout, 'rollout'));
           await validateTables(connectionData, [...steps.prepare.validations, ...steps.rollout.validations]);
 
           context.postAction(() =>
             OperationLogger.logExecution(MigrationServiceName, database, 'cleanup', async () => {
-              await updateTables(connectionData, steps.cleanup);
+              await updateTables(connectionData, getStepStatements(steps.cleanup, 'cleanup'));
               await validateTables(connectionData, steps.cleanup.validations);
 
               delete newResult.oldRepository;

@@ -51,7 +51,7 @@ describe('migration :: client column length tests', () => {
     try {
       await runMigration(client, steps.prepare);
       await runMigration(client, steps.rollout);
-      await runMigration(client, steps.cleanup);
+      await runMigration(client, steps.cleanup, 'cleanup');
 
       return undefined;
     } catch (error) {

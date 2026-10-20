@@ -82,7 +82,7 @@ describe('migration :: client index options tests', async () => {
 
     await runMigration(client, steps.prepare);
     await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
 
     const indexes = await client.rawQuery(
       `SELECT pg_get_indexdef(indexrelid) AS definition FROM pg_index ` +

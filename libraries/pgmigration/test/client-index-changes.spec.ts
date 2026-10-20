@@ -47,7 +47,7 @@ describe('migration :: client index changes tests', async () => {
 
     await runMigration(client, steps.prepare);
     await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
   };
 
   const getIndexes = async (table: string) => {
@@ -221,7 +221,7 @@ describe('migration :: client index changes tests', async () => {
       ['index_type_change_column_sk', 'index_type_change_column_uk', 'index_type_change_id_pk']
     );
 
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
 
     deepEqual(
       (await getIndexes('index_type_change')).map(({ name }) => name),

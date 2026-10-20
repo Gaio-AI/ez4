@@ -1,4 +1,4 @@
-import type { PgMigrationQueries } from '@ez4/pgmigration/library';
+import type { PgMigrationStatement } from '@ez4/pgmigration/library';
 import type { ExecuteStatementCommandOutput } from '@aws-sdk/client-rds-data';
 import type { TestContext } from 'node:test';
 
@@ -23,17 +23,6 @@ const indexQuery = `CREATE INDEX CONCURRENTLY IF NOT EXISTS "items_other_sk" ON 
 const assertQuery = `SELECT 1 FROM "items" WHERE NOT "status" IN ('a', 'b') LIMIT 1`;
 
 const lockedAlterQuery = `DO $ez4$ BEGIN PERFORM set_config('lock_timeout', '5s', true); ${alterQuery}; END $ez4$`;
-
-const getQueries = (queries: Partial<PgMigrationQueries>): PgMigrationQueries => {
-  return {
-    tables: [],
-    constraints: [],
-    validations: [],
-    relations: [],
-    indexes: [],
-    ...queries
-  };
-};
 
 // Answers each statement with its listed results in order, and records every statement sent.
 const mockDataApi = (t: TestContext, results: Record<string, StatementResult[]>) => {
@@ -63,20 +52,15 @@ const getLockTimeoutError = () => {
   });
 };
 
-const modify = (queries: PgMigrationQueries) => {
-  return modifyDatabase(logger, { clusterArn, secretArn, database: 'test', queries });
+const modify = (statements: PgMigrationStatement[]) => {
+  return modifyDatabase(logger, { clusterArn, secretArn, database: 'test', statements });
 };
 
 describe('aurora migration client', () => {
   it('assert :: statement runs with a lock timeout, a concurrent one as it is', async (t) => {
     const statements = mockDataApi(t, {});
 
-    await modify(
-      getQueries({
-        tables: [{ query: alterQuery }],
-        indexes: [{ query: indexQuery, concurrent: true }]
-      })
-    );
+    await modify([{ query: alterQuery }, { query: indexQuery, concurrent: true }]);
 
     deepEqual(statements, [lockedAlterQuery, indexQuery]);
   });
@@ -86,7 +70,7 @@ describe('aurora migration client', () => {
       [lockedAlterQuery]: [getLockTimeoutError()]
     });
 
-    await modify(getQueries({ tables: [{ query: alterQuery }] }));
+    await modify([{ query: alterQuery }]);
 
     deepEqual(statements, [lockedAlterQuery, lockedAlterQuery]);
   });
@@ -96,7 +80,7 @@ describe('aurora migration client', () => {
       [assertQuery]: [new StatementTimeoutException({ $metadata: {}, message: 'timeout' })]
     });
 
-    await modify(getQueries({ tables: [{ query: alterQuery, assert: assertQuery }] }));
+    await modify([{ query: alterQuery, assert: assertQuery }]);
 
     deepEqual(statements, [assertQuery, lockedAlterQuery]);
   });

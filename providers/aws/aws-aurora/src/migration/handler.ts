@@ -4,7 +4,7 @@ import type { MigrationState, MigrationResult } from './types';
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
 import { getCreateQueries, getMigrationStatements, getMigrationWarnings, getUpdateStepQueries } from '@ez4/pgmigration';
 import { Logger } from '@ez4/logger';
-import { getTableRepositoryChanges } from '@ez4/pgmigration/library';
+import { getStepStatements, getTableRepositoryChanges } from '@ez4/pgmigration/library';
 import { deepCompare, isEmptyObject } from '@ez4/utils';
 
 import { getClusterResult } from '../cluster/utils';
@@ -104,7 +104,7 @@ const createResource = (candidate: MigrationState, context: StepContext): Promis
         database,
         clusterArn,
         secretArn,
-        queries: getCreateQueries(repository)
+        statements: getStepStatements(getCreateQueries(repository), 'prepare')
       });
     }
 
@@ -143,7 +143,7 @@ const updateResource = async (candidate: MigrationState, current: MigrationState
 
       await modifyDatabase(logger, {
         ...connectionData,
-        queries: steps.prepare,
+        statements: getStepStatements(steps.prepare, 'prepare'),
         database
       });
 
@@ -151,7 +151,7 @@ const updateResource = async (candidate: MigrationState, current: MigrationState
         OperationLogger.logExecution(MigrationServiceName, database, 'rollout', async (logger) => {
           await modifyDatabase(logger, {
             ...connectionData,
-            queries: steps.rollout,
+            statements: getStepStatements(steps.rollout, 'rollout'),
             database
           });
 
@@ -163,7 +163,7 @@ const updateResource = async (candidate: MigrationState, current: MigrationState
               OperationLogger.logExecution(MigrationServiceName, database, 'cleanup', async (logger) => {
                 await modifyDatabase(logger, {
                   ...connectionData,
-                  queries: steps.cleanup,
+                  statements: getStepStatements(steps.cleanup, 'cleanup'),
                   database
                 });
 

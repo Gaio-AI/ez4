@@ -125,7 +125,7 @@ describe('migration :: client tables tests', async () => {
 
     await runMigration(client, steps.prepare);
     await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
 
     const result = await Promise.all([
       tableExists(client, 'table_a'),
@@ -142,7 +142,7 @@ describe('migration :: client tables tests', async () => {
 
     await runMigration(client, steps.prepare);
     await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
 
     const result = await Promise.all([
       tableExists(client, 'table_a'),
@@ -172,7 +172,7 @@ describe('migration :: client tables tests', async () => {
 
     await runMigration(client, steps.prepare);
     await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
 
     const result = await Promise.all([
       tableExists(client, 'renamed_table_a'),

@@ -30,3 +30,5 @@ export type PgMigrationSteps = {
   rollout: PgMigrationQueries;
   cleanup: PgMigrationQueries;
 };
+
+export type PgMigrationStep = keyof PgMigrationSteps;

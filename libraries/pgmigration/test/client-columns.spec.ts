@@ -101,7 +101,7 @@ describe('migration :: client columns tests', () => {
 
     await runMigration(client, steps.prepare);
     await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.cleanup, 'cleanup');
   };
 
   it('assert :: migrate integer column to decimal', async () => {

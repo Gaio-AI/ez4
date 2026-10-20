@@ -8,6 +8,7 @@ import { getCreateQueries, getUpdateStepQueries } from '@ez4/pgmigration';
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
+import { indexExists } from './common/queries';
 import { runMigration } from './common/migration';
 
 describe('migration :: client scoped relation tests', async () => {
@@ -72,9 +73,9 @@ describe('migration :: client scoped relation tests', async () => {
   const runSteps = async (target: PgTableRepository, source: PgTableRepository) => {
     const steps = getUpdateStepQueries(target, source);
 
-    await runMigration(client, steps.prepare);
-    await runMigration(client, steps.rollout);
-    await runMigration(client, steps.cleanup);
+    await runMigration(client, steps.prepare, 'prepare');
+    await runMigration(client, steps.rollout, 'rollout');
+    await runMigration(client, steps.cleanup, 'cleanup');
   };
 
   beforeEach(async () => {
@@ -122,5 +123,16 @@ describe('migration :: client scoped relation tests', async () => {
     await client.rawQuery(`DELETE FROM "scoped_contacts" WHERE "id" = 'contact-b'`);
 
     deepEqual(await client.rawQuery(`SELECT "id" FROM "scoped_messages"`), []);
+  });
+
+  it('assert :: unscope a relation along with its key', async () => {
+    await runMigration(client, getCreateQueries(getRepository(['account_id'])));
+
+    await runSteps(getRepository(), getRepository(['account_id']));
+
+    await client.rawQuery(`INSERT INTO "scoped_contacts" VALUES ('contact-b', 'account-b')`);
+    await client.rawQuery(`INSERT INTO "scoped_messages" VALUES ('message-a', 'account-a', 'contact-b')`);
+
+    deepEqual(await indexExists(client, 'scoped_contacts_account_id_id_uk'), []);
   });
 });

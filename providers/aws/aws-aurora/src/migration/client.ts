@@ -1,4 +1,4 @@
-import type { PgMigrationQueries, PgMigrationStatement } from '@ez4/pgmigration/library';
+import type { PgMigrationStatement } from '@ez4/pgmigration/library';
 import type { PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
 
@@ -17,7 +17,7 @@ export type ConnectionRequest = {
 };
 
 export type ModifyDatabaseRequest = ConnectionRequest & {
-  queries: PgMigrationQueries;
+  statements: PgMigrationStatement[];
 };
 
 export const createDatabase = async (logger: OperationLogLine, request: ConnectionRequest): Promise<void> => {
@@ -39,15 +39,13 @@ export const createDatabase = async (logger: OperationLogLine, request: Connecti
 export const modifyDatabase = async (logger: OperationLogLine, request: ModifyDatabaseRequest): Promise<void> => {
   logger.update(`Modifying database`);
 
-  const { clusterArn, secretArn, database, queries } = request;
+  const { clusterArn, secretArn, database, statements } = request;
 
   const driver = new ApiClientDriver({
     resourceArn: clusterArn,
     secretArn,
     database
   });
-
-  const statements = [...queries.tables, ...queries.constraints, ...queries.indexes, ...queries.relations];
 
   await executeMigrationStatements(driver, statements);
 };

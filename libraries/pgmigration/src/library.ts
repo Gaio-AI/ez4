@@ -5,6 +5,7 @@ export * from './errors/relation';
 export * from './errors/index';
 export * from './utils/repository';
 export * from './utils/lock';
+export * from './utils/steps';
 export * from './types/query';
 
 export * from './queries/database';

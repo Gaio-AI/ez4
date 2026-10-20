@@ -7,6 +7,7 @@ import type { ClientConnection } from '@ez4/pgclient';
 import {
   DatabaseQueries,
   getMigrationQuery,
+  getStepStatements,
   MigrationAssertionFailedError,
   MigrationValidationFailedError
 } from '@ez4/pgmigration/library';
@@ -30,9 +31,9 @@ export const createAllTables = async (connection: ClientConnection, repository: 
 
   // Steps run in the deploy order, each one validated before the next: rollout uses the columns and tables that prepare
   // creates, and cleanup renames the constraints that rollout validates.
-  for (const queries of [steps.prepare, steps.rollout, steps.cleanup]) {
-    await runAllStatements(client, [...queries.tables, ...queries.constraints, ...queries.indexes, ...queries.relations]);
-    await runAllValidations(client, queries.validations);
+  for (const step of ['prepare', 'rollout', 'cleanup'] as const) {
+    await runAllStatements(client, getStepStatements(steps[step], step));
+    await runAllValidations(client, steps[step].validations);
   }
 
   await saveRepositoryState(database, repository);
