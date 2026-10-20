@@ -4,11 +4,14 @@ import type { Arn, OperationLogLine } from '@ez4/aws-common';
 
 import { DatabaseQueries, getMigrationQuery, MigrationAssertionFailedError } from '@ez4/pgmigration/library';
 import { StatementTimeoutException } from '@aws-sdk/client-rds-data';
-import { Wait } from '@ez4/utils';
+import { Wait, WaitMaxAttemptsError } from '@ez4/utils';
 
 import { isDeadlockException, isLockTimeoutException } from '../client/errors';
 import { ApiClientDriver } from '../client/drivers/api';
-import { MigrationFailedError } from './errors';
+import { MigrationFailedError, MigrationStatementRunningError } from './errors';
+
+// Enough of a statement to tell it apart, and short enough to fit what Postgres keeps of its text.
+const RUNNING_QUERY_PREFIX = 200;
 
 export type ConnectionRequest = {
   database: string;
@@ -78,6 +81,11 @@ const executeMigrationStatements = async (driver: ApiClientDriver, statements: P
       await executeMigrationStatement(driver, { ...statement, query: getMigrationQuery(statement) }, options);
     } catch (error) {
       errors.push(`${error}`);
+
+      // The next statements would run alongside the one still running.
+      if (error instanceof MigrationStatementRunningError) {
+        break;
+      }
     }
   }
 
@@ -109,9 +117,44 @@ const executeMigrationStatement = async (driver: ApiClientDriver, statement: PgM
     if (!(error instanceof StatementTimeoutException)) {
       throw error;
     }
+
+    await waitForStatement(driver, query, options);
   }
 
   return true;
+};
+
+// The Data API stops waiting for a statement after 45 s while the database keeps running it. The migration runs
+// its statements one after another: a concurrent index build that starts while another one on the same table is
+// still running deadlocks with it, and Postgres leaves one of the two indexes invalid. So the next statement
+// waits for this one to end, found by the start of its text (Postgres keeps only the start of a long one).
+const waitForStatement = async (driver: ApiClientDriver, query: string, options?: PgExecuteOptions) => {
+  const queryStart = query.slice(0, RUNNING_QUERY_PREFIX).replaceAll("'", "''");
+
+  const runningQuery =
+    `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() ` +
+    `AND starts_with("query", '${queryStart}')`;
+
+  try {
+    await Wait.until(
+      async () => {
+        const { records } = await driver.executeStatement({ query: runningQuery }, options);
+
+        return records.length > 0 ? Wait.RetryAttempt : true;
+      },
+      {
+        minDelay: 5,
+        maxDelay: 30,
+        attempts: 480
+      }
+    );
+  } catch (error) {
+    if (error instanceof WaitMaxAttemptsError) {
+      throw new MigrationStatementRunningError(query);
+    }
+
+    throw error;
+  }
 };
 
 // An assert only fails the migration before the statement does: the statement, or the validation after it,
