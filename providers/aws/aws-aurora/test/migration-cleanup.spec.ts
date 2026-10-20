@@ -63,7 +63,7 @@ const dropColumnQuery =
   `DO $ez4$ BEGIN PERFORM set_config('lock_timeout', '5s', true); ` +
   `ALTER TABLE IF EXISTS "items" DROP COLUMN IF EXISTS "legacy"; END $ez4$`;
 
-const buildState = (repository: PgTableRepository, version: string, failAlias?: boolean): EntryStates<TestState> => ({
+const buildState = (repository: PgTableRepository, version: string, failAlias?: boolean, disabled?: boolean): EntryStates<TestState> => ({
   cluster: {
     type: ClusterServiceType,
     entryId: 'cluster',
@@ -84,7 +84,8 @@ const buildState = (repository: PgTableRepository, version: string, failAlias?: 
     dependencies: ['cluster'],
     parameters: {
       database: 'test',
-      repository
+      repository,
+      ...(disabled && { disabled })
     },
     result: {
       clusterArn,
@@ -263,6 +264,23 @@ describe('aurora migration cleanup', () => {
     ok(state.function?.partial);
 
     deepEqual(state.migration?.result, { clusterArn, secretArn, oldRepository });
+  });
+
+  it('assert :: no statement when the migration runs outside of the deploy', async (t) => {
+    const events: string[] = [];
+
+    mockDataApi(t, events);
+
+    const newState = buildState(newRepository, 'v2', false, true);
+    const oldState = saveState(buildState(oldRepository, 'v1', false, true));
+
+    const { state, errors } = await deploy(events, newState, oldState);
+
+    // The integrity check still validates the declared index.
+    deepEqual(events, [validateIndexQuery, 'alias v2', 'unpublish']);
+    deepEqual(errors, []);
+
+    deepEqual(state.migration?.result, { clusterArn, secretArn });
   });
 
   it('assert :: cleanup on the next deploy after the code switch', async (t) => {

@@ -93,6 +93,24 @@ Ensure the user performing deployments has the permissions below:
 
 The execution policy of a project that has an Aurora database reads only the master secrets of the project's own clusters, matched by the `aws:rds:primaryDBClusterArn` tag RDS puts on each (the `aws:ResourceTag` condition key, which the IAM policy simulator evaluates too). That holds for the Data API as well, which reads the secret with the caller's permission. Without it, a function in one stage could read another stage's master secret and, from inside the VPC, sign in to that stage's cluster.
 
+## Migrations
+
+Each deploy migrates the tables to the declared schema in three steps: **prepare** before the functions update, **rollout** before their aliases switch, **cleanup** after. The plan lists the statements of each step under the migration's `statements` (`rollout.1 = …`), so what a schema change costs shows before applying it. A statement that takes a table lock waits for it at most 5 seconds and is retried, instead of keeping every write to the table waiting behind it.
+
+To run the migrations outside of the deploy, turn them off in the database service:
+
+```ts
+export declare class Db extends Database.Service<PostgresEngine> {
+  options: {
+    migration: false;
+  };
+
+  // ...
+}
+```
+
+The deploy then creates the database and leaves its tables, indexes and constraints to the outside migrations, and never drops the database, not even when the service is removed with `--force`. The integrity check still validates the declared indexes and constraints by their names before the functions switch, so the outside migrations keep the names the declaration gives them (or the index `name` option). Local runs (`ez4 serve`, `ez4 test`) still create the tables from the declaration.
+
 ## Native connections
 
 By default a function reaches the database through the Data API. A link can connect natively instead, with the Postgres protocol, which needs the function in a VPC (see `@ez4/aws-function`):

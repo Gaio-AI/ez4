@@ -31,6 +31,14 @@ export type ClientOptions = {
    * in with the cluster's master secret.
    */
   user?: string;
+
+  /**
+   * Whether the deploy migrates the tables (default `true`), read from the database service itself. Off,
+   * it creates the database and leaves tables, indexes and constraints to migrations run outside of it,
+   * and never drops the database. The integrity check still validates the declared indexes and
+   * constraints by their names.
+   */
+  migration?: boolean;
 };
 
 /**

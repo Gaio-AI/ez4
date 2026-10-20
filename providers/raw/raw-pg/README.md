@@ -131,6 +131,10 @@ What happens during deploy:
 4. The Lambda (or any consuming service) gets a typed `Client<Db>` with
    the full EZ4 query API.
 
+The plan lists the statements of each step under the migration's `statements`, and a statement that takes a table lock waits for it at most 5 seconds and is retried.
+
+To run the migrations outside of the deploy, set `options: { migration: false }` in the database service. The deploy then leaves the tables to the outside migrations and never drops them, not even with `--force`. Local runs still create the tables from the declaration.
+
 Destroying:
 
 ```sh

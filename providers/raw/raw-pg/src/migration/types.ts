@@ -10,6 +10,11 @@ export type MigrationParameters = {
   allowDeletion?: boolean;
   database: string;
   envName: string;
+
+  /**
+   * Tables are migrated outside of the deploy, which leaves them and the database as they are.
+   */
+  disabled?: boolean;
 };
 
 export type MigrationResult = {

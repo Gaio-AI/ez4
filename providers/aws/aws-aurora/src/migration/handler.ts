@@ -2,10 +2,10 @@ import type { StepContext, StepHandler } from '@ez4/state';
 import type { MigrationState, MigrationResult } from './types';
 
 import { CorruptedResourceError, OperationLogger, ReplaceResourceError } from '@ez4/aws-common';
-import { getCreateQueries, getMigrationWarnings, getUpdateStepQueries } from '@ez4/pgmigration';
+import { getCreateQueries, getMigrationStatements, getMigrationWarnings, getUpdateStepQueries } from '@ez4/pgmigration';
 import { Logger } from '@ez4/logger';
 import { getTableRepositoryChanges } from '@ez4/pgmigration/library';
-import { deepCompare } from '@ez4/utils';
+import { deepCompare, isEmptyObject } from '@ez4/utils';
 
 import { getClusterResult } from '../cluster/utils';
 import { createDatabase, deleteDatabase, modifyDatabase } from './client';
@@ -31,8 +31,6 @@ const previewResource = (candidate: MigrationState, current: MigrationState) => 
   const sourceRepository = (current.partial ? current.result?.oldRepository : undefined) ?? source.repository;
   const targetRepository = target.repository;
 
-  const databaseChanges = getTableRepositoryChanges(targetRepository, sourceRepository);
-
   for (const warning of getMigrationWarnings(targetRepository, sourceRepository)) {
     Logger.warn(warning);
   }
@@ -53,13 +51,30 @@ const previewResource = (candidate: MigrationState, current: MigrationState) => 
     }
   );
 
+  // A migration run outside of the deploy changes nothing here, whatever the repository says.
+  if (target.disabled) {
+    return {
+      ...resourceChanges,
+      name: target.database
+    };
+  }
+
+  const databaseChanges = getTableRepositoryChanges(targetRepository, sourceRepository);
+  const statements = getMigrationStatements(targetRepository, sourceRepository);
+
   return {
     ...resourceChanges,
     counts: resourceChanges.counts + (databaseChanges.counts && 1),
     name: target.database,
     nested: {
       ...resourceChanges.nested,
-      repository: databaseChanges
+      repository: databaseChanges,
+      ...(!isEmptyObject(statements) && {
+        statements: {
+          counts: Object.keys(statements).length,
+          create: statements
+        }
+      })
     }
   };
 };
@@ -73,12 +88,10 @@ const replaceResource = async (candidate: MigrationState, current: MigrationStat
 };
 
 const createResource = (candidate: MigrationState, context: StepContext): Promise<MigrationResult> => {
-  const { database, repository } = candidate.parameters;
+  const { database, repository, disabled } = candidate.parameters;
 
   return OperationLogger.logExecution(MigrationServiceName, database, 'creation', async (logger) => {
     const { clusterArn, secretArn } = getClusterResult(MigrationServiceName, 'migration', context);
-
-    const queries = getCreateQueries(repository);
 
     await createDatabase(logger, {
       database,
@@ -86,12 +99,14 @@ const createResource = (candidate: MigrationState, context: StepContext): Promis
       secretArn
     });
 
-    await modifyDatabase(logger, {
-      database,
-      clusterArn,
-      secretArn,
-      queries
-    });
+    if (!disabled) {
+      await modifyDatabase(logger, {
+        database,
+        clusterArn,
+        secretArn,
+        queries: getCreateQueries(repository)
+      });
+    }
 
     return {
       clusterArn,
@@ -121,7 +136,7 @@ const updateResource = async (candidate: MigrationState, current: MigrationState
       ...connectionData
     };
 
-    if (databaseChanges.counts) {
+    if (databaseChanges.counts && !parameters.disabled) {
       newResult.oldRepository = sourceRepository;
 
       const steps = getUpdateStepQueries(targetRepository, sourceRepository);
@@ -166,10 +181,16 @@ const updateResource = async (candidate: MigrationState, current: MigrationState
 
 const deleteResource = async (current: MigrationState, context: StepContext) => {
   const { result, parameters } = current;
-  const { database, allowDeletion } = parameters;
+  const { database, allowDeletion, disabled } = parameters;
 
   if (result) {
     return OperationLogger.logExecution(MigrationServiceName, database, 'deletion', async (logger) => {
+      // The database holds tables the deploy doesn't own, so not even a forced deploy drops it.
+      if (disabled) {
+        context.addWarning(`Database '${database}' is migrated outside of the deploy and isn't deleted.`);
+        return;
+      }
+
       if (!allowDeletion && !context.force) {
         context.addWarning(`Deletion of database '${database}' is denied.`);
         return;
