@@ -41,8 +41,10 @@ const renamedTable: StepState = {
   } as StepState['preview']
 };
 
+// Every spec registers into the same registry, and the first handler with an answer wins: this one
+// answers only for its own state.
 tryCreateTrigger('Test:report-rename', {
-  'deploy:plan': () => [renamedTable]
+  'deploy:plan': (event) => (event.newState === newState ? [renamedTable] : undefined)
 });
 
 describe('report :: renamed nested resource', () => {
