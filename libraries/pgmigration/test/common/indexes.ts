@@ -7,6 +7,7 @@ export const getRebuildIndexStatement = (name: string) => {
       `AND ("indisvalid" = false OR "indisready" = false)) OR EXISTS (SELECT 1 FROM "pg_stat_activity" ` +
       `WHERE "state" = 'active' AND "pid" != pg_backend_pid() AND "query" ILIKE '%' || '"${name}"' || '%'))`,
     query: `DROP INDEX CONCURRENTLY IF EXISTS "${name}"`,
+    condition: 'only when the index is invalid',
     concurrent: true
   };
 };
