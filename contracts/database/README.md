@@ -166,8 +166,29 @@ relations: {
 | source     | string                                                 | Related table and column (`'<table>:<column>'`).                                              |
 | onDelete   | `'cascade' \| 'set null' \| 'restrict' \| 'no action'` | What deleting the related record does to the record holding its key (Aurora Postgres).        |
 | foreignKey | boolean                                                | Whether the relation has a foreign key, overriding what the indexes decide (Aurora Postgres). |
+| scope      | string[]                                               | Columns both tables have that the foreign key also references (Aurora Postgres).              |
 
 `foreignKey: true` gives a foreign key to a relation between two primary keys (a table that extends another by its key), and `foreignKey: false` keeps one off a relation. A foreign key needs a primary or unique column on the related table and columns of the same type, and `'set null'` needs a column that takes null: the deploy fails otherwise.
+
+`scope` makes the foreign key reference the related column together with columns both tables have, so a record only relates to one with the same values in them (of the same account, for example):
+
+```ts
+// contacts
+indexes: {
+  id: Index.Primary;
+  'account_id:id': Index.Unique;
+};
+
+// messages
+relations: {
+  'contact_id@contact': {
+    source: 'contacts:id';
+    scope: ['account_id'];
+  };
+};
+```
+
+The related table needs a primary or unique key on exactly those columns (`account_id` and `id` in `contacts`, above), and each scope column needs the same type in both tables and can't take null in the table holding the key, since Postgres doesn't check a key with a null column. Deleting the related record with `'set null'` clears only the relation column and keeps the scope, which takes Postgres 15 or later.
 
 #### Streams (DynamoDB only)
 

@@ -41,7 +41,7 @@ export const getUnindexedForeignKeys = (target: PgTableRepository, source: PgTab
     for (const targetAlias in relations) {
       const relation = relations[targetAlias];
 
-      if (!RelationQuery.hasForeignKey(relation) || hasLeadingIndex(indexes, relation.targetColumn)) {
+      if (!RelationQuery.hasForeignKey(relation) || hasKeyIndex(indexes, relation)) {
         continue;
       }
 
@@ -63,13 +63,21 @@ export const getUnindexedForeignKeys = (target: PgTableRepository, source: PgTab
 };
 
 const isUnindexedKey = (relation: PgRelationMetadata, indexes: PgIndexRepository, column: string) => {
-  return RelationQuery.hasForeignKey(relation) && relation.targetColumn === column && !hasLeadingIndex(indexes, column);
+  return RelationQuery.hasForeignKey(relation) && relation.targetColumn === column && !hasKeyIndex(indexes, relation);
 };
 
-// A partial index serves the key lookup only when it leaves out just the rows without a key.
-const hasLeadingIndex = (indexes: PgIndexRepository, column: string) => {
+// The key lookup filters the key columns (the scope and the column), so an index serves it when it is led by
+// the column or by all of them. A partial index serves it only when it leaves out just the rows without a key.
+const hasKeyIndex = (indexes: PgIndexRepository, relation: PgRelationMetadata) => {
+  const { targetColumn, scope = [] } = relation;
+
+  const keyColumns = [...scope, targetColumn];
+
   return Object.values(indexes).some(({ columns, options }) => {
-    return columns[0] === column && (!options?.where || isNotNullFilter(options.where, column));
+    const leadingColumns = columns.slice(0, keyColumns.length);
+    const isLeading = columns[0] === targetColumn || keyColumns.every((column) => leadingColumns.includes(column));
+
+    return isLeading && (!options?.where || isNotNullFilter(options.where, targetColumn));
   });
 };
 

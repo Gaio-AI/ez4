@@ -25,6 +25,7 @@ type ForeignKey = {
   sourceColumn: string;
   targetColumn: string;
   onDelete: RelationDeleteAction;
+  scope: string[];
 };
 
 export namespace RelationQuery {
@@ -213,13 +214,14 @@ export namespace RelationQuery {
       return undefined;
     }
 
-    const { sourceTable, sourceColumn, targetColumn } = relation;
+    const { sourceTable, sourceColumn, targetColumn, scope = [] } = relation;
 
     return {
       sourceTable,
       sourceColumn,
       targetColumn,
-      onDelete: getDeleteAction(relation, schema)
+      onDelete: getDeleteAction(relation, schema),
+      scope
     };
   };
 
@@ -231,11 +233,13 @@ export namespace RelationQuery {
     return builder.table(table).alter().existing().constraint(name).validate();
   };
 
+  // A scoped key references the record within the scope it shares with it (`account_id`, for example), so it
+  // can't point to a record of another scope. Clearing it on delete clears its own column only, not the scope.
   const getCreateQuery = (builder: SqlBuilder, table: string, name: string, foreignKey: ForeignKey) => {
-    const { sourceTable, sourceColumn, targetColumn, onDelete } = foreignKey;
+    const { sourceTable, sourceColumn, targetColumn, onDelete, scope } = foreignKey;
 
     const query = builder.table(table).alter().existing().constraint(name);
-    const constraint = query.foreign(targetColumn, getTableName(sourceTable), [sourceColumn]);
+    const constraint = query.foreign([...scope, targetColumn], getTableName(sourceTable), [...scope, sourceColumn]);
 
     const deleteAction = constraint.delete();
 
@@ -245,7 +249,7 @@ export namespace RelationQuery {
         break;
 
       case 'set null':
-        deleteAction.null();
+        deleteAction.null(scope.length ? [targetColumn] : undefined);
         break;
 
       case 'restrict':

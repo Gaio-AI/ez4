@@ -55,7 +55,7 @@ export class SqlConstraintClause {
     return this.#state.clause as SqlPrimaryKeyConstraintClause;
   }
 
-  foreign(target: string, source: string, columns: string[]) {
+  foreign(target: string | string[], source: string, columns: string[]) {
     const { clause } = this.#state;
 
     if (!(clause instanceof SqlForeignKeyConstraintClause)) {

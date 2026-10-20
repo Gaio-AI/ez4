@@ -10,6 +10,7 @@ import {
   getPropertyObject,
   getPropertyString,
   getPropertyStringIn,
+  getPropertyStringList,
   getReferenceType,
   hasHeritageType
 } from '@ez4/common/library';
@@ -76,7 +77,7 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, members: MemberType[],
       return undefined;
     }
 
-    const { source, onDelete, foreignKey } = relationOptions;
+    const { source, onDelete, foreignKey, scope } = relationOptions;
 
     const [targetColumn, targetAlias] = relationTarget.split('@', 2);
     const [sourceTable, sourceColumn] = source.split(':', 2);
@@ -87,7 +88,8 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, members: MemberType[],
       targetColumn,
       targetAlias,
       ...(onDelete && { onDelete }),
-      ...(foreignKey !== undefined && { foreignKey })
+      ...(foreignKey !== undefined && { foreignKey }),
+      ...(scope && { scope })
     });
   }
 
@@ -116,7 +118,7 @@ const getRelationOptions = (member: ModelProperty, type: TypeObject | TypeModel,
     return undefined;
   }
 
-  const options: Partial<Pick<TableRelation, 'onDelete' | 'foreignKey'>> & { source?: string } = {};
+  const options: Partial<Pick<TableRelation, 'onDelete' | 'foreignKey' | 'scope'>> & { source?: string } = {};
 
   for (const option of getObjectMembers(relationObject)) {
     if (!isModelProperty(option)) {
@@ -140,6 +142,15 @@ const getRelationOptions = (member: ModelProperty, type: TypeObject | TypeModel,
 
       case 'foreignKey': {
         if ((options.foreignKey = getPropertyBoolean(option)) === undefined) {
+          errorList.push(new InvalidRelationOptionError(relationTarget, option.name, type.file));
+          return undefined;
+        }
+
+        break;
+      }
+
+      case 'scope': {
+        if (!(options.scope = getPropertyStringList(option))?.length) {
           errorList.push(new InvalidRelationOptionError(relationTarget, option.name, type.file));
           return undefined;
         }
