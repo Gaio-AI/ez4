@@ -18,6 +18,7 @@ export * from './errors/http/authorization';
 export * from './errors/http/provider';
 export * from './errors/http/route';
 export * from './errors/http/group';
+export * from './errors/http/guard';
 export * from './errors/http/cache';
 export * from './errors/http/access';
 export * from './errors/http/cors';

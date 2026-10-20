@@ -96,6 +96,19 @@ listener: typeof routeListener;
  
 > Use `typeof` because the route listener is referenced by type. See the gateway [listener](./gateway-listener.md) for more details.
 
+#### Allow (optional)
+
+What the route allows, which the service guard receives as declared.
+
+- Required on every route when the service defaults declare a `guard`, and refused when they don't.
+- A literal value: a string, number or boolean, a tuple of them, or an object of either.
+
+```ts
+allow: [Role.Reader, Role.Writer];
+```
+
+> See the gateway [guard](./gateway-guard.md) for more details.
+
 #### Group (optional)
 
 Route group whose function serves the route.

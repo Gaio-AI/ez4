@@ -17,6 +17,7 @@ import { createIntegrationGroupFunction } from '../integration/function/service'
 import { getIntegration, createIntegration } from '../integration/service';
 import { getInternalName } from './utils/name';
 import { mergeScopeHeaders } from './utils/scope';
+import { getRouteGuard } from './utils/guard';
 import { RoleMissingError } from './errors';
 
 /**
@@ -79,7 +80,7 @@ export const getIntegrationGroupFunction = (
       functionName,
       // Not the route list, which would outgrow the description limits and change with every route.
       description: `Route group ${groupName}`,
-      routes: groupRoutes.map((route) => getGroupRoute(route, defaults, context)),
+      routes: groupRoutes.map((route) => getGroupRoute(route, service, defaults, context)),
       timeout: Math.max(5, timeout - 1),
       variables: [options.variables, service.variables, ...groupRoutes.map(getRouteVariables)],
       references: getGroupReferences(groupRoutes),
@@ -118,11 +119,14 @@ export const getIntegrationGroupFunction = (
 
 const getGroupRoute = (
   route: HttpRoute,
+  service: HttpService,
   defaults: Pick<HttpRoute, 'httpErrors' | 'preferences' | 'scope'>,
   context: EventContext
 ): IntegrationGroupRoute => {
   const { handler } = route;
   const { request, response } = handler;
+
+  const guard = getRouteGuard(service.defaults, route, context);
 
   return {
     routeKey: route.path,
@@ -132,6 +136,7 @@ const getGroupRoute = (
       module: handler.module,
       dependencies: context.getDependencyFiles(handler.file)
     },
+    ...(guard && { guard }),
     ...(request && {
       ...('headers' in request && { headersSchema: getOptionalRuntimeSchema(request.headers) }),
       ...('query' in request && { querySchema: getOptionalRuntimeSchema(request.query) }),

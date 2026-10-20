@@ -5,10 +5,14 @@ import type { HttpListener } from './listener';
 import type { HttpRequest } from './request';
 import type { HttpHandler } from './handler';
 import type { HttpErrors } from './errors';
+import type { HttpAllow } from './guard';
 import type { HttpPath } from './path';
 
 // Brings the `Http.Service` groups declaration of `./group` to whoever reads the route contract.
 export type { HttpGroup } from './group';
+
+// Brings the `Http.Allow` and `Http.Guard` declarations of `./guard` likewise.
+export type { HttpAllow, HttpGuard } from './guard';
 
 /**
  * HTTP route.
@@ -60,6 +64,19 @@ export interface HttpRoute<T extends HttpRequest, U extends AuthRequest> extends
    * - Invoked only after the authorizer (if defined) succeeds.
    */
   readonly handler: HttpHandler<T>;
+
+  /**
+   * What the route allows, which the service's `defaults.guard` receives as declared.
+   *
+   * - Required on every route when the service has a guard, and refused when it has none.
+   * - Routes outside a group that share a handler share its function too, so they must allow the same.
+   *
+   * @example
+   * ```ts
+   * allow: [Role.Reader, Role.Writer];
+   * ```
+   */
+  readonly allow?: HttpAllow;
 
   /**
    * Route group whose function serves the route.

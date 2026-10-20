@@ -5,6 +5,7 @@ import type { Http } from '@ez4/gateway';
 import type { MatchingRoute } from '../../utils/route';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd, onTimeout } from '@ez4/local-common';
+import { createEmulatorModule } from '@ez4/project/library';
 import { getRandomUUID, pickObject } from '@ez4/utils';
 import { assertQueryStrings, resolveValidation } from '@ez4/gateway/utils';
 import { Runtime } from '@ez4/common';
@@ -50,17 +51,27 @@ const handleHttpRequest = async (
 
   Runtime.setScope({ ...Runtime.readScopeValues(route.scope, route.headers), traceId }, route.scope);
 
+  const variables = {
+    ...options.variables,
+    ...service.variables,
+    ...route.variables,
+    ...provider?.variables
+  };
+
   const module = await createModule({
     listener: route.listener ?? service.defaults?.listener,
     version: options.version,
     handler,
-    variables: {
-      ...options.variables,
-      ...service.variables,
-      ...route.variables,
-      ...provider?.variables
-    }
+    variables
   });
+
+  const guardModule =
+    route.guard &&
+    (await createEmulatorModule({
+      entrypoint: route.guard,
+      version: options.version,
+      variables
+    }));
 
   const currentRequest: Http.Incoming<Http.Request> = {
     requestId: getRandomUUID(),
@@ -92,6 +103,11 @@ const handleHttpRequest = async (
       }
 
       await onReady(module, serviceClients, currentRequest);
+
+      // As the gateway runtime, the guard runs right before the handler, with the route's `allow`.
+      if (guardModule) {
+        await guardModule.invoke(currentRequest, route.allow, serviceClients);
+      }
 
       const response = await module.handler<Http.Response>(currentRequest, serviceClients);
       const preferences = route.preferences;

@@ -25,6 +25,7 @@ import { getFullTypeName } from '../utils/name';
 import { getWebPreferencesMetadata } from '../preferences';
 import { getWebScopeMetadata } from '../scope';
 import { getHttpErrorsMetadata } from './errors';
+import { getHttpGuardMetadata } from './guard';
 import { HttpNamespaceType } from './types';
 
 const FULL_BASE_TYPE = getFullTypeName(HttpNamespaceType, 'Defaults');
@@ -123,6 +124,11 @@ const getTypeFromMembers = (parent: TypeModel, members: MemberType[], reflection
 
       case 'listener': {
         defaults.listener = getServiceListener(member.value, errorList);
+        break;
+      }
+
+      case 'guard': {
+        defaults.guard = getHttpGuardMetadata(member.value, errorList);
         break;
       }
 

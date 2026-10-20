@@ -14,12 +14,18 @@ export type IntegrationEntryPoint = IntegrationFunction & {
   dependencies: string[];
 };
 
+export type IntegrationGuard = {
+  entrypoint: IntegrationEntryPoint;
+  allow: unknown;
+};
+
 export type IntegrationFunctionParameters = Omit<
   FunctionParameters,
   'getFunctionFiles' | 'getFunctionBundle' | 'getFunctionHash' | 'getFunctionVariables' | 'sourceFile' | 'handlerName'
 > & {
   type: IntegrationFunctionType;
   handler: IntegrationEntryPoint;
+  guard?: IntegrationGuard;
   listener?: IntegrationFunction;
   preferences?: HttpPreferences;
   scope?: Runtime.ScopeHeaders;
@@ -42,6 +48,7 @@ export type IntegrationFunctionParameters = Omit<
 export type IntegrationGroupRoute = {
   routeKey: string;
   handler: IntegrationEntryPoint;
+  guard?: IntegrationGuard;
   headersSchema?: ObjectSchema;
   identitySchema?: ObjectSchema | UnionSchema;
   parametersSchema?: ObjectSchema;

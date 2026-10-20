@@ -2,7 +2,7 @@ import type { EntryState, EntryStates } from '@ez4/state';
 import type { LinkedVariables } from '@ez4/project/library';
 import type { RoleState } from '@ez4/aws-identity';
 import type { LogGroupState } from '@ez4/aws-logs';
-import type { IntegrationFunctionParameters, IntegrationGroupParameters } from './types';
+import type { IntegrationFunctionParameters, IntegrationGroupParameters, IntegrationGuard } from './types';
 import type { BundleFunction } from './bundler';
 
 import { getDisabledProjects } from '@ez4/project/library';
@@ -34,7 +34,7 @@ export const createIntegrationFunction = <E extends EntryState>(
   parameters: IntegrationFunctionParameters
 ) => {
   const { headersSchema, parametersSchema, querySchema, bodySchema, identitySchema, responseSchema } = parameters;
-  const { type, handler, variables, debug, architecture, preferences, errorsMap, scope } = parameters;
+  const { type, handler, guard, variables, debug, architecture, preferences, errorsMap, scope } = parameters;
 
   return createFunction(state, roleState, logGroupState, {
     handlerName: 'apiEntryPoint',
@@ -60,7 +60,7 @@ export const createIntegrationFunction = <E extends EntryState>(
       return bundleFunctions[type](parameters, [...context.getDependencies(), ...context.getConnections()]);
     },
     getFunctionFiles: () => {
-      return [handler.sourceFile, [...handler.dependencies, getIntegrationTemplateFile(type)]];
+      return [handler.sourceFile, [...handler.dependencies, ...getGuardFiles(guard), getIntegrationTemplateFile(type)]];
     },
     getFunctionHash: () => {
       const disabledProjects = getDisabledProjects(parameters.context, parameters.references);
@@ -77,12 +77,26 @@ export const createIntegrationFunction = <E extends EntryState>(
         errorsMap,
         scope,
         debug,
+        ...(guard && {
+          guard: getGuardSettings(guard)
+        }),
         ...(disabledProjects.length > 0 && {
           disabledProjects
         })
       });
     }
   });
+};
+
+// The guard's source and imports, so a change to the guard reaches every function behind it.
+const getGuardFiles = (guard: IntegrationGuard | undefined) => {
+  return guard ? [guard.entrypoint.sourceFile, ...guard.entrypoint.dependencies] : [];
+};
+
+// What the source hash doesn't hold: which guard function, and the `allow` it's given, which lives in the route
+// declaration rather than in any file of the bundle.
+const getGuardSettings = ({ entrypoint: { dependencies: _dependencies, ...entrypoint }, allow }: IntegrationGuard) => {
+  return { entrypoint, allow };
 };
 
 /**
@@ -120,7 +134,7 @@ export const createIntegrationGroupFunction = <E extends EntryState>(
       return bundleGroupFunction(parameters, [...context.getDependencies(), ...context.getConnections()]);
     },
     getFunctionFiles: () => {
-      const routeFiles = routes.flatMap(({ handler }) => handler.dependencies);
+      const routeFiles = routes.flatMap(({ handler, guard }) => [...handler.dependencies, ...getGuardFiles(guard)]);
 
       return [groupName, [...arrayUnique(routeFiles), getGroupTemplateFile()]];
     },
@@ -129,7 +143,13 @@ export const createIntegrationGroupFunction = <E extends EntryState>(
 
       // The whole route table, handlers included, since one can change within files the source hash already
       // holds. Their import graph is the source hash's, so a new import leaves bytes alone to be skipped.
-      const routeTable = routes.map(({ handler: { dependencies: _dependencies, ...handler }, ...route }) => ({ ...route, handler }));
+      const routeTable = routes.map(({ handler: { dependencies: _dependencies, ...handler }, guard, ...route }) => ({
+        ...route,
+        handler,
+        ...(guard && {
+          guard: getGuardSettings(guard)
+        })
+      }));
 
       return hashObject({
         architecture,

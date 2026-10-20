@@ -1,11 +1,19 @@
 import type { EntryState } from '@ez4/state';
-import type { IntegrationFunctionParameters, IntegrationGroupParameters, IntegrationGroupRoute } from './types';
+import type { BundlerHandler } from '@ez4/aws-common';
+
+import type {
+  IntegrationEntryPoint,
+  IntegrationFunctionParameters,
+  IntegrationGroupParameters,
+  IntegrationGroupRoute,
+  IntegrationGuard
+} from './types';
 
 import { join } from 'node:path';
 
 import { getDefinitionsObject } from '@ez4/project/library';
 import { getFunctionBundle } from '@ez4/aws-common';
-import { pickObject } from '@ez4/utils';
+import { hashObject, pickObject } from '@ez4/utils';
 
 import { IntegrationServiceName } from '../types';
 import { IntegrationFunctionType } from './types';
@@ -31,21 +39,22 @@ export const getGroupTemplateFile = () => {
 };
 
 /**
- * The handlers a group function imports, each once, and the position of each route's handler among them.
+ * The handlers a group function imports, each once, and the position of each route's handler among them. A handler
+ * behind a guard counts once per `allow` it's given.
  */
 const getGroupHandlers = (routes: IntegrationGroupRoute[]) => {
   const handlerKeys: string[] = [];
 
-  const handlers: IntegrationGroupRoute['handler'][] = [];
+  const handlers: BundlerHandler[] = [];
   const positions: number[] = [];
 
-  for (const { handler } of routes) {
-    const handlerKey = `${handler.module ?? handler.sourceFile}:${handler.functionName}`;
+  for (const { handler, guard } of routes) {
+    const handlerKey = `${handler.module ?? handler.sourceFile}:${handler.functionName}${guard ? `:${hashObject(getBundlerGuard(guard))}` : ''}`;
 
     let position = handlerKeys.indexOf(handlerKey);
 
     if (position < 0) {
-      position = handlers.push(handler) - 1;
+      position = handlers.push(getBundlerHandler(handler, guard)) - 1;
       handlerKeys.push(handlerKey);
     }
 
@@ -55,13 +64,22 @@ const getGroupHandlers = (routes: IntegrationGroupRoute[]) => {
   return { handlers, positions };
 };
 
+const getBundlerGuard = ({ entrypoint: { dependencies: _dependencies, ...entrypoint }, allow }: IntegrationGuard) => {
+  return { entrypoint, allow };
+};
+
+const getBundlerHandler = (handler: IntegrationEntryPoint, guard: IntegrationGuard | undefined): BundlerHandler => {
+  return guard ? { ...handler, guard: getBundlerGuard(guard) } : handler;
+};
+
 export const bundleGroupFunction = async (parameters: IntegrationGroupParameters, connections: EntryState[]) => {
   const { groupName, routes, listener, functionName, context, references, debug } = parameters;
 
   const { handlers, positions } = getGroupHandlers(routes);
 
-  // Each route's settings go as a JSON string, which the template parses on the route's first request.
-  const groupRoutes = routes.map(({ routeKey, handler: _handler, ...config }, index) => {
+  // Each route's settings go as a JSON string, which the template parses on the route's first request. Its guard
+  // is in its handler already.
+  const groupRoutes = routes.map(({ routeKey, handler: _handler, guard: _guard, ...config }, index) => {
     return [routeKey, { handler: positions[index], config: JSON.stringify(config) }];
   });
 
@@ -86,6 +104,7 @@ export const bundleGroupFunction = async (parameters: IntegrationGroupParameters
 export const bundleRequestFunction = async (parameters: IntegrationFunctionParameters, connections: EntryState[]) => {
   const {
     handler,
+    guard,
     listener,
     preferences,
     functionName,
@@ -121,7 +140,7 @@ export const bundleRequestFunction = async (parameters: IntegrationFunctionParam
       __EZ4_ERRORS_MAP: errorsMap ? JSON.stringify(errorsMap) : 'undefined',
       __EZ4_SCOPE: scope ? JSON.stringify(scope) : 'undefined'
     },
-    handler,
+    handler: getBundlerHandler(handler, guard),
     listener,
     debug
   });

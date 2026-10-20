@@ -2,6 +2,7 @@ import type { WebDefaults } from '../defaults';
 import type { HttpListener } from './listener';
 import type { HttpRequest } from './request';
 import type { HttpErrors } from './errors';
+import type { HttpGuard } from './guard';
 
 /**
  * Default HTTP service parameters.
@@ -15,6 +16,15 @@ export interface HttpDefaults<T extends HttpRequest> extends WebDefaults {
    * - Useful for logging, tracing, metrics, and instrumentation.
    */
   readonly listener?: HttpListener<T>;
+
+  /**
+   * Guard for all routes, which decides whether a request may reach the handler from the route's `allow`.
+   *
+   * - Runs inside the route's function, after the request is validated and right before the handler.
+   * - Every route must declare `allow`: a route without one fails the build instead of going unguarded.
+   * - Not run by authorizers, which are shared between routes and cached by their identity source.
+   */
+  readonly guard?: HttpGuard<T>;
 
   /**
    * Maps known exceptions to HTTP status codes across all handlers.

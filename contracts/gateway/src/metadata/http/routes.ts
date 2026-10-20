@@ -28,6 +28,7 @@ import {
 } from '@ez4/common/library';
 
 import { IncompleteRouteError } from '../../errors/http/route';
+import { InvalidRouteAllowError } from '../../errors/http/guard';
 import { MismatchParametersTypeError } from '../../errors/parameters';
 import { getAuthHandlerMetadata } from '../auth/handler';
 import { getReservedConcurrency } from '../utils/concurrency';
@@ -37,6 +38,7 @@ import { getWebPreferencesMetadata } from '../preferences';
 import { getWebScopeMetadata } from '../scope';
 import { getHttpHandlerMetadata } from './handler';
 import { getHttpErrorsMetadata } from './errors';
+import { getHttpAllowMetadata } from './guard';
 import { HttpNamespaceType } from './types';
 
 export const isHttpRouteDeclaration = (type: AllType): type is TypeModel => {
@@ -126,6 +128,8 @@ const getTypeFromMembers = (
   const route: Incomplete<HttpRoute> = {};
   const properties = new Set(['path', 'handler']);
 
+  let invalidAllow = false;
+
   for (const member of members) {
     if (!isModelProperty(member) || member.inherited) {
       continue;
@@ -178,6 +182,14 @@ const getTypeFromMembers = (
 
       case 'authorizer': {
         route.authorizer = getAuthHandlerMetadata(member.value, parent, reflection, errorList, external, HttpNamespaceType);
+        break;
+      }
+
+      // Enforced by the owner's guard, so it isn't part of the client's contract.
+      case 'allow': {
+        if (!external && (route.allow = getHttpAllowMetadata(member.value, reflection)) === undefined) {
+          invalidAllow = true;
+        }
         break;
       }
 
@@ -245,6 +257,11 @@ const getTypeFromMembers = (
 
   if (!isCompleteRoute(route)) {
     errorList.push(new IncompleteRouteError([...properties], type.file));
+    return undefined;
+  }
+
+  if (invalidAllow) {
+    errorList.push(new InvalidRouteAllowError(route.path, type.file));
     return undefined;
   }
 

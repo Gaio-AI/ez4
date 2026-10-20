@@ -28,11 +28,24 @@ export type BundlerEntrypoint = {
   module?: string;
 };
 
+/**
+ * A function the handler runs behind, called right before it with the handler's own request and context and
+ * the given `allow` in between. Throwing keeps the handler from running.
+ */
+export type BundlerGuard = {
+  entrypoint: BundlerEntrypoint;
+  allow: unknown;
+};
+
+export type BundlerHandler = BundlerEntrypoint & {
+  guard?: BundlerGuard;
+};
+
 export type BundlerOptions = {
   filePrefix: string;
   templateFile: string;
   resourceName: string;
-  handler: BundlerEntrypoint;
+  handler: BundlerHandler;
   listener?: BundlerEntrypoint;
   context?: Record<string, LinkedContext>;
   define?: Record<string, string>;
@@ -52,7 +65,7 @@ export type BundlerGroupOptions = Omit<BundlerOptions, 'handler'> & {
    * Name the bundle is cached and written under, unique among the bundles of a deploy.
    */
   groupName: string;
-  handlers: BundlerEntrypoint[];
+  handlers: BundlerHandler[];
 };
 
 const isGroupOptions = (options: BundlerOptions | BundlerGroupOptions): options is BundlerGroupOptions => {
@@ -262,14 +275,17 @@ const getBundleTarget = (options: BundlerOptions | BundlerGroupOptions) => {
     };
   }
 
-  const { sourceFile, functionName } = options.handler;
+  const { sourceFile, functionName, guard } = options.handler;
   const { dir: targetPath, name: targetName } = parse(sourceFile);
 
   const handlerName = toKebabCase(functionName);
 
+  // The same handler behind another guard, or none, is another bundle.
+  const guardSuffix = guard ? `.${hashObject(guard).slice(0, 8)}` : '';
+
   return {
-    cacheKey: `${sourceFile}:${functionName}`,
-    targetFile: join(targetPath, `${filePrefix}.${targetName}.${handlerName}.mjs`),
+    cacheKey: `${sourceFile}:${functionName}${guardSuffix}`,
+    targetFile: join(targetPath, `${filePrefix}.${targetName}.${handlerName}${guardSuffix}.mjs`),
     sourceName: sourceFile
   };
 };
@@ -325,7 +341,17 @@ const getHandlerCode = (options: BundlerOptions | BundlerGroupOptions) => {
   if (!isGroupOptions(options)) {
     const { handler } = options;
 
-    return `import { ${handler.functionName} as handle } from '${getEntrypointImport(handler)}';`;
+    if (!handler.guard) {
+      return `import { ${handler.functionName} as handle } from '${getEntrypointImport(handler)}';`;
+    }
+
+    const guards = getGuardCode([handler]);
+
+    return [
+      `import { ${handler.functionName} as __EZ4_HANDLER } from '${getEntrypointImport(handler)}';`,
+      ...guards.imports,
+      `const handle = ${guards.getGuardedHandler(handler, '__EZ4_HANDLER')};`
+    ].join('\n');
   }
 
   // Aliased by position, since handlers of different files may share a name.
@@ -333,9 +359,62 @@ const getHandlerCode = (options: BundlerOptions | BundlerGroupOptions) => {
     return `import { ${handler.functionName} as __EZ4_HANDLER_${index} } from '${getEntrypointImport(handler)}';`;
   });
 
-  const handlers = options.handlers.map((_, index) => `__EZ4_HANDLER_${index}`);
+  const guards = getGuardCode(options.handlers);
 
-  return `${imports.join('\n')}\nconst __EZ4_HANDLERS = [${handlers.join(', ')}];`;
+  const handlers = options.handlers.map((handler, index) => {
+    return guards.getGuardedHandler(handler, `__EZ4_HANDLER_${index}`);
+  });
+
+  return [...imports, ...guards.imports, `const __EZ4_HANDLERS = [${handlers.join(', ')}];`].join('\n');
+};
+
+/**
+ * Imports each guard of the handlers once, and wraps a guarded handler so its guard runs right before it. A handler
+ * without a guard is referenced as is, so a bundle with no guard has the same code as one built by a bundler
+ * without guards.
+ */
+const getGuardCode = (handlers: BundlerHandler[]) => {
+  const guardKeys: string[] = [];
+  const imports: string[] = [];
+
+  for (const { guard } of handlers) {
+    const guardKey = guard && getEntrypointKey(guard.entrypoint);
+
+    if (guard && guardKey && !guardKeys.includes(guardKey)) {
+      imports.push(
+        `import { ${guard.entrypoint.functionName} as __EZ4_GUARD_${guardKeys.length} } from '${getEntrypointImport(guard.entrypoint)}';`
+      );
+      guardKeys.push(guardKey);
+    }
+  }
+
+  if (imports.length) {
+    imports.push(
+      'const __EZ4_GUARDED = (guard, allow, handler) => async (request, context) => {',
+      '  await guard(request, allow, context);',
+      '  return handler(request, context);',
+      '};'
+    );
+  }
+
+  const getGuardedHandler = ({ guard }: BundlerHandler, handlerName: string) => {
+    if (!guard) {
+      return handlerName;
+    }
+
+    const guardIndex = guardKeys.indexOf(getEntrypointKey(guard.entrypoint));
+
+    return `__EZ4_GUARDED(__EZ4_GUARD_${guardIndex}, ${JSON.stringify(guard.allow)}, ${handlerName})`;
+  };
+
+  return {
+    imports,
+    getGuardedHandler
+  };
+};
+
+const getEntrypointKey = (entrypoint: BundlerEntrypoint) => {
+  return `${entrypoint.module ?? entrypoint.sourceFile}:${entrypoint.functionName}`;
 };
 
 const getEntrypointImport = (entrypoint: BundlerEntrypoint) => {
