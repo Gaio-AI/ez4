@@ -109,11 +109,14 @@ export type HttpErrors = {
   [name: string]: number;
 };
 
+export type HttpAllow = string | number | boolean | HttpAllow[] | { [name: string]: HttpAllow };
+
 export type HttpRoute = HttpDefaults & {
   name?: string;
   path: HttpPath;
   handler: HttpHandler;
   authorizer?: AuthHandler;
+  allow?: HttpAllow;
   variables?: LinkedVariables;
   disabled?: boolean;
   group?: string;
@@ -138,6 +141,7 @@ export type HttpGroup = {
 
 export type HttpDefaults = {
   listener?: ServiceListener;
+  guard?: FunctionSignature;
   httpErrors?: HttpErrors;
   preferences?: HttpPreferences;
   architecture?: ArchitectureType;

@@ -3,6 +3,7 @@ import type { DeployOptions, EventContext } from '@ez4/project/library';
 import type { EntryStates } from '@ez4/state';
 import type { GatewayState } from '../gateway/types';
 
+import { isHttpService } from '@ez4/gateway/library';
 import { tryGetFunctionState } from '@ez4/aws-function';
 import { deepMerge, isAnyObject } from '@ez4/utils';
 import { isRoleState } from '@ez4/aws-identity';
@@ -10,11 +11,14 @@ import { createLogGroup } from '@ez4/aws-logs';
 
 import { Defaults } from '../utils/defaults';
 import { getOptionalRuntimeSchema } from '../utils/schema';
+import type { IntegrationGuard } from '../integration/function/types';
+
 import { IntegrationFunctionType } from '../integration/function/types';
 import { createIntegrationFunction } from '../integration/function/service';
 import { getIntegration, createIntegration } from '../integration/service';
 import { getFunctionName, getInternalName } from './utils/name';
 import { mergeScopeHeaders } from './utils/scope';
+import { getRouteGuard } from './utils/guard';
 import { RoleMissingError } from './errors';
 
 export const getIntegrationRequestFunction = (
@@ -25,7 +29,9 @@ export const getIntegrationRequestFunction = (
   options: DeployOptions,
   context: EventContext
 ) => {
-  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.HttpRequest, true, options, context);
+  const guard = isHttpService(service) ? getRouteGuard(service.defaults, target, context) : undefined;
+
+  return getIntegrationFunction(state, service, gatewayState, target, IntegrationFunctionType.HttpRequest, true, options, context, guard);
 };
 
 export const getIntegrationConnectionFunction = (
@@ -69,7 +75,8 @@ const getIntegrationFunction = (
   type: IntegrationFunctionType,
   readsScope: boolean,
   options: DeployOptions,
-  context: EventContext
+  context: EventContext,
+  guard?: IntegrationGuard
 ) => {
   if (!context.role || !isRoleState(context.role)) {
     throw new RoleMissingError();
@@ -140,6 +147,7 @@ const getIntegrationFunction = (
         module: handler.module,
         dependencies
       },
+      ...(guard && { guard }),
       listener: listener && {
         functionName: listener.name,
         sourceFile: listener.file,

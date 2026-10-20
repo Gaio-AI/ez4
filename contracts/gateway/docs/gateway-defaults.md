@@ -65,6 +65,19 @@ listener: typeof globalListener;
 
 > Use `typeof` because the route listener is referenced by type.
 
+#### Guard (optional)
+
+Guard for all HTTP routes, which decides from each route's `allow` whether a request reaches the handler.
+
+- Runs inside the route's function, after the request is validated and right before the handler.
+- Every route must then declare `allow`.
+
+```ts
+guard: typeof roleGuard;
+```
+
+> Only for HTTP Services. See the gateway [guard](./gateway-guard.md) for more details.
+
 #### HTTP errors (optional)
 
 Maps exceptions to HTTP status codes.

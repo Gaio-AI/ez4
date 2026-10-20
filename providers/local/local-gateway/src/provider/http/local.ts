@@ -121,6 +121,7 @@ const buildHttpRoutes = (service: HttpService) => {
   const defaultTimeout = service.defaults?.timeout;
   const defaultErrors = service.defaults?.httpErrors;
   const defaultScope = service.defaults?.scope;
+  const defaultGuard = service.defaults?.guard;
 
   for (const route of service.routes) {
     const [method, path] = route.path.split(' ', 2);
@@ -138,7 +139,12 @@ const buildHttpRoutes = (service: HttpService) => {
       authorizer: route.authorizer,
       listener: route.listener,
       scope: { ...defaultScope, ...route.scope },
-      handler: route.handler
+      handler: route.handler,
+      ...(defaultGuard &&
+        route.allow !== undefined && {
+          guard: defaultGuard,
+          allow: route.allow
+        })
     };
   }
 

@@ -25,6 +25,7 @@ import { getFullTypeName } from '../utils/name';
 import { createHttpService, HttpNamespaceType } from './types';
 import { checkHttpRouteGroups, getHttpGroupsMetadata } from './groups';
 import { getHttpDefaultsMetadata } from './defaults';
+import { checkHttpRouteGuards } from './guard';
 import { getHttpThrottlingMetadata } from './throttling';
 import { getHttpAccessMetadata } from './access';
 import { getHttpCacheMetadata } from './cache';
@@ -139,6 +140,7 @@ export const getHttpServicesMetadata = (reflection: ReflectionTypes) => {
     attachLinkedServices(service, reflection, errorList, fileName);
 
     checkHttpRouteGroups(service, errorList);
+    checkHttpRouteGuards(service, errorList);
 
     allServices[declaration.name] = service;
   }

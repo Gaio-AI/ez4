@@ -1,0 +1,135 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestService": {
+    "type": "@ez4/http",
+    "name": "TestService",
+    "context": {},
+    "description": "Service for testing route guard.",
+    "file": "test/http/input/output-guard.ts",
+    "variables": {},
+    "services": {},
+    "routes": [
+      {
+        "path": "GET /items",
+        "handler": {
+          "name": "listItems",
+          "file": "test/http/input/output-guard.ts",
+          "position": [
+            57,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "allow": [
+          "reader",
+          "writer"
+        ]
+      },
+      {
+        "path": "GET /items/count",
+        "handler": {
+          "name": "listItems",
+          "file": "test/http/input/output-guard.ts",
+          "position": [
+            57,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "allow": [
+          "reader",
+          "writer"
+        ]
+      },
+      {
+        "path": "POST /items",
+        "handler": {
+          "name": "createItem",
+          "file": "test/http/input/output-guard.ts",
+          "position": [
+            63,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "allow": "writer"
+      },
+      {
+        "path": "GET /health",
+        "handler": {
+          "name": "health",
+          "file": "test/http/input/output-guard.ts",
+          "position": [
+            75,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "allow": "public"
+      },
+      {
+        "path": "DELETE /items",
+        "handler": {
+          "name": "deleteItems",
+          "file": "test/http/input/output-guard.ts",
+          "position": [
+            69,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "allow": {
+          "owner": true,
+          "level": 2
+        }
+      },
+      {
+        "path": "GET /tags",
+        "handler": {
+          "name": "listItems",
+          "file": "test/http/input/output-guard.ts",
+          "position": [
+            57,
+            1
+          ],
+          "response": {
+            "status": 204
+          }
+        },
+        "group": "tags",
+        "allow": [
+          "reader"
+        ]
+      }
+    ],
+    "defaults": {
+      "guard": {
+        "name": "testGuard",
+        "file": "test/http/input/output-guard.ts",
+        "position": [
+          55,
+          1
+        ]
+      }
+    }
+  }
+}

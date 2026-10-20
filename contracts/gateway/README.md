@@ -111,6 +111,7 @@ export function postHandler(request: Http.Incoming<MyRequest>, { otherService, v
 - [Gateway handlers](./docs/gateway-handler.md)
 - [Gateway authorizers](./docs/gateway-authorizer.md)
 - [Gateway listeners](./docs/gateway-listener.md)
+- [Gateway guards](./docs/gateway-guard.md)
 - [Gateway providers](./docs/gateway-provider.md)
 - [Gateway defaults](./docs/gateway-defaults.md)
 
