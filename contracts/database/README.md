@@ -98,6 +98,46 @@ With your database service defined, EZ4 handles provisioning, migrations, scalin
 | relations | object                    | Table relations.            |
 | indexes   | object                    | Table indexes.              |
 
+#### Indexes
+
+Each index is keyed by its columns, joined by `:`, and takes its type:
+
+```ts
+indexes: {
+  id: Index.Primary;
+  'account_id:created_at': Index.Secondary;
+};
+```
+
+An object declares the index with options (Aurora Postgres):
+
+```ts
+indexes: {
+  'account_id:created_at': {
+    type: Index.Secondary;
+    name: 'messages_active_by_account';
+    where: { deleted_at: null };
+    include: ['status'];
+    order: { created_at: 'desc' };
+  };
+};
+```
+
+| Name             | Type                                             | Description                                                                                      |
+| ---------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| type             | Index                                            | Index type.                                                                                      |
+| columns          | string[]                                         | Index columns, when the key is a name rather than the columns (two indexes on the same columns). |
+| name             | string                                           | Index name in the database, instead of one made of the table, the key and the type.              |
+| where            | object                                           | Indexes only the matching rows (a partial index), with literal values as in a query `where`.     |
+| include          | string[]                                         | Columns stored in the index besides its key, so a query that reads only them needs no table.     |
+| order            | object                                           | Descending (`'desc'`) or ascending (`'asc'`) order of each index column.                         |
+| nullsNotDistinct | boolean                                          | A unique index that takes rows with the same columns as duplicates even when they are null.      |
+| method           | `'btree' \| 'hash' \| 'gin' \| 'gist' \| 'brin'` | Index method, instead of `btree` (or `gin` for a single object or array column).                 |
+
+A partial unique index doesn't identify a record, so queries can't look a record up by it and an upsert doesn't use it as its conflict target. Postgres uses a partial index only for a query whose filters include its `where`. The deploy fails on options a method doesn't take (a unique index other than `btree`, for example), and the plan warns about a new secondary index that another index covers.
+
+A primary key and a TTL index take no options besides `columns`.
+
 #### Relations
 
 Each relation is keyed by `'<column>@<alias>'`, the table's column and the name the relation takes in queries, and points to `'<table>:<column>'`, the related table and column:

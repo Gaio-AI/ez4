@@ -1,6 +1,25 @@
 import type { PgIndexRepository, PgRelationMetadata, PgTableRepository } from '@ez4/pgclient/library';
+import type { TableIndexFilters } from '@ez4/database/library';
+
+import { deepEqual, isAnyObject } from '@ez4/utils';
+import { Index } from '@ez4/database';
 
 import { RelationQuery } from '../queries/relations';
+
+/**
+ * What the deploy plan warns about the migration from the source to the target repository.
+ */
+export const getMigrationWarnings = (target: PgTableRepository, source: PgTableRepository) => {
+  const foreignKeyWarnings = getUnindexedForeignKeys(target, source).map(({ table, column, sourceTable }) => {
+    return `Foreign key ${table}.${column} has no index led by ${column}: deleting or updating a record of ${sourceTable} scans ${table}.`;
+  });
+
+  const indexWarnings = getRedundantIndexes(target, source).map(({ table, index, coveringIndex }) => {
+    return `Index ${table}.${index} is covered by ${table}.${coveringIndex}, which starts with its columns: keeping both costs every write.`;
+  });
+
+  return [...foreignKeyWarnings, ...indexWarnings];
+};
 
 export type UnindexedForeignKey = {
   table: string;
@@ -47,6 +66,79 @@ const isUnindexedKey = (relation: PgRelationMetadata, indexes: PgIndexRepository
   return RelationQuery.hasForeignKey(relation) && relation.targetColumn === column && !hasLeadingIndex(indexes, column);
 };
 
+// A partial index serves the key lookup only when it leaves out just the rows without a key.
 const hasLeadingIndex = (indexes: PgIndexRepository, column: string) => {
-  return Object.values(indexes).some(({ columns }) => columns[0] === column);
+  return Object.values(indexes).some(({ columns, options }) => {
+    return columns[0] === column && (!options?.where || isNotNullFilter(options.where, column));
+  });
+};
+
+const isNotNullFilter = (filters: TableIndexFilters, column: string) => {
+  const filterKeys = Object.keys(filters);
+  const filter = filters[column];
+
+  return (
+    filterKeys.length === 1 &&
+    filterKeys[0] === column &&
+    isAnyObject(filter) &&
+    (deepEqual(filter, { not: null }) || deepEqual(filter, { isNull: false }))
+  );
+};
+
+export type RedundantIndex = {
+  table: string;
+  index: string;
+  coveringIndex: string;
+};
+
+/**
+ * Secondary indexes the migration leaves covered by another index of the table, whose columns start
+ * with theirs: the other index serves the same queries, and keeping both costs every write. Only a
+ * pair where one of the indexes is new or changed is listed, so a schema isn't reported on every
+ * deploy.
+ */
+export const getRedundantIndexes = (target: PgTableRepository, source: PgTableRepository) => {
+  const redundantIndexes: RedundantIndex[] = [];
+
+  for (const table in target) {
+    const { indexes } = target[table];
+    const sourceIndexes = source[table]?.indexes ?? {};
+
+    const isChanged = (indexKey: string) => {
+      const sourceIndex = sourceIndexes[indexKey];
+
+      return !sourceIndex || !deepEqual(indexes[indexKey], sourceIndex);
+    };
+
+    for (const indexKey in indexes) {
+      const index = indexes[indexKey];
+
+      if (index.type !== Index.Secondary || index.options) {
+        continue;
+      }
+
+      const coveringKey = Object.keys(indexes).find((otherKey) => {
+        const { columns, options } = indexes[otherKey];
+
+        const isCovering =
+          otherKey !== indexKey &&
+          columns.length >= index.columns.length &&
+          index.columns.every((column, position) => columns[position] === column) &&
+          !options?.where &&
+          (options?.method ?? 'btree') === 'btree';
+
+        return isCovering && (isChanged(indexKey) || isChanged(otherKey));
+      });
+
+      if (coveringKey) {
+        redundantIndexes.push({
+          table,
+          index: indexKey,
+          coveringIndex: coveringKey
+        });
+      }
+    }
+  }
+
+  return redundantIndexes;
 };

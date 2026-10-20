@@ -2,9 +2,11 @@ import type { PgRelationMetadata, PgTableRepository } from '@ez4/pgclient/librar
 import type { AnySchema } from '@ez4/schema';
 
 import { Index } from '@ez4/database';
+import { isAnyObject } from '@ez4/utils';
 
 import { MigrationNameCollisionError } from '../errors/naming';
 import { MigrationRelationError } from '../errors/relation';
+import { MigrationIndexError } from '../errors/index';
 import { ConstraintQuery } from '../queries/constraints';
 import { RelationQuery } from '../queries/relations';
 import { IndexQueries } from '../queries/indexes';
@@ -16,8 +18,59 @@ import { getStoredName } from '../utils/naming';
  * declaration, before anything is deployed.
  */
 export const validateRepository = (target: PgTableRepository) => {
+  validateIndexes(target);
   validateRelations(target);
   validateNames(target);
+};
+
+const INDEX_FILTER_OPERATORS = ['equal', 'not', 'gt', 'gte', 'lt', 'lte', 'isIn', 'isNull'];
+
+const validateIndexes = (target: PgTableRepository) => {
+  for (const table in target) {
+    const { indexes } = target[table];
+
+    for (const indexKey in indexes) {
+      const { type, options } = indexes[indexKey];
+
+      if (!options) {
+        continue;
+      }
+
+      const indexName = `${table}.${indexKey}`;
+      const method = options.method ?? 'btree';
+
+      if (type === Index.Unique && method !== 'btree') {
+        throw new MigrationIndexError(indexName, `is unique, which only a btree index can be`);
+      }
+
+      if (options.nullsNotDistinct && type !== Index.Unique) {
+        throw new MigrationIndexError(indexName, `has nulls not distinct, which only a unique index takes`);
+      }
+
+      if (options.order && method !== 'btree') {
+        throw new MigrationIndexError(indexName, `has an order, which only a btree index keeps`);
+      }
+
+      if (options.include && method !== 'btree' && method !== 'gist') {
+        throw new MigrationIndexError(indexName, `includes columns, which only a btree or gist index stores`);
+      }
+
+      if (options.where && !isIndexFilters(options.where)) {
+        throw new MigrationIndexError(indexName, `has a where with an operator other than ${INDEX_FILTER_OPERATORS.join(', ')}`);
+      }
+    }
+  }
+};
+
+// Each column is compared to a literal (or null), or takes operators that compare it to literals.
+const isIndexFilters = (filters: Record<string, unknown>) => {
+  return Object.values(filters).every((value) => {
+    if (!isAnyObject(value)) {
+      return true;
+    }
+
+    return Object.keys(value).every((operator) => INDEX_FILTER_OPERATORS.includes(operator));
+  });
 };
 
 const validateRelations = (target: PgTableRepository) => {

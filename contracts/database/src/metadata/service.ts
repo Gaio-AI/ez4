@@ -184,8 +184,9 @@ const validateRelations = (type: TypeObject | TypeModel, tables: DatabaseTable[]
   return errorList;
 };
 
+// The index of the column alone. A partial one (with `where`) doesn't identify a record by the column.
 const getIndexType = (indexes: TableIndex[], columnName: string) => {
-  return indexes.find(({ name }) => name === columnName)?.type;
+  return indexes.find(({ columns, options }) => columns.length === 1 && columns[0] === columnName && !options?.where)?.type;
 };
 
 const getTableMap = (tables: DatabaseTable[]) => {

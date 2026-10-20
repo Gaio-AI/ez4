@@ -1,6 +1,6 @@
 import type { OrderMode } from '../types/mode';
 import type { Order } from '../types/order';
-import type { DecomposeIndexName } from './indexes';
+import type { DecomposeIndexColumns } from './indexes';
 import type { TableMetadata } from './table';
 import type { Database } from './contract';
 
@@ -12,7 +12,7 @@ export namespace OrderModeUtils {
    * Order input for index columns.
    */
   export type IndexInput<I extends Database.Indexes> = {
-    [P in DecomposeIndexName<keyof I>]?: Order;
+    [P in DecomposeIndexColumns<I>]?: Order;
   };
 
   /**

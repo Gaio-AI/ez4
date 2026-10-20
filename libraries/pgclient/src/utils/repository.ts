@@ -22,7 +22,7 @@ export const getTableRepository = (tables: DatabaseTable[]): PgTableRepository =
 const getTableIndexes = (tableIndexes: TableIndex[]) => {
   const indexes: PgIndexRepository = {};
 
-  for (const { name, columns, type } of tableIndexes) {
+  for (const { name, columns, type, options } of tableIndexes) {
     if (type !== Index.Primary && type !== Index.Secondary && type !== Index.Unique) {
       continue;
     }
@@ -30,7 +30,8 @@ const getTableIndexes = (tableIndexes: TableIndex[]) => {
     indexes[name] = {
       name,
       columns,
-      type
+      type,
+      ...(options && { options })
     };
   }
 

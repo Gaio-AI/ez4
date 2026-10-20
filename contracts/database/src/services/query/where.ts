@@ -1,5 +1,5 @@
 import type { AnyObject, IsObject, IsObjectEmpty, Prettify } from '@ez4/utils';
-import type { DecomposeIndexName, PrimaryIndexes, UniqueIndexes } from '../indexes';
+import type { IndexColumns, PrimaryIndexes, UniqueIndexes } from '../indexes';
 import type { RelationFilter } from '../relations';
 import type { InsensitiveModeUtils } from '../insensitive';
 import type { DatabaseEngine } from '../engine';
@@ -91,7 +91,7 @@ type WhereRelationFilters<V extends AnyObject, E extends DatabaseEngine> = {
 type WhereIndexFields<I extends Database.Indexes> = PrimaryIndexes<I> & UniqueIndexes<I>;
 
 type WhereRequiredFilters<V extends AnyObject, I extends Database.Indexes> = {
-  [P in keyof WhereIndexFields<I>]: { [N in DecomposeIndexName<P>]: V[N] };
+  [P in keyof WhereIndexFields<I>]: { [N in IndexColumns<P, WhereIndexFields<I>[P]>]: V[N] };
 }[keyof WhereIndexFields<I>];
 
 type WhereOptionalFilters<V extends AnyObject, T extends TableMetadata, I extends Database.Indexes> = {

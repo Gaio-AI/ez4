@@ -1,12 +1,14 @@
 import type { PgIndexRepository, PgTableIndex } from '@ez4/pgclient/library';
-import type { ObjectComparison } from '@ez4/utils';
+import type { TableIndexFilters } from '@ez4/database/library';
+import type { AnyObject, ObjectComparison } from '@ez4/utils';
+import type { SqlBuilder, SqlFilters } from '@ez4/pgsql';
 import type { ObjectSchema } from '@ez4/schema';
-import type { SqlBuilder } from '@ez4/pgsql';
 import type { PgMigrationQueries } from '../types/query';
 
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
-import { deepEqual } from '@ez4/utils';
+import { escapeSqlText } from '@ez4/pgsql';
+import { deepEqual, isAnyObject } from '@ez4/utils';
 
 import { getPrimaryKeyName, getSecondaryKeyName, getTemporaryName, getUniqueKeyName } from '../utils/naming';
 
@@ -73,13 +75,31 @@ export namespace IndexQueries {
       indexes: []
     };
 
-    const { columns } = index;
+    const { columns, options } = index;
 
-    const query = builder.index(name).create(table, columns).type(getIndexType(columns, schema)).concurrent().missing();
+    const query = builder.index(name).create(table, columns).type(getIndexMethod(index, schema)).concurrent().missing();
+
+    const where = options?.where && getIndexFilters(builder, options.where);
+
+    if (where) {
+      query.where(where);
+    }
+
+    if (options?.include) {
+      query.include(options.include);
+    }
+
+    if (options?.order) {
+      query.order(options.order);
+    }
 
     if (index.type === Index.Unique) {
+      if (options?.nullsNotDistinct) {
+        query.nullsNotDistinct();
+      }
+
       statements.indexes.push(getRebuildStatement(builder, name), {
-        assert: getCheckUniqueRecordsQuery(builder, table, columns),
+        assert: getCheckUniqueRecordsQuery(builder, table, columns, { where, nullsNotDistinct: options?.nullsNotDistinct }),
         query: query.unique().build(),
         concurrent: true,
         name
@@ -138,7 +158,7 @@ export namespace IndexQueries {
       }
     }
 
-    combineQueries(steps.rollout, prepareRenameColumns(builder, table, targetIndexes, renamedKeys));
+    combineQueries(steps.rollout, prepareRenameColumns(builder, table, sourceIndexes, targetIndexes, renamedKeys));
     combineQueries(steps.rollout, prepareCreate(builder, table, schema, getNonPrimaryIndexes(targetIndexes, createdKeys)));
     combineSteps(steps, prepareUpdate(builder, table, schema, sourceIndexes, targetIndexes, updatedKeys, renamedColumns));
     combineQueries(steps.cleanup, prepareDelete(builder, table, getNonPrimaryIndexes(sourceIndexes, removedKeys)));
@@ -291,7 +311,11 @@ export namespace IndexQueries {
   const isSameIndex = (sourceIndex: PgTableIndex, targetIndex: PgTableIndex, renamedColumns: Record<string, string>) => {
     const sourceColumns = sourceIndex.columns.map((column) => renamedColumns[column] ?? column);
 
-    return sourceIndex.type === targetIndex.type && deepEqual(sourceColumns, targetIndex.columns);
+    return (
+      sourceIndex.type === targetIndex.type &&
+      deepEqual(sourceColumns, targetIndex.columns) &&
+      deepEqual(sourceIndex.options ?? {}, targetIndex.options ?? {})
+    );
   };
 
   // An index keeping its name (its columns changed, but not its type) is built aside under a temporary
@@ -330,6 +354,10 @@ export namespace IndexQueries {
   };
 
   const getIndexName = (table: string, index: PgTableIndex) => {
+    if (index.options?.name) {
+      return index.options.name;
+    }
+
     switch (index.type) {
       case Index.Primary:
         return getPrimaryKeyName(table, index.name);
@@ -350,10 +378,14 @@ export namespace IndexQueries {
     };
   };
 
+  const getIndexQueries = (): IndexMigrationQueries => {
+    return { constraints: [], validations: [], indexes: [] };
+  };
+
   const getIndexSteps = (): IndexMigrationSteps => {
     return {
-      rollout: { constraints: [], validations: [], indexes: [] },
-      cleanup: { constraints: [], validations: [], indexes: [] }
+      rollout: getIndexQueries(),
+      cleanup: getIndexQueries()
     };
   };
 
@@ -369,165 +401,115 @@ export namespace IndexQueries {
   };
 
   export const prepareRenameTable = (builder: SqlBuilder, fromTable: string, toTable: string, indexes: PgIndexRepository) => {
-    const statements: IndexMigrationQueries = {
-      validations: [],
-      constraints: [],
-      indexes: []
-    };
+    const statements = getIndexQueries();
 
     for (const indexKey in indexes) {
-      const { type, name: indexName } = indexes[indexKey];
+      const index = indexes[indexKey];
 
-      switch (type) {
-        default:
-          throw new Error(`Unsupported index type.`);
-
-        case Index.Primary: {
-          const fromName = getPrimaryKeyName(fromTable, indexName);
-          const toName = getPrimaryKeyName(toTable, indexName);
-
-          statements.constraints.push({
-            check: getCheckConstraintExistsQuery(builder, toName),
-            query: builder.table(toTable).alter().existing().constraint(fromName).rename(toName).build()
-          });
-
-          break;
-        }
-
-        case Index.Unique: {
-          const fromName = getUniqueKeyName(fromTable, indexName);
-          const toName = getUniqueKeyName(toTable, indexName);
-
-          statements.indexes.push({
-            query: builder.index(fromName).rename(toName).existing().build()
-          });
-
-          break;
-        }
-
-        case Index.Secondary: {
-          const fromName = getSecondaryKeyName(fromTable, indexName);
-          const toName = getSecondaryKeyName(toTable, indexName);
-
-          statements.indexes.push({
-            query: builder.index(fromName).rename(toName).existing().build()
-          });
-
-          break;
-        }
-      }
+      combineQueries(statements, prepareRename(builder, toTable, index, getIndexName(fromTable, index), getIndexName(toTable, index)));
     }
 
     return statements;
   };
 
-  export const prepareRenameColumns = (builder: SqlBuilder, table: string, indexes: PgIndexRepository, changes: Record<string, string>) => {
-    const statements: IndexMigrationQueries = {
-      validations: [],
-      constraints: [],
-      indexes: []
-    };
+  export const prepareRenameColumns = (
+    builder: SqlBuilder,
+    table: string,
+    sourceIndexes: PgIndexRepository,
+    targetIndexes: PgIndexRepository,
+    changes: Record<string, string>
+  ) => {
+    const statements = getIndexQueries();
 
     for (const fromIndex in changes) {
-      const toIndex = changes[fromIndex];
+      const sourceIndex = sourceIndexes[fromIndex];
+      const targetIndex = targetIndexes[changes[fromIndex]];
 
-      const { type } = indexes[toIndex];
-
-      switch (type) {
-        default:
-          throw new Error(`Unsupported index type.`);
-
-        case Index.Primary: {
-          const oldName = getPrimaryKeyName(table, fromIndex);
-          const newName = getPrimaryKeyName(table, toIndex);
-
-          statements.constraints.push({
-            check: getCheckConstraintExistsQuery(builder, newName),
-            query: builder.table(table).alter().existing().constraint(oldName).rename(newName).build()
-          });
-
-          break;
-        }
-
-        case Index.Unique: {
-          const oldName = getUniqueKeyName(table, fromIndex);
-          const newName = getUniqueKeyName(table, toIndex);
-
-          statements.indexes.push({
-            query: builder.index(oldName).rename(newName).existing().build()
-          });
-
-          break;
-        }
-
-        case Index.Secondary: {
-          const oldName = getSecondaryKeyName(table, fromIndex);
-          const newName = getSecondaryKeyName(table, toIndex);
-
-          statements.indexes.push({
-            query: builder.index(oldName).rename(newName).existing().build()
-          });
-
-          break;
-        }
-      }
+      combineQueries(
+        statements,
+        prepareRename(builder, table, targetIndex, getIndexName(table, sourceIndex), getIndexName(table, targetIndex))
+      );
     }
 
     return statements;
   };
 
   export const prepareDelete = (builder: SqlBuilder, table: string, indexes: PgIndexRepository) => {
-    const statements: IndexMigrationQueries = {
-      validations: [],
-      constraints: [],
-      indexes: []
-    };
+    const statements = getIndexQueries();
 
     for (const indexKey in indexes) {
-      const { type, name: indexName } = indexes[indexKey];
+      const index = indexes[indexKey];
+      const name = getIndexName(table, index);
 
-      switch (type) {
-        default:
-          throw new Error(`Unsupported index type.`);
-
-        case Index.Primary: {
-          const name = getPrimaryKeyName(table, indexName);
-          const query = builder.table(table).alter().existing().constraint(name).drop().existing();
-
-          statements.constraints.push({
-            query: query.build()
-          });
-
-          break;
-        }
-
-        case Index.Unique: {
-          const name = getUniqueKeyName(table, indexName);
-          const query = builder.index(name).drop().existing().concurrent();
-
-          statements.indexes.push({
-            query: query.build(),
-            concurrent: true
-          });
-
-          break;
-        }
-
-        case Index.Secondary: {
-          const name = getSecondaryKeyName(table, indexName);
-          const query = builder.index(name).drop().existing().concurrent();
-
-          statements.indexes.push({
-            query: query.build(),
-            concurrent: true
-          });
-
-          break;
-        }
+      if (index.type === Index.Primary) {
+        statements.constraints.push({
+          query: builder.table(table).alter().existing().constraint(name).drop().existing().build()
+        });
+      } else {
+        statements.indexes.push({
+          query: builder.index(name).drop().existing().concurrent().build(),
+          concurrent: true
+        });
       }
     }
 
     return statements;
+  };
+
+  // An index named apart from its table and columns keeps its name when they are renamed.
+  const prepareRename = (builder: SqlBuilder, table: string, index: PgTableIndex, fromName: string, toName: string) => {
+    const statements = getIndexQueries();
+
+    if (fromName === toName) {
+      return statements;
+    }
+
+    if (index.type === Index.Primary) {
+      statements.constraints.push({
+        check: getCheckConstraintExistsQuery(builder, toName),
+        query: builder.table(table).alter().existing().constraint(fromName).rename(toName).build()
+      });
+    } else {
+      statements.indexes.push({
+        query: builder.index(fromName).rename(toName).existing().build()
+      });
+    }
+
+    return statements;
+  };
+
+  /**
+   * The literal predicate of a partial index: Postgres uses the index only for queries whose filters
+   * imply it, which a parameter can't do.
+   */
+  const getIndexFilters = (builder: SqlBuilder, filters: TableIndexFilters): SqlFilters => {
+    const result: AnyObject = {};
+
+    for (const key in filters) {
+      result[key] = getIndexFilterValue(builder, key, filters[key]);
+    }
+
+    return result;
+  };
+
+  const getIndexFilterValue = (builder: SqlBuilder, operator: string, value: unknown): unknown => {
+    if (value === null || (typeof value === 'boolean' && operator === 'isNull')) {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((element) => getIndexFilterValue(builder, operator, element));
+    }
+
+    if (isAnyObject(value)) {
+      return getIndexFilters(builder, value);
+    }
+
+    return builder.rawValue(typeof value === 'string' ? escapeSqlText(value) : `${value}`);
+  };
+
+  const getIndexMethod = (index: PgTableIndex, schema: ObjectSchema) => {
+    return index.options?.method?.toUpperCase() ?? getIndexType(index.columns, schema);
   };
 
   const getIndexType = (columns: string[], schema: ObjectSchema) => {

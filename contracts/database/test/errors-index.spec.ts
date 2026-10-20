@@ -7,6 +7,7 @@ import {
   InvalidIndexesTypeError,
   InvalidIndexTypeError,
   InvalidIndexReferenceError,
+  InvalidIndexOptionError,
   registerTriggers
 } from '@ez4/database/library';
 
@@ -51,5 +52,16 @@ describe('database index errors', () => {
 
     ok(error1 instanceof InvalidIndexReferenceError);
     equal(error1.indexName, 'id');
+  });
+
+  it('assert :: invalid index option', () => {
+    const [error1, error2] = parseFile('invalid-index-option', 2);
+
+    ok(error1 instanceof InvalidIndexOptionError);
+    equal(error1.indexName, 'value');
+    equal(error1.indexOption, 'method');
+
+    ok(error2 instanceof IncompleteTableError);
+    deepEqual(error2.properties, ['indexes']);
   });
 });
