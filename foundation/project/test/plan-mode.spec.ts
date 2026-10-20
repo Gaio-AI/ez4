@@ -67,7 +67,11 @@ tryCreateTrigger('Test:plan-mode', {
 
     return plannedEntry;
   },
-  'deploy:plan': () => plannedSteps,
+  // Every spec registers into the same registry, and the first handler with an answer wins: this one
+  // answers only for the state holding its entry.
+  'deploy:plan': ({ newState, oldState }) => {
+    return newState[plannedEntry.entryId] || oldState[plannedEntry.entryId] ? plannedSteps : undefined;
+  },
   'deploy:apply': applyDeploy,
   'deploy:lock': lockDeploy,
   'deploy:unlock': unlockDeploy,
