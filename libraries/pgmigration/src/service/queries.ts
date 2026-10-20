@@ -97,14 +97,15 @@ export const getUpdateStepQueries = (target: PgTableRepository, source: PgTableR
         }
       }
 
-      if (targetColumns?.nested) {
-        steps.rollout.tables.push(...ColumnQuery.prepareUpdate(builder, table, targetSchema, targetIndexes, targetColumns.nested));
-        combineSteps(steps, ConstraintQuery.prepareUpdate(builder, table, targetSchema, sourceSchema, targetColumns.nested));
-      }
-
+      // A declared rename can come with changes to the column, made under its new name.
       if (targetColumns?.rename) {
         steps.rollout.tables.push(...ColumnQuery.prepareRename(builder, table, targetColumns.rename));
         steps.rollout.constraints.push(...ConstraintQuery.prepareRenameColumns(builder, table, targetSchema, targetColumns.rename));
+      }
+
+      if (targetColumns?.nested) {
+        steps.rollout.tables.push(...ColumnQuery.prepareUpdate(builder, table, targetSchema, targetIndexes, targetColumns.nested));
+        combineSteps(steps, ConstraintQuery.prepareUpdate(builder, table, targetSchema, sourceSchema, targetColumns.nested));
       }
 
       if (targetColumns?.remove) {

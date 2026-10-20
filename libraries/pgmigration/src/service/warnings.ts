@@ -4,6 +4,7 @@ import type { TableIndexFilters } from '@ez4/database/library';
 import { deepEqual, isAnyObject } from '@ez4/utils';
 import { Index } from '@ez4/database';
 
+import { getTableRepositoryChanges } from '../utils/repository';
 import { RelationQuery } from '../queries/relations';
 
 /**
@@ -18,7 +19,54 @@ export const getMigrationWarnings = (target: PgTableRepository, source: PgTableR
     return `Index ${table}.${index} is covered by ${table}.${coveringIndex}, which starts with its columns: keeping both costs every write.`;
   });
 
-  return [...foreignKeyWarnings, ...indexWarnings];
+  const renameWarnings = getDetectedRenames(target, source).map(({ table, from, to }) => {
+    const name = table ? `Column ${table}.${from}` : `Table ${from}`;
+
+    return (
+      `${name} is renamed to ${to} because the names look alike: declare it in renamedFrom, ` +
+      `or add ${to} and remove ${from} in separate deploys if it is not a rename.`
+    );
+  });
+
+  return [...foreignKeyWarnings, ...indexWarnings, ...renameWarnings];
+};
+
+export type DetectedRename = {
+  table?: string;
+  from: string;
+  to: string;
+};
+
+/**
+ * Tables and columns the migration renames because their names look alike, without a `renamedFrom`
+ * declaring it. A table or column that is removed while another one with a similar name is added
+ * looks like a rename, which moves its data to the new one.
+ */
+export const getDetectedRenames = (target: PgTableRepository, source: PgTableRepository) => {
+  const changes = getTableRepositoryChanges(target, source);
+  const renames: DetectedRename[] = [];
+
+  for (const from in changes.rename) {
+    const to = changes.rename[from];
+
+    if (target[to].renamedFrom?.table !== from) {
+      renames.push({ from, to });
+    }
+  }
+
+  for (const table in changes.nested) {
+    const columnRenames = changes.nested[table].nested?.schema?.nested?.properties?.rename;
+
+    for (const from in columnRenames) {
+      const to = columnRenames[from];
+
+      if (target[table].renamedFrom?.columns?.[to] !== from) {
+        renames.push({ table, from, to });
+      }
+    }
+  }
+
+  return renames;
 };
 
 export type UnindexedForeignKey = {

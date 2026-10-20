@@ -90,13 +90,34 @@ With your database service defined, EZ4 handles provisioning, migrations, scalin
 
 #### Tables
 
-| Name      | Type                      | Description                 |
-| --------- | ------------------------- | --------------------------- |
-| stream    | Database.UseTableStream<> | Table stream configuration. |
-| name      | string                    | Table name.                 |
-| schema    | object                    | Table schema.               |
-| relations | object                    | Table relations.            |
-| indexes   | object                    | Table indexes.              |
+| Name        | Type                      | Description                                                       |
+| ----------- | ------------------------- | ----------------------------------------------------------------- |
+| stream      | Database.UseTableStream<> | Table stream configuration.                                       |
+| name        | string                    | Table name.                                                       |
+| schema      | object                    | Table schema.                                                     |
+| relations   | object                    | Table relations.                                                  |
+| indexes     | object                    | Table indexes.                                                    |
+| renamedFrom | object                    | Previous names of the table and of its columns (Aurora Postgres). |
+
+The migration renames a table or column that `renamedFrom` declares, keeping its data, instead of dropping it and creating it again:
+
+```ts
+Database.UseTable<{
+  name: 'contacts';
+  renamedFrom: {
+    table: 'people';
+    columns: {
+      full_name: 'name';
+    };
+  };
+  schema: ContactSchema;
+  indexes: ContactIndexes;
+}>;
+```
+
+Each column is listed with the name it had, and each previous name becomes one column only. A rename already deployed is skipped, so the declaration can stay in place. A renamed column can change in the same deploy (to take null, for example). The previous names can't be in use: no other table can have the previous table name, and no column of the table can have a previous column name.
+
+Without a declaration, the migration still renames a table or column that is removed while another one with a similar name is added (sharing a word, such as `author_name` and `author_title`), and the deploy plan warns about it. Declare a real rename, and add and remove columns in separate deploys when they only look alike.
 
 #### Indexes
 

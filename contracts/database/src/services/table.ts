@@ -36,7 +36,21 @@ export interface DatabaseTable<T extends TableSchema, E extends DatabaseEngine> 
    * Table stream configuration.
    */
   readonly stream?: E['streamMode'] extends StreamMode.Supported ? TableStream<T> : never;
+
+  /**
+   * Previous names of the table and of its columns, which the migration renames instead of dropping
+   * and creating them again (Aurora Postgres).
+   */
+  readonly renamedFrom?: TableRenamedFrom<T>;
 }
+
+/**
+ * Previous names of a table with schema `T` and of its columns, each column with the name it had.
+ */
+export type TableRenamedFrom<T extends TableSchema> = {
+  readonly table?: string;
+  readonly columns?: { readonly [P in keyof T]?: string };
+};
 
 /**
  * Given a database service `T`, it returns all its table.

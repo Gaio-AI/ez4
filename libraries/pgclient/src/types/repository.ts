@@ -1,4 +1,4 @@
-import type { TableIndex, TableRelation } from '@ez4/database/library';
+import type { TableIndex, TableRelation, TableRenames } from '@ez4/database/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { AnyObject } from '@ez4/utils';
 
@@ -8,6 +8,7 @@ export type PgTableRepository = Record<string, PgTableMetadata>;
 
 export type PgTableMetadata = {
   name: string;
+  renamedFrom?: TableRenames;
   relations: PgRelationRepository;
   indexes: PgIndexRepository;
   schema: ObjectSchema;

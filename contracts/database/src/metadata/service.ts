@@ -22,6 +22,7 @@ import { isModelProperty } from '@ez4/reflection';
 import { isObjectWith } from '@ez4/utils';
 
 import { IncompleteServiceError } from '../errors/service';
+import { InvalidTableRenameError } from '../errors/table';
 import { InvalidRelationAliasError, InvalidRelationColumnError, InvalidRelationTableError } from '../errors/relations';
 import { getDatabaseScalabilityMetadata } from './scalability';
 import { getDatabaseEngineMetadata } from './engine';
@@ -114,9 +115,10 @@ export const getDatabaseServicesMetadata = (reflection: ReflectionTypes) => {
     }
 
     const relationErrors = validateRelations(declaration, service.tables);
+    const renameErrors = validateRenames(declaration, service.tables);
 
-    if (relationErrors.length) {
-      errorList.push(...relationErrors);
+    if (relationErrors.length || renameErrors.length) {
+      errorList.push(...relationErrors, ...renameErrors);
       continue;
     }
 
@@ -189,6 +191,28 @@ const validateRelations = (type: TypeObject | TypeModel, tables: DatabaseTable[]
   }
 
   return errorList;
+};
+
+// A table renamed from the name of another table, or from a name another table is renamed from too,
+// would take the place of that table.
+const validateRenames = (type: TypeObject | TypeModel, tables: DatabaseTable[]) => {
+  const takenNames = new Set(tables.map(({ name }) => name));
+
+  return tables.flatMap(({ name, renamedFrom }) => {
+    const previousName = renamedFrom?.table;
+
+    if (!previousName) {
+      return [];
+    }
+
+    if (takenNames.has(previousName)) {
+      return [new InvalidTableRenameError(name, previousName, type.file)];
+    }
+
+    takenNames.add(previousName);
+
+    return [];
+  });
 };
 
 // The index of the column alone. A partial one (with `where`) doesn't identify a record by the column.
