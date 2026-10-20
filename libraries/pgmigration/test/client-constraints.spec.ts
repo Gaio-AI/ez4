@@ -1,11 +1,11 @@
-import type { PgMigrationQueries, PgMigrationStatement } from '@ez4/pgmigration/library';
+import type { PgMigrationQueries, PgMigrationStatement, PgMigrationStep } from '@ez4/pgmigration/library';
 import type { PgTableRepository } from '@ez4/pgclient/library';
 
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { deepEqual } from 'assert/strict';
 
 import { getCreateQueries, getDeleteQueries, getUpdateStepQueries } from '@ez4/pgmigration';
-import { MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
+import { getStepStatements, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
 import { Client } from '@ez4/pgclient/driver';
 import { SchemaType } from '@ez4/schema';
 
@@ -85,8 +85,8 @@ describe('migration :: client constraints tests', () => {
   };
 
   // Like the deploy, a failing statement is recorded and the next one still runs.
-  const runPhase = async (queries: PgMigrationQueries) => {
-    const statements = [...queries.tables, ...queries.constraints, ...queries.indexes, ...queries.relations];
+  const runPhase = async (queries: PgMigrationQueries, step: PgMigrationStep = 'prepare') => {
+    const statements = getStepStatements(queries, step);
 
     const errors = [];
 
@@ -116,7 +116,7 @@ describe('migration :: client constraints tests', () => {
   const deploy = async <T>(targetRepository: PgTableRepository, onSwitch?: () => Promise<T>) => {
     const steps = getUpdateStepQueries(targetRepository, sourceRepository);
 
-    const rollout = [...(await runPhase(steps.prepare)), ...(await runPhase(steps.rollout))];
+    const rollout = [...(await runPhase(steps.prepare, 'prepare')), ...(await runPhase(steps.rollout, 'rollout'))];
 
     if (rollout.length) {
       return { rollout };
@@ -126,7 +126,7 @@ describe('migration :: client constraints tests', () => {
 
     const writes = await onSwitch?.();
 
-    const cleanup = await runPhase(steps.cleanup);
+    const cleanup = await runPhase(steps.cleanup, 'cleanup');
 
     return { rollout, writes, cleanup };
   };

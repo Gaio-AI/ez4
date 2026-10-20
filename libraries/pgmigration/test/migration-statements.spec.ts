@@ -34,6 +34,54 @@ describe('migration :: migration statements tests', () => {
     });
   });
 
+  it('assert :: cleanup drops foreign keys before the keys they reference', () => {
+    const getRelatedRepository = (related: boolean) => {
+      return getTableRepository([
+        {
+          name: 'contacts',
+          indexes: [
+            { name: 'id', type: Index.Primary, columns: ['id'] },
+            ...(related ? [{ name: 'email', type: Index.Unique, columns: ['email'] }] : [])
+          ],
+          schema: {
+            type: SchemaType.Object,
+            properties: {
+              id: { type: SchemaType.String },
+              email: { type: SchemaType.String }
+            }
+          }
+        },
+        {
+          name: 'messages',
+          indexes: [{ name: 'id', type: Index.Primary, columns: ['id'] }],
+          relations: related
+            ? [
+                {
+                  sourceTable: 'contacts',
+                  sourceColumn: 'email',
+                  sourceIndex: Index.Unique,
+                  targetColumn: 'contact_email',
+                  targetAlias: 'contact'
+                }
+              ]
+            : [],
+          schema: {
+            type: SchemaType.Object,
+            properties: {
+              id: { type: SchemaType.String },
+              contact_email: { type: SchemaType.String }
+            }
+          }
+        }
+      ]);
+    };
+
+    deepEqual(getMigrationStatements(getRelatedRepository(false), getRelatedRepository(true)), {
+      'cleanup.1': `ALTER TABLE IF EXISTS "messages" DROP CONSTRAINT IF EXISTS "messages_contact_fk"`,
+      'cleanup.2': 'DROP INDEX CONCURRENTLY IF EXISTS "contacts_email_uk"'
+    });
+  });
+
   it('assert :: no statements for an unchanged repository', () => {
     const repository = getRepository(['id', 'value']);
 

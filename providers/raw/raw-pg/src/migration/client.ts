@@ -1,9 +1,14 @@
 import type { Database, Client as DbClient } from '@ez4/database';
-import type { PgMigrationQueries, PgMigrationStatement, PgValidationStatement } from '@ez4/pgmigration/library';
+import type { PgMigrationStatement, PgValidationStatement } from '@ez4/pgmigration/library';
 import type { PgTableRepository } from '@ez4/pgclient/library';
 
 import { getDeleteQueries, getUpdateStepQueries } from '@ez4/pgmigration';
-import { getMigrationQuery, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
+import {
+  getMigrationQuery,
+  getStepStatements,
+  MigrationAssertionFailedError,
+  MigrationValidationFailedError
+} from '@ez4/pgmigration/library';
 import { Client } from '@ez4/pgclient/driver';
 import { Wait } from '@ez4/utils';
 
@@ -33,10 +38,10 @@ export const createTables = async (context: ApplyContext) => {
   return applyStepQueries(context, {});
 };
 
-export const updateTables = async (context: ApplyContext, queries: PgMigrationQueries) => {
+export const updateTables = async (context: ApplyContext, statements: PgMigrationStatement[]) => {
   const client = getConnection(context);
 
-  await runAllStatements(client, [...queries.tables, ...queries.constraints, ...queries.indexes, ...queries.relations]);
+  await runAllStatements(client, statements);
 };
 
 export const validateTables = async (context: ApplyContext, validations: PgValidationStatement[]) => {
@@ -56,11 +61,11 @@ const applyStepQueries = async (context: ApplyContext, oldRepository: PgTableRep
   const steps = getUpdateStepQueries(context.repository, oldRepository);
   const client = getConnection(context);
 
-  const prepareQueries = [...steps.prepare.tables, ...steps.prepare.constraints, ...steps.prepare.indexes, ...steps.prepare.relations];
-  const rolloutQueries = [...steps.rollout.tables, ...steps.rollout.constraints, ...steps.rollout.indexes, ...steps.rollout.relations];
-  const cleanupQueries = [...steps.cleanup.tables, ...steps.cleanup.constraints, ...steps.cleanup.indexes, ...steps.cleanup.relations];
-
-  await runAllStatements(client, [...prepareQueries, ...rolloutQueries, ...cleanupQueries]);
+  await runAllStatements(client, [
+    ...getStepStatements(steps.prepare, 'prepare'),
+    ...getStepStatements(steps.rollout, 'rollout'),
+    ...getStepStatements(steps.cleanup, 'cleanup')
+  ]);
 
   const validations = [...steps.prepare.validations, ...steps.rollout.validations, ...steps.cleanup.validations];
 

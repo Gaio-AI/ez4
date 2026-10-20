@@ -192,4 +192,56 @@ describe('aurora local tables', () => {
 
     deepEqual(result, [[{ parent_id: true }], [{ children_parent_fk: true }]]);
   });
+
+  it('assert :: removed relation along with the unique key it references', async () => {
+    const getRepository = (related: boolean): PgTableRepository => ({
+      owners: {
+        name: 'owners',
+        relations: {},
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: { type: SchemaType.String },
+            email: { type: SchemaType.String }
+          }
+        },
+        indexes: {
+          id: { type: Index.Primary, columns: ['id'], name: 'id' },
+          ...(related && {
+            email: { type: Index.Unique, columns: ['email'], name: 'email' }
+          })
+        }
+      },
+      pets: {
+        name: 'pets',
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: { type: SchemaType.String },
+            owner_email: { type: SchemaType.String }
+          }
+        },
+        indexes: {
+          id: { type: Index.Primary, columns: ['id'], name: 'id' }
+        },
+        relations: {
+          ...(related && {
+            owner: {
+              sourceTable: 'owners',
+              sourceColumn: 'email',
+              sourceIndex: Index.Unique,
+              targetColumn: 'owner_email'
+            }
+          })
+        }
+      }
+    });
+
+    await createAllTables(CONNECTION, getRepository(true), getServeOptions(true));
+    await createAllTables(CONNECTION, getRepository(false), getServeOptions(false));
+
+    const result = await Promise.all([constraintExists('pets_owner_fk'), indexExists('owners_email_uk')]);
+
+    deepEqual(result, [[], []]);
+  });
 });

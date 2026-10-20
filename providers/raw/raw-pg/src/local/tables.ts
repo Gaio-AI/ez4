@@ -5,7 +5,12 @@ import type { ServeOptions } from '@ez4/project/library';
 import type { ClientConnection } from '@ez4/pgclient';
 
 import { getDeleteQueries, getUpdateStepQueries, validateRepository } from '@ez4/pgmigration';
-import { getMigrationQuery, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
+import {
+  getMigrationQuery,
+  getStepStatements,
+  MigrationAssertionFailedError,
+  MigrationValidationFailedError
+} from '@ez4/pgmigration/library';
 import { Client } from '@ez4/pgclient/driver';
 
 import { loadRepositoryState, saveRepositoryState } from './state';
@@ -21,11 +26,11 @@ export const createAllTables = async (connection: ClientConnection, repository: 
   const steps = getUpdateStepQueries(repository, oldRepository);
   const client = getClient(connection);
 
-  const prepareQueries = [...steps.prepare.tables, ...steps.prepare.constraints, ...steps.prepare.indexes, ...steps.prepare.relations];
-  const rolloutQueries = [...steps.rollout.tables, ...steps.rollout.constraints, ...steps.rollout.indexes, ...steps.rollout.relations];
-  const cleanupQueries = [...steps.cleanup.tables, ...steps.cleanup.constraints, ...steps.cleanup.indexes, ...steps.cleanup.relations];
-
-  await runAllStatements(client, [...prepareQueries, ...rolloutQueries, ...cleanupQueries]);
+  await runAllStatements(client, [
+    ...getStepStatements(steps.prepare, 'prepare'),
+    ...getStepStatements(steps.rollout, 'rollout'),
+    ...getStepStatements(steps.cleanup, 'cleanup')
+  ]);
 
   const validations = [...steps.prepare.validations, ...steps.rollout.validations, ...steps.cleanup.validations];
 

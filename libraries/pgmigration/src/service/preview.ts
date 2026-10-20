@@ -1,5 +1,6 @@
 import type { PgTableRepository } from '@ez4/pgclient/library';
 
+import { getStepStatements } from '../utils/steps';
 import { getUpdateStepQueries } from './queries';
 
 /**
@@ -13,9 +14,7 @@ export const getMigrationStatements = (target: PgTableRepository, source: PgTabl
   const statements: Record<string, string> = {};
 
   for (const step of ['prepare', 'rollout', 'cleanup'] as const) {
-    const { tables, constraints, indexes, relations } = steps[step];
-
-    [...tables, ...constraints, ...indexes, ...relations].forEach(({ query }, position) => {
+    getStepStatements(steps[step], step).forEach(({ query }, position) => {
       statements[`${step}.${position + 1}`] = query;
     });
   }
