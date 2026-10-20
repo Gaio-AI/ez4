@@ -59,9 +59,12 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
     tags: options.tags
   });
 
+  const { migration = true } = service.options ?? {};
+
   const migrationState = createMigration(state, clusterState, instanceState, {
     repository,
-    database: getDatabaseName(service, options)
+    database: getDatabaseName(service, options),
+    ...(!migration && { disabled: true })
   });
 
   const integrityState = createIntegrity(state, migrationState);

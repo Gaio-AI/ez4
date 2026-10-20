@@ -29,6 +29,17 @@ export type PostgresEngine = {
   streamMode: StreamMode.Unsupported;
   lockMode: LockMode.Supported;
   aggregateMode: AggregateMode.Supported;
-  options: {};
+  options: ServiceOptions;
   name: 'raw-pg';
+};
+
+/**
+ * Database service options.
+ */
+export type ServiceOptions = {
+  /**
+   * Whether the deploy migrates the tables (default `true`). Off, it leaves tables, indexes and
+   * constraints to migrations run outside of it, and never drops the database.
+   */
+  migration?: boolean;
 };

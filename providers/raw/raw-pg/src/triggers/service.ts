@@ -26,10 +26,13 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
 
   validateRepository(repository);
 
+  const { migration = true } = service.options ?? {};
+
   const migrationState = createMigration(state, {
     repository,
     database,
-    envName
+    envName,
+    ...(!migration && { disabled: true })
   });
 
   context.setServiceState(service, options, migrationState);

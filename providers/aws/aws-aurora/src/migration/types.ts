@@ -10,6 +10,11 @@ export type MigrationParameters = {
   repository: PgTableRepository;
   allowDeletion?: boolean;
   database: string;
+
+  /**
+   * Tables are migrated outside of the deploy, which leaves them and the database as they are.
+   */
+  disabled?: boolean;
 };
 
 export type MigrationResult = {
