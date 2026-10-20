@@ -2,7 +2,7 @@ import type { PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
 
 import { getDatabaseName } from '@ez4/pgclient/utils';
 import { getTableRepository } from '@ez4/pgclient/library';
-import { validateRepositoryNames } from '@ez4/pgmigration';
+import { validateRepository } from '@ez4/pgmigration';
 import { PaginationMode } from '@ez4/database';
 
 import { createCluster } from '../cluster/service';
@@ -38,7 +38,7 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
 
   const repository = getTableRepository(service.tables);
 
-  validateRepositoryNames(repository);
+  validateRepository(repository);
 
   const clusterState = createCluster(state, {
     clusterName: getClusterName(service, options),

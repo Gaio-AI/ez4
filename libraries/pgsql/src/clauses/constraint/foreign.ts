@@ -140,6 +140,12 @@ export class SqlForeignKeyActionClause {
     return this;
   }
 
+  noAction() {
+    this.#state.action = ConstraintAction.NoAction;
+
+    return this;
+  }
+
   build() {
     const { constraint, action } = this.#state;
 
@@ -156,6 +162,9 @@ export class SqlForeignKeyActionClause {
 
       case ConstraintAction.Null:
         return 'SET null';
+
+      case ConstraintAction.NoAction:
+        return 'NO ACTION';
     }
 
     return undefined;

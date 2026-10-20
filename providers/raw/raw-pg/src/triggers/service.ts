@@ -2,7 +2,7 @@ import type { PrepareResourceEvent, ServiceEvent } from '@ez4/project/library';
 
 import { getTableRepository } from '@ez4/pgclient/library';
 import { getDatabaseName } from '@ez4/pgclient/utils';
-import { validateRepositoryNames } from '@ez4/pgmigration';
+import { validateRepository } from '@ez4/pgmigration';
 
 import { createMigration } from '../migration/service';
 import { MissingConnectionStringError } from './errors';
@@ -24,7 +24,7 @@ export const prepareDatabaseServices = (event: PrepareResourceEvent) => {
   const database = getDatabaseName(service, options);
   const repository = getTableRepository(service.tables);
 
-  validateRepositoryNames(repository);
+  validateRepository(repository);
 
   const migrationState = createMigration(state, {
     repository,

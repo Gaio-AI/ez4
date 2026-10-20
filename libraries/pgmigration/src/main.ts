@@ -1,2 +1,3 @@
 export * from './service/queries';
-export * from './service/names';
+export * from './service/validation';
+export * from './service/warnings';

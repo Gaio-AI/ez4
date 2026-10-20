@@ -10,13 +10,13 @@ import {
   MigrationAssertionFailedError,
   MigrationValidationFailedError
 } from '@ez4/pgmigration/library';
-import { getUpdateStepQueries, validateRepositoryNames } from '@ez4/pgmigration';
+import { getUpdateStepQueries, validateRepository } from '@ez4/pgmigration';
 import { Client } from '@ez4/pgclient/driver';
 
 import { loadRepositoryState, saveRepositoryState } from './state';
 
 export const createAllTables = async (connection: ClientConnection, repository: PgTableRepository, options: ServeOptions) => {
-  validateRepositoryNames(repository);
+  validateRepository(repository);
 
   await ensureDatabase(connection);
 

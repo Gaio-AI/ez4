@@ -41,14 +41,16 @@ const getTableRelations = (tableRelations: TableRelation[]) => {
   const relations: PgRelationRepository = {};
 
   for (const relation of tableRelations) {
-    const { sourceColumn, sourceIndex, targetColumn, targetIndex } = relation;
+    const { sourceColumn, sourceIndex, targetColumn, targetIndex, onDelete, foreignKey } = relation;
 
     relations[relation.targetAlias] = {
       sourceTable: relation.sourceTable,
       sourceColumn,
       sourceIndex,
       targetColumn,
-      targetIndex
+      targetIndex,
+      ...(onDelete && { onDelete }),
+      ...(foreignKey !== undefined && { foreignKey })
     };
   }
 

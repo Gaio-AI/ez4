@@ -42,14 +42,20 @@ export type RelationFilter<T extends AnyObject = AnyObject, R extends AnyObject 
 };
 
 /**
- * Given a relation source name `T`, it produces the source table name.
+ * Given a relation `T`, either its source name or an object with its source and options, it produces
+ * the source name.
  */
-export type RelationSourceTable<T> = T extends `${infer U}:${string}` ? U : never;
+export type RelationSource<T> = T extends { source: infer S } ? S : T;
 
 /**
- * Given a relation source name `T`, it produces the source column name.
+ * Given a relation `T`, it produces the source table name.
  */
-export type RelationSourceColumn<T> = T extends `${string}:${infer U}` ? U : never;
+export type RelationSourceTable<T> = RelationSource<T> extends `${infer U}:${string}` ? U : never;
+
+/**
+ * Given a relation `T`, it produces the source column name.
+ */
+export type RelationSourceColumn<T> = RelationSource<T> extends `${string}:${infer U}` ? U : never;
 
 /**
  * Given a relation target name `T`, it produces the target column name.

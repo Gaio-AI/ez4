@@ -122,6 +122,24 @@ describe('sql table foreign constraint tests', () => {
     );
   });
 
+  it('assert :: add foreign key (use delete no action)', () => {
+    const query = sql.table('table').alter();
+
+    const constraint = query.constraint('foo').foreign('relation_id', 'table', ['bar', 'baz']);
+
+    constraint.delete().noAction();
+
+    const statement = query.build();
+
+    equal(
+      statement,
+      `ALTER TABLE "table" ADD CONSTRAINT "foo" ` +
+        `FOREIGN KEY ("relation_id") ` +
+        `REFERENCES "table" ("bar", "baz") ` +
+        `ON DELETE NO ACTION`
+    );
+  });
+
   it('assert :: add foreign key (use update cascade)', () => {
     const query = sql.table('table').alter();
 

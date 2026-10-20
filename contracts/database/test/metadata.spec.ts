@@ -29,6 +29,7 @@ describe('database service metadata', () => {
   it('assert :: table schema', () => testFile('schema'));
   it('assert :: table indexes', () => testFile('indexes'));
   it('assert :: table relations', () => testFile('relations'));
+  it('assert :: table relation options', () => testFile('relation-options'));
   it('assert :: table stream', () => testFile('stream'));
   it('assert :: stream variables', () => testFile('variables'));
   it('assert :: stream dependencies', () => testFile('dependencies'));

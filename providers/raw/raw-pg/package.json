@@ -48,6 +48,7 @@
     "@ez4/aws-common": "^2.6.0",
     "@ez4/common": "^2.6.0",
     "@ez4/database": "^2.6.0",
+    "@ez4/logger": "^2.6.0",
     "@ez4/pgclient": "^2.6.0",
     "@ez4/pgmigration": "^2.6.0",
     "@ez4/project": "^2.6.0",
