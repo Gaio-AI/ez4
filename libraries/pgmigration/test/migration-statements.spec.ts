@@ -28,7 +28,7 @@ describe('migration :: migration statements tests', () => {
 
     deepEqual(getMigrationStatements(targetRepository, sourceRepository), {
       'prepare.1': `ALTER TABLE IF EXISTS "table" ADD COLUMN IF NOT EXISTS "value" text DEFAULT null`,
-      'rollout.1': 'DROP INDEX CONCURRENTLY IF EXISTS "table_value_sk"',
+      'rollout.1': 'DROP INDEX CONCURRENTLY IF EXISTS "table_value_sk" -- only when the index is invalid',
       'rollout.2': `CREATE INDEX CONCURRENTLY IF NOT EXISTS "table_value_sk" ON "table" USING BTREE ("value")`,
       'cleanup.1': `ALTER TABLE IF EXISTS "table" DROP COLUMN IF EXISTS "legacy"`
     });

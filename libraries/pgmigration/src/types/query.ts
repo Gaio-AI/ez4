@@ -9,6 +9,12 @@ export type PgMigrationStatement = {
    * transaction block.
    */
   concurrent?: boolean;
+
+  /**
+   * When a statement that its check usually skips runs. The deploy plan prints the query without the
+   * check, so a drop that only rebuilds an invalid index would otherwise read as dropping the index.
+   */
+  condition?: string;
 };
 
 export type PgValidationStatement = {

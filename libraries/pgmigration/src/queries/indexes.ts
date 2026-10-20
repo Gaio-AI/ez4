@@ -374,6 +374,7 @@ export namespace IndexQueries {
     return {
       check: getCheckIndexRebuildQuery(builder, name),
       query: builder.index(name).drop().existing().concurrent().build(),
+      condition: 'only when the index is invalid',
       concurrent: true
     };
   };

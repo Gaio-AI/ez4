@@ -14,8 +14,8 @@ export const getMigrationStatements = (target: PgTableRepository, source: PgTabl
   const statements: Record<string, string> = {};
 
   for (const step of ['prepare', 'rollout', 'cleanup'] as const) {
-    getStepStatements(steps[step], step).forEach(({ query }, position) => {
-      statements[`${step}.${position + 1}`] = query;
+    getStepStatements(steps[step], step).forEach(({ query, condition }, position) => {
+      statements[`${step}.${position + 1}`] = condition ? `${query} -- ${condition}` : query;
     });
   }
 
