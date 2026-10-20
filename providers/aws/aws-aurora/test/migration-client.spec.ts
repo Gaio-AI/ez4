@@ -3,7 +3,8 @@ import type { ExecuteStatementCommandOutput } from '@aws-sdk/client-rds-data';
 import type { TestContext } from 'node:test';
 
 import { describe, it } from 'node:test';
-import { deepEqual } from 'node:assert/strict';
+import { deepEqual, rejects } from 'node:assert/strict';
+import { scheduler } from 'node:timers/promises';
 
 import { DatabaseErrorException, ExecuteStatementCommand, RDSDataClient, StatementTimeoutException } from '@aws-sdk/client-rds-data';
 
@@ -73,6 +74,51 @@ describe('aurora migration client', () => {
     await modify([{ query: alterQuery }]);
 
     deepEqual(statements, [lockedAlterQuery, lockedAlterQuery]);
+  });
+
+  it('assert :: statement that outlasts its call is waited for before the next one', async (t) => {
+    t.mock.method(scheduler, 'wait', async () => {});
+
+    const runningQuery =
+      `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() ` +
+      `AND starts_with("query", '${lockedAlterQuery.replaceAll("'", "''")}')`;
+
+    const stillRunning = {
+      columnMetadata: [{ name: 'running' }],
+      records: [[{ longValue: 1 }]]
+    };
+
+    const statements = mockDataApi(t, {
+      [lockedAlterQuery]: [new StatementTimeoutException({ $metadata: {}, message: 'timeout' })],
+      [runningQuery]: [stillRunning, stillRunning, {}]
+    });
+
+    await modify([{ query: alterQuery }, { query: indexQuery, concurrent: true }]);
+
+    deepEqual(statements, [lockedAlterQuery, runningQuery, runningQuery, runningQuery, indexQuery]);
+  });
+
+  it('assert :: statement still running stops the migration', async (t) => {
+    t.mock.method(scheduler, 'wait', async () => {});
+
+    const runningQuery =
+      `SELECT 1 FROM "pg_stat_activity" WHERE "state" = 'active' AND "pid" != pg_backend_pid() ` +
+      `AND starts_with("query", '${indexQuery}')`;
+
+    const stillRunning = {
+      columnMetadata: [{ name: 'running' }],
+      records: [[{ longValue: 1 }]]
+    };
+
+    const statements = mockDataApi(t, {
+      [indexQuery]: [new StatementTimeoutException({ $metadata: {}, message: 'timeout' })],
+      [runningQuery]: Array(480).fill(stillRunning)
+    });
+
+    await rejects(modify([{ query: indexQuery, concurrent: true }, { query: alterQuery }]), /Statement still running in the database/);
+
+    deepEqual(statements.at(-1), runningQuery);
+    deepEqual(statements.includes(lockedAlterQuery), false);
   });
 
   it('assert :: assert that times out leaves the check to the statement', async (t) => {
