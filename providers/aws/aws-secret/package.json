@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-secret",
   "description": "EZ4: Self-managed AWS Secrets Manager provider",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -54,9 +54,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1127.0",
-    "@ez4/aws-common": "^2.7.0",
-    "@ez4/project": "^2.7.0",
-    "@ez4/state": "^2.7.0",
-    "@ez4/utils": "^2.7.0"
+    "@ez4/aws-common": "^2.8.0",
+    "@ez4/project": "^2.8.0",
+    "@ez4/state": "^2.8.0",
+    "@ez4/utils": "^2.8.0"
   }
 }
