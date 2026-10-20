@@ -1,19 +1,27 @@
-import type { AllType, ReflectionTypes, TypeModel, TypeObject } from '@ez4/reflection';
+import type { AllType, ModelProperty, ReflectionTypes, TypeModel, TypeObject } from '@ez4/reflection';
 import type { MemberType } from '@ez4/common/library';
-import type { TableRelation } from './types';
+import type { RelationDeleteAction, TableRelation } from './types';
 
 import {
   isModelDeclaration,
   getModelMembers,
   getObjectMembers,
+  getPropertyBoolean,
+  getPropertyObject,
   getPropertyString,
+  getPropertyStringIn,
   getReferenceType,
   hasHeritageType
 } from '@ez4/common/library';
 
 import { isModelProperty, isTypeObject, isTypeReference } from '@ez4/reflection';
 
-import { IncorrectRelationsTypeError, InvalidRelationsTypeError, InvalidRelationTargetError } from '../errors/relations';
+import {
+  IncorrectRelationsTypeError,
+  InvalidRelationOptionError,
+  InvalidRelationsTypeError,
+  InvalidRelationTargetError
+} from '../errors/relations';
 
 type TypeParent = TypeModel | TypeObject;
 
@@ -61,24 +69,100 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, members: MemberType[],
       continue;
     }
 
-    const relationSource = getPropertyString(member);
     const relationTarget = member.name;
+    const relationOptions = getRelationOptions(member, type, errorList);
 
-    if (!relationSource) {
-      errorList.push(new InvalidRelationTargetError(relationTarget, type.file));
+    if (!relationOptions) {
       return undefined;
     }
 
+    const { source, onDelete, foreignKey } = relationOptions;
+
     const [targetColumn, targetAlias] = relationTarget.split('@', 2);
-    const [sourceTable, sourceColumn] = relationSource.split(':', 2);
+    const [sourceTable, sourceColumn] = source.split(':', 2);
 
     relations.push({
       sourceTable,
       sourceColumn,
       targetColumn,
-      targetAlias
+      targetAlias,
+      ...(onDelete && { onDelete }),
+      ...(foreignKey !== undefined && { foreignKey })
     });
   }
 
   return relations;
+};
+
+const RELATION_DELETE_ACTIONS: RelationDeleteAction[] = ['cascade', 'set null', 'restrict', 'no action'];
+
+/**
+ * A relation is either its source (`'table:column'`) or an object with the source and its options.
+ */
+const getRelationOptions = (member: ModelProperty, type: TypeObject | TypeModel, errorList: Error[]) => {
+  const relationTarget = member.name;
+  const relationSource = getPropertyString(member);
+
+  if (relationSource) {
+    return {
+      source: relationSource
+    };
+  }
+
+  const relationObject = getPropertyObject(member);
+
+  if (!relationObject) {
+    errorList.push(new InvalidRelationTargetError(relationTarget, type.file));
+    return undefined;
+  }
+
+  const options: Partial<Pick<TableRelation, 'onDelete' | 'foreignKey'>> & { source?: string } = {};
+
+  for (const option of getObjectMembers(relationObject)) {
+    if (!isModelProperty(option)) {
+      continue;
+    }
+
+    switch (option.name) {
+      case 'source': {
+        options.source = getPropertyString(option);
+        break;
+      }
+
+      case 'onDelete': {
+        if (!(options.onDelete = getPropertyStringIn(option, RELATION_DELETE_ACTIONS))) {
+          errorList.push(new InvalidRelationOptionError(relationTarget, option.name, type.file));
+          return undefined;
+        }
+
+        break;
+      }
+
+      case 'foreignKey': {
+        if ((options.foreignKey = getPropertyBoolean(option)) === undefined) {
+          errorList.push(new InvalidRelationOptionError(relationTarget, option.name, type.file));
+          return undefined;
+        }
+
+        break;
+      }
+
+      default: {
+        errorList.push(new InvalidRelationOptionError(relationTarget, option.name, type.file));
+        return undefined;
+      }
+    }
+  }
+
+  const { source, ...relationOptions } = options;
+
+  if (!source) {
+    errorList.push(new InvalidRelationTargetError(relationTarget, type.file));
+    return undefined;
+  }
+
+  return {
+    ...relationOptions,
+    source
+  };
 };

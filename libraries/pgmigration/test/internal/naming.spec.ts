@@ -5,7 +5,7 @@ import type { MigrationNameCollisionError } from '@ez4/pgmigration/library';
 import { describe, it } from 'node:test';
 import { deepEqual, equal, notEqual, ok, throws } from 'assert/strict';
 
-import { validateRepositoryNames } from '@ez4/pgmigration';
+import { validateRepository } from '@ez4/pgmigration';
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
@@ -47,7 +47,7 @@ describe('migration :: naming tests', () => {
   });
 
   it('assert :: names that stay distinct once truncated', () => {
-    validateRepositoryNames({
+    validateRepository({
       ...getRepository('interaction_lists_interactions', ['interaction_list_id:active:interaction_id', 'account_id:created_at']),
       ...getRepository('contact_sources', ['account_id:source_type:external_id:connection_id'])
     });
@@ -60,7 +60,7 @@ describe('migration :: naming tests', () => {
     ]);
 
     throws(
-      () => validateRepositoryNames(repository),
+      () => validateRepository(repository),
       (error: MigrationNameCollisionError) => {
         deepEqual(error.names, [
           'table_with_a_rather_long_name_first_column_with_a_long_name_second_column_one_sk',

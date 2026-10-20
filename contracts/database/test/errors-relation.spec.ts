@@ -6,6 +6,7 @@ import {
   InvalidRelationsTypeError,
   InvalidRelationAliasError,
   InvalidRelationTargetError,
+  InvalidRelationOptionError,
   InvalidRelationTableError,
   InvalidRelationColumnError,
   registerTriggers
@@ -37,6 +38,14 @@ describe('database relation errors', () => {
 
     ok(error1 instanceof InvalidRelationTargetError);
     equal(error1.relationSource, 'foo:id');
+  });
+
+  it('assert :: invalid relation option', () => {
+    const [error1] = parseFile('invalid-relation-option', 1);
+
+    ok(error1 instanceof InvalidRelationOptionError);
+    equal(error1.relationTarget, 'foo_id@foo');
+    equal(error1.relationOption, 'onDelete');
   });
 
   it('assert :: invalid relation table', () => {

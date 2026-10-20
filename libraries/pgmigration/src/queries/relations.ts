@@ -1,12 +1,11 @@
-import type { PgRelationMetadata, PgRelationRepository } from '@ez4/pgclient/library';
-import type { ObjectSchema, ObjectSchemaProperties } from '@ez4/schema';
-import type { ObjectComparison } from '@ez4/utils';
+import type { PgRelationMetadata, PgRelationRepository, PgTableMetadata } from '@ez4/pgclient/library';
+import type { RelationDeleteAction } from '@ez4/database/library';
+import type { ObjectSchema } from '@ez4/schema';
 import type { SqlBuilder } from '@ez4/pgsql';
 import type { PgMigrationQueries } from '../types/query';
 
 import { getTableName } from '@ez4/pgclient/utils';
-import { isNullishSchema } from '@ez4/schema';
-import { isNullish } from '@ez4/utils';
+import { deepEqual } from '@ez4/utils';
 import { Index } from '@ez4/database';
 
 import { isOptionalColumn } from '../utils/columns';
@@ -21,6 +20,13 @@ import {
 
 type RelationQueries = Pick<PgMigrationQueries, 'relations' | 'validations'>;
 
+type ForeignKey = {
+  sourceTable: string;
+  sourceColumn: string;
+  targetColumn: string;
+  onDelete: RelationDeleteAction;
+};
+
 export namespace RelationQuery {
   export const prepareCreate = (builder: SqlBuilder, table: string, schema: ObjectSchema, relations: PgRelationRepository) => {
     const statements: RelationQueries = {
@@ -29,22 +35,18 @@ export namespace RelationQuery {
     };
 
     for (const targetAlias in relations) {
-      const relation = relations[targetAlias];
+      const foreignKey = getForeignKey(relations[targetAlias], schema);
 
-      if (isNotRealRelation(relation)) {
+      if (!foreignKey) {
         continue;
       }
 
-      const { [relation.targetColumn]: targetSchema } = schema.properties;
-
       const relationName = getRelationName(table, targetAlias);
-
-      const targetRequired = !!isNullishSchema(targetSchema);
 
       statements.relations.push(
         {
           check: getCheckConstraintExistsQuery(builder, relationName),
-          query: getCreateQuery(builder, table, relationName, relation, targetRequired).build()
+          query: getCreateQuery(builder, table, relationName, foreignKey).build()
         },
         {
           check: getCheckConstraintValidQuery(builder, relationName),
@@ -62,91 +64,32 @@ export namespace RelationQuery {
     return statements;
   };
 
-  export const prepareUpdate = (
-    builder: SqlBuilder,
-    table: string,
-    targetSchema: ObjectSchema,
-    relations: PgRelationRepository,
-    changes: Record<string, ObjectComparison>
-  ) => {
+  /**
+   * The foreign keys of a table that already exists, compared as the constraints they make: whether the
+   * relation has one, what it references and its delete action. A change that keeps the key (such as
+   * dropping the index that supports its column) leaves the constraint in place, and a key that changes
+   * for more than one reason is replaced once.
+   */
+  export const prepareUpdate = (builder: SqlBuilder, table: string, source: PgTableMetadata, target: PgTableMetadata) => {
     const steps = {
       rollout: { validations: [], relations: [] } as RelationQueries,
       cleanup: { validations: [], relations: [] } as RelationQueries
     };
 
-    for (const targetAlias in relations) {
-      const relation = relations[targetAlias];
-      const relationChanges = changes[relation.targetColumn];
+    for (const targetAlias in target.relations) {
+      const sourceRelation = source.relations[targetAlias];
 
-      if (isNotRealRelation(relation) || !relationChanges) {
+      if (!sourceRelation) {
         continue;
       }
 
-      const { create, update, remove } = relationChanges;
-
-      const change = { ...remove, ...update, ...create };
-
-      if (isNullish(change.optional) && isNullish(change.nullable)) {
-        continue;
-      }
-
-      const columnSchema = targetSchema.properties[relation.targetColumn];
-      const columnOptional = isOptionalColumn(columnSchema);
+      const sourceKey = getForeignKey(sourceRelation, source.schema);
+      const targetKey = getForeignKey(target.relations[targetAlias], target.schema);
 
       const newName = getRelationName(table, targetAlias);
-      const tmpName = getTemporaryName(newName);
 
-      steps.rollout.relations.push(
-        {
-          check: getCheckConstraintExistsQuery(builder, tmpName),
-          query: getCreateQuery(builder, table, tmpName, relation, columnOptional).build()
-        },
-        {
-          check: getCheckConstraintValidQuery(builder, tmpName),
-          query: getValidateQuery(builder, table, tmpName).build()
-        }
-      );
-
-      steps.rollout.validations.push({
-        check: getCheckConstraintInvalidQuery(builder, tmpName),
-        retry: getCheckRunningValidationQuery(builder, tmpName),
-        name: newName
-      });
-
-      steps.cleanup.relations.push(
-        {
-          query: getDeleteQuery(builder, table, newName).build()
-        },
-        {
-          query: builder.table(table).alter().existing().constraint(tmpName).rename(newName).build()
-        }
-      );
-    }
-
-    return steps;
-  };
-
-  export const prepareUpdateSource = (
-    builder: SqlBuilder,
-    table: string,
-    columns: ObjectSchemaProperties,
-    sourceRelations: PgRelationRepository,
-    targetRelations: PgRelationRepository,
-    changes: Record<string, ObjectComparison>
-  ) => {
-    const steps = {
-      rollout: { validations: [], relations: [] } as RelationQueries,
-      cleanup: { validations: [], relations: [] } as RelationQueries
-    };
-
-    for (const targetAlias in changes) {
-      const newName = getRelationName(table, targetAlias);
-
-      const sourceRelation = sourceRelations[targetAlias];
-      const targetRelation = targetRelations[targetAlias];
-
-      if (isNotRealRelation(targetRelation)) {
-        if (!isNotRealRelation(sourceRelation)) {
+      if (!targetKey) {
+        if (sourceKey) {
           steps.cleanup.relations.push({
             query: getDeleteQuery(builder, table, newName).build()
           });
@@ -155,21 +98,16 @@ export namespace RelationQuery {
         continue;
       }
 
-      // The indexes of a relation decide whether it has a foreign key, but not what the key is: a change that
-      // keeps the key (such as dropping the index that supports its column) leaves the constraint in place.
-      if (!isNotRealRelation(sourceRelation) && isSameForeignKey(sourceRelation, targetRelation)) {
+      if (sourceKey && deepEqual(sourceKey, targetKey)) {
         continue;
       }
-
-      const targetSchema = columns[targetRelation.targetColumn];
-      const targetOptional = !!targetSchema && isOptionalColumn(targetSchema);
 
       const tmpName = getTemporaryName(newName);
 
       steps.rollout.relations.push(
         {
           check: getCheckConstraintExistsQuery(builder, tmpName),
-          query: getCreateQuery(builder, table, tmpName, targetRelation, targetOptional).build()
+          query: getCreateQuery(builder, table, tmpName, targetKey).build()
         },
         {
           check: getCheckConstraintValidQuery(builder, tmpName),
@@ -200,9 +138,7 @@ export namespace RelationQuery {
     const statements = [];
 
     for (const targetAlias in relations) {
-      const relation = relations[targetAlias];
-
-      if (isNotRealRelation(relation)) {
+      if (!hasForeignKey(relations[targetAlias])) {
         continue;
       }
 
@@ -224,9 +160,7 @@ export namespace RelationQuery {
     const statements = [];
 
     for (const targetAlias in relations) {
-      const relation = relations[targetAlias];
-
-      if (isNotRealRelation(relation)) {
+      if (!hasForeignKey(relations[targetAlias])) {
         continue;
       }
 
@@ -242,22 +176,51 @@ export namespace RelationQuery {
 
   export const getNames = (table: string, relations: PgRelationRepository) => {
     return Object.keys(relations)
-      .filter((targetAlias) => !isNotRealRelation(relations[targetAlias]))
+      .filter((targetAlias) => hasForeignKey(relations[targetAlias]))
       .map((targetAlias) => getRelationName(table, targetAlias));
   };
 
-  const isNotRealRelation = (relation: PgRelationMetadata) => {
+  /**
+   * Whether the relation is held by a foreign key: unless it says so, when the record holds the key of
+   * a primary or unique column of another record.
+   */
+  export const hasForeignKey = (relation: PgRelationMetadata) => {
+    if (relation.foreignKey !== undefined) {
+      return relation.foreignKey;
+    }
+
     const { sourceIndex, targetIndex } = relation;
 
-    return !sourceIndex || sourceIndex === Index.Secondary || targetIndex === Index.Primary;
+    return !!sourceIndex && sourceIndex !== Index.Secondary && targetIndex !== Index.Primary;
   };
 
-  const isSameForeignKey = (relation: PgRelationMetadata, otherRelation: PgRelationMetadata) => {
-    return (
-      relation.sourceTable === otherRelation.sourceTable &&
-      relation.sourceColumn === otherRelation.sourceColumn &&
-      relation.targetColumn === otherRelation.targetColumn
-    );
+  /**
+   * What deleting the referenced record does to the record holding the key: unless the relation says,
+   * the key is cleared when its column takes null, and the record is deleted otherwise.
+   */
+  export const getDeleteAction = (relation: PgRelationMetadata, schema: ObjectSchema): RelationDeleteAction => {
+    if (relation.onDelete) {
+      return relation.onDelete;
+    }
+
+    const columnSchema = schema.properties[relation.targetColumn];
+
+    return columnSchema && isOptionalColumn(columnSchema) ? 'set null' : 'cascade';
+  };
+
+  const getForeignKey = (relation: PgRelationMetadata, schema: ObjectSchema): ForeignKey | undefined => {
+    if (!hasForeignKey(relation)) {
+      return undefined;
+    }
+
+    const { sourceTable, sourceColumn, targetColumn } = relation;
+
+    return {
+      sourceTable,
+      sourceColumn,
+      targetColumn,
+      onDelete: getDeleteAction(relation, schema)
+    };
   };
 
   const getDeleteQuery = (builder: SqlBuilder, table: string, name: string) => {
@@ -268,18 +231,30 @@ export namespace RelationQuery {
     return builder.table(table).alter().existing().constraint(name).validate();
   };
 
-  const getCreateQuery = (builder: SqlBuilder, table: string, name: string, relation: PgRelationMetadata, optional: boolean) => {
-    const { sourceTable, sourceColumn, targetColumn } = relation;
-
-    const sourceTableName = getTableName(sourceTable);
+  const getCreateQuery = (builder: SqlBuilder, table: string, name: string, foreignKey: ForeignKey) => {
+    const { sourceTable, sourceColumn, targetColumn, onDelete } = foreignKey;
 
     const query = builder.table(table).alter().existing().constraint(name);
-    const constraint = query.foreign(targetColumn, sourceTableName, [sourceColumn]);
+    const constraint = query.foreign(targetColumn, getTableName(sourceTable), [sourceColumn]);
 
-    if (!optional) {
-      constraint.delete().cascade();
-    } else {
-      constraint.delete().null();
+    const deleteAction = constraint.delete();
+
+    switch (onDelete) {
+      case 'cascade':
+        deleteAction.cascade();
+        break;
+
+      case 'set null':
+        deleteAction.null();
+        break;
+
+      case 'restrict':
+        deleteAction.restrict();
+        break;
+
+      case 'no action':
+        deleteAction.noAction();
+        break;
     }
 
     constraint.update().cascade();

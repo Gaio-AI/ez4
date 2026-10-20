@@ -24,6 +24,16 @@ export class InvalidRelationTargetError extends TypeError {
   }
 }
 
+export class InvalidRelationOptionError extends TypeError {
+  constructor(
+    public relationTarget: string,
+    public relationOption: string,
+    fileName?: string
+  ) {
+    super(`Relation ${relationTarget} has an invalid ${relationOption} option.`, fileName);
+  }
+}
+
 export class InvalidRelationTableError extends TypeError {
   constructor(
     public relationTable: string,

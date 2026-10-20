@@ -8,5 +8,6 @@ export const enum ChangeType {
 export const enum ConstraintAction {
   Restrict = 'restrict',
   Cascade = 'cascade',
-  Null = 'null'
+  Null = 'null',
+  NoAction = 'no action'
 }

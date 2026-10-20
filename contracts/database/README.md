@@ -98,6 +98,37 @@ With your database service defined, EZ4 handles provisioning, migrations, scalin
 | relations | object                    | Table relations.            |
 | indexes   | object                    | Table indexes.              |
 
+#### Relations
+
+Each relation is keyed by `'<column>@<alias>'`, the table's column and the name the relation takes in queries, and points to `'<table>:<column>'`, the related table and column:
+
+```ts
+relations: {
+  'account_id@account': 'accounts:id';
+};
+```
+
+The indexes of both columns decide what the relation is: a column that holds the primary or unique key of another table relates to one record of it, and a key that other records hold relates to many of them. On Aurora Postgres, the table that holds the key of a primary or unique column gets a foreign key. When that column takes null, deleting the related record sets it to null; otherwise it deletes the record too.
+
+An object declares the relation with options:
+
+```ts
+relations: {
+  'account_id@account': {
+    source: 'accounts:id';
+    onDelete: 'restrict';
+  };
+};
+```
+
+| Name       | Type                                                   | Description                                                                                   |
+| ---------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| source     | string                                                 | Related table and column (`'<table>:<column>'`).                                              |
+| onDelete   | `'cascade' \| 'set null' \| 'restrict' \| 'no action'` | What deleting the related record does to the record holding its key (Aurora Postgres).        |
+| foreignKey | boolean                                                | Whether the relation has a foreign key, overriding what the indexes decide (Aurora Postgres). |
+
+`foreignKey: true` gives a foreign key to a relation between two primary keys (a table that extends another by its key), and `foreignKey: false` keeps one off a relation. A foreign key needs a primary or unique column on the related table and columns of the same type, and `'set null'` needs a column that takes null: the deploy fails otherwise.
+
 #### Streams (DynamoDB only)
 
 | Name         | Type             | Description                                                 |

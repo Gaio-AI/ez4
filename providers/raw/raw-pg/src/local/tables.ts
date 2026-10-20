@@ -4,14 +4,14 @@ import type { PgTableRepository } from '@ez4/pgclient/library';
 import type { ServeOptions } from '@ez4/project/library';
 import type { ClientConnection } from '@ez4/pgclient';
 
-import { getDeleteQueries, getUpdateStepQueries, validateRepositoryNames } from '@ez4/pgmigration';
+import { getDeleteQueries, getUpdateStepQueries, validateRepository } from '@ez4/pgmigration';
 import { getMigrationQuery, MigrationAssertionFailedError, MigrationValidationFailedError } from '@ez4/pgmigration/library';
 import { Client } from '@ez4/pgclient/driver';
 
 import { loadRepositoryState, saveRepositoryState } from './state';
 
 export const createAllTables = async (connection: ClientConnection, repository: PgTableRepository, options: ServeOptions) => {
-  validateRepositoryNames(repository);
+  validateRepository(repository);
 
   const { database } = connection;
 

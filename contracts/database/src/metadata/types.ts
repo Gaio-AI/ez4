@@ -60,6 +60,8 @@ export type TableIndex = {
   type: Index;
 };
 
+export type RelationDeleteAction = 'cascade' | 'set null' | 'restrict' | 'no action';
+
 export type TableRelation = {
   sourceTable: string;
   sourceColumn: string;
@@ -67,6 +69,8 @@ export type TableRelation = {
   targetColumn: string;
   targetAlias: string;
   targetIndex?: Index;
+  onDelete?: RelationDeleteAction;
+  foreignKey?: boolean;
 };
 
 export type DatabaseTable = {
