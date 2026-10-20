@@ -48,6 +48,13 @@ describe('database relation errors', () => {
     equal(error1.relationOption, 'onDelete');
   });
 
+  it('assert :: invalid relation scope column', () => {
+    const [error1] = parseFile('invalid-relation-scope', 1);
+
+    ok(error1 instanceof InvalidRelationColumnError);
+    equal(error1.relationColumn, 'account_id');
+  });
+
   it('assert :: invalid relation table', () => {
     const [error1] = parseFile('invalid-relation-table', 1);
 

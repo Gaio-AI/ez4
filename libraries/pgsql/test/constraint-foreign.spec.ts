@@ -140,6 +140,24 @@ describe('sql table foreign constraint tests', () => {
     );
   });
 
+  it('assert :: add foreign key (multiple columns, delete nullable column)', () => {
+    const query = sql.table('table').alter();
+
+    const constraint = query.constraint('foo').foreign(['account_id', 'relation_id'], 'table', ['account_id', 'id']);
+
+    constraint.delete().null(['relation_id']);
+
+    const statement = query.build();
+
+    equal(
+      statement,
+      `ALTER TABLE "table" ADD CONSTRAINT "foo" ` +
+        `FOREIGN KEY ("account_id", "relation_id") ` +
+        `REFERENCES "table" ("account_id", "id") ` +
+        `ON DELETE SET null ("relation_id")`
+    );
+  });
+
   it('assert :: add foreign key (use update cascade)', () => {
     const query = sql.table('table').alter();
 

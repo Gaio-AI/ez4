@@ -90,6 +90,7 @@ export type TableRelation = {
   targetIndex?: Index;
   onDelete?: RelationDeleteAction;
   foreignKey?: boolean;
+  scope?: string[];
 };
 
 export type DatabaseTable = {

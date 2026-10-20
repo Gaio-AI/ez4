@@ -1,5 +1,5 @@
 import type { PgRelationMetadata, PgTableRepository } from '@ez4/pgclient/library';
-import type { AnySchema } from '@ez4/schema';
+import type { AnySchema, ObjectSchema } from '@ez4/schema';
 
 import { Index } from '@ez4/database';
 import { isAnyObject } from '@ez4/utils';
@@ -89,7 +89,15 @@ const validateRelations = (target: PgTableRepository) => {
           throw new MigrationRelationError(relationName, 'has a delete action but no foreign key');
         }
 
+        if (relation.scope) {
+          throw new MigrationRelationError(relationName, 'has a scope but no foreign key');
+        }
+
         continue;
+      }
+
+      if (relation.scope) {
+        validateScope(target, relationName, relation, schema);
       }
 
       if (relation.foreignKey && relation.sourceIndex !== Index.Primary && relation.sourceIndex !== Index.Unique) {
@@ -100,17 +108,70 @@ const validateRelations = (target: PgTableRepository) => {
         throw new MigrationRelationError(relationName, `sets ${relation.targetColumn} to null, which doesn't take null`);
       }
 
-      if (targetSchema && sourceSchema && getKeyType(targetSchema, relation) !== getKeyType(sourceSchema, relation, true)) {
+      const targetPrimary = relation.targetIndex === Index.Primary;
+      const sourcePrimary = relation.sourceIndex === Index.Primary;
+
+      if (targetSchema && sourceSchema && getKeyType(targetSchema, targetPrimary) !== getKeyType(sourceSchema, sourcePrimary)) {
         throw new MigrationRelationError(relationName, `holds a key of another type than ${relation.sourceColumn}`);
       }
     }
   }
 };
 
+// A scoped key references the scope columns and the related column together, so Postgres needs a
+// unique key on exactly those columns of the related table, and each scope column of the same type.
+const validateScope = (target: PgTableRepository, relationName: string, relation: PgRelationMetadata, schema: ObjectSchema) => {
+  const { sourceTable, sourceColumn, targetColumn, scope = [] } = relation;
+
+  const keyColumns = [...scope, sourceColumn];
+
+  if (hasRepeatedColumn(keyColumns) || hasRepeatedColumn([...scope, targetColumn])) {
+    throw new MigrationRelationError(relationName, 'has a scope that repeats a column of its key');
+  }
+
+  const sourceTableMetadata = target[sourceTable];
+
+  const hasKey = Object.values(sourceTableMetadata?.indexes ?? {}).some(({ type, columns, options }) => {
+    return (
+      (type === Index.Primary || type === Index.Unique) &&
+      !options?.where &&
+      columns.length === keyColumns.length &&
+      keyColumns.every((column) => columns.includes(column))
+    );
+  });
+
+  if (!hasKey) {
+    throw new MigrationRelationError(
+      relationName,
+      `references ${sourceColumn} within ${scope.join(', ')}, which needs a primary or unique key on ${keyColumns.join(', ')} in ${sourceTable}`
+    );
+  }
+
+  for (const scopeColumn of scope) {
+    const targetSchema = schema.properties[scopeColumn];
+    const sourceSchema = sourceTableMetadata?.schema.properties[scopeColumn];
+
+    // Postgres only checks a key with many columns when none of them is null.
+    if (targetSchema && isOptionalColumn(targetSchema)) {
+      throw new MigrationRelationError(
+        relationName,
+        `is scoped by ${scopeColumn}, which takes null: the key isn't checked on records without it`
+      );
+    }
+
+    if (targetSchema && sourceSchema && getKeyType(targetSchema, false) !== getKeyType(sourceSchema, false)) {
+      throw new MigrationRelationError(relationName, `is scoped by ${scopeColumn}, which has another type in ${sourceTable}`);
+    }
+  }
+};
+
+const hasRepeatedColumn = (columns: string[]) => {
+  return new Set(columns).size < columns.length;
+};
+
 // Types a foreign key can compare: a serial key is a bigint, and every string is compared as text.
-const getKeyType = (schema: AnySchema, relation: PgRelationMetadata, source?: boolean) => {
-  const index = source ? relation.sourceIndex : relation.targetIndex;
-  const type = getColumnType(schema, index === Index.Primary);
+const getKeyType = (schema: AnySchema, primary: boolean) => {
+  const type = getColumnType(schema, primary);
 
   if (type === 'bigserial') {
     return 'bigint';

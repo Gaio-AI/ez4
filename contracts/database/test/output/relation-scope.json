@@ -1,0 +1,114 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestDatabase": {
+    "type": "@ez4/database",
+    "name": "TestDatabase",
+    "context": {},
+    "file": "test/input/output-relation-scope.ts",
+    "variables": {},
+    "services": {},
+    "engine": {
+      "parametersMode": "index",
+      "transactionMode": "static",
+      "insensitiveMode": "unsupported",
+      "undefinedMode": "supported",
+      "paginationMode": "offset",
+      "relationMode": "supported",
+      "streamMode": "supported",
+      "orderMode": "any",
+      "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
+      "name": "test"
+    },
+    "tables": [
+      {
+        "name": "messages",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "account_id": {
+              "type": "string"
+            },
+            "contact_id": {
+              "type": "string"
+            }
+          },
+          "identity": 1
+        },
+        "relations": [
+          {
+            "sourceTable": "contacts",
+            "sourceColumn": "id",
+            "targetColumn": "contact_id",
+            "targetAlias": "contact",
+            "scope": [
+              "account_id"
+            ],
+            "sourceIndex": "primary",
+            "targetIndex": "secondary"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "id",
+            "columns": [
+              "id"
+            ],
+            "type": "primary"
+          },
+          {
+            "name": "contact_id",
+            "columns": [
+              "contact_id"
+            ],
+            "type": "secondary"
+          }
+        ]
+      },
+      {
+        "name": "contacts",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "account_id": {
+              "type": "string"
+            }
+          },
+          "identity": 1
+        },
+        "indexes": [
+          {
+            "name": "id",
+            "columns": [
+              "id"
+            ],
+            "type": "primary"
+          },
+          {
+            "name": "account_id:id",
+            "columns": [
+              "account_id",
+              "id"
+            ],
+            "type": "unique"
+          }
+        ]
+      }
+    ]
+  }
+}

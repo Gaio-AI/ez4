@@ -174,6 +174,13 @@ const validateRelations = (type: TypeObject | TypeModel, tables: DatabaseTable[]
         errorList.push(new InvalidRelationColumnError(sourceColumn, type.file));
       }
 
+      // A scope column is in both tables, under the same name.
+      for (const scopeColumn of relation.scope ?? []) {
+        if (!targetColumns[scopeColumn] || (sourceColumns && !sourceColumns[scopeColumn])) {
+          errorList.push(new InvalidRelationColumnError(scopeColumn, type.file));
+        }
+      }
+
       const sourceIndexes = tablesMap[sourceTable]?.indexes ?? [];
 
       relation.sourceIndex = getIndexType(sourceIndexes, sourceColumn);

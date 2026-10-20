@@ -9,16 +9,16 @@ export class SqlForeignKeyConstraintClause {
     constraint: SqlConstraintClause;
     delete?: SqlForeignKeyActionClause;
     update?: SqlForeignKeyActionClause;
-    targetColumn: string;
+    targetColumns: string[];
     sourceColumns: string[];
     sourceTable: string;
   };
 
-  constructor(constraint: SqlConstraintClause, targetColumn: string, sourceTable: string, sourceColumns: string[]) {
+  constructor(constraint: SqlConstraintClause, targetColumns: string | string[], sourceTable: string, sourceColumns: string[]) {
     this.#state = {
+      targetColumns: Array.isArray(targetColumns) ? targetColumns : [targetColumns],
       sourceTable,
       sourceColumns,
-      targetColumn,
       constraint
     };
   }
@@ -52,7 +52,7 @@ export class SqlForeignKeyConstraintClause {
    * @returns Returns itself.
    */
   target(column: string) {
-    this.#state.targetColumn = column;
+    this.#state.targetColumns = [column];
 
     return this;
   }
@@ -80,7 +80,7 @@ export class SqlForeignKeyConstraintClause {
   }
 
   build() {
-    const { validate, constraint, targetColumn, sourceTable, sourceColumns, ...actions } = this.#state;
+    const { validate, constraint, targetColumns, sourceTable, sourceColumns, ...actions } = this.#state;
 
     if (!constraint.building) {
       return constraint.build();
@@ -88,7 +88,7 @@ export class SqlForeignKeyConstraintClause {
 
     const clause = ['ADD', 'CONSTRAINT', escapeSqlName(constraint.name)];
 
-    clause.push('FOREIGN', 'KEY', `(${escapeSqlName(targetColumn)})`);
+    clause.push('FOREIGN', 'KEY', `(${escapeSqlNames(targetColumns)})`);
     clause.push('REFERENCES', escapeSqlName(sourceTable), `(${escapeSqlNames(sourceColumns)})`);
 
     const deleteAction = actions.delete?.build();
@@ -114,6 +114,7 @@ export class SqlForeignKeyActionClause {
   #state: {
     constraint: SqlConstraintClause;
     action?: ConstraintAction;
+    columns?: string[];
   };
 
   constructor(constraint: SqlConstraintClause) {
@@ -134,8 +135,13 @@ export class SqlForeignKeyActionClause {
     return this;
   }
 
-  null() {
+  /**
+   * Sets the key columns to null, or only the given ones (Postgres 15+), which keeps the others of a
+   * key with many columns.
+   */
+  null(columns?: string[]) {
     this.#state.action = ConstraintAction.Null;
+    this.#state.columns = columns;
 
     return this;
   }
@@ -147,7 +153,7 @@ export class SqlForeignKeyActionClause {
   }
 
   build() {
-    const { constraint, action } = this.#state;
+    const { constraint, action, columns } = this.#state;
 
     if (!constraint.building) {
       return constraint.build();
@@ -161,7 +167,7 @@ export class SqlForeignKeyActionClause {
         return 'CASCADE';
 
       case ConstraintAction.Null:
-        return 'SET null';
+        return columns?.length ? `SET null (${escapeSqlNames(columns)})` : 'SET null';
 
       case ConstraintAction.NoAction:
         return 'NO ACTION';
