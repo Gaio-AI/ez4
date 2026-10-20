@@ -93,8 +93,17 @@ export type TableRelation = {
   scope?: string[];
 };
 
+/**
+ * Previous names of a table and of its columns (each column with the name it had).
+ */
+export type TableRenames = {
+  table?: string;
+  columns?: Record<string, string>;
+};
+
 export type DatabaseTable = {
   name: string;
+  renamedFrom?: TableRenames;
   schema: TableSchema;
   relations?: TableRelation[];
   indexes: TableIndex[];

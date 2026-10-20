@@ -6,6 +6,7 @@ import {
   IncorrectSchemaTypeError,
   IncorrectTableTypeError,
   InvalidSchemaTypeError,
+  InvalidTableRenameError,
   InvalidTableTypeError,
   registerTriggers
 } from '@ez4/database/library';
@@ -44,6 +45,28 @@ describe('database service errors', () => {
 
     ok(error1 instanceof InvalidServicePropertyError);
     deepEqual(error1.propertyName, 'invalid_property');
+  });
+
+  it('assert :: invalid table renames', () => {
+    const [error1, error2, error3] = parseFile('invalid-table-renames', 3);
+
+    ok(error1 instanceof InvalidTableRenameError);
+    equal(error1.tableName, 'contacts');
+    equal(error1.renameName, 'missing');
+
+    ok(error2 instanceof InvalidTableRenameError);
+    equal(error2.renameName, 'full_name');
+
+    ok(error3 instanceof InvalidTableRenameError);
+    equal(error3.renameName, 'last_name');
+  });
+
+  it('assert :: invalid table renamed table', () => {
+    const [error1] = parseFile('invalid-table-renamed-table', 1);
+
+    ok(error1 instanceof InvalidTableRenameError);
+    equal(error1.tableName, 'contacts');
+    equal(error1.renameName, 'people');
   });
 
   it('assert :: incorrect table schema', () => {

@@ -1,0 +1,23 @@
+import type { Database, Index } from '@ez4/database';
+import type { TestEngine } from '../common/engines';
+
+export declare class TestDatabase extends Database.Service<TestEngine> {
+  tables: [
+    Database.UseTable<{
+      name: 'contacts';
+      renamedFrom: {
+        table: 'people';
+        columns: {
+          full_name: 'name';
+        };
+      };
+      schema: {
+        id: string;
+        full_name: string;
+      };
+      indexes: {
+        id: Index.Primary;
+      };
+    }>
+  ];
+}

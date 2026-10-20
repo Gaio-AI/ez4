@@ -6,14 +6,15 @@ import { Index } from '@ez4/database';
 import { getTableName } from './resources';
 
 export const getTableRepository = (tables: DatabaseTable[]): PgTableRepository => {
-  return tables.reduce((current, { name, schema, relations, indexes }) => {
+  return tables.reduce((current, { name, schema, relations, indexes, renamedFrom }) => {
     return {
       ...current,
       [name]: {
         name: getTableName(name),
         indexes: getTableIndexes(indexes),
         relations: getTableRelations(relations ?? []),
-        schema
+        schema,
+        ...(renamedFrom && { renamedFrom })
       }
     };
   }, {});
