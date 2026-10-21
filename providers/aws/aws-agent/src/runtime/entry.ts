@@ -3,7 +3,10 @@ import type { ObjectSchema } from '@ez4/schema';
 import type { AgentStorage } from './storage';
 import type { AgentProvider } from './types';
 import * as http from 'node:http';
-import { runAgentRuntime } from './main';
+import { homedir } from 'node:os';
+import { readRegistryGrants } from './registry';
+import { createRegistryTokenSource } from './registry-token';
+import { runAgentRuntime, type RunAgentRuntimeParameters } from './main';
 import { createS3Storage } from './storage';
 import { AgentProviders } from './providers/index';
 import { WORKSPACE_MOUNT_PATH, type WorkspaceRuntime } from '../workspace/runtime';
@@ -97,12 +100,20 @@ export const startAgent = async (
   handlers: Function[],
   context: object,
   env: Record<string, string | undefined> = process.env,
-  ports: { storage?: AgentStorage; provider?: AgentProvider; workspace?: WorkspaceRuntime } = {}
+  ports: {
+    storage?: AgentStorage;
+    provider?: AgentProvider;
+    workspace?: WorkspaceRuntime;
+    registry?: RunAgentRuntimeParameters['registry'];
+  } = {}
 ): Promise<number> => {
   applyProxyEnvironment(env);
   const { agentName, invocationId, bucketName, timeoutSeconds } = readAgentEnvironment(env);
   const hook = (index: number) => (index >= 0 ? handlers[index] : undefined);
   const workspace = ports.workspace ?? resolveWorkspaceRuntime(env);
+  const grants = readRegistryGrants(env);
+  const registry =
+    ports.registry ?? (grants.length > 0 ? { grants, getToken: createRegistryTokenSource(), home: env.HOME ?? homedir() } : undefined);
   return runAgentRuntime({
     agentName,
     invocationId,
@@ -118,6 +129,7 @@ export const startAgent = async (
     prepare: hook(definition.hooks.prepare) as never,
     finish: hook(definition.hooks.finish) as never,
     context,
-    workspace
+    workspace,
+    registry
   });
 };

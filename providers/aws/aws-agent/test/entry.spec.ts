@@ -1,5 +1,8 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { equal, throws, deepEqual } from 'node:assert/strict';
+import { equal, throws, deepEqual, rejects } from 'node:assert/strict';
 import { SchemaType } from '@ez4/schema';
 import { AgentProvider, AgentToolsMode } from '@ez4/agent';
 
@@ -66,5 +69,58 @@ describe('agent container entrypoint', () => {
     equal(seenContext, linked);
     const result = files['results/EchoAgent/id-1.json'];
     deepEqual(result && typeof result === 'object' && 'output' in result && result.output, { text: 'hi' });
+  });
+
+  it('assert :: startAgent reads the exported grants and writes the registry auth', async () => {
+    const files: Record<string, unknown> = { 'invocations/EchoAgent/id-2.json': { input: { text: 'hi' } } };
+    const home = await mkdtemp(join(tmpdir(), 'registry-entry-'));
+    const grants = [{ domain: 'gaio', repository: 'npm', region: 'us-east-1', accountId: '010928226197' }];
+    try {
+      const code = await startAgent(
+        definition,
+        [async () => ({ prompt: 'hi' })],
+        {},
+        {
+          EZ4_AGENT_NAME: 'EchoAgent',
+          EZ4_AGENT_ID: 'id-2',
+          EZ4_AGENT_BUCKET: 'b',
+          EZ4_AGENT_TIMEOUT: '60',
+          EZ4_AGENT_CODEARTIFACT: JSON.stringify(grants),
+          HOME: home
+        },
+        {
+          storage: memoryStorage(files),
+          provider: { run: async () => ({ output: { text: 'ok' } }) } as never,
+          registry: { grants, getToken: async () => 'tok-2', home }
+        }
+      );
+
+      equal(code, 0);
+      equal(
+        await readFile(join(home, '.npmrc'), 'utf8'),
+        '//gaio-010928226197.d.codeartifact.us-east-1.amazonaws.com/npm/npm/:_authToken=tok-2\n'
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('assert :: startAgent writes no registry auth without grants', async () => {
+    const files: Record<string, unknown> = { 'invocations/EchoAgent/id-3.json': { input: { text: 'hi' } } };
+    const home = await mkdtemp(join(tmpdir(), 'registry-entry-'));
+    try {
+      const code = await startAgent(
+        definition,
+        [async () => ({ prompt: 'hi' })],
+        {},
+        { EZ4_AGENT_NAME: 'EchoAgent', EZ4_AGENT_ID: 'id-3', EZ4_AGENT_BUCKET: 'b', EZ4_AGENT_TIMEOUT: '60', HOME: home },
+        { storage: memoryStorage(files), provider: { run: async () => ({ output: { text: 'ok' } }) } as never }
+      );
+
+      equal(code, 0);
+      await rejects(readFile(join(home, '.npmrc'), 'utf8'));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });

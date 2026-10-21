@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import { equal, deepEqual, rejects, ok } from 'node:assert/strict';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -73,6 +73,52 @@ describe('runtime :: registry auth', () => {
       await rejects(stat(join(home, '.npmrc')));
     } finally {
       await rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
+import { createRegistryTokenSource } from '../src/runtime/registry-token';
+
+describe('runtime :: registry token source', () => {
+  it('assert :: asks the grant domain for a token owned by the account', async () => {
+    const sent: unknown[] = [];
+    const source = createRegistryTokenSource(() => ({
+      send: (async (command: { input: unknown }) => (sent.push(command.input), { authorizationToken: 'tok-9' })) as never
+    }));
+
+    equal(await source(grant), 'tok-9');
+    deepEqual(sent, [{ domain: 'gaio', domainOwner: '010928226197' }]);
+  });
+
+  it('assert :: an empty answer is an error', async () => {
+    const source = createRegistryTokenSource(() => ({ send: (async () => ({})) as never }));
+    await rejects(source(grant), /returned no token/);
+  });
+
+  it('assert :: the token request uses fetch, which follows the egress proxy', async () => {
+    const saved = { ...process.env };
+    delete process.env.AWS_ENDPOINT_URL;
+    process.env.AWS_ACCESS_KEY_ID = 'test';
+    process.env.AWS_SECRET_ACCESS_KEY = 'test';
+    const urls: string[] = [];
+    const fetchMock = mock.method(globalThis, 'fetch', async (input: unknown) => {
+      urls.push(String((input as { url?: string }).url ?? input));
+      return new Response(JSON.stringify({ authorizationToken: 'tok-fetch', expiration: 1.8e9 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+
+    try {
+      equal(await createRegistryTokenSource()(grant), 'tok-fetch');
+      equal(urls.length, 1);
+      ok(urls[0]!.startsWith('https://codeartifact.us-east-1.amazonaws.com/'));
+    } finally {
+      fetchMock.mock.restore();
+      for (const name of ['AWS_ENDPOINT_URL', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']) {
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+      }
     }
   });
 });

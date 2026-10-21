@@ -1,3 +1,4 @@
+import { writeRegistryAuth, type RegistryGrant, type RegistryTokenSource } from './registry';
 import type { Agent } from '@ez4/agent';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Service as CommonService } from '@ez4/common';
@@ -36,6 +37,7 @@ export interface RunAgentRuntimeParameters {
   workdir?: string;
   env?: Record<string, string>;
   workspace?: WorkspaceRuntime;
+  registry?: { grants: readonly RegistryGrant[]; getToken: RegistryTokenSource; home: string };
 }
 
 export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Promise<number> => {
@@ -56,7 +58,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     context = {},
     workdir = process.cwd(),
     env = {},
-    workspace
+    workspace,
+    registry
   } = parameters;
 
   const timer = createTimeoutTimer(timeoutSeconds);
@@ -87,6 +90,23 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
     let effectiveWorkdir = workdir;
     let effectiveInstructions = instructions;
     let workspaceRequest: Agent.WorkspaceRequest | undefined;
+
+    if (registry) {
+      try {
+        await writeRegistryAuth(registry.grants, registry.getToken, registry.home);
+      } catch (registryErr: unknown) {
+        const message = registryErr instanceof Error ? registryErr.message : String(registryErr);
+        await writeResult(storage, agentName, invocationId, {
+          id: invocationId,
+          agent: agentName,
+          status: AgentResultStatus.Failed,
+          error: { code: AgentErrorCode.HookError, message },
+          correlation,
+          finishedAt: new Date().toISOString()
+        });
+        return 1;
+      }
+    }
 
     if (workspace) {
       workspaceRequest = await checkoutWorkspace(workspace, effectiveWorkdir, envelope.workspace);
