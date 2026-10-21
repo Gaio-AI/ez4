@@ -13,7 +13,7 @@ export const generateDockerfile = (agent: AgentService): string => {
   const workspacePackages = agent.workspace ? ['git', 'ca-certificates'] : [];
   const aptPackages = [...new Set([...workspacePackages, ...(agent.image?.aptPackages ?? [])])].join(' ');
 
-  const lines: string[] = [`FROM ${base}`, 'WORKDIR /app', 'ENV NODE_ENV=production'];
+  const lines: string[] = [`FROM ${base}`, 'WORKDIR /app', 'ENV NODE_ENV=production', 'ENV PATH=/app/node_modules/.bin:$PATH'];
 
   if (aptPackages) {
     lines.push(`RUN apt-get update && apt-get install -y --no-install-recommends ${aptPackages} && rm -rf /var/lib/apt/lists/*`);
