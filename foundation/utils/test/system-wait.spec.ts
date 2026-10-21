@@ -68,4 +68,38 @@ describe('system wait utils', { timeout: 180000 }, () => {
       equal(Wait.delay(4, 3, minDelay, maxDelay), 5);
     }
   });
+
+  it('assert :: spread delay (retries span the window)', async () => {
+    const minDelay = 5;
+    const maxDelay = 30;
+    const window = 600;
+
+    for (const maxAttempts of [2, 3, 6]) {
+      for (let counter = 0; counter < 100; counter++) {
+        let total = 0;
+
+        for (let attempt = 1; attempt < maxAttempts; attempt++) {
+          total += Wait.spread(attempt, maxAttempts, minDelay, maxDelay, window);
+        }
+
+        ok(total >= window, `${maxAttempts} attempts span ${total} s`);
+      }
+    }
+  });
+
+  it('assert :: spread delay (first retry comes soon)', async () => {
+    for (let counter = 0; counter < 100; counter++) {
+      const first = Wait.spread(1, 3, 5, 30, 600);
+
+      ok(first >= 5 && first <= 30);
+    }
+  });
+
+  it('assert :: spread delay (last attempt and overflow come soon)', async () => {
+    for (let counter = 0; counter < 100; counter++) {
+      for (const delay of [Wait.spread(3, 3, 5, 30, 600), Wait.spread(4, 3, 5, 30, 600), Wait.spread(1, 1, 5, 30, 600)]) {
+        ok(delay >= 5 && delay <= 30);
+      }
+    }
+  });
 });

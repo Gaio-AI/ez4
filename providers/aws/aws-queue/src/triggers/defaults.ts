@@ -49,6 +49,12 @@ export namespace Defaults {
   export const MaxBackoff = 30;
 
   /**
+   * Minimum time (in seconds) between the first and the last attempt of a queue that declares no backoff, long
+   * enough for a database restart or failover to end before the message runs out of attempts.
+   */
+  export const RetryWindow = 600;
+
+  /**
    * Default queue retention (14 days)
    */
   export const Retention = 20160;

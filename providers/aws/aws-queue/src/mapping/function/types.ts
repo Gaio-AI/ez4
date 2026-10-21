@@ -16,6 +16,11 @@ export type QueueBackoff = {
   attempts: number;
   minDelay: number;
   maxDelay: number;
+  /**
+   * Minimum time (in seconds) between the first and the last attempt. Without it (or with `0`) the delays
+   * follow `minDelay` and `maxDelay` alone.
+   */
+  window?: number;
 };
 
 export type QueueFunctionParameters = Omit<

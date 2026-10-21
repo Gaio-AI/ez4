@@ -14,6 +14,7 @@ declare const __EZ4_SCHEMA: MessageSchema | null;
 declare const __EZ4_MAX_ATTEMPTS: number;
 declare const __EZ4_MIN_BACKOFF: number;
 declare const __EZ4_MAX_BACKOFF: number;
+declare const __EZ4_RETRY_WINDOW: number;
 declare const __EZ4_PARALLELISM: number;
 declare const __EZ4_ACKNOWLEDGE: 'record' | 'batch';
 declare const __EZ4_CONTEXT: object;
@@ -292,7 +293,9 @@ const retryMessage = async (record: SQSRecord, userDelay?: number) => {
 
   try {
     const attemptCount = Number(attributes.ApproximateReceiveCount);
-    const attemptDelay = Wait.delay(attemptCount, __EZ4_MAX_ATTEMPTS, __EZ4_MIN_BACKOFF, __EZ4_MAX_BACKOFF);
+    const attemptDelay = __EZ4_RETRY_WINDOW
+      ? Wait.spread(attemptCount, __EZ4_MAX_ATTEMPTS, __EZ4_MIN_BACKOFF, __EZ4_MAX_BACKOFF, __EZ4_RETRY_WINDOW)
+      : Wait.delay(attemptCount, __EZ4_MAX_ATTEMPTS, __EZ4_MIN_BACKOFF, __EZ4_MAX_BACKOFF);
 
     await client.send(
       new ChangeMessageVisibilityCommand({

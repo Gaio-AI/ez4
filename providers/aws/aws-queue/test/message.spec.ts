@@ -44,6 +44,7 @@ const runtimeGlobals = {
   __EZ4_MAX_ATTEMPTS: 5,
   __EZ4_MIN_BACKOFF: 5,
   __EZ4_MAX_BACKOFF: 5,
+  __EZ4_RETRY_WINDOW: 0,
   __EZ4_PARALLELISM: 1,
   __EZ4_ACKNOWLEDGE: 'record',
   __EZ4_CONTEXT: {},
