@@ -3,6 +3,7 @@ import { equal, deepEqual, rejects, ok } from 'node:assert/strict';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createRegistryTokenSource } from '../src/runtime/registry-token';
 import {
   readRegistryGrants,
   registryHost,
@@ -75,9 +76,53 @@ describe('runtime :: registry auth', () => {
       await rm(home, { recursive: true, force: true });
     }
   });
-});
 
-import { createRegistryTokenSource } from '../src/runtime/registry-token';
+  it('assert :: overwrites an existing ~/.npmrc with mode 600 atomically and leaves no tmp file', async () => {
+    const { writeFile, readdir, chmod } = await import('node:fs/promises');
+    const home = await mkdtemp(join(tmpdir(), 'registry-'));
+    try {
+      const file = join(home, '.npmrc');
+      await writeFile(file, 'old', { mode: 0o644 });
+      await chmod(file, 0o644);
+      await writeRegistryAuth([grant], async () => 'tok-new', home);
+      equal(await readFile(file, 'utf8'), renderNpmrc([{ grant, token: 'tok-new' }]));
+      equal((await stat(file)).mode & 0o777, 0o600);
+      const remaining = await readdir(home);
+      equal(
+        remaining.some((name) => name.endsWith('.tmp')),
+        false
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('assert :: redacts already-obtained tokens if a later grant fails', async () => {
+    const grant2: RegistryGrant = { domain: 'gaio', repository: 'other', region: 'us-east-1', accountId: '010928226197' };
+    const home = await mkdtemp(join(tmpdir(), 'registry-'));
+    try {
+      await rejects(
+        writeRegistryAuth(
+          [grant, grant2],
+          async (g) => {
+            if (g.repository === 'npm') return 'tok-first';
+            throw new Error('denied after tok-first was issued');
+          },
+          home
+        ),
+        (error: unknown) => {
+          ok(error instanceof RegistryAuthError);
+          equal(error.grant, grant2);
+          equal(error.message, 'CodeArtifact token request failed for gaio/other: denied after [redacted] was issued');
+          equal(error.message.includes('tok-first'), false);
+          return true;
+        }
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('runtime :: registry token source', () => {
   it('assert :: asks the grant domain for a token owned by the account', async () => {

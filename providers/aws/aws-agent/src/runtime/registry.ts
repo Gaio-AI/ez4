@@ -1,4 +1,4 @@
-import { chmod, writeFile } from 'node:fs/promises';
+import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const REGISTRY_GRANTS_ENV = 'EZ4_AGENT_CODEARTIFACT';
@@ -42,11 +42,16 @@ export const writeRegistryAuth = async (grants: readonly RegistryGrant[], getTok
     try {
       entries.push({ grant, token: await getToken(grant) });
     } catch (error) {
-      throw new RegistryAuthError(grant, error);
+      let message = error instanceof Error ? error.message : String(error);
+      for (const { token } of entries) {
+        message = message.replaceAll(token, '[redacted]');
+      }
+      throw new RegistryAuthError(grant, message);
     }
   }
 
   const file = join(home, '.npmrc');
-  await writeFile(file, renderNpmrc(entries), { mode: 0o600 });
-  await chmod(file, 0o600);
+  const temp = `${file}.${process.pid}.tmp`;
+  await writeFile(temp, renderNpmrc(entries), { mode: 0o600 });
+  await rename(temp, file);
 };
