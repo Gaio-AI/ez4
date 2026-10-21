@@ -10,6 +10,7 @@ import { validate, createValidatorContext, getErrorDetails } from '@ez4/validato
 import { createArtifactsClient } from './artifacts';
 import { createTimeoutTimer } from './timer';
 import { checkoutWorkspace, publishWorkspace, pushWorkspaceBranch, type WorkspaceRuntime } from '../workspace/runtime';
+import { gitIdentityEnv } from '../workspace/github';
 
 export interface InvocationEnvelope {
   input: unknown;
@@ -112,6 +113,8 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
       workspaceRequest = await checkoutWorkspace(workspace, effectiveWorkdir, envelope.workspace);
     }
 
+    const identity = await workspace?.identity?.();
+
     if (prepare) {
       try {
         const prepareResult = await prepare(
@@ -157,7 +160,7 @@ export const runAgentRuntime = async (parameters: RunAgentRuntimeParameters): Pr
         tools,
         mcpServers,
         outputSchema: getJsonSchema(outputSchema),
-        env,
+        env: { ...(identity && gitIdentityEnv(identity)), ...env },
         signal: timer.signal
       });
     } catch (provErr: unknown) {

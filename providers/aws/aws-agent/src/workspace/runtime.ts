@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import type { Agent } from '@ez4/agent';
 import type { AgentService } from '@ez4/agent/library';
 import { defaultGit, type Git } from './git';
+import { gitIdentityEnv, type GitIdentity } from './github';
 
 export const WORKSPACE_MOUNT_PATH = '/mnt/ez4-workspace';
 
@@ -13,6 +14,7 @@ export type WorkspaceRuntime = {
   root: string;
   workspace: NonNullable<AgentService['workspace']>;
   token?: (access?: 'read' | 'write') => Promise<string | undefined>;
+  identity?: () => Promise<GitIdentity | undefined>;
   git?: Git;
   now?: () => number;
 };
@@ -315,6 +317,7 @@ export const publishWorkspace = async (
   for (const repoName of Object.keys(request.repos)) assertWorkspaceName('repository', repoName);
   const git = runtime.git ?? defaultGit;
   const token = runtime.token ? await runtime.token() : undefined;
+  const identity = await runtime.identity?.();
   const nowMs = getNowMs(runtime);
   const publishedRefs: Agent.WorkspaceRef[] = [];
 
@@ -330,7 +333,7 @@ export const publishWorkspace = async (
     if (diffResult.exitCode !== 0) {
       const commitResult = await git(
         ['-c', 'user.name=ez4-agent', '-c', 'user.email=agent@ez4.invalid', 'commit', '-m', `${agent} ${id}`],
-        { cwd: repoDir }
+        { cwd: repoDir, env: identity && gitIdentityEnv(identity) }
       );
       if (commitResult.exitCode !== 0) {
         throw new Error(redact(commitResult.stderr || commitResult.stdout || 'git commit failed', token));

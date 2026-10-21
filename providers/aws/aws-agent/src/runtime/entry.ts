@@ -10,7 +10,7 @@ import { runAgentRuntime, type RunAgentRuntimeParameters } from './main';
 import { createS3Storage } from './storage';
 import { AgentProviders } from './providers/index';
 import { WORKSPACE_MOUNT_PATH, type WorkspaceRuntime } from '../workspace/runtime';
-import { mintInstallationToken } from '../workspace/github';
+import { mintInstallationToken, resolveAppIdentity, type GitIdentity } from '../workspace/github';
 export type AgentEntryDefinition = {
   name: string;
   provider: Agent.ProviderName;
@@ -73,6 +73,7 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
   }
   const workspaceMeta = JSON.parse(env.EZ4_AGENT_WORKSPACE);
   let token: ((access?: 'read' | 'write') => Promise<string | undefined>) | undefined;
+  let identity: (() => Promise<GitIdentity>) | undefined;
 
   if (env.EZ4_WORKSPACE_GITHUB_APP) {
     const { GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY } = JSON.parse(env.EZ4_WORKSPACE_GITHUB_APP);
@@ -83,6 +84,8 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
         privateKeyPem: GITHUB_APP_PRIVATE_KEY,
         access
       });
+    let resolved: Promise<GitIdentity> | undefined;
+    identity = () => (resolved ??= resolveAppIdentity({ appId: GITHUB_APP_ID, privateKeyPem: GITHUB_APP_PRIVATE_KEY }));
   } else if (env.EZ4_WORKSPACE_TOKEN) {
     const secretToken = env.EZ4_WORKSPACE_TOKEN;
     token = () => Promise.resolve(secretToken);
@@ -91,7 +94,8 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
   return {
     root: WORKSPACE_MOUNT_PATH,
     workspace: workspaceMeta,
-    token
+    token,
+    identity
   };
 };
 

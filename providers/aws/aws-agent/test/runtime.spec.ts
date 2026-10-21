@@ -458,6 +458,47 @@ describe('runtime :: execution lifecycle', () => {
     equal(result.workspace, undefined);
   });
 
+  it('assert :: the provider runs with the git identity of the workspace runtime', async () => {
+    const files = new Map<string, unknown>([['invocations/test-agent/inv-id.json', { input: { task: 'hello' } }]]);
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string) => files.get(key) as T,
+      writeJson: async (key, value) => void files.set(key, value),
+      putBuffer: async () => undefined,
+      getBuffer: async () => undefined
+    };
+    let providerEnv: Record<string, string> | undefined;
+    const workspace: WorkspaceRuntime = {
+      root: await mkdtemp(join(tmpdir(), 'ws-')),
+      workspace: { repos: [] },
+      identity: async () => ({ name: 'app[bot]', email: '7+app[bot]@users.noreply.github.com' })
+    };
+
+    const exitCode = await runAgentRuntime({
+      agentName: 'test-agent',
+      invocationId: 'inv-id',
+      inputSchema,
+      outputSchema,
+      storage,
+      provider: {
+        run: async (req: AgentProviderRequest): Promise<AgentProviderResponse> => {
+          providerEnv = req.env;
+          return { output: { result: 'done' } };
+        }
+      },
+      tools: { mode: AgentToolsMode.Readonly },
+      mcpServers: {},
+      instructions: 'Do work',
+      model: 'test-model',
+      timeoutSeconds: 30,
+      workdir: await mkdtemp(join(tmpdir(), 'wd-')),
+      workspace
+    });
+
+    equal(exitCode, 0);
+    equal(providerEnv?.GIT_AUTHOR_NAME, 'app[bot]');
+    equal(providerEnv?.GIT_COMMITTER_EMAIL, '7+app[bot]@users.noreply.github.com');
+  });
+
   it('assert :: the provider gets the output schema as JSON Schema, without ez4 schema keywords', async () => {
     const memory = new Map<string, string>();
     const storage: AgentStorage = {

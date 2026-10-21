@@ -186,6 +186,18 @@ describe('workspace :: runtime', () => {
     deepEqual(await remoteHead(), secondRefs[0].head);
   });
 
+  it('assert :: leftover changes are committed as the identity of the runtime', async () => {
+    const { runtime, workdir } = await setupWorkspace({ repos: ['api'] });
+    runtime.identity = async () => ({ name: 'app[bot]', email: '7+app[bot]@users.noreply.github.com' });
+
+    const request = await checkoutWorkspace(runtime, workdir);
+    await writeFile(join(request.repos.api.path, 'fix.txt'), 'fixed');
+    await publishWorkspace(runtime, request, 'Implement', 'inv-1');
+
+    const { stdout } = await git(['log', '-1', '--format=%an <%ae> | %cn <%ce>'], { cwd: request.repos.api.path });
+    deepEqual(stdout.trim(), 'app[bot] <7+app[bot]@users.noreply.github.com> | app[bot] <7+app[bot]@users.noreply.github.com>');
+  });
+
   it('assert :: only the push to the remote asks for a write token', async () => {
     const { runtime, workdir } = await setupWorkspace({ repos: ['api'] });
     const asked: (string | undefined)[] = [];
