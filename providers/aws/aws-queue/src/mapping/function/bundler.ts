@@ -34,6 +34,7 @@ export const bundleQueueFunction = async (parameters: BundleQueueFunctionParamet
       __EZ4_MAX_ATTEMPTS: `${backoff.attempts}`,
       __EZ4_MIN_BACKOFF: `${backoff.minDelay}`,
       __EZ4_MAX_BACKOFF: `${backoff.maxDelay}`,
+      __EZ4_RETRY_WINDOW: `${backoff.window ?? 0}`,
       __EZ4_PARALLELISM: `${parallelism}`,
       __EZ4_ACKNOWLEDGE: JSON.stringify(acknowledge)
     },

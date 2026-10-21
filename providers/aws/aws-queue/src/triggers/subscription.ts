@@ -70,7 +70,8 @@ export const prepareSubscriptions = (
         backoff: {
           attempts: deadLetter?.maxAttempts ?? Defaults.MaxAttempts,
           minDelay: backoff?.minDelay ?? Defaults.MinBackoff,
-          maxDelay: backoff?.maxDelay ?? Defaults.MaxBackoff
+          maxDelay: backoff?.maxDelay ?? Defaults.MaxBackoff,
+          window: backoff ? 0 : Defaults.RetryWindow
         },
         parallelism: subscription.parallelism ?? Defaults.Parallelism,
         acknowledge: subscription.acknowledge ?? Defaults.Acknowledge,

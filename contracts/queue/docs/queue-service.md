@@ -94,6 +94,13 @@ Defines the minimum and maximum delays for the retry behavior of the queue. The 
 - In the first retry the delay time is close to the minimum amount specified.
 - In the last retry the delay is close to the maximum amount specified.
 
+A deployed queue that declares no backoff spreads its retries over a window of at least 10 minutes instead:
+the first retry comes after 5 to 30 seconds, and the retries after it split the rest of the window, so the last
+attempt only runs once the window has gone by. A dependency that is down for a few minutes (a database restart or
+failover) is back before the message runs out of attempts. With two attempts, the only retry waits the whole
+window. In a FIFO queue, a failing message holds its group for that window before it reaches the dead-letter queue.
+Declare a backoff to choose the delays yourself. The local emulator keeps the short delays.
+
 ```ts
 backoff: Queue.UseBackoff<{
   minDelay: 5;

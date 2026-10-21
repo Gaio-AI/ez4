@@ -70,6 +70,37 @@ export namespace Wait {
   };
 
   /**
+   * Get the next retry delay (in seconds) for retries that have to span at least `window` seconds.
+   *
+   * The first retry waits between `minDelay` and `maxDelay`, so a passing failure is retried soon. The retries
+   * after it split what is left of the window, so the last attempt only runs once the window has gone by: a
+   * dependency that is down for less than the window is back before the attempts run out. Each share waits up to
+   * a quarter more, so the messages of one outage don't all come back in the same second. The last attempt and
+   * any past it wait between `minDelay` and `maxDelay` as well: no retry is left to stretch, and waiting longer
+   * would only hold back the dead-letter.
+   *
+   * @param attempt Current attempt.
+   * @param maxAttempts Maximum number of attempts.
+   * @param minDelay Minimum delay for the first retry.
+   * @param maxDelay Maximum delay for the first retry.
+   * @param window Minimum time between the first and the last attempt.
+   * @returns Returns the next retry delay value.
+   */
+  export const spread = (attempt: number, maxAttempts: number, minDelay: number, maxDelay: number, window: number) => {
+    const retries = maxAttempts - 1;
+
+    const stretched = attempt <= retries && (attempt > 1 || retries === 1);
+
+    if (!stretched) {
+      return getRandomInteger(minDelay, maxDelay);
+    }
+
+    const share = retries > 1 ? Math.ceil((window - minDelay) / (retries - 1)) : window;
+
+    return getRandomInteger(share, Math.ceil(share * 1.25));
+  };
+
+  /**
    * Wait until the given `callback` function returns a truthy value or the maximum number
    * of `attempts` is reached.
    *
