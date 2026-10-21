@@ -1,4 +1,5 @@
-import { rename, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const REGISTRY_GRANTS_ENV = 'EZ4_AGENT_CODEARTIFACT';
@@ -51,7 +52,12 @@ export const writeRegistryAuth = async (grants: readonly RegistryGrant[], getTok
   }
 
   const file = join(home, '.npmrc');
-  const temp = `${file}.${process.pid}.tmp`;
-  await writeFile(temp, renderNpmrc(entries), { mode: 0o600 });
-  await rename(temp, file);
+  const temp = `${file}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temp, renderNpmrc(entries), { mode: 0o600, flag: 'wx' });
+    await rename(temp, file);
+  } catch (error) {
+    await rm(temp, { force: true });
+    throw error;
+  }
 };

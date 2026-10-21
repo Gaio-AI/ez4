@@ -97,6 +97,21 @@ describe('runtime :: registry auth', () => {
     }
   });
 
+  it('assert :: removes the tmp file when the rename fails', async () => {
+    const { mkdir, readdir } = await import('node:fs/promises');
+    const home = await mkdtemp(join(tmpdir(), 'registry-'));
+    try {
+      await mkdir(join(home, '.npmrc', 'occupied'), { recursive: true });
+      await rejects(writeRegistryAuth([grant], async () => 'tok-1', home));
+      equal(
+        (await readdir(home)).some((name) => name.endsWith('.tmp')),
+        false
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it('assert :: redacts already-obtained tokens if a later grant fails', async () => {
     const grant2: RegistryGrant = { domain: 'gaio', repository: 'other', region: 'us-east-1', accountId: '010928226197' };
     const home = await mkdtemp(join(tmpdir(), 'registry-'));
