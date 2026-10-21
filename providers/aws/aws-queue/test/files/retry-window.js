@@ -8,4 +8,6 @@ export const twoAttemptsHandler = fail;
 
 export const oneAttemptHandler = fail;
 
+export const sixAttemptsHandler = fail;
+
 export const backoffHandler = fail;
