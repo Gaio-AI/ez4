@@ -128,8 +128,18 @@ maxAge: 3600;
 
 Determines whether the scheduler is disabled.
 
+- The schedule is still deployed, with its state set to disabled, so it never fires; its function stays and can be invoked directly.
+- `ez4 serve` does not fire a disabled scheduler on its expression either; it still runs when invoked through its endpoint.
+- Not allowed on a dynamic scheduler.
+
 ```ts
 disabled: true;
+```
+
+To disable it on some stages only, read the flag from the environment: a missing variable keeps the default, and only `true` disables it.
+
+```ts
+disabled: Environment.VariableOrValue<'SCHEDULERS_DISABLED', false>;
 ```
 
 #### Custom tags (optional)
