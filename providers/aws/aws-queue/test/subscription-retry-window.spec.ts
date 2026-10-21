@@ -165,6 +165,17 @@ describe('queue subscription retry window', () => {
     }
   });
 
+  it('assert :: without a backoff the retries of a longer queue split the retry window', async () => {
+    const entryPoint = await loadEntryPoint('sixAttemptsHandler', { deadLetter: { maxAttempts: 6 } });
+
+    for (let counter = 0; counter < 20; counter++) {
+      const delays = await getRetryDelays(entryPoint, 6);
+
+      ok(delays[0] >= 5 && delays[0] <= 30, `first retry after ${delays[0]} s`);
+      ok(sum(delays) >= RetryWindow, `last attempt after ${sum(delays)} s`);
+    }
+  });
+
   it('assert :: without a backoff a queue with two attempts waits the whole retry window for its only retry', async () => {
     const entryPoint = await loadEntryPoint('twoAttemptsHandler', { deadLetter: { maxAttempts: 2 } });
 

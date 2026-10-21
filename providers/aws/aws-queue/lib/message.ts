@@ -6,7 +6,7 @@ import type { Queue } from '@ez4/queue';
 import { SQSClient, DeleteMessageCommand, ChangeMessageVisibilityCommand } from '@aws-sdk/client-sqs';
 import { getJsonMessage, resolveValidation } from '@ez4/queue/utils';
 import { ServiceEventType, Runtime } from '@ez4/common';
-import { getRandomUUID, Tasks, Wait } from '@ez4/utils';
+import { getRandomInteger, getRandomUUID, Tasks, Wait } from '@ez4/utils';
 
 const client = new SQSClient({});
 
@@ -288,13 +288,39 @@ const ackMessage = async (record: SQSRecord) => {
   }
 };
 
+/**
+ * Delay (in seconds) before the next attempt of a queue whose retries have to span the retry window.
+ *
+ * The first retry waits between the backoff bounds, so a passing failure is retried soon. The retries after it
+ * split what is left of the window, so the last attempt only runs once the window has gone by: a dependency that
+ * is down for less than the window is back before the attempts run out. Each share waits up to a quarter more, so
+ * the messages of one outage don't all come back in the same second. The last attempt and any past it wait between
+ * the backoff bounds as well: no retry is left to stretch, and waiting longer would only hold back the dead-letter.
+ *
+ * It lives in this runtime rather than in `@ez4/utils` because every function bundles that package: a change there
+ * would change the bytes of every function, not only of the queue ones.
+ */
+const getWindowDelay = (attempt: number) => {
+  const retries = __EZ4_MAX_ATTEMPTS - 1;
+
+  const stretched = attempt <= retries && (attempt > 1 || retries === 1);
+
+  if (!stretched) {
+    return getRandomInteger(__EZ4_MIN_BACKOFF, __EZ4_MAX_BACKOFF);
+  }
+
+  const share = retries > 1 ? Math.ceil((__EZ4_RETRY_WINDOW - __EZ4_MIN_BACKOFF) / (retries - 1)) : __EZ4_RETRY_WINDOW;
+
+  return getRandomInteger(share, Math.ceil(share * 1.25));
+};
+
 const retryMessage = async (record: SQSRecord, userDelay?: number) => {
   const { messageId, receiptHandle, attributes } = record;
 
   try {
     const attemptCount = Number(attributes.ApproximateReceiveCount);
     const attemptDelay = __EZ4_RETRY_WINDOW
-      ? Wait.spread(attemptCount, __EZ4_MAX_ATTEMPTS, __EZ4_MIN_BACKOFF, __EZ4_MAX_BACKOFF, __EZ4_RETRY_WINDOW)
+      ? getWindowDelay(attemptCount)
       : Wait.delay(attemptCount, __EZ4_MAX_ATTEMPTS, __EZ4_MIN_BACKOFF, __EZ4_MAX_BACKOFF);
 
     await client.send(
