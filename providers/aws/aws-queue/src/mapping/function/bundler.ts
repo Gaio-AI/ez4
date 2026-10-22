@@ -21,8 +21,26 @@ export const getQueueTemplateFile = () => {
 };
 
 export const bundleQueueFunction = async (parameters: BundleQueueFunctionParameters, connections: EntryState[]) => {
-  const { handler, listener, functionName, messageSchema, backoff, parallelism, acknowledge, idempotency, context, references, debug } =
-    parameters;
+  const {
+    handler,
+    listener,
+    functionName,
+    messageSchema,
+    backoff,
+    parallelism,
+    acknowledge,
+    idempotency,
+    keyConcurrency,
+    context,
+    references,
+    debug
+  } = parameters;
+
+  const claimsAttributes = {
+    handlerName: handler.functionName,
+    keyAttribute: ClaimsKeyAttribute,
+    expirationAttribute: ClaimsExpirationAttribute
+  };
 
   const definitions = getDefinitionsObject(connections);
 
@@ -40,14 +58,8 @@ export const bundleQueueFunction = async (parameters: BundleQueueFunctionParamet
       __EZ4_RETRY_WINDOW: `${backoff.window ?? 0}`,
       __EZ4_PARALLELISM: `${parallelism}`,
       __EZ4_ACKNOWLEDGE: JSON.stringify(acknowledge),
-      __EZ4_IDEMPOTENCY: idempotency
-        ? JSON.stringify({
-            ...idempotency,
-            handlerName: handler.functionName,
-            keyAttribute: ClaimsKeyAttribute,
-            expirationAttribute: ClaimsExpirationAttribute
-          })
-        : 'null'
+      __EZ4_IDEMPOTENCY: idempotency ? JSON.stringify({ ...idempotency, ...claimsAttributes }) : 'null',
+      __EZ4_KEY_CONCURRENCY: keyConcurrency ? JSON.stringify({ ...keyConcurrency, ...claimsAttributes }) : 'null'
     },
     handler,
     listener,

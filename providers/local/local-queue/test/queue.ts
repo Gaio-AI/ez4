@@ -33,7 +33,7 @@ export type ProbeEvent = {
   time: number;
 };
 
-export type ProbeHandler = (request: Queue.Incoming<TestMessage>) => Promise<void> | void;
+export type ProbeHandler = (request: Queue.DeferrableIncoming<TestMessage>) => Promise<void> | void;
 
 export type ProbeListener = (event: ProbeEvent) => void;
 
@@ -190,7 +190,8 @@ export const useQueueProbe = (t: TestContext) => {
 
   globalThis.queueProbe = {
     handler: async (incoming) => {
-      const request = incoming as Queue.Incoming<TestMessage>;
+      // The runtime gives every request `defer`, and throws when it's reached on a FIFO message.
+      const request = incoming as Queue.DeferrableIncoming<TestMessage>;
       const { requestId, attempt, maxAttempts, traceId, message } = request;
 
       requests.push({ requestId, attempt, maxAttempts, traceId, message, time: Date.now() });

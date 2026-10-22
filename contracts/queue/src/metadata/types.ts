@@ -75,6 +75,11 @@ export type QueueIdempotency = {
   ttl: number;
 };
 
+export type QueueKeyConcurrency = {
+  key: string[];
+  max: number;
+};
+
 export type QueueSubscription = {
   listener?: ServiceListener;
   handler: QueueSubscriptionHandler;
@@ -87,6 +92,7 @@ export type QueueSubscription = {
   parallelism?: number;
   acknowledge?: QueueSubscriptionAcknowledge;
   idempotency?: QueueIdempotency;
+  keyConcurrency?: QueueKeyConcurrency;
   batch?: number;
   memory?: number;
   files?: string[];

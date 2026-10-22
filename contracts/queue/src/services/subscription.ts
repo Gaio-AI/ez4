@@ -2,22 +2,34 @@ import type { ArchitectureType, LogLevel, RuntimeType } from '@ez4/project';
 import type { LinkedVariables } from '@ez4/project/library';
 import type { QueueSubscriptionListener } from './listener';
 import type { QueueIdempotency } from './idempotency';
+import type { QueueKeyConcurrency } from './concurrency';
+import type { QueueDeferrableIncoming, QueueIncoming } from './incoming';
 import type { QueueSubscriptionHandler } from './handler';
 import type { QueueMessage } from './message';
+import type { Queue } from './contract';
+
+/**
+ * The request the handlers of a queue in the given mode receive: only a standard queue's can be deferred. Checked
+ * as a whole (not per union member), so a mode left open (`any`, as in constraints) takes every handler.
+ */
+export type QueueModeIncoming<T extends QueueMessage, U extends Queue.Mode> = [U] extends [{ fairMode: true }]
+  ? QueueDeferrableIncoming<T>
+  : QueueIncoming<T>;
 
 /**
  * Queue subscription.
  */
-export interface QueueSubscription<T extends QueueMessage> {
+export interface QueueSubscription<T extends QueueMessage, U extends Queue.Mode = { fairMode: true }> {
   /**
    * Life-cycle listener function for the subscription.
    */
   readonly listener?: QueueSubscriptionListener<T>;
 
   /**
-   * Entry-point handler function for the subscription.
+   * Entry-point handler function for the subscription. A handler that defers its messages declares
+   * `Queue.DeferrableIncoming`, which only a standard queue gives.
    */
-  readonly handler: QueueSubscriptionHandler<T>;
+  readonly handler: QueueSubscriptionHandler<T, QueueModeIncoming<T, U>>;
 
   /**
    * Maximum number of messages per handler invocation. A FIFO queue takes at most 10.
@@ -62,6 +74,13 @@ export interface QueueSubscription<T extends QueueMessage> {
    *   and the message is consumed, so it runs neither again nor twice.
    */
   readonly idempotency?: QueueIdempotency<T>;
+
+  /**
+   * Run at most `max` messages with the same key at once: a message whose key has no free slot is deferred for a
+   * few seconds instead of running, without spending an attempt. For a limit per tenant, such as one account's
+   * share of a provider quota. Not available on a FIFO queue, where a deferred copy would lose its place.
+   */
+  readonly keyConcurrency?: QueueKeyConcurrency<T>;
 
   /**
    * Variables associated to the subscription.

@@ -34,8 +34,11 @@ import {
   InvalidSubscriptionTypeError
 } from '../errors/subscription';
 
+import { IncorrectKeyConcurrencyKeyError, InvalidKeyConcurrencyQueueError } from '../errors/concurrency';
 import { IncorrectIdempotencyKeyError } from '../errors/idempotency';
-import { getMissingIdempotencyKeys, getQueueIdempotencyMetadata } from './idempotency';
+import { getQueueKeyConcurrencyMetadata } from './concurrency';
+import { getQueueIdempotencyMetadata } from './idempotency';
+import { getMissingKeyFields } from './utils/key';
 import { getSubscriptionHandlerMetadata } from './handler';
 
 // An SQS event source mapping takes at most this many messages per batch from a FIFO queue.
@@ -52,11 +55,21 @@ export const isQueueSubscriptionDeclaration = (type: AllType) => {
 export const validateQueueSubscriptions = (service: QueueService | QueueImport, fileName?: string) => {
   const errorList: Error[] = [];
 
-  for (const { handler, idempotency } of service.subscriptions) {
-    const missingKeys = idempotency && getMissingIdempotencyKeys(idempotency, service.schema);
+  for (const { handler, idempotency, keyConcurrency } of service.subscriptions) {
+    const missingIdempotencyKeys = idempotency && getMissingKeyFields(idempotency.key, service.schema);
+    const missingConcurrencyKeys = keyConcurrency && getMissingKeyFields(keyConcurrency.key, service.schema);
 
-    if (missingKeys?.length) {
-      errorList.push(new IncorrectIdempotencyKeyError(handler.name, missingKeys, fileName));
+    if (missingIdempotencyKeys?.length) {
+      errorList.push(new IncorrectIdempotencyKeyError(handler.name, missingIdempotencyKeys, fileName));
+    }
+
+    if (missingConcurrencyKeys?.length) {
+      errorList.push(new IncorrectKeyConcurrencyKeyError(handler.name, missingConcurrencyKeys, fileName));
+    }
+
+    // Holding a message back for a slot sends a copy, which a FIFO queue would put after the rest of its group.
+    if (keyConcurrency && service.fifoMode) {
+      errorList.push(new InvalidKeyConcurrencyQueueError(handler.name, fileName));
     }
   }
 
@@ -208,6 +221,11 @@ const getTypeFromMembers = (
 
       case 'idempotency': {
         subscription.idempotency = getQueueIdempotencyMetadata(member.value, parent, reflection, errorList);
+        break;
+      }
+
+      case 'keyConcurrency': {
+        subscription.keyConcurrency = getQueueKeyConcurrencyMetadata(member.value, parent, reflection, errorList);
         break;
       }
 

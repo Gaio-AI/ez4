@@ -46,6 +46,29 @@ export type QueueFunctionIdempotency = {
   lease: number;
 };
 
+export type QueueFunctionKeyConcurrency = {
+  /**
+   * Table that keeps the slots of the subscription.
+   */
+  tableName: string;
+
+  /**
+   * Message fields whose values form the key.
+   */
+  key: string[];
+
+  /**
+   * Slots of each key.
+   */
+  max: number;
+
+  /**
+   * Time (in seconds) a slot is held for its execution, after which another one can take it. It's the queue
+   * timeout: no execution outlives it.
+   */
+  lease: number;
+};
+
 export type QueueFunctionParameters = Omit<
   FunctionParameters,
   'getFunctionFiles' | 'getFunctionBundle' | 'getFunctionHash' | 'getFunctionVariables' | 'sourceFile' | 'handlerName'
@@ -60,5 +83,6 @@ export type QueueFunctionParameters = Omit<
   parallelism: number;
   acknowledge: QueueSubscriptionAcknowledge;
   idempotency?: QueueFunctionIdempotency;
+  keyConcurrency?: QueueFunctionKeyConcurrency;
   debug?: boolean;
 };

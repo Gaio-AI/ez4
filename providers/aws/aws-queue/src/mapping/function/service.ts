@@ -17,7 +17,8 @@ export const createQueueFunction = <E extends EntryState>(
   logGroupState: LogGroupState,
   parameters: QueueFunctionParameters
 ) => {
-  const { handler, variables, debug, architecture, backoff, parallelism, acknowledge, idempotency, messageSchema } = parameters;
+  const { handler, variables, debug, architecture, backoff, parallelism, acknowledge, idempotency, keyConcurrency, messageSchema } =
+    parameters;
 
   return createFunction(state, roleState, logGroupState, {
     handlerName: 'sqsEntryPoint',
@@ -56,6 +57,9 @@ export const createQueueFunction = <E extends EntryState>(
         debug,
         ...(idempotency && {
           idempotency
+        }),
+        ...(keyConcurrency && {
+          keyConcurrency
         }),
         ...(disabledProjects.length > 0 && {
           disabledProjects

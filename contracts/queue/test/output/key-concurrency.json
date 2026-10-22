@@ -1,0 +1,87 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestQueue": {
+    "type": "@ez4/queue",
+    "name": "TestQueue",
+    "context": {},
+    "file": "test/input/output-key-concurrency.ts",
+    "variables": {},
+    "services": {},
+    "schema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "identity": 1
+    },
+    "subscriptions": [
+      {
+        "handler": {
+          "name": "testHandler",
+          "file": "test/input/output-key-concurrency.ts",
+          "position": [
+            44,
+            1
+          ]
+        },
+        "keyConcurrency": {
+          "key": [
+            "accountId"
+          ],
+          "max": 1
+        }
+      },
+      {
+        "handler": {
+          "name": "otherHandler",
+          "file": "test/input/output-key-concurrency.ts",
+          "position": [
+            49,
+            1
+          ]
+        },
+        "keyConcurrency": {
+          "key": [
+            "accountId",
+            "connectionId"
+          ],
+          "max": 3
+        }
+      },
+      {
+        "handler": {
+          "name": "thirdHandler",
+          "file": "test/input/output-key-concurrency.ts",
+          "position": [
+            51,
+            1
+          ]
+        },
+        "keyConcurrency": {
+          "key": [
+            "connectionId"
+          ],
+          "max": 2
+        }
+      }
+    ]
+  }
+}

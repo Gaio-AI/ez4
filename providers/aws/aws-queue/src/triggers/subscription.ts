@@ -32,7 +32,7 @@ export const prepareSubscriptions = (
   const claimsTableState = prepareClaimsTable(state, service, options);
 
   for (const subscription of subscriptions) {
-    const { handler, listener, idempotency } = subscription;
+    const { handler, listener, idempotency, keyConcurrency } = subscription;
 
     const internalName = getInternalName(service, handler.name);
 
@@ -90,6 +90,15 @@ export const prepareSubscriptions = (
               lease: timeout
             }
           }),
+        ...(keyConcurrency &&
+          claimsTableState && {
+            keyConcurrency: {
+              tableName: claimsTableState.parameters.tableName,
+              key: keyConcurrency.key,
+              max: keyConcurrency.max,
+              lease: timeout
+            }
+          }),
         handler: {
           sourceFile: handler.file,
           functionName: handler.name,
@@ -130,10 +139,10 @@ export const prepareSubscriptions = (
   }
 };
 
-// One table keeps the keys of every subscription of the queue that runs its messages once. It only holds keys that
-// expire, so it goes away with the last subscription that uses it.
+// One table keeps the keys and the slots of every subscription of the queue that runs its messages once or limits
+// them per key. It only holds items that expire, so it goes away with the last subscription that uses it.
 const prepareClaimsTable = (state: EntryStates, service: QueueService | QueueImport, options: DeployOptions) => {
-  if (!service.subscriptions.some(({ idempotency }) => !!idempotency)) {
+  if (!service.subscriptions.some(({ idempotency, keyConcurrency }) => !!idempotency || !!keyConcurrency)) {
     return undefined;
   }
 

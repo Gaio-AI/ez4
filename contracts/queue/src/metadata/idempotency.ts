@@ -1,6 +1,5 @@
 import type { AllType, ReflectionTypes, TypeModel, TypeObject } from '@ez4/reflection';
 import type { MemberType } from '@ez4/common/library';
-import type { AnySchema } from '@ez4/schema';
 import type { Incomplete } from '@ez4/utils';
 import type { QueueIdempotency } from './types';
 
@@ -10,15 +9,14 @@ import {
   getModelMembers,
   getObjectMembers,
   getPropertyNumber,
-  getPropertyString,
-  getPropertyStringList,
   getReferenceType,
   hasHeritageType
 } from '@ez4/common/library';
 
 import { isModelProperty, isTypeObject, isTypeReference } from '@ez4/reflection';
-import { isObjectSchema, isUnionSchema } from '@ez4/schema';
 import { isAnyNumber, isObjectWith } from '@ez4/utils';
+
+import { getKeyFieldsProperty } from './utils/key';
 
 import {
   IncompleteIdempotencyError,
@@ -43,28 +41,6 @@ export const getQueueIdempotencyMetadata = (type: AllType, parent: TypeModel, re
   }
 
   return undefined;
-};
-
-/**
- * The key fields of an idempotency that aren't required fields of every message the schema takes: a message
- * without one of them has no key to run once by.
- */
-export const getMissingIdempotencyKeys = (idempotency: QueueIdempotency, schema: AnySchema) => {
-  return idempotency.key.filter((fieldName) => !isRequiredMessageField(schema, fieldName));
-};
-
-const isRequiredMessageField = (schema: AnySchema, fieldName: string): boolean => {
-  if (isObjectSchema(schema)) {
-    const property = schema.properties[fieldName];
-
-    return !!property && !property.optional && !property.nullable;
-  }
-
-  if (isUnionSchema(schema)) {
-    return schema.elements.every((element) => isRequiredMessageField(element, fieldName));
-  }
-
-  return false;
 };
 
 const isCompleteIdempotency = (type: Incomplete<QueueIdempotency>): type is QueueIdempotency => {
@@ -105,8 +81,7 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, parent: TypeModel, mem
       }
 
       case 'key': {
-        const fieldName = getPropertyString(member);
-        const fieldNames = fieldName ? [fieldName] : getPropertyStringList(member);
+        const fieldNames = getKeyFieldsProperty(member);
 
         if (fieldNames?.length) {
           idempotency.key = fieldNames;

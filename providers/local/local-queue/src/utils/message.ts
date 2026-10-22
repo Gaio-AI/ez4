@@ -14,6 +14,16 @@ import { getMessageGroupId } from './group';
 export type MessageAttributes = {
   traceId: string;
   scope?: string;
+
+  /**
+   * Times the message was deferred, each wait counting once.
+   */
+  defers?: number;
+
+  /**
+   * When (in milliseconds) a message deferred past the longest wait of a queue is due.
+   */
+  deferUntil?: number;
 };
 
 export type OutgoingMessage = {
