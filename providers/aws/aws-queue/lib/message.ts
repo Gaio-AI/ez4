@@ -2,11 +2,27 @@ import type { SQSEvent, Context, SQSBatchItemFailure, SQSBatchResponse, SQSRecor
 import type { ValidationCustomContext } from '@ez4/validator';
 import type { MessageSchema } from '@ez4/queue/utils';
 import type { Queue } from '@ez4/queue';
+import type { AttributeValue, DynamoDBClient, UpdateItemCommand, DeleteItemCommand } from '@aws-sdk/client-dynamodb';
 
 import { SQSClient, DeleteMessageCommand, ChangeMessageVisibilityCommand } from '@aws-sdk/client-sqs';
-import { getJsonMessage, resolveValidation } from '@ez4/queue/utils';
+import { getIdempotencyKey, getJsonMessage, isUnknownOutcomeError, resolveValidation } from '@ez4/queue/utils';
 import { ServiceEventType, Runtime } from '@ez4/common';
 import { getRandomInteger, getRandomUUID, Tasks, Wait } from '@ez4/utils';
+
+type ClaimsOptions = {
+  tableName: string;
+  handlerName: string;
+  key: string[];
+  ttl: number;
+  lease: number;
+  keyAttribute: string;
+  expirationAttribute: string;
+};
+
+type HeldClaim = {
+  key: string;
+  owner: string;
+};
 
 const client = new SQSClient({});
 
@@ -17,6 +33,7 @@ declare const __EZ4_MAX_BACKOFF: number;
 declare const __EZ4_RETRY_WINDOW: number;
 declare const __EZ4_PARALLELISM: number;
 declare const __EZ4_ACKNOWLEDGE: 'record' | 'batch';
+declare const __EZ4_IDEMPOTENCY: ClaimsOptions | null;
 declare const __EZ4_CONTEXT: object;
 
 declare function dispatch(event: Queue.ServiceEvent<Queue.Message>, context: object): Promise<void>;
@@ -201,11 +218,40 @@ const processRecord = async (
     };
 
     let currentRequest: Queue.Incoming<Queue.Message> | undefined;
+    let heldClaim: HeldClaim | undefined;
     let handled = false;
 
     try {
       const payload = JSON.parse(record.body);
       const message = await getJsonMessage(payload, schema, onCustomValidation);
+
+      if (__EZ4_IDEMPOTENCY) {
+        const claimKey = getIdempotencyKey(__EZ4_IDEMPOTENCY.handlerName, message, __EZ4_IDEMPOTENCY.key);
+        const claimResult = await takeClaim(__EZ4_IDEMPOTENCY, claimKey);
+
+        if (claimResult.status === 'done') {
+          console.info({ messageId: record.messageId, claimKey, claimStatus: claimResult.status });
+
+          if (deleteEachRecord) {
+            await ackMessage(record);
+          }
+
+          return outcome;
+        }
+
+        if (claimResult.status === 'busy') {
+          console.info({ messageId: record.messageId, claimKey, claimStatus: claimResult.status });
+
+          outcome.handedBack = true;
+          outcome.holdsGroup = true;
+
+          await retryMessage(record);
+
+          return outcome;
+        }
+
+        heldClaim = claimResult.claim;
+      }
 
       const retry = async (options?: Queue.RetryOptions) => {
         outcome.handedBack = true;
@@ -230,6 +276,15 @@ const processRecord = async (
 
       handled = true;
 
+      // A handler that handed its message back runs it again, so the key goes back with it.
+      if (heldClaim && __EZ4_IDEMPOTENCY) {
+        if (outcome.handedBack) {
+          await releaseClaim(__EZ4_IDEMPOTENCY, heldClaim);
+        } else {
+          await keepClaim(__EZ4_IDEMPOTENCY, heldClaim, 'done');
+        }
+      }
+
       if (deleteEachRecord && !outcome.handedBack) {
         await ackMessage(record);
       }
@@ -243,9 +298,7 @@ const processRecord = async (
       // A record whose handler finished is consumed even when a hook after it fails: sending it
       // back would run it again.
       if (!handled) {
-        await retryMessage(record);
-
-        outcome.handedBack = true;
+        await failRecord(record, heldClaim, error, deleteEachRecord, outcome);
       }
     } finally {
       if (currentRequest) {
@@ -255,6 +308,38 @@ const processRecord = async (
 
     return outcome;
   });
+};
+
+const failRecord = async (
+  record: SQSRecord,
+  heldClaim: HeldClaim | undefined,
+  error: unknown,
+  deleteEachRecord: boolean,
+  outcome: RecordOutcome
+) => {
+  if (!heldClaim || !__EZ4_IDEMPOTENCY) {
+    outcome.handedBack = true;
+
+    return retryMessage(record);
+  }
+
+  // The work may or may not have happened: the key is kept as if it ran, and the message is consumed so it runs
+  // neither again nor twice.
+  if (isUnknownOutcomeError(error)) {
+    await keepClaim(__EZ4_IDEMPOTENCY, heldClaim, 'unknown');
+
+    if (deleteEachRecord) {
+      await ackMessage(record);
+    }
+
+    return undefined;
+  }
+
+  await releaseClaim(__EZ4_IDEMPOTENCY, heldClaim);
+
+  outcome.handedBack = true;
+
+  return retryMessage(record);
 };
 
 const getQueueUrl = (queueArn: string): string => {
@@ -337,6 +422,164 @@ const retryMessage = async (record: SQSRecord, userDelay?: number) => {
       messageId
     });
   }
+};
+
+/**
+ * - `taken`: this execution holds the key and runs the handler.
+ * - `done`: the key already ran, or its outcome is unknown, so the handler doesn't run again.
+ * - `busy`: another execution holds the key, so the message goes back to the queue.
+ */
+type ClaimResult = { status: 'taken'; claim: HeldClaim } | { status: 'done' } | { status: 'busy' };
+
+type DynamoDbCache = {
+  dynamoDbClient: DynamoDBClient;
+  UpdateItemCommand: typeof UpdateItemCommand;
+  DeleteItemCommand: typeof DeleteItemCommand;
+};
+
+const enum ClaimState {
+  Running = 'running',
+  Done = 'done',
+  Unknown = 'unknown'
+}
+
+// Loaded on the first claim, so a queue function that doesn't run its messages once never loads the client.
+let DYNAMODB_CACHE: Promise<DynamoDbCache> | undefined;
+
+/**
+ * Take the key for one execution of the handler. A key that's free, or whose lease or ttl has passed (the table
+ * deletes expired items some time later), is taken; one that's running in another execution or that already ran
+ * isn't.
+ */
+const takeClaim = async (options: ClaimsOptions, key: string): Promise<ClaimResult> => {
+  const { dynamoDbClient, UpdateItemCommand } = await getDynamoDbClient();
+
+  const owner = getRandomUUID();
+  const now = getEpochSeconds();
+
+  try {
+    await dynamoDbClient.send(
+      new UpdateItemCommand({
+        TableName: options.tableName,
+        Key: getClaimItemKey(options, key),
+        UpdateExpression: 'SET #state = :state, #owner = :owner, #expiration = :expiration',
+        ConditionExpression: 'attribute_not_exists(#key) OR #expiration <= :now',
+        ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
+        ExpressionAttributeNames: {
+          '#key': options.keyAttribute,
+          '#state': 'state',
+          '#owner': 'owner',
+          '#expiration': options.expirationAttribute
+        },
+        ExpressionAttributeValues: {
+          ':state': { S: ClaimState.Running },
+          ':owner': { S: owner },
+          ':expiration': { N: `${now + options.lease}` },
+          ':now': { N: `${now}` }
+        }
+      })
+    );
+
+    return { status: 'taken', claim: { key, owner } };
+    //
+  } catch (error) {
+    if (!isConditionalCheckFailed(error)) {
+      throw error;
+    }
+
+    return error.Item?.state?.S === ClaimState.Running ? { status: 'busy' } : { status: 'done' };
+  }
+};
+
+/**
+ * Keep the key for its ttl, as done or as unknown. The handler has already run, so a failure here is only logged:
+ * the key frees itself once its lease passes, and a message delivered after that runs again.
+ */
+const keepClaim = async (options: ClaimsOptions, claim: HeldClaim, state: 'done' | 'unknown') => {
+  try {
+    const { dynamoDbClient, UpdateItemCommand } = await getDynamoDbClient();
+
+    await dynamoDbClient.send(
+      new UpdateItemCommand({
+        TableName: options.tableName,
+        Key: getClaimItemKey(options, claim.key),
+        UpdateExpression: 'SET #state = :state, #expiration = :expiration',
+        ConditionExpression: '#owner = :owner',
+        ExpressionAttributeNames: {
+          '#state': 'state',
+          '#owner': 'owner',
+          '#expiration': options.expirationAttribute
+        },
+        ExpressionAttributeValues: {
+          ':state': { S: state === 'done' ? ClaimState.Done : ClaimState.Unknown },
+          ':owner': { S: claim.owner },
+          ':expiration': { N: `${getEpochSeconds() + options.ttl}` }
+        }
+      })
+    );
+  } catch (error) {
+    console.warn({ error: `${error}`, claimKey: claim.key, claimState: state });
+  }
+};
+
+/**
+ * Free the key for the next attempt. A failure is only logged: the key frees itself once its lease passes.
+ */
+const releaseClaim = async (options: ClaimsOptions, claim: HeldClaim) => {
+  try {
+    const { dynamoDbClient, DeleteItemCommand } = await getDynamoDbClient();
+
+    await dynamoDbClient.send(
+      new DeleteItemCommand({
+        TableName: options.tableName,
+        Key: getClaimItemKey(options, claim.key),
+        ConditionExpression: '#owner = :owner',
+        ExpressionAttributeNames: {
+          '#owner': 'owner'
+        },
+        ExpressionAttributeValues: {
+          ':owner': { S: claim.owner }
+        }
+      })
+    );
+  } catch (error) {
+    if (!isConditionalCheckFailed(error)) {
+      console.warn({ error: `${error}`, claimKey: claim.key });
+    }
+  }
+};
+
+const getClaimItemKey = (options: ClaimsOptions, key: string): Record<string, AttributeValue> => {
+  return {
+    [options.keyAttribute]: { S: key }
+  };
+};
+
+const getEpochSeconds = () => {
+  return Math.floor(Date.now() / 1000);
+};
+
+const isConditionalCheckFailed = (error: unknown): error is Error & { Item?: Record<string, AttributeValue> } => {
+  return error instanceof Error && error.name === 'ConditionalCheckFailedException';
+};
+
+const getDynamoDbClient = async () => {
+  if (!DYNAMODB_CACHE) {
+    DYNAMODB_CACHE = import('@aws-sdk/client-dynamodb')
+      .then(({ DynamoDBClient, UpdateItemCommand, DeleteItemCommand }) => {
+        return {
+          dynamoDbClient: new DynamoDBClient({}),
+          UpdateItemCommand,
+          DeleteItemCommand
+        };
+      })
+      .catch((error) => {
+        DYNAMODB_CACHE = undefined;
+        throw error;
+      });
+  }
+
+  return DYNAMODB_CACHE;
 };
 
 const onCustomValidation = (value: unknown, context: ValidationCustomContext) => {

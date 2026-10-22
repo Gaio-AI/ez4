@@ -1,9 +1,11 @@
 import type { MessageAttributes, OutgoingMessage } from '../utils/message';
+import type { LocalClaims } from './claims';
 
 import { getRandomUUID } from '@ez4/utils';
 import { Logger } from '@ez4/logger';
 
 import { InvalidParameterValueError } from '../utils/errors';
+import { createLocalClaims } from './claims';
 
 export type LocalQueueParameters = {
   queueName: string;
@@ -45,6 +47,7 @@ export type LocalQueue = {
   subscribe: (listener: () => void) => () => void;
   notify: () => void;
   shutdown: () => void;
+  claims: LocalClaims;
 };
 
 type StoredMessage = {
@@ -445,6 +448,7 @@ export const createLocalQueue = (parameters: LocalQueueParameters): LocalQueue =
     waitUntil,
     subscribe,
     notify,
-    shutdown
+    shutdown,
+    claims: createLocalClaims()
   };
 };

@@ -10,6 +10,12 @@ export const getPolicyDocument = async (prefixList: string[]) => {
         return buildQueueArn(region, accountId, `${prefix}-*`);
       }),
       permissions: ['sqs:SendMessage', 'sqs:ReceiveMessage', 'sqs:GetQueueAttributes', 'sqs:ChangeMessageVisibility', 'sqs:DeleteMessage']
+    },
+    {
+      resourceIds: prefixList.map((prefix) => {
+        return `arn:aws:dynamodb:${region}:${accountId}:table/${prefix}-*-claims`;
+      }),
+      permissions: ['dynamodb:UpdateItem', 'dynamodb:DeleteItem']
     }
   ]);
 };

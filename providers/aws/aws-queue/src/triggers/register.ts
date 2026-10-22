@@ -3,6 +3,7 @@ import type { PrepareResourceEvent, ConnectResourceEvent, ServiceEvent } from '@
 import { registerTriggers as registerAwsTriggers } from '@ez4/aws-common';
 import { registerTriggers as registerAwsIdentityTriggers } from '@ez4/aws-identity';
 import { registerTriggers as registerAwsFunctionTriggers } from '@ez4/aws-function';
+import { registerTriggers as registerAwsDynamoDbTriggers } from '@ez4/aws-dynamodb';
 import { registerTriggers as registerQueueTriggers } from '@ez4/queue/library';
 import { tryCreateTrigger } from '@ez4/project/library';
 
@@ -16,6 +17,7 @@ export const registerTriggers = () => {
   registerAwsTriggers();
   registerAwsIdentityTriggers();
   registerAwsFunctionTriggers();
+  registerAwsDynamoDbTriggers();
   registerQueueTriggers();
 
   tryCreateTrigger('@ez4/aws-queue', {

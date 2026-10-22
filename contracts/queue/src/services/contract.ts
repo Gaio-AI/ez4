@@ -3,6 +3,7 @@ import type { Service as CommonService } from '@ez4/common';
 import type { QueueSubscriptionListener } from './listener';
 import type { QueueSubscriptionHandler } from './handler';
 import type { QueueSubscription } from './subscription';
+import type { QueueIdempotency } from './idempotency';
 import type { QueueDeadLetter } from './deadletter';
 import type { QueueFifoMode } from './fifomode';
 import type { QueueFairMode } from './fairmode';
@@ -34,6 +35,8 @@ export namespace Queue {
 
   export type Subscription<T extends Message> = QueueSubscription<T>;
 
+  export type Idempotency<T extends Message> = QueueIdempotency<T>;
+
   export type ServiceEvent<T extends Message = Message> =
     | CommonService.BeginEvent<Request>
     | CommonService.ReadyEvent<Incoming<T>>
@@ -46,6 +49,11 @@ export namespace Queue {
    * Queue Subscription definition.
    */
   export type UseSubscription<T extends Subscription<any>> = T;
+
+  /**
+   * Queue Subscription idempotency definition.
+   */
+  export type UseIdempotency<T extends Idempotency<any>> = T;
 
   /**
    * Queue FIFO mode definition.

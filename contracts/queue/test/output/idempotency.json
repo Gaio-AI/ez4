@@ -1,0 +1,137 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestQueue": {
+    "type": "@ez4/queue",
+    "name": "TestQueue",
+    "context": {},
+    "file": "test/input/output-idempotency.ts",
+    "variables": {},
+    "services": {},
+    "schema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "number"
+        },
+        "note": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "identity": 1
+    },
+    "subscriptions": [
+      {
+        "handler": {
+          "name": "testHandler",
+          "file": "test/input/output-idempotency.ts",
+          "position": [
+            60,
+            1
+          ]
+        },
+        "idempotency": {
+          "key": [
+            "eventId"
+          ],
+          "ttl": 604800
+        }
+      },
+      {
+        "handler": {
+          "name": "otherHandler",
+          "file": "test/input/output-idempotency.ts",
+          "position": [
+            62,
+            1
+          ]
+        },
+        "idempotency": {
+          "key": [
+            "jobId",
+            "contactId"
+          ],
+          "ttl": 3600
+        }
+      },
+      {
+        "handler": {
+          "name": "thirdHandler",
+          "file": "test/input/output-idempotency.ts",
+          "position": [
+            64,
+            1
+          ]
+        },
+        "idempotency": {
+          "key": [
+            "jobId"
+          ],
+          "ttl": 86400
+        }
+      }
+    ]
+  },
+  "TestImportQueue": {
+    "type": "@ez4/import:queue",
+    "name": "TestImportQueue",
+    "context": {},
+    "file": "test/input/output-idempotency.ts",
+    "variables": {},
+    "services": {},
+    "reference": "TestQueue",
+    "subscriptions": [
+      {
+        "handler": {
+          "name": "testHandler",
+          "file": "test/input/output-idempotency.ts",
+          "position": [
+            60,
+            1
+          ]
+        },
+        "idempotency": {
+          "key": [
+            "eventId"
+          ],
+          "ttl": 60
+        }
+      }
+    ],
+    "schema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "number"
+        },
+        "note": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "identity": 1
+    },
+    "project": "name from project in ez4.project.js"
+  }
+}

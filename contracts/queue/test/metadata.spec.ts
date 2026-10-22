@@ -34,6 +34,7 @@ describe('queue metadata', () => {
   it('assert :: subscription validation', () => testFile('validation'));
   it('assert :: subscription listener', () => testFile('listener'));
   it('assert :: subscription vpc', () => testFile('vpc'));
+  it('assert :: subscription idempotency', () => testFile('idempotency'));
   it('assert :: queue message', () => testFile('message'));
   it('assert :: import queue', () => testFile('import'));
 });

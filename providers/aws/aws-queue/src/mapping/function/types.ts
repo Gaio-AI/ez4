@@ -23,6 +23,29 @@ export type QueueBackoff = {
   window?: number;
 };
 
+export type QueueFunctionIdempotency = {
+  /**
+   * Table that keeps the keys of the subscription.
+   */
+  tableName: string;
+
+  /**
+   * Message fields whose values form the key.
+   */
+  key: string[];
+
+  /**
+   * Time (in seconds) a key that ran is kept.
+   */
+  ttl: number;
+
+  /**
+   * Time (in seconds) a running key is held for its execution, after which another one can take it. It's the
+   * queue timeout: no execution outlives it.
+   */
+  lease: number;
+};
+
 export type QueueFunctionParameters = Omit<
   FunctionParameters,
   'getFunctionFiles' | 'getFunctionBundle' | 'getFunctionHash' | 'getFunctionVariables' | 'sourceFile' | 'handlerName'
@@ -36,5 +59,6 @@ export type QueueFunctionParameters = Omit<
   backoff: QueueBackoff;
   parallelism: number;
   acknowledge: QueueSubscriptionAcknowledge;
+  idempotency?: QueueFunctionIdempotency;
   debug?: boolean;
 };
