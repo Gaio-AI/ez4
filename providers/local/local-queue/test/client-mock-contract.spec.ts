@@ -1,3 +1,4 @@
+import type { SendMessagesError } from '@ez4/queue/utils';
 import type { QueueService } from '@ez4/queue/library';
 
 import { describe, it, mock } from 'node:test';
@@ -47,6 +48,24 @@ describe('local queue client mock contract', () => {
     await client.sendMessage({ id: 'a', extra: 'dropped by the schema' } as any);
 
     deepEqual(client.delivered, [{ id: 'a' }]);
+  });
+
+  it('assert :: deliver each message of a batch and fail only the invalid one', async () => {
+    const client = createClientMock('contractQueue', getQueueService());
+
+    await rejects(
+      () => client.sendMessages([{ id: 'a' }, { id: 'b', note: null } as any, { id: 'c' }]),
+      (error: SendMessagesError) => {
+        equal(error.name, 'SendMessagesError');
+        equal(error.failures.length, 1);
+        equal(error.failures[0].index, 1);
+        ok(error.failures[0].error instanceof MalformedMessageError);
+
+        return true;
+      }
+    );
+
+    deepEqual(client.delivered, [{ id: 'a' }, { id: 'c' }]);
   });
 
   it('assert :: reject a fifo message without its group', async () => {

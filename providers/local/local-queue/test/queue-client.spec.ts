@@ -1,3 +1,4 @@
+import type { SendMessagesError } from '@ez4/queue/utils';
 import type { TestMessage } from './queue';
 
 import { deepEqual, equal, rejects } from 'node:assert/strict';
@@ -39,6 +40,26 @@ describe('local queue client', () => {
 
       await rejects(() => client.sendMessage({ id: 'x'.repeat(largestId + 1) }), SIZE_ERROR);
     });
+  });
+
+  it('assert :: send messages queues each one and an invalid one fails alone', async (t) => {
+    const { client } = await startQueue(t, getQueueService('sendMessagesQueue', { subscriptions: [] }));
+
+    await rejects(
+      () => client.sendMessages([{ id: 'a' }, { id: 1 as unknown as string }, { id: 'c' }]),
+      (error: SendMessagesError) => {
+        equal(error.name, 'SendMessagesError');
+
+        deepEqual(
+          error.failures.map(({ index, message }) => ({ index, message })),
+          [{ index: 1, message: { id: 1 } }]
+        );
+
+        return true;
+      }
+    );
+
+    deepEqual(await client.receiveMessage({ messages: 10 }), [{ id: 'a' }, { id: 'c' }]);
   });
 
   it('assert :: refuse a delay out of 0 to 900 seconds', async (t) => {

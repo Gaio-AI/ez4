@@ -5,6 +5,7 @@ import { getJsonStringMessage } from '@ez4/queue/utils';
 import { Logger } from '@ez4/logger';
 
 import { getMessageGroupId } from '../utils/group';
+import { sendEachMessage } from '../utils/message';
 
 export type ClientMockClient<T extends Queue.Message, U extends Queue.Mode> = Client<T, U> & {
   readonly delivered: T[];
@@ -16,6 +17,19 @@ export const createClientMock = <T extends Queue.Message = any, U extends Queue.
 ): ClientMockClient<T, U> => {
   const delivered: T[] = [];
 
+  const deliverMessage = async (message: T) => {
+    if (!contract) {
+      return;
+    }
+
+    // The same checks the real client makes before sending, so a message it would refuse fails here too.
+    const payload = await getJsonStringMessage(message, contract.schema);
+
+    getMessageGroupId(message, contract);
+
+    delivered.push(JSON.parse(payload));
+  };
+
   return new (class {
     get delivered() {
       return delivered;
@@ -24,16 +38,13 @@ export const createClientMock = <T extends Queue.Message = any, U extends Queue.
     async sendMessage(message: T, _options?: SendOptions<U>) {
       Logger.log(`✉️  Sending message to queue [${resourceName}]`);
 
-      if (!contract) {
-        return;
-      }
+      await deliverMessage(message);
+    }
 
-      // The same checks the real client makes before sending, so a message it would refuse fails here too.
-      const payload = await getJsonStringMessage(message, contract.schema);
+    async sendMessages(messages: T[], _options?: SendOptions<U>) {
+      Logger.log(`✉️  Sending ${messages.length} messages to queue [${resourceName}]`);
 
-      getMessageGroupId(message, contract);
-
-      delivered.push(JSON.parse(payload));
+      await sendEachMessage(messages, deliverMessage);
     }
 
     receiveMessage(): Promise<T[]> {

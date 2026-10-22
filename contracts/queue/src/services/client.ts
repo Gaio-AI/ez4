@@ -13,6 +13,17 @@ export interface Client<T extends Queue.Message, U extends Queue.Mode> {
   sendMessage(message: T, options?: SendOptions<U>): Promise<void>;
 
   /**
+   * Send new JSON messages to the queue, grouped in as few requests as the provider takes.
+   *
+   * Each message succeeds or fails on its own, as with `sendMessage`: the others are still sent, and
+   * then it throws a `SendMessagesError` listing each message that failed and why.
+   *
+   * @param messages Message objects.
+   * @param options Send options, applied to every message.
+   */
+  sendMessages(messages: T[], options?: SendOptions<U>): Promise<void>;
+
+  /**
    * Receive JSON messages from the queue.
    *
    * @param options Receive options.
