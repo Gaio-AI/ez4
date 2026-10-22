@@ -41,7 +41,7 @@ declare class TestSubscription implements Queue.Subscription<TestMessage> {
   keyConcurrency: TestKeyConcurrency;
 }
 
-export async function testHandler(request: Queue.Incoming<TestMessage>) {
+export async function testHandler(request: Queue.DeferrableIncoming<TestMessage>) {
   // Ensure defer types.
   await request.defer({ delay: 60 });
 }

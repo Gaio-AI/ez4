@@ -202,7 +202,7 @@ export const processLambdaBatch = (
         holdsGroup: false
       };
 
-      let currentRequest: Queue.Incoming<Queue.Message> | undefined;
+      let currentRequest: Queue.DeferrableIncoming<Queue.Message> | undefined;
       let heldClaim: HeldClaim | undefined;
       let heldSlot: HeldClaim | undefined;
       let deferred = false;

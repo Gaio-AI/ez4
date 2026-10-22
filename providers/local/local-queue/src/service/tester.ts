@@ -34,13 +34,13 @@ export namespace QueueTester {
     ? { fifoMode: true }
     : { fairMode: true };
 
-  export type Incoming<T extends Queue.Message> = Queue.Incoming<T> & {
-    retry: Mock<Queue.Incoming<T>['retry']>;
-    defer: Mock<Queue.Incoming<T>['defer']>;
+  export type Incoming<T extends Queue.Message> = Queue.DeferrableIncoming<T> & {
+    retry: Mock<Queue.DeferrableIncoming<T>['retry']>;
+    defer: Mock<Queue.DeferrableIncoming<T>['defer']>;
   };
 
   export type IncomingOverrides = Partial<
-    Pick<Queue.Incoming<Queue.Message>, 'requestId' | 'traceId' | 'attempt' | 'maxAttempts' | 'retry' | 'defer'>
+    Pick<Queue.DeferrableIncoming<Queue.Message>, 'requestId' | 'traceId' | 'attempt' | 'maxAttempts' | 'retry' | 'defer'>
   >;
 
   export const getClient = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {

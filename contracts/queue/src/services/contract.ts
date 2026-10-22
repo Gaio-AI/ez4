@@ -7,7 +7,7 @@ import type { QueueIdempotency } from './idempotency';
 import type { QueueDeadLetter } from './deadletter';
 import type { QueueFifoMode } from './fifomode';
 import type { QueueFairMode } from './fairmode';
-import type { QueueDeferOptions, QueueIncoming, QueueRetryOptions } from './incoming';
+import type { QueueDeferOptions, QueueDeferrableIncoming, QueueIncoming, QueueRetryOptions } from './incoming';
 import type { QueueKeyConcurrency } from './concurrency';
 import type { QueueBackoff } from './backoff';
 import type { QueueRequest } from './request';
@@ -31,11 +31,12 @@ export namespace Queue {
   export type FairMode<T extends Message> = QueueFairMode<T>;
 
   export type Incoming<T extends Message> = QueueIncoming<T>;
+  export type DeferrableIncoming<T extends Message> = QueueDeferrableIncoming<T>;
 
   export type Listener<T extends Message> = QueueSubscriptionListener<T>;
   export type Handler<T extends Message> = QueueSubscriptionHandler<T>;
 
-  export type Subscription<T extends Message> = QueueSubscription<T>;
+  export type Subscription<T extends Message, U extends Mode = { fairMode: true }> = QueueSubscription<T, U>;
 
   export type Idempotency<T extends Message> = QueueIdempotency<T>;
 
@@ -95,13 +96,18 @@ export namespace Queue {
   export type Mode = { fifoMode: true } | { fairMode: true };
 
   /**
+   * Mode of the given queue service.
+   */
+  export type ServiceMode<T extends Service<any, any>> = T extends Service<any, infer U> ? U : never;
+
+  /**
    * Queue service.
    */
   export declare abstract class Service<T extends Message, U extends Mode> implements CommonService.Provider {
     /**
      * All subscriptions associated to the queue.
      */
-    abstract readonly subscriptions: Subscription<T>[];
+    abstract readonly subscriptions: Subscription<T, U>[];
 
     /**
      * Message schema.
@@ -211,7 +217,7 @@ export namespace Queue {
     /**
      * All subscriptions attached to the imported queue.
      */
-    readonly subscriptions: Subscription<T['schema']>[];
+    readonly subscriptions: Subscription<T['schema'], ServiceMode<T>>[];
 
     /**
      * Imported message schema (do not replace).
