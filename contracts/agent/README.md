@@ -73,7 +73,7 @@ permissions: {
 };
 ```
 
-The egress proxy lets the agent reach the endpoint of each granted service (`logs.<region>.amazonaws.com`, ...) and, for `CodeArtifactRead`, the npm endpoint of the domain (`<domain>-<account>.d.codeartifact.<region>.amazonaws.com`). A log group grant cannot hide group names: listing log groups is not scoped by IAM, reading their events is.
+The egress proxy lets the agent reach the endpoint of each granted service (`logs.<region>.amazonaws.com`, ...) and, for `CodeArtifactRead`, the npm endpoint of the domain (`<domain>-<account>.d.codeartifact.<region>.amazonaws.com`). The runtime also asks CodeArtifact for a token with the task role and writes it to `~/.npmrc` before the workspace checkout, so `npm` and `pnpm` installs of private packages work without any setup in the agent. A log group grant cannot hide group names: listing log groups is not scoped by IAM, reading their events is.
 
 #### Egress
 

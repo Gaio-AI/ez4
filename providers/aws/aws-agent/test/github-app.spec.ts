@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
-import { deepEqual } from 'node:assert/strict';
+import { deepEqual, rejects } from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { mintInstallationToken, createGitHubAppJwt } from '../src/workspace/github';
+import { mintInstallationToken, createGitHubAppJwt, resolveAppIdentity, gitIdentityEnv } from '../src/workspace/github';
 
 describe('workspace :: github app', () => {
   const { privateKey } = generateKeyPairSync('rsa', {
@@ -51,5 +51,34 @@ describe('workspace :: github app', () => {
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
     deepEqual(header, { alg: 'RS256', typ: 'JWT' });
     deepEqual(payload, { iat: 1_700_000_000 - 60, exp: 1_700_000_000 + 540, iss: '123' });
+  });
+
+  it('assert :: the identity is the app bot with its noreply address', async () => {
+    const paths: string[] = [];
+    const identity = await resolveAppIdentity({
+      appId: '1',
+      privateKeyPem: testKey,
+      fetch: async (url) => {
+        const path = new URL(String(url)).pathname;
+        paths.push(path);
+        const body = path === '/app' ? { slug: 'gaio-code-agent' } : { id: 4242 };
+        return new Response(JSON.stringify(body), { status: 200 });
+      }
+    });
+    deepEqual(paths, ['/app', '/users/gaio-code-agent%5Bbot%5D']);
+    deepEqual(identity, { name: 'gaio-code-agent[bot]', email: '4242+gaio-code-agent[bot]@users.noreply.github.com' });
+    deepEqual(gitIdentityEnv(identity), {
+      GIT_AUTHOR_NAME: 'gaio-code-agent[bot]',
+      GIT_AUTHOR_EMAIL: '4242+gaio-code-agent[bot]@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'gaio-code-agent[bot]',
+      GIT_COMMITTER_EMAIL: '4242+gaio-code-agent[bot]@users.noreply.github.com'
+    });
+  });
+
+  it('assert :: a failed identity lookup is an error, never a fallback identity', async () => {
+    await rejects(
+      resolveAppIdentity({ appId: '1', privateKeyPem: testKey, fetch: async () => new Response('no', { status: 401 }) }),
+      /identity lookup failed with status 401/
+    );
   });
 });

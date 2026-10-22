@@ -1,3 +1,4 @@
+import { AgentPermission } from '@ez4/agent';
 import type { AgentService } from '@ez4/agent/library';
 import type { EcsTaskDefState } from '@ez4/aws-ecs';
 import { describe, it } from 'node:test';
@@ -146,5 +147,57 @@ describe('agent ECS task definition builder', () => {
     equal(state.entryId, createEcsTaskDefStateId('TestAgent'));
     deepEqual(state.dependencies, ['dep1']);
     ok(states[state.entryId] !== undefined);
+  });
+  it('assert :: exports the CodeArtifact grants for the runtime', () => {
+    const agent = {
+      type: ServiceType,
+      name: 'InstallAgent',
+      permissions: {
+        grants: [
+          { permission: AgentPermission.LogsRead, resources: ['*'] },
+          { permission: AgentPermission.CodeArtifactRead, resources: ['gaio/npm'] }
+        ]
+      }
+    } as unknown as AgentService;
+
+    const taskDef = buildTaskDefinitionInput(
+      agent,
+      'ecr-uri',
+      'arn:aws:iam::123456789012:role/task-role',
+      'arn:aws:iam::123456789012:role/exec-role',
+      'arn:aws:logs:us-east-1:123456789012:log-group:/ez4/agents/install',
+      {
+        bucketName: 'agent-bucket',
+        baseName: getAgentsBaseName({ prefix: 'ez4', projectName: 'stg', branchName: '', lockId: 'x' } as DeployOptions)
+      }
+    );
+
+    const envMap = Object.fromEntries((taskDef.containerDefinitions?.[0]?.environment ?? []).map((e) => [e.name, e.value]));
+    deepEqual(JSON.parse(envMap['EZ4_AGENT_CODEARTIFACT'] ?? 'null'), [
+      { domain: 'gaio', repository: 'npm', region: 'us-east-1', accountId: '123456789012' }
+    ]);
+  });
+
+  it('assert :: leaves the variable out when the agent has no CodeArtifact grant', () => {
+    const agent = {
+      type: ServiceType,
+      name: 'PlainAgent',
+      permissions: { grants: [{ permission: AgentPermission.LogsRead, resources: ['*'] }] }
+    } as unknown as AgentService;
+
+    const taskDef = buildTaskDefinitionInput(
+      agent,
+      'ecr-uri',
+      'arn:aws:iam::123456789012:role/task-role',
+      'arn:aws:iam::123456789012:role/exec-role',
+      'arn:aws:logs:us-east-1:123456789012:log-group:/ez4/agents/plain',
+      {
+        bucketName: 'agent-bucket',
+        baseName: getAgentsBaseName({ prefix: 'ez4', projectName: 'stg', branchName: '', lockId: 'x' } as DeployOptions)
+      }
+    );
+
+    const names = (taskDef.containerDefinitions?.[0]?.environment ?? []).map((e) => e.name);
+    equal(names.includes('EZ4_AGENT_CODEARTIFACT'), false);
   });
 });

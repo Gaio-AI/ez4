@@ -35,6 +35,17 @@ describe('agent dockerfile generator', () => {
     ok(dockerfile.indexOf('chown 1000:1000 /work') < dockerfile.lastIndexOf('WORKDIR /work'));
   });
 
+  it('assert :: the binaries of the installed packages are on PATH', () => {
+    const dockerfile = generateDockerfile({
+      type: ServiceType,
+      name: 'ToolAgent',
+      image: { npmPackages: ['pnpm@10.33.0'] }
+    } as unknown as AgentService);
+
+    ok(dockerfile.includes('ENV PATH=/app/node_modules/.bin:$PATH\n'));
+    ok(dockerfile.indexOf('ENV PATH=') < dockerfile.indexOf('USER 1000'));
+  });
+
   it('assert :: an agent with a workspace gets git once, even when it also declares it', () => {
     const withWorkspace = {
       type: ServiceType,

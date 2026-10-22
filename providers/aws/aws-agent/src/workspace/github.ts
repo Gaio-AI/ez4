@@ -59,3 +59,44 @@ export const mintInstallationToken = async (params: {
   const data = (await response.json()) as { token: string };
   return data.token;
 };
+
+export type GitIdentity = { name: string; email: string };
+
+/**
+ * The commit identity GitHub attributes to the App: `<slug>[bot]` with the noreply address built from the bot user id.
+ */
+export const resolveAppIdentity = async (params: {
+  appId: string;
+  privateKeyPem: string;
+  fetch?: typeof fetch;
+  now?: () => number;
+}): Promise<GitIdentity> => {
+  const { appId, privateKeyPem, fetch: fetchFn = globalThis.fetch, now = () => Math.floor(Date.now() / 1000) } = params;
+
+  const get = async <T>(path: string, authorization?: string): Promise<T> => {
+    const response = await fetchFn(`https://api.github.com${path}`, {
+      headers: {
+        ...(authorization && { Authorization: authorization }),
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub App identity lookup failed with status ${response.status} for ${path}`);
+    }
+    return (await response.json()) as T;
+  };
+
+  const { slug } = await get<{ slug: string }>('/app', `Bearer ${createGitHubAppJwt(appId, privateKeyPem, now())}`);
+  const name = `${slug}[bot]`;
+  const { id } = await get<{ id: number }>(`/users/${encodeURIComponent(name)}`);
+
+  return { name, email: `${id}+${name}@users.noreply.github.com` };
+};
+
+export const gitIdentityEnv = ({ name, email }: GitIdentity): Record<string, string> => ({
+  GIT_AUTHOR_NAME: name,
+  GIT_AUTHOR_EMAIL: email,
+  GIT_COMMITTER_NAME: name,
+  GIT_COMMITTER_EMAIL: email
+});

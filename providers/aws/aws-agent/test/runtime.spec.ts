@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import { equal, deepEqual, ok } from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runAgentRuntime } from '../src/runtime/main';
@@ -458,6 +458,47 @@ describe('runtime :: execution lifecycle', () => {
     equal(result.workspace, undefined);
   });
 
+  it('assert :: the provider runs with the git identity of the workspace runtime', async () => {
+    const files = new Map<string, unknown>([['invocations/test-agent/inv-id.json', { input: { task: 'hello' } }]]);
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string) => files.get(key) as T,
+      writeJson: async (key, value) => void files.set(key, value),
+      putBuffer: async () => undefined,
+      getBuffer: async () => undefined
+    };
+    let providerEnv: Record<string, string> | undefined;
+    const workspace: WorkspaceRuntime = {
+      root: await mkdtemp(join(tmpdir(), 'ws-')),
+      workspace: { repos: [] },
+      identity: async () => ({ name: 'app[bot]', email: '7+app[bot]@users.noreply.github.com' })
+    };
+
+    const exitCode = await runAgentRuntime({
+      agentName: 'test-agent',
+      invocationId: 'inv-id',
+      inputSchema,
+      outputSchema,
+      storage,
+      provider: {
+        run: async (req: AgentProviderRequest): Promise<AgentProviderResponse> => {
+          providerEnv = req.env;
+          return { output: { result: 'done' } };
+        }
+      },
+      tools: { mode: AgentToolsMode.Readonly },
+      mcpServers: {},
+      instructions: 'Do work',
+      model: 'test-model',
+      timeoutSeconds: 30,
+      workdir: await mkdtemp(join(tmpdir(), 'wd-')),
+      workspace
+    });
+
+    equal(exitCode, 0);
+    equal(providerEnv?.GIT_AUTHOR_NAME, 'app[bot]');
+    equal(providerEnv?.GIT_COMMITTER_EMAIL, '7+app[bot]@users.noreply.github.com');
+  });
+
   it('assert :: the provider gets the output schema as JSON Schema, without ez4 schema keywords', async () => {
     const memory = new Map<string, string>();
     const storage: AgentStorage = {
@@ -499,5 +540,80 @@ describe('runtime :: execution lifecycle', () => {
       required: ['result'],
       additionalProperties: false
     });
+  });
+
+  it('writes the registry auth before prepare and runs the agent', async () => {
+    const files = new Map<string, unknown>([['invocations/test-agent/inv-1.json', { input: { task: 'hello' } }]]);
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string) => files.get(key) as T,
+      writeJson: async (key, value) => void files.set(key, value),
+      putBuffer: async () => undefined,
+      getBuffer: async () => undefined
+    };
+    const home = await mkdtemp(join(tmpdir(), 'registry-runtime-'));
+    const grant = { domain: 'gaio', repository: 'npm', region: 'us-east-1', accountId: '010928226197' };
+    let npmrcAtPrepare = '';
+    try {
+      const exitCode = await runAgentRuntime({
+        agentName: 'test-agent',
+        invocationId: 'inv-1',
+        inputSchema,
+        outputSchema,
+        storage,
+        provider: { run: async () => ({ output: { result: 'ok' } }) },
+        tools: { mode: AgentToolsMode.Readonly },
+        mcpServers: {},
+        instructions: 'Do work',
+        model: 'test-model',
+        prepare: async () => {
+          npmrcAtPrepare = await readFile(join(home, '.npmrc'), 'utf8');
+          return { prompt: 'hello' };
+        },
+        registry: { grants: [grant], getToken: async () => 'tok-1', home },
+        timeoutSeconds: 30
+      });
+
+      equal(exitCode, 0);
+      ok(npmrcAtPrepare.includes(':_authToken=tok-1'));
+      ok(!JSON.stringify([...files.values()]).includes('tok-1'));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('fails the run when the token request fails and never starts the provider', async () => {
+    const files = new Map<string, unknown>([['invocations/test-agent/inv-2.json', { input: { task: 'hello' } }]]);
+    const storage: AgentStorage = {
+      readJson: async <T>(key: string) => files.get(key) as T,
+      writeJson: async (key, value) => void files.set(key, value),
+      putBuffer: async () => undefined,
+      getBuffer: async () => undefined
+    };
+    let providerRan = false;
+    const exitCode = await runAgentRuntime({
+      agentName: 'test-agent',
+      invocationId: 'inv-2',
+      inputSchema,
+      outputSchema,
+      storage,
+      provider: { run: async () => ((providerRan = true), { output: { result: 'ok' } }) },
+      tools: { mode: AgentToolsMode.Readonly },
+      mcpServers: {},
+      instructions: 'Do work',
+      model: 'test-model',
+      registry: {
+        grants: [{ domain: 'gaio', repository: 'npm', region: 'us-east-1', accountId: '010928226197' }],
+        getToken: async () => Promise.reject(new Error('AccessDenied')),
+        home: tmpdir()
+      },
+      timeoutSeconds: 30
+    });
+
+    equal(exitCode, 1);
+    equal(providerRan, false);
+    const result = files.get('results/test-agent/inv-2.json') as { status: string; error: { code: string; message: string } };
+    equal(result.status, 'failed');
+    equal(result.error.code, 'hook_error');
+    equal(result.error.message, 'CodeArtifact token request failed for gaio/npm: AccessDenied');
   });
 });

@@ -1,3 +1,5 @@
+import { AgentPermission } from '@ez4/agent';
+import { REGISTRY_GRANTS_ENV, type RegistryGrant } from '../runtime/registry';
 import type { MountPoint, RegisterTaskDefinitionCommandInput, Volume } from '@aws-sdk/client-ecs';
 import type { AgentService } from '@ez4/agent/library';
 import type { LinkedVariables } from '@ez4/project/library';
@@ -10,7 +12,7 @@ import { WORKSPACE_MOUNT_PATH, WORKSPACE_VOLUME_NAME } from '../workspace/resour
 
 export const AGENT_CONTAINER_NAME = 'agent';
 
-export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets' | 'workspace'>;
+export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets' | 'workspace' | 'permissions'>;
 
 export interface TaskDefOptions {
   baseName: string;
@@ -127,6 +129,19 @@ export const buildTaskDefinitionInput = (
       name: 'EZ4_AGENT_WORKSPACE',
       value: JSON.stringify({ repos: agent.workspace.repos })
     });
+  }
+
+  const registryGrants: RegistryGrant[] = (agent.permissions?.grants ?? [])
+    .filter(({ permission }) => permission === AgentPermission.CodeArtifactRead)
+    .flatMap(({ resources }) =>
+      resources.map((resource) => {
+        const [domain, repository] = resource.split('/');
+        return { domain: domain!, repository: repository!, region, accountId };
+      })
+    );
+
+  if (registryGrants.length > 0) {
+    environment.push({ name: REGISTRY_GRANTS_ENV, value: JSON.stringify(registryGrants) });
   }
 
   const volumes: Volume[] = [];

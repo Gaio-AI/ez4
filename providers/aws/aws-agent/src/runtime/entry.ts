@@ -3,11 +3,14 @@ import type { ObjectSchema } from '@ez4/schema';
 import type { AgentStorage } from './storage';
 import type { AgentProvider } from './types';
 import * as http from 'node:http';
-import { runAgentRuntime } from './main';
+import { homedir } from 'node:os';
+import { readRegistryGrants } from './registry';
+import { createRegistryTokenSource } from './registry-token';
+import { runAgentRuntime, type RunAgentRuntimeParameters } from './main';
 import { createS3Storage } from './storage';
 import { AgentProviders } from './providers/index';
 import { WORKSPACE_MOUNT_PATH, type WorkspaceRuntime } from '../workspace/runtime';
-import { mintInstallationToken } from '../workspace/github';
+import { mintInstallationToken, resolveAppIdentity, type GitIdentity } from '../workspace/github';
 export type AgentEntryDefinition = {
   name: string;
   provider: Agent.ProviderName;
@@ -70,6 +73,7 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
   }
   const workspaceMeta = JSON.parse(env.EZ4_AGENT_WORKSPACE);
   let token: ((access?: 'read' | 'write') => Promise<string | undefined>) | undefined;
+  let identity: (() => Promise<GitIdentity>) | undefined;
 
   if (env.EZ4_WORKSPACE_GITHUB_APP) {
     const { GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY } = JSON.parse(env.EZ4_WORKSPACE_GITHUB_APP);
@@ -80,6 +84,8 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
         privateKeyPem: GITHUB_APP_PRIVATE_KEY,
         access
       });
+    let resolved: Promise<GitIdentity> | undefined;
+    identity = () => (resolved ??= resolveAppIdentity({ appId: GITHUB_APP_ID, privateKeyPem: GITHUB_APP_PRIVATE_KEY }));
   } else if (env.EZ4_WORKSPACE_TOKEN) {
     const secretToken = env.EZ4_WORKSPACE_TOKEN;
     token = () => Promise.resolve(secretToken);
@@ -88,7 +94,8 @@ export const resolveWorkspaceRuntime = (env: Record<string, string | undefined>)
   return {
     root: WORKSPACE_MOUNT_PATH,
     workspace: workspaceMeta,
-    token
+    token,
+    identity
   };
 };
 
@@ -97,12 +104,20 @@ export const startAgent = async (
   handlers: Function[],
   context: object,
   env: Record<string, string | undefined> = process.env,
-  ports: { storage?: AgentStorage; provider?: AgentProvider; workspace?: WorkspaceRuntime } = {}
+  ports: {
+    storage?: AgentStorage;
+    provider?: AgentProvider;
+    workspace?: WorkspaceRuntime;
+    registry?: RunAgentRuntimeParameters['registry'];
+  } = {}
 ): Promise<number> => {
   applyProxyEnvironment(env);
   const { agentName, invocationId, bucketName, timeoutSeconds } = readAgentEnvironment(env);
   const hook = (index: number) => (index >= 0 ? handlers[index] : undefined);
   const workspace = ports.workspace ?? resolveWorkspaceRuntime(env);
+  const grants = readRegistryGrants(env);
+  const registry =
+    ports.registry ?? (grants.length > 0 ? { grants, getToken: createRegistryTokenSource(), home: env.HOME ?? homedir() } : undefined);
   return runAgentRuntime({
     agentName,
     invocationId,
@@ -118,6 +133,7 @@ export const startAgent = async (
     prepare: hook(definition.hooks.prepare) as never,
     finish: hook(definition.hooks.finish) as never,
     context,
-    workspace
+    workspace,
+    registry
   });
 };
