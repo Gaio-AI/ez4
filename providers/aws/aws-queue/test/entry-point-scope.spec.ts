@@ -32,6 +32,7 @@ describe('queue entry point scope', () => {
       __EZ4_PARALLELISM: 1,
       __EZ4_ACKNOWLEDGE: 'record',
       __EZ4_IDEMPOTENCY: null,
+      __EZ4_KEY_CONCURRENCY: null,
       __EZ4_CONTEXT: {},
       dispatch: async () => {},
       handle: async () => {
@@ -82,6 +83,7 @@ describe('queue entry point scope', () => {
       '__EZ4_PARALLELISM',
       '__EZ4_ACKNOWLEDGE',
       '__EZ4_IDEMPOTENCY',
+      '__EZ4_KEY_CONCURRENCY',
       '__EZ4_CONTEXT',
       'dispatch',
       'handle'

@@ -2,6 +2,7 @@ import type { ArchitectureType, LogLevel, RuntimeType } from '@ez4/project';
 import type { LinkedVariables } from '@ez4/project/library';
 import type { QueueSubscriptionListener } from './listener';
 import type { QueueIdempotency } from './idempotency';
+import type { QueueKeyConcurrency } from './concurrency';
 import type { QueueSubscriptionHandler } from './handler';
 import type { QueueMessage } from './message';
 
@@ -62,6 +63,13 @@ export interface QueueSubscription<T extends QueueMessage> {
    *   and the message is consumed, so it runs neither again nor twice.
    */
   readonly idempotency?: QueueIdempotency<T>;
+
+  /**
+   * Run at most `max` messages with the same key at once: a message whose key has no free slot is deferred for a
+   * few seconds instead of running, without spending an attempt. For a limit per tenant, such as one account's
+   * share of a provider quota. Not available on a FIFO queue, where a deferred copy would lose its place.
+   */
+  readonly keyConcurrency?: QueueKeyConcurrency<T>;
 
   /**
    * Variables associated to the subscription.

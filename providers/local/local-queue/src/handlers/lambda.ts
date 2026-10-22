@@ -7,8 +7,18 @@ import type { LocalQueue, ReceivedMessage } from '../service/queue';
 import type { HeldClaim } from '../service/claims';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd, onTimeout } from '@ez4/local-common';
-import { getIdempotencyKey, getJsonMessage, isUnknownOutcomeError, resolveValidation } from '@ez4/queue/utils';
-import { getRandomUUID, pickObject, Tasks, Wait } from '@ez4/utils';
+import {
+  MaxDeferCount,
+  MaxDeferDelay,
+  getConcurrencySlotKey,
+  getIdempotencyKey,
+  getJsonMessage,
+  getSlotWaitDelay,
+  isUnknownOutcomeError,
+  resolveValidation
+} from '@ez4/queue/utils';
+
+import { getRandomInteger, getRandomUUID, pickObject, Tasks, Wait } from '@ez4/utils';
 import { Runtime } from '@ez4/common';
 import { Logger } from '@ez4/logger';
 
@@ -35,7 +45,7 @@ export const processLambdaBatch = (
   signal: AbortSignal
 ) => {
   const { name: queueName, services, schema } = service;
-  const { handler, listener, idempotency } = subscription;
+  const { handler, listener, idempotency, keyConcurrency } = subscription;
 
   const timeout = (service.timeout ?? Defaults.Timeout) * 1000;
   const deadline = Date.now() + timeout;
@@ -124,6 +134,62 @@ export const processLambdaBatch = (
     logFailure(message, retryMessage(message));
   };
 
+  // A copy the queue delivers after the delay (in seconds), as a new message with no attempt spent. A delay past the
+  // longest wait a queue takes is made of waits that long, the copy carrying when it's due. A `counted` wait counts
+  // toward the most a message is deferred, past which it fails like with an error.
+  const sendDeferredCopy = (message: ReceivedMessage, delay: number, counted: boolean) => {
+    const previousCount = message.attributes.defers ?? 0;
+    const defers = counted ? previousCount + 1 : previousCount;
+
+    if (defers > MaxDeferCount) {
+      throw new Error(`The message was already deferred ${MaxDeferCount} times, the most it takes.`);
+    }
+
+    if (isAbandoned) {
+      return;
+    }
+
+    const wait = Math.max(0, Math.ceil(delay));
+    const queueWait = Math.min(wait, MaxDeferDelay);
+
+    const reason = counted ? `deferred ${defers} of ${MaxDeferCount} times` : 'every slot of its key is held';
+
+    Logger.log(`Queue [${queueName}] message [${message.messageId}] comes back in ${wait}s, ${reason}.`);
+
+    queue.sendMessage({
+      body: message.body,
+      attributes: {
+        traceId: message.attributes.traceId,
+        scope: message.attributes.scope,
+        defers,
+        ...(wait > queueWait && {
+          deferUntil: Date.now() + wait * 1000
+        })
+      },
+      delay: queueWait
+    });
+  };
+
+  // The slots are tried from a random one, so the executions of a busy key don't all take the same slot first.
+  const takeSlot = (safeMessage: Queue.Message) => {
+    if (!keyConcurrency) {
+      return undefined;
+    }
+
+    const firstSlot = getRandomInteger(0, keyConcurrency.max - 1);
+
+    for (let offset = 0; offset < keyConcurrency.max; offset++) {
+      const slot = (firstSlot + offset) % keyConcurrency.max;
+      const slotResult = queue.claims.take(getConcurrencySlotKey(handler.name, safeMessage, keyConcurrency.key, slot), timeout);
+
+      if (slotResult.status === 'taken') {
+        return slotResult.claim;
+      }
+    }
+
+    return undefined;
+  };
+
   const processRecord = (module: VirtualModule, message: ReceivedMessage, deleteEachRecord: boolean) => {
     const { traceId, scope } = message.attributes;
 
@@ -138,9 +204,28 @@ export const processLambdaBatch = (
 
       let currentRequest: Queue.Incoming<Queue.Message> | undefined;
       let heldClaim: HeldClaim | undefined;
+      let heldSlot: HeldClaim | undefined;
+      let deferred = false;
       let handled = false;
 
+      // The message leaves the queue without its handler running (again): it already ran, or a copy took its place.
+      const consumeMessage = () => {
+        if (deleteEachRecord) {
+          ackMessage(message);
+        }
+      };
+
       try {
+        // A copy deferred past the longest wait a queue takes comes back early, and waits again.
+        const waitLeft = (message.attributes.deferUntil ?? 0) - Date.now();
+
+        if (waitLeft > 0) {
+          sendDeferredCopy(message, waitLeft / 1000, true);
+          consumeMessage();
+
+          return outcome;
+        }
+
         const payload = JSON.parse(message.body);
         const safeMessage = await getJsonMessage(payload, schema, onCustomValidation);
 
@@ -151,9 +236,7 @@ export const processLambdaBatch = (
           if (claimResult.status === 'done') {
             Logger.log(`Queue [${queueName}] message [${message.messageId}] already ran for its key, it's acknowledged without running.`);
 
-            if (deleteEachRecord) {
-              ackMessage(message);
-            }
+            consumeMessage();
 
             return outcome;
           }
@@ -172,11 +255,52 @@ export const processLambdaBatch = (
           heldClaim = claimResult.claim;
         }
 
+        if (keyConcurrency) {
+          heldSlot = takeSlot(safeMessage);
+
+          // Every slot of its key is held: the message waits its turn without spending an attempt.
+          if (!heldSlot) {
+            sendDeferredCopy(message, getSlotWaitDelay(), false);
+
+            if (heldClaim) {
+              queue.claims.release(heldClaim);
+            }
+
+            consumeMessage();
+
+            return outcome;
+          }
+        }
+
         const retry = (retryOptions?: Queue.RetryOptions) => {
+          if (deferred) {
+            return Promise.reject(new Error('The message was already deferred.'));
+          }
+
           outcome.handedBack = true;
           outcome.holdsGroup = true;
 
           retryMessage(message, retryOptions?.delay);
+
+          return Promise.resolve();
+        };
+
+        const defer = (deferOptions: Queue.DeferOptions) => {
+          if (message.groupId !== undefined) {
+            return Promise.reject(new Error(`A message of a FIFO queue can't be deferred.`));
+          }
+
+          if (outcome.handedBack || deferred) {
+            return Promise.reject(new Error('The message was already handed back.'));
+          }
+
+          try {
+            sendDeferredCopy(message, deferOptions.delay, true);
+          } catch (error) {
+            return Promise.reject(error);
+          }
+
+          deferred = true;
 
           return Promise.resolve();
         };
@@ -186,7 +310,8 @@ export const processLambdaBatch = (
           attempt: message.receiveCount,
           message: safeMessage,
           traceId,
-          retry
+          retry,
+          defer
         };
 
         activeRequests.set(currentRequest, message);
@@ -196,9 +321,9 @@ export const processLambdaBatch = (
 
         handled = true;
 
-        // A handler that handed its message back runs it again, so the key goes back with it.
+        // A handler that handed its message back, or put it off, runs it again later, so the key goes back with it.
         if (heldClaim && idempotency) {
-          if (outcome.handedBack) {
+          if (outcome.handedBack || deferred) {
             queue.claims.release(heldClaim);
           } else {
             queue.claims.keep(heldClaim, 'done', idempotency.ttl * 1000);
@@ -216,11 +341,21 @@ export const processLambdaBatch = (
         outcome.holdsGroup = true;
 
         // A record whose handler finished is consumed even when a hook after it fails: sending it back
-        // would run it again.
-        if (!handled) {
+        // would run it again. One whose handler put it off already has its copy in the queue.
+        if (deferred && !handled) {
+          if (heldClaim) {
+            queue.claims.release(heldClaim);
+          }
+
+          consumeMessage();
+        } else if (!handled) {
           failRecord(message, heldClaim, error, deleteEachRecord, outcome);
         }
       } finally {
+        if (heldSlot) {
+          queue.claims.release(heldSlot);
+        }
+
         if (currentRequest) {
           activeRequests.delete(currentRequest);
         }

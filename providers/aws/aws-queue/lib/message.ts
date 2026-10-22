@@ -3,20 +3,40 @@ import type { ValidationCustomContext } from '@ez4/validator';
 import type { MessageSchema } from '@ez4/queue/utils';
 import type { Queue } from '@ez4/queue';
 import type { AttributeValue, DynamoDBClient, UpdateItemCommand, DeleteItemCommand } from '@aws-sdk/client-dynamodb';
+import type { MessageAttributeValue } from '@aws-sdk/client-sqs';
 
-import { SQSClient, DeleteMessageCommand, ChangeMessageVisibilityCommand } from '@aws-sdk/client-sqs';
-import { getIdempotencyKey, getJsonMessage, isUnknownOutcomeError, resolveValidation } from '@ez4/queue/utils';
+import { SQSClient, DeleteMessageCommand, ChangeMessageVisibilityCommand, SendMessageCommand } from '@aws-sdk/client-sqs';
+
+import {
+  MaxDeferCount,
+  MaxDeferDelay,
+  getConcurrencySlotKey,
+  getIdempotencyKey,
+  getJsonMessage,
+  getSlotWaitDelay,
+  isUnknownOutcomeError,
+  resolveValidation
+} from '@ez4/queue/utils';
 import { ServiceEventType, Runtime } from '@ez4/common';
 import { getRandomInteger, getRandomUUID, Tasks, Wait } from '@ez4/utils';
 
-type ClaimsOptions = {
+type ClaimsTable = {
   tableName: string;
-  handlerName: string;
-  key: string[];
-  ttl: number;
   lease: number;
   keyAttribute: string;
   expirationAttribute: string;
+};
+
+type ClaimsOptions = ClaimsTable & {
+  handlerName: string;
+  key: string[];
+  ttl: number;
+};
+
+type SlotsOptions = ClaimsTable & {
+  handlerName: string;
+  key: string[];
+  max: number;
 };
 
 type HeldClaim = {
@@ -34,6 +54,7 @@ declare const __EZ4_RETRY_WINDOW: number;
 declare const __EZ4_PARALLELISM: number;
 declare const __EZ4_ACKNOWLEDGE: 'record' | 'batch';
 declare const __EZ4_IDEMPOTENCY: ClaimsOptions | null;
+declare const __EZ4_KEY_CONCURRENCY: SlotsOptions | null;
 declare const __EZ4_CONTEXT: object;
 
 declare function dispatch(event: Queue.ServiceEvent<Queue.Message>, context: object): Promise<void>;
@@ -41,6 +62,9 @@ declare function handle(request: Queue.Incoming<Queue.Message>, context: object)
 
 // Time kept at the end of the invocation to report a timeout before the runtime is stopped.
 const TimeoutMargin = 1000;
+
+const DeferCountAttribute = 'EZ4.DEFERS';
+const DeferUntilAttribute = 'EZ4.DEFER_UNTIL';
 
 type ActiveRecord = {
   traceId: string;
@@ -219,9 +243,28 @@ const processRecord = async (
 
     let currentRequest: Queue.Incoming<Queue.Message> | undefined;
     let heldClaim: HeldClaim | undefined;
+    let heldSlot: HeldClaim | undefined;
+    let deferred = false;
     let handled = false;
 
+    // The record leaves the queue without its handler running (again): it already ran, or a copy took its place.
+    const consumeRecord = async () => {
+      if (deleteEachRecord) {
+        await ackMessage(record);
+      }
+    };
+
     try {
+      // A copy deferred past the longest wait a queue takes comes back early, and waits again.
+      const waitLeft = getDeferWaitLeft(record);
+
+      if (waitLeft > 0) {
+        await sendDeferredCopy(record, waitLeft, true);
+        await consumeRecord();
+
+        return outcome;
+      }
+
       const payload = JSON.parse(record.body);
       const message = await getJsonMessage(payload, schema, onCustomValidation);
 
@@ -232,9 +275,7 @@ const processRecord = async (
         if (claimResult.status === 'done') {
           console.info({ messageId: record.messageId, claimKey, claimStatus: claimResult.status });
 
-          if (deleteEachRecord) {
-            await ackMessage(record);
-          }
+          await consumeRecord();
 
           return outcome;
         }
@@ -253,11 +294,46 @@ const processRecord = async (
         heldClaim = claimResult.claim;
       }
 
+      if (__EZ4_KEY_CONCURRENCY) {
+        heldSlot = await takeSlot(__EZ4_KEY_CONCURRENCY, message);
+
+        // Every slot of its key is held: the message waits its turn without spending an attempt.
+        if (!heldSlot) {
+          await sendDeferredCopy(record, getSlotWaitDelay(), false);
+
+          if (heldClaim && __EZ4_IDEMPOTENCY) {
+            await releaseClaim(__EZ4_IDEMPOTENCY, heldClaim);
+          }
+
+          await consumeRecord();
+
+          return outcome;
+        }
+      }
+
       const retry = async (options?: Queue.RetryOptions) => {
+        if (deferred) {
+          throw new Error('The message was already deferred.');
+        }
+
         outcome.handedBack = true;
         outcome.holdsGroup = true;
 
         await retryMessage(record, options?.delay);
+      };
+
+      const defer = async (options: Queue.DeferOptions) => {
+        if (record.attributes.MessageGroupId) {
+          throw new Error(`A message of a FIFO queue can't be deferred.`);
+        }
+
+        if (outcome.handedBack || deferred) {
+          throw new Error('The message was already handed back.');
+        }
+
+        await sendDeferredCopy(record, options.delay, true);
+
+        deferred = true;
       };
 
       currentRequest = {
@@ -265,7 +341,8 @@ const processRecord = async (
         attempt: Number(record.attributes.ApproximateReceiveCount),
         traceId,
         message,
-        retry
+        retry,
+        defer
       };
 
       activeRequests.set(currentRequest, { traceId, record });
@@ -276,9 +353,9 @@ const processRecord = async (
 
       handled = true;
 
-      // A handler that handed its message back runs it again, so the key goes back with it.
+      // A handler that handed its message back, or put it off, runs it again later, so the key goes back with it.
       if (heldClaim && __EZ4_IDEMPOTENCY) {
-        if (outcome.handedBack) {
+        if (outcome.handedBack || deferred) {
           await releaseClaim(__EZ4_IDEMPOTENCY, heldClaim);
         } else {
           await keepClaim(__EZ4_IDEMPOTENCY, heldClaim, 'done');
@@ -296,11 +373,21 @@ const processRecord = async (
       outcome.holdsGroup = true;
 
       // A record whose handler finished is consumed even when a hook after it fails: sending it
-      // back would run it again.
-      if (!handled) {
+      // back would run it again. One whose handler put it off already has its copy in the queue.
+      if (deferred && !handled) {
+        if (heldClaim && __EZ4_IDEMPOTENCY) {
+          await releaseClaim(__EZ4_IDEMPOTENCY, heldClaim);
+        }
+
+        await consumeRecord();
+      } else if (!handled) {
         await failRecord(record, heldClaim, error, deleteEachRecord, outcome);
       }
     } finally {
+      if (heldSlot && __EZ4_KEY_CONCURRENCY) {
+        await releaseClaim(__EZ4_KEY_CONCURRENCY, heldSlot);
+      }
+
       if (currentRequest) {
         activeRequests.delete(currentRequest);
       }
@@ -340,6 +427,93 @@ const failRecord = async (
   outcome.handedBack = true;
 
   return retryMessage(record);
+};
+
+const getDeferWaitLeft = (record: SQSRecord) => {
+  const deferUntil = Number(record.messageAttributes[DeferUntilAttribute]?.stringValue);
+
+  return Number.isFinite(deferUntil) ? deferUntil - getEpochSeconds() : 0;
+};
+
+/**
+ * Send a copy of the record that the queue delivers after the delay, as a new message with no attempt spent. A delay
+ * past the longest wait a queue takes is made of waits that long, the copy carrying when it's due. A `counted` wait
+ * counts toward the most a message is deferred, past which it fails like with an error.
+ */
+const sendDeferredCopy = async (record: SQSRecord, delay: number, counted: boolean) => {
+  const previousCount = Number(record.messageAttributes[DeferCountAttribute]?.stringValue) || 0;
+  const deferCount = counted ? previousCount + 1 : previousCount;
+
+  if (deferCount > MaxDeferCount) {
+    throw new Error(`The message was already deferred ${MaxDeferCount} times, the most it takes.`);
+  }
+
+  const wait = Math.max(0, Math.ceil(delay));
+  const queueWait = Math.min(wait, MaxDeferDelay);
+
+  // One line per copy, so a queue that mostly defers shows up: `slotWait` for a key without a free slot.
+  console.info({ messageId: record.messageId, deferDelay: wait, deferCount, slotWait: !counted });
+
+  await client.send(
+    new SendMessageCommand({
+      QueueUrl: getQueueUrl(record.eventSourceARN),
+      MessageBody: record.body,
+      DelaySeconds: queueWait,
+      MessageAttributes: {
+        ...getCopiedAttributes(record),
+        [DeferCountAttribute]: {
+          DataType: 'Number',
+          StringValue: `${deferCount}`
+        },
+        ...(wait > queueWait && {
+          [DeferUntilAttribute]: {
+            DataType: 'Number',
+            StringValue: `${getEpochSeconds() + wait}`
+          }
+        })
+      }
+    })
+  );
+};
+
+// The trace and the scope go along with the copy; the defer attributes are written anew.
+const getCopiedAttributes = (record: SQSRecord) => {
+  const attributes: Record<string, MessageAttributeValue> = {};
+
+  for (const [name, { dataType, stringValue, binaryValue }] of Object.entries(record.messageAttributes)) {
+    if (name === DeferCountAttribute || name === DeferUntilAttribute) {
+      continue;
+    }
+
+    attributes[name] = {
+      DataType: dataType,
+      ...(stringValue !== undefined && { StringValue: stringValue }),
+      ...(binaryValue !== undefined && { BinaryValue: Buffer.from(binaryValue, 'base64') })
+    };
+  }
+
+  return attributes;
+};
+
+/**
+ * Take a free slot of the message's key, or none when every one is held. The slots are tried from a random one, so
+ * the executions of a busy key don't all write the same slot first.
+ */
+const takeSlot = async (options: SlotsOptions, message: Queue.Message) => {
+  const firstSlot = getRandomInteger(0, options.max - 1);
+
+  for (let offset = 0; offset < options.max; offset++) {
+    const slot = (firstSlot + offset) % options.max;
+    const slotKey = getConcurrencySlotKey(options.handlerName, message, options.key, slot);
+
+    const slotResult = await takeClaim(options, slotKey);
+
+    if (slotResult.status === 'taken') {
+      return slotResult.claim;
+    }
+  }
+
+  return undefined;
 };
 
 const getQueueUrl = (queueArn: string): string => {
@@ -451,7 +625,7 @@ let DYNAMODB_CACHE: Promise<DynamoDbCache> | undefined;
  * deletes expired items some time later), is taken; one that's running in another execution or that already ran
  * isn't.
  */
-const takeClaim = async (options: ClaimsOptions, key: string): Promise<ClaimResult> => {
+const takeClaim = async (options: ClaimsTable, key: string): Promise<ClaimResult> => {
   const { dynamoDbClient, UpdateItemCommand } = await getDynamoDbClient();
 
   const owner = getRandomUUID();
@@ -525,7 +699,7 @@ const keepClaim = async (options: ClaimsOptions, claim: HeldClaim, state: 'done'
 /**
  * Free the key for the next attempt. A failure is only logged: the key frees itself once its lease passes.
  */
-const releaseClaim = async (options: ClaimsOptions, claim: HeldClaim) => {
+const releaseClaim = async (options: ClaimsTable, claim: HeldClaim) => {
   try {
     const { dynamoDbClient, DeleteItemCommand } = await getDynamoDbClient();
 
@@ -549,7 +723,7 @@ const releaseClaim = async (options: ClaimsOptions, claim: HeldClaim) => {
   }
 };
 
-const getClaimItemKey = (options: ClaimsOptions, key: string): Record<string, AttributeValue> => {
+const getClaimItemKey = (options: ClaimsTable, key: string): Record<string, AttributeValue> => {
   return {
     [options.keyAttribute]: { S: key }
   };

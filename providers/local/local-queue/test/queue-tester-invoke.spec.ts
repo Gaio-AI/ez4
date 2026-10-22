@@ -98,6 +98,13 @@ describe('local queue tester invoke', () => {
       [[{ delay: 10 }]]
     );
 
+    await request.defer({ delay: 60 });
+
+    deepEqual(
+      request.defer.mock.calls.map((call) => call.arguments),
+      [[{ delay: 60 }]]
+    );
+
     const auditRequest = await QueueTester.incoming<AuditQueue>('AuditQueue', { orderId: 'incoming-1', action: 'placed' });
 
     // Without a dead-letter queue, the attempts the runtime is deployed with.

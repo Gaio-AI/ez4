@@ -48,6 +48,7 @@ const runtimeGlobals = {
   __EZ4_PARALLELISM: 1,
   __EZ4_ACKNOWLEDGE: 'record',
   __EZ4_IDEMPOTENCY: null,
+  __EZ4_KEY_CONCURRENCY: null,
   __EZ4_CONTEXT: {},
   handle: async (request: Queue.Incoming<{ id: string }>) => {
     const { id } = request.message;

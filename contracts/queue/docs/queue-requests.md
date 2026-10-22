@@ -83,6 +83,29 @@ When no delay is supplied, the queue backoff configuration is used. Once the con
 
 The retry method returns a promise and should be awaited. Handlers should return after requesting a retry and should avoid performing acknowledgement-dependent work afterward.
 
+## Deferring messages
+
+A wait that isn't a failure, such as a provider's rate limit or quota, shouldn't spend the attempts that lead to the dead-letter queue. `defer` sends a copy of the message back to the queue with the delay and consumes the current delivery, so the copy comes back as a new first attempt.
+
+```ts
+export async function processMessage(request: Queue.Incoming<MyMessage>) {
+  const quota = await getQuota(request.message.accountId);
+
+  if (quota.exhausted) {
+    await request.defer({
+      delay: quota.resetsIn
+    });
+
+    return;
+  }
+}
+```
+
+- A delay above 900 seconds (the longest a queue takes) is made of waits of 900 seconds; the copy comes back early and waits again without running the handler.
+- A message is deferred at most 20 times, each wait counting once; past that, `defer` throws and the message fails like with any other error.
+- A message of a FIFO queue can't be deferred, since its copy would lose its place in the group: `defer` throws there.
+- A message deferred by its handler is consumed even if the handler throws afterward, as its copy is already in the queue. `retry` after `defer` (or `defer` after `retry`) throws.
+
 ## Contract schema
 
 Request validation and transformation are powered by the rich schema system provided by the [@ez4/schema](../../../foundation/schema/) package. Schemas define the structure, validation rules, and transformations applied before the request reaches your handler.

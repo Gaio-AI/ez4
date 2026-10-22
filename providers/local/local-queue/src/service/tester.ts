@@ -36,10 +36,11 @@ export namespace QueueTester {
 
   export type Incoming<T extends Queue.Message> = Queue.Incoming<T> & {
     retry: Mock<Queue.Incoming<T>['retry']>;
+    defer: Mock<Queue.Incoming<T>['defer']>;
   };
 
   export type IncomingOverrides = Partial<
-    Pick<Queue.Incoming<Queue.Message>, 'requestId' | 'traceId' | 'attempt' | 'maxAttempts' | 'retry'>
+    Pick<Queue.Incoming<Queue.Message>, 'requestId' | 'traceId' | 'attempt' | 'maxAttempts' | 'retry' | 'defer'>
   >;
 
   export const getClient = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
@@ -104,7 +105,7 @@ export namespace QueueTester {
   /**
    * Make the request a subscription handler receives for the given message, to call the handler directly. The
    * message goes through the checks of the real client and then the queue schema, as it reaches the runtime, so a
-   * message either would refuse fails with its error. `retry` records its calls.
+   * message either would refuse fails with its error. `retry` and `defer` record their calls.
    */
   export const incoming = async <T extends Queue.Service<any, Queue.Mode>>(
     resourceName: string,
@@ -129,6 +130,7 @@ export namespace QueueTester {
       attempt: overrides?.attempt ?? 1,
       maxAttempts: overrides?.maxAttempts ?? service.deadLetter?.maxAttempts ?? Defaults.MaxAttempts,
       retry: tracker.fn(overrides?.retry ?? (() => Promise.resolve())),
+      defer: tracker.fn(overrides?.defer ?? (() => Promise.resolve())),
       message: safeMessage
     };
   };

@@ -7,7 +7,8 @@ import type { QueueIdempotency } from './idempotency';
 import type { QueueDeadLetter } from './deadletter';
 import type { QueueFifoMode } from './fifomode';
 import type { QueueFairMode } from './fairmode';
-import type { QueueIncoming, QueueRetryOptions } from './incoming';
+import type { QueueDeferOptions, QueueIncoming, QueueRetryOptions } from './incoming';
+import type { QueueKeyConcurrency } from './concurrency';
 import type { QueueBackoff } from './backoff';
 import type { QueueRequest } from './request';
 import type { QueueMessage } from './message';
@@ -21,6 +22,7 @@ export namespace Queue {
   export type Request = QueueRequest;
 
   export type RetryOptions = QueueRetryOptions;
+  export type DeferOptions = QueueDeferOptions;
 
   export type DeadLetter = QueueDeadLetter;
   export type Backoff = QueueBackoff;
@@ -36,6 +38,8 @@ export namespace Queue {
   export type Subscription<T extends Message> = QueueSubscription<T>;
 
   export type Idempotency<T extends Message> = QueueIdempotency<T>;
+
+  export type KeyConcurrency<T extends Message> = QueueKeyConcurrency<T>;
 
   export type ServiceEvent<T extends Message = Message> =
     | CommonService.BeginEvent<Request>
@@ -54,6 +58,11 @@ export namespace Queue {
    * Queue Subscription idempotency definition.
    */
   export type UseIdempotency<T extends Idempotency<any>> = T;
+
+  /**
+   * Queue Subscription concurrency per key definition.
+   */
+  export type UseKeyConcurrency<T extends KeyConcurrency<any>> = T;
 
   /**
    * Queue FIFO mode definition.

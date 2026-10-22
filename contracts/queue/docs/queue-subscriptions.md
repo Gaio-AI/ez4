@@ -126,6 +126,21 @@ idempotency: {
 
 On AWS the keys are kept in a DynamoDB table per queue (`<queue name>-claims`, with time to live), created with the first subscription that declares idempotency and removed with the last one. Each message costs two writes.
 
+#### Key concurrency (optional)
+
+Runs at most `max` messages with the same key at once, across every execution of the subscription: a message whose key has no free slot is deferred for 5 to 30 seconds instead of running, without spending an attempt (and without counting toward the most a message is deferred). For a limit per tenant, such as one account's share of a provider quota. The key is the value of one or more required message fields.
+
+```ts
+keyConcurrency: {
+  key: 'accountId';
+  max: 1;
+};
+```
+
+- A slot is held for the queue timeout at most, so an execution that dies frees it on its own.
+- Not available on a FIFO queue, where a waiting copy would lose its place in the group; the group already runs one message at a time.
+- On AWS the slots live in the same `<queue name>-claims` table as the idempotency keys, at two writes per message when a slot is free.
+
 #### Log retention (optional)
 
 Specifies the number of days logs should be retained.
