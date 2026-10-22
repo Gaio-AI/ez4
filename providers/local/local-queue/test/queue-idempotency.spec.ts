@@ -119,5 +119,7 @@ describe('local queue idempotency', () => {
 
     await client.sendMessage({ id: 'a' });
     await waitFor(() => probe.requests.length === 2);
+
+    equal(probe.requests.length, 2);
   });
 });
