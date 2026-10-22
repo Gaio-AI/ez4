@@ -1,6 +1,7 @@
 import type { ArchitectureType, LogLevel, RuntimeType } from '@ez4/project';
 import type { LinkedVariables } from '@ez4/project/library';
 import type { QueueSubscriptionListener } from './listener';
+import type { QueueIdempotency } from './idempotency';
 import type { QueueSubscriptionHandler } from './handler';
 import type { QueueMessage } from './message';
 
@@ -50,6 +51,17 @@ export interface QueueSubscription<T extends QueueMessage> {
    *   toward the dead-letter queue. Only for idempotent handlers.
    */
   readonly acknowledge?: 'record' | 'batch';
+
+  /**
+   * Run the handler once per key while the key is kept, however many times the queue delivers it:
+   *
+   * - a message whose key already ran is acknowledged without running the handler;
+   * - a message whose key is running in another execution goes back to the queue;
+   * - a handler that fails or calls `retry` frees the key for the next attempt;
+   * - a handler that throws `UnknownOutcomeError` (its work may or may not have happened) keeps the key
+   *   and the message is consumed, so it runs neither again nor twice.
+   */
+  readonly idempotency?: QueueIdempotency<T>;
 
   /**
    * Variables associated to the subscription.

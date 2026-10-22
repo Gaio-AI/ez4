@@ -106,6 +106,26 @@ How a handler invocation acknowledges the messages of its batch.
 acknowledge: 'batch';
 ```
 
+#### Idempotency (optional)
+
+Runs the handler once per key while the key is kept, however many times the queue delivers the message. The key is the value of one or more required message fields that name the unit of work (the id of the provider event, or the job and the contact it's for), never a timestamp.
+
+- A message whose key already ran is acknowledged without running the handler.
+- A message whose key is running in another execution goes back to the queue.
+- A handler that fails, or calls `retry`, frees the key for the next attempt.
+- A handler that throws `UnknownOutcomeError` (from `@ez4/queue/utils`), because its work may or may not have happened, keeps the key and the message is consumed: it runs neither again nor twice.
+- `ttl` is how long (in seconds) a key that ran keeps a repeated message out. A running key is held for the queue timeout, so an execution that dies frees it once its message is visible again.
+- It also makes the `batch` acknowledge safe: what already ran is skipped when the batch comes back.
+
+```ts
+idempotency: {
+  key: ['jobId', 'contactId'];
+  ttl: 604800;
+};
+```
+
+On AWS the keys are kept in a DynamoDB table per queue (`<queue name>-claims`, with time to live), created with the first subscription that declares idempotency and removed with the last one. Each message costs two writes.
+
 #### Log retention (optional)
 
 Specifies the number of days logs should be retained.

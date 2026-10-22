@@ -8,6 +8,8 @@ import { getDefinitionsObject } from '@ez4/project/library';
 import { getFunctionBundle } from '@ez4/aws-common';
 import { pickObject } from '@ez4/utils';
 
+import { ClaimsExpirationAttribute, ClaimsKeyAttribute } from './claims';
+
 // __MODULE_PATH is defined by the package bundler.
 declare const __MODULE_PATH: string;
 
@@ -19,7 +21,8 @@ export const getQueueTemplateFile = () => {
 };
 
 export const bundleQueueFunction = async (parameters: BundleQueueFunctionParameters, connections: EntryState[]) => {
-  const { handler, listener, functionName, messageSchema, backoff, parallelism, acknowledge, context, references, debug } = parameters;
+  const { handler, listener, functionName, messageSchema, backoff, parallelism, acknowledge, idempotency, context, references, debug } =
+    parameters;
 
   const definitions = getDefinitionsObject(connections);
 
@@ -36,7 +39,15 @@ export const bundleQueueFunction = async (parameters: BundleQueueFunctionParamet
       __EZ4_MAX_BACKOFF: `${backoff.maxDelay}`,
       __EZ4_RETRY_WINDOW: `${backoff.window ?? 0}`,
       __EZ4_PARALLELISM: `${parallelism}`,
-      __EZ4_ACKNOWLEDGE: JSON.stringify(acknowledge)
+      __EZ4_ACKNOWLEDGE: JSON.stringify(acknowledge),
+      __EZ4_IDEMPOTENCY: idempotency
+        ? JSON.stringify({
+            ...idempotency,
+            handlerName: handler.functionName,
+            keyAttribute: ClaimsKeyAttribute,
+            expirationAttribute: ClaimsExpirationAttribute
+          })
+        : 'null'
     },
     handler,
     listener,

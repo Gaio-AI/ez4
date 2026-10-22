@@ -4,9 +4,10 @@ import type { ValidationCustomContext } from '@ez4/validator';
 import type { VirtualModule } from '@ez4/local-common';
 import type { Queue } from '@ez4/queue';
 import type { LocalQueue, ReceivedMessage } from '../service/queue';
+import type { HeldClaim } from '../service/claims';
 
 import { createModule, onBegin, onReady, onDone, onError, onEnd, onTimeout } from '@ez4/local-common';
-import { getJsonMessage, resolveValidation } from '@ez4/queue/utils';
+import { getIdempotencyKey, getJsonMessage, isUnknownOutcomeError, resolveValidation } from '@ez4/queue/utils';
 import { getRandomUUID, pickObject, Tasks, Wait } from '@ez4/utils';
 import { Runtime } from '@ez4/common';
 import { Logger } from '@ez4/logger';
@@ -34,7 +35,7 @@ export const processLambdaBatch = (
   signal: AbortSignal
 ) => {
   const { name: queueName, services, schema } = service;
-  const { handler, listener } = subscription;
+  const { handler, listener, idempotency } = subscription;
 
   const timeout = (service.timeout ?? Defaults.Timeout) * 1000;
   const deadline = Date.now() + timeout;
@@ -95,6 +96,34 @@ export const processLambdaBatch = (
     Logger.warn(`${failure}, it's visible again in ${delay}s.`);
   };
 
+  const failRecord = (
+    message: ReceivedMessage,
+    heldClaim: HeldClaim | undefined,
+    error: unknown,
+    deleteEachRecord: boolean,
+    outcome: RecordOutcome
+  ) => {
+    // The work may or may not have happened: the key is kept as if it ran, and the message is consumed so it runs
+    // neither again nor twice.
+    if (heldClaim && idempotency && isUnknownOutcomeError(error)) {
+      queue.claims.keep(heldClaim, 'unknown', idempotency.ttl * 1000);
+
+      if (deleteEachRecord) {
+        ackMessage(message);
+      }
+
+      return;
+    }
+
+    if (heldClaim) {
+      queue.claims.release(heldClaim);
+    }
+
+    outcome.handedBack = true;
+
+    logFailure(message, retryMessage(message));
+  };
+
   const processRecord = (module: VirtualModule, message: ReceivedMessage, deleteEachRecord: boolean) => {
     const { traceId, scope } = message.attributes;
 
@@ -108,11 +137,40 @@ export const processLambdaBatch = (
       };
 
       let currentRequest: Queue.Incoming<Queue.Message> | undefined;
+      let heldClaim: HeldClaim | undefined;
       let handled = false;
 
       try {
         const payload = JSON.parse(message.body);
         const safeMessage = await getJsonMessage(payload, schema, onCustomValidation);
+
+        if (idempotency) {
+          const claimKey = getIdempotencyKey(handler.name, safeMessage, idempotency.key);
+          const claimResult = queue.claims.take(claimKey, timeout);
+
+          if (claimResult.status === 'done') {
+            Logger.log(`Queue [${queueName}] message [${message.messageId}] already ran for its key, it's acknowledged without running.`);
+
+            if (deleteEachRecord) {
+              ackMessage(message);
+            }
+
+            return outcome;
+          }
+
+          if (claimResult.status === 'busy') {
+            Logger.warn(`Queue [${queueName}] message [${message.messageId}] goes back, its key is running in another execution.`);
+
+            outcome.handedBack = true;
+            outcome.holdsGroup = true;
+
+            retryMessage(message);
+
+            return outcome;
+          }
+
+          heldClaim = claimResult.claim;
+        }
 
         const retry = (retryOptions?: Queue.RetryOptions) => {
           outcome.handedBack = true;
@@ -138,6 +196,15 @@ export const processLambdaBatch = (
 
         handled = true;
 
+        // A handler that handed its message back runs it again, so the key goes back with it.
+        if (heldClaim && idempotency) {
+          if (outcome.handedBack) {
+            queue.claims.release(heldClaim);
+          } else {
+            queue.claims.keep(heldClaim, 'done', idempotency.ttl * 1000);
+          }
+        }
+
         if (deleteEachRecord && !outcome.handedBack) {
           ackMessage(message);
         }
@@ -151,9 +218,7 @@ export const processLambdaBatch = (
         // A record whose handler finished is consumed even when a hook after it fails: sending it back
         // would run it again.
         if (!handled) {
-          outcome.handedBack = true;
-
-          logFailure(message, retryMessage(message));
+          failRecord(message, heldClaim, error, deleteEachRecord, outcome);
         }
       } finally {
         if (currentRequest) {

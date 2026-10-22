@@ -4,13 +4,15 @@ import type { EntryStates } from '@ez4/state';
 import type { QueueState } from '../queue/types';
 
 import { isLinkedContextVpcRequired, linkServiceContext } from '@ez4/project/library';
+import { AttributeKeyType, AttributeType, createTable } from '@ez4/aws-dynamodb';
 import { getFunctionState, tryGetFunctionState } from '@ez4/aws-function';
 import { isRoleState } from '@ez4/aws-identity';
 import { createLogGroup } from '@ez4/aws-logs';
 
 import { createMapping } from '../mapping/service';
 import { createQueueFunction } from '../mapping/function/service';
-import { getFunctionName, getInternalName, getMaxWaitForBatchSize } from './utils';
+import { ClaimsExpirationAttribute, ClaimsKeyAttribute } from '../mapping/function/claims';
+import { getClaimsTableName, getFunctionName, getInternalName, getMaxWaitForBatchSize } from './utils';
 import { RoleMissingError } from './errors';
 import { Defaults } from './defaults';
 
@@ -27,8 +29,10 @@ export const prepareSubscriptions = (
 
   const { deadLetter, backoff, subscriptions } = service;
 
+  const claimsTableState = prepareClaimsTable(state, service, options);
+
   for (const subscription of subscriptions) {
-    const { handler, listener } = subscription;
+    const { handler, listener, idempotency } = subscription;
 
     const internalName = getInternalName(service, handler.name);
 
@@ -58,6 +62,8 @@ export const prepareSubscriptions = (
         tags
       });
 
+      const timeout = service.timeout ?? Defaults.Timeout;
+
       handlerState = createQueueFunction(state, context.role, logGroupState, {
         functionName: subscriptionName,
         messageSchema: service.schema,
@@ -65,8 +71,8 @@ export const prepareSubscriptions = (
         variables: [options.variables, service.variables, subscription.variables],
         references: subscription.handler.references,
         context: service.context,
-        dependencies: [queueState.entryId],
-        timeout: service.timeout ?? Defaults.Timeout,
+        dependencies: claimsTableState ? [queueState.entryId, claimsTableState.entryId] : [queueState.entryId],
+        timeout,
         backoff: {
           attempts: deadLetter?.maxAttempts ?? Defaults.MaxAttempts,
           minDelay: backoff?.minDelay ?? Defaults.MinBackoff,
@@ -75,6 +81,15 @@ export const prepareSubscriptions = (
         },
         parallelism: subscription.parallelism ?? Defaults.Parallelism,
         acknowledge: subscription.acknowledge ?? Defaults.Acknowledge,
+        ...(idempotency &&
+          claimsTableState && {
+            idempotency: {
+              tableName: claimsTableState.parameters.tableName,
+              key: idempotency.key,
+              ttl: idempotency.ttl,
+              lease: timeout
+            }
+          }),
         handler: {
           sourceFile: handler.file,
           functionName: handler.name,
@@ -113,6 +128,30 @@ export const prepareSubscriptions = (
       }
     });
   }
+};
+
+// One table keeps the keys of every subscription of the queue that runs its messages once. It only holds keys that
+// expire, so it goes away with the last subscription that uses it.
+const prepareClaimsTable = (state: EntryStates, service: QueueService | QueueImport, options: DeployOptions) => {
+  if (!service.subscriptions.some(({ idempotency }) => !!idempotency)) {
+    return undefined;
+  }
+
+  return createTable(state, {
+    tableName: getClaimsTableName(service, options),
+    attributeSchema: [
+      [
+        {
+          attributeName: ClaimsKeyAttribute,
+          attributeType: AttributeType.String,
+          keyType: AttributeKeyType.Hash
+        }
+      ]
+    ],
+    ttlAttribute: ClaimsExpirationAttribute,
+    allowDeletion: true,
+    tags: options.tags
+  });
 };
 
 export const connectSubscriptions = (

@@ -34,6 +34,8 @@ import {
   InvalidSubscriptionTypeError
 } from '../errors/subscription';
 
+import { IncorrectIdempotencyKeyError } from '../errors/idempotency';
+import { getMissingIdempotencyKeys, getQueueIdempotencyMetadata } from './idempotency';
 import { getSubscriptionHandlerMetadata } from './handler';
 
 // An SQS event source mapping takes at most this many messages per batch from a FIFO queue.
@@ -49,6 +51,14 @@ export const isQueueSubscriptionDeclaration = (type: AllType) => {
  */
 export const validateQueueSubscriptions = (service: QueueService | QueueImport, fileName?: string) => {
   const errorList: Error[] = [];
+
+  for (const { handler, idempotency } of service.subscriptions) {
+    const missingKeys = idempotency && getMissingIdempotencyKeys(idempotency, service.schema);
+
+    if (missingKeys?.length) {
+      errorList.push(new IncorrectIdempotencyKeyError(handler.name, missingKeys, fileName));
+    }
+  }
 
   if (service.fifoMode) {
     for (const { handler, batch } of service.subscriptions) {
@@ -193,6 +203,11 @@ const getTypeFromMembers = (
 
       case 'listener': {
         subscription.listener = getServiceListener(member.value, errorList);
+        break;
+      }
+
+      case 'idempotency': {
+        subscription.idempotency = getQueueIdempotencyMetadata(member.value, parent, reflection, errorList);
         break;
       }
 

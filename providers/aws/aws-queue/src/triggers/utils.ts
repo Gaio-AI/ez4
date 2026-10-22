@@ -17,6 +17,10 @@ export const getDeadLetterQueueName = (service: QueueService, options: CommonOpt
   return `${getServiceName(service, options)}-deadletter`;
 };
 
+export const getClaimsTableName = (service: QueueService | QueueImport, options: CommonOptions) => {
+  return `${getServiceName(service, options)}-claims`;
+};
+
 export const getInternalName = (service: QueueService | QueueImport, suffixName: string) => {
   return `${toKebabCase(service.name)}-${toKebabCase(suffixName)}`;
 };

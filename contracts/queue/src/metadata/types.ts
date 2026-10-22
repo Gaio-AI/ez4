@@ -70,6 +70,11 @@ export type QueueBackoff = {
 
 export type QueueSubscriptionAcknowledge = 'record' | 'batch';
 
+export type QueueIdempotency = {
+  key: string[];
+  ttl: number;
+};
+
 export type QueueSubscription = {
   listener?: ServiceListener;
   handler: QueueSubscriptionHandler;
@@ -81,6 +86,7 @@ export type QueueSubscription = {
   concurrency?: number;
   parallelism?: number;
   acknowledge?: QueueSubscriptionAcknowledge;
+  idempotency?: QueueIdempotency;
   batch?: number;
   memory?: number;
   files?: string[];
