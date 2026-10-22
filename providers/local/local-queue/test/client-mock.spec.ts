@@ -43,6 +43,18 @@ describe('local queue tests', () => {
     equal(client.sendMessage.mock.callCount(), 1);
   });
 
+  it('assert :: send messages (unordered queue)', async () => {
+    const client = QueueTester.getClientMock<TestUnorderedQueue>('queue');
+
+    await client.sendMessages([
+      { foo: 'foo', bar: 1 },
+      { foo: 'foo', bar: 2 }
+    ]);
+
+    equal(client.sendMessages.mock.callCount(), 1);
+    equal(client.sendMessage.mock.callCount(), 0);
+  });
+
   it('assert :: send message (ordered queue)', async () => {
     const client = QueueTester.getClientMock<TestOrderedQueue>('queue');
 

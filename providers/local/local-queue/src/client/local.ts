@@ -7,7 +7,7 @@ import { captureMessageTrace } from '@ez4/local-common';
 import { getJsonMessage } from '@ez4/queue/utils';
 import { Logger } from '@ez4/logger';
 
-import { getOutgoingMessage } from '../utils/message';
+import { getOutgoingMessage, sendEachMessage } from '../utils/message';
 import { LocalQueueHandleKey } from '../utils/handle';
 
 export const createLocalClient = <T extends Queue.Message = any, U extends Queue.Mode = any>(
@@ -31,6 +31,17 @@ export const createLocalClient = <T extends Queue.Message = any, U extends Queue
       const outgoingMessage = await getOutgoingMessage(message, service, trace, options?.delay);
 
       queue.sendMessage(outgoingMessage);
+    }
+
+    async sendMessages(messages: T[], options?: SendOptions<U>) {
+      // The trace is taken before anything else, callers import the scope right before sending.
+      const trace = captureMessageTrace();
+
+      Logger.log(`✉️  Sending ${messages.length} messages to queue [${resourceName}]`);
+
+      await sendEachMessage(messages, async (message) => {
+        queue.sendMessage(await getOutgoingMessage(message, service, trace, options?.delay));
+      });
     }
 
     async receiveMessage(options?: ReceiveOptions): Promise<T[]> {

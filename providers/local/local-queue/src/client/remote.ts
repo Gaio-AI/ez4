@@ -7,7 +7,7 @@ import { getServiceName } from '@ez4/project/library';
 import { captureMessageTrace, getMessageTraceHeaders } from '@ez4/local-common';
 import { Logger } from '@ez4/logger';
 
-import { getMessageDelayHeaders, getOutgoingMessage } from '../utils/message';
+import { getMessageDelayHeaders, getOutgoingMessage, sendEachMessage } from '../utils/message';
 
 export type RemoteClientOptions = CommonOptions & {
   serviceHost: string;
@@ -52,6 +52,17 @@ export const createRemoteClient = <T extends Queue.Message = any, U extends Queu
       const outgoingMessage = await getOutgoingMessage(message, service, trace, options?.delay);
 
       forwarder.forwardMessage(outgoingMessage);
+    }
+
+    async sendMessages(messages: T[], options?: SendOptions<U>) {
+      // The trace is taken before anything else, callers import the scope right before sending.
+      const trace = captureMessageTrace();
+
+      Logger.log(`✉️  Sending ${messages.length} messages to queue [${resourceName}] at ${forwarder.queueHost}.`);
+
+      await sendEachMessage(messages, async (message) => {
+        forwarder.forwardMessage(await getOutgoingMessage(message, service, trace, options?.delay));
+      });
     }
 
     receiveMessage(): Promise<T[]> {

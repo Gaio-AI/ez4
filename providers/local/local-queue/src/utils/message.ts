@@ -1,10 +1,11 @@
 import type { QueueImport, QueueService } from '@ez4/queue/library';
+import type { SendMessageFailure } from '@ez4/queue/utils';
 import type { MessageTrace } from '@ez4/local-common';
 import type { AnyObject } from '@ez4/utils';
 
 import { createHash } from 'node:crypto';
 
-import { getJsonStringMessage } from '@ez4/queue/utils';
+import { SendMessagesError, getJsonStringMessage } from '@ez4/queue/utils';
 import { getRandomUUID } from '@ez4/utils';
 
 import { InvalidParameterValueError } from './errors';
@@ -73,6 +74,26 @@ export const getOutgoingMessage = async (
     deduplicationId,
     delay
   };
+};
+
+/**
+ * Send each message in order, as the real client does in its batches: one that fails leaves the others to
+ * go, and then all failures are thrown together.
+ */
+export const sendEachMessage = async <T>(messages: T[], sendMessage: (message: T) => Promise<void>) => {
+  const failures: SendMessageFailure<T>[] = [];
+
+  for (const [index, message] of messages.entries()) {
+    try {
+      await sendMessage(message);
+    } catch (error) {
+      failures.push({ index, message, error: error instanceof Error ? error : new Error(`${error}`) });
+    }
+  }
+
+  if (failures.length) {
+    throw new SendMessagesError(failures, messages.length);
+  }
 };
 
 export const getMessageDelayHeaders = (delay: number | undefined): Record<string, string> => {

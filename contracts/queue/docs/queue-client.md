@@ -19,6 +19,30 @@ export async function anotherHandler(_request: any, { myQueue }: Service.Context
 
 > The queue client validates the message against the declared queue message type before sending.
 
+#### Send many messages
+
+```ts
+import { SendMessagesError } from '@ez4/queue/utils';
+
+export async function anotherHandler(_request: any, { myQueue }: Service.Context<MyService>) {
+  try {
+    await myQueue.sendMessages([
+      { foo: 'foo', bar: 1 },
+      { foo: 'foo', bar: 2 }
+    ]);
+  } catch (error) {
+    if (error instanceof SendMessagesError) {
+      // Every other message was sent.
+      for (const { index, message, error: reason } of error.failures) {
+        console.error(index, message, reason.message);
+      }
+    }
+  }
+}
+```
+
+> The messages go in as few requests as the provider takes (on AWS, up to 10 messages and 1 MiB per request). Each message succeeds or fails on its own, as with `sendMessage`: the others are still sent, and then `SendMessagesError` lists each failed message with its position in the list and the reason. A fifo queue sends its requests one at a time, so each group keeps the order of the list, except a message SQS failed on its side, which is sent once more after the rest of its request.
+
 #### Receive messages
 
 ```ts

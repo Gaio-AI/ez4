@@ -21,6 +21,7 @@ export namespace QueueTester {
   export type ClientMock<T extends Queue.Message, U extends Queue.Mode> = Client<T, U> & {
     receiveMessage: Mock<Client<T, U>['receiveMessage']>;
     sendMessage: Mock<Client<T, U>['sendMessage']>;
+    sendMessages: Mock<Client<T, U>['sendMessages']>;
 
     /**
      * Messages as the consumer receives them: validated and trimmed by the queue schema.
@@ -49,6 +50,7 @@ export namespace QueueTester {
     const client = createClientMock(resourceName, getQueueContract(resourceName)) as ClientMock<T['schema'], ClientMode<T>>;
 
     tracker.method(client, 'sendMessage');
+    tracker.method(client, 'sendMessages');
     tracker.method(client, 'receiveMessage');
 
     return client;

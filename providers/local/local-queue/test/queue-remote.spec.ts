@@ -139,6 +139,24 @@ describe('local queue import', () => {
     );
   });
 
+  it('assert :: send messages forwards each one in order and an invalid one fails alone', async (t) => {
+    const owner = await startOwner(t);
+
+    const { client } = registerImport(t, getQueueImport('sendMessagesImport'), owner.host);
+
+    await rejects(() => client.sendMessages([{ id: 'a' }, { id: 1 as unknown as string }, { id: 'c' }]), {
+      name: 'SendMessagesError',
+      message: /^1 of 3 messages/
+    });
+
+    await waitFor(() => owner.requests.length === 2);
+
+    deepEqual(
+      owner.requests.map(({ body }) => JSON.parse(body).id),
+      ['a', 'c']
+    );
+  });
+
   it('assert :: a stubbed fetch does not take the emulator traffic', async (t) => {
     const owner = await startOwner(t);
 
