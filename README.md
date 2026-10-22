@@ -30,19 +30,20 @@ EZ4 treats your TypeScript code as the source of truth for both infrastructure a
 
 Each component exposes a **contract**, a strongly typed interface that describes how the resource is created, configured, and consumed. Contracts are **provider‑agnostic**, **composable**, **type‑safe**, and **reflection‑driven**. They describe both the infrastructure and the runtime behavior of a component, allowing EZ4 to generate cloud resources and local clients from the same source of truth.
 
-| Contract                                  | Local Provider                                  | AWS Provider                                                                         |
-| ----------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [Gateway](./contracts/gateway/)           | [Gateway](./providers/local/local-gateway/)     | [API Gateway](./providers/aws/aws-gateway/)                                          |
-| [Database](./contracts/database/)         | [Database](./providers/local/local-database/)   | [DynamoDB](./providers/aws/aws-dynamodb/), [AWS Aurora](./providers/aws/aws-aurora/) |
-| [Cache](./contracts/cache/)               | [Cache](./providers/local/local-cache/)         | [Valkey](./providers/aws/aws-valkey/)                                                |
-| [Scheduler](./contracts/scheduler/)       | [Scheduler](./providers/local/local-scheduler/) | [Scheduler](./providers/aws/aws-scheduler/)                                          |
-| [Storage](./contracts/storage/)           | [Storage](./providers/local/local-storage/)     | [Bucket](./providers/aws/aws-bucket/)                                                |
-| [Topic](./contracts/topic/)               | [Topic](./providers/local/local-topic/)         | [Topic](./providers/aws/aws-topic/)                                                  |
-| [Queue](./contracts/queue/)               | [Queue](./providers/local/local-queue/)         | [Queue](./providers/aws/aws-queue/)                                                  |
-| [Distribution](./contracts/distribution/) | N/A                                             | [CloudFront](./providers/aws/aws-cloudfront/)                                        |
-| [Email](./contracts/email/)               | N/A                                             | [Email](./providers/aws/aws-email/)                                                  |
-| [Validation](./contracts/validation/)     | N/A                                             | N/A                                                                                  |
-| [Factory](./contracts/factory/)           | N/A                                             | N/A                                                                                  |
+| Contract                                  | Local Provider                                    | AWS Provider                                                                         |
+| ----------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [Gateway](./contracts/gateway/)           | [Gateway](./providers/local/local-gateway/)       | [API Gateway](./providers/aws/aws-gateway/)                                          |
+| [Database](./contracts/database/)         | [Database](./providers/local/local-database/)     | [DynamoDB](./providers/aws/aws-dynamodb/), [AWS Aurora](./providers/aws/aws-aurora/) |
+| [Cache](./contracts/cache/)               | [Cache](./providers/local/local-cache/)           | [Valkey](./providers/aws/aws-valkey/)                                                |
+| [Scheduler](./contracts/scheduler/)       | [Scheduler](./providers/local/local-scheduler/)   | [Scheduler](./providers/aws/aws-scheduler/)                                          |
+| [Storage](./contracts/storage/)           | [Storage](./providers/local/local-storage/)       | [Bucket](./providers/aws/aws-bucket/)                                                |
+| [Topic](./contracts/topic/)               | [Topic](./providers/local/local-topic/)           | [Topic](./providers/aws/aws-topic/)                                                  |
+| [Queue](./contracts/queue/)               | [Queue](./providers/local/local-queue/)           | [Queue](./providers/aws/aws-queue/)                                                  |
+| [Distribution](./contracts/distribution/) | N/A                                               | [CloudFront](./providers/aws/aws-cloudfront/)                                        |
+| [Email](./contracts/email/)               | N/A                                               | [Email](./providers/aws/aws-email/)                                                  |
+| [Encryption](./contracts/encryption/)     | [Encryption](./providers/local/local-encryption/) | [KMS](./providers/aws/aws-kms/)                                                      |
+| [Validation](./contracts/validation/)     | N/A                                               | N/A                                                                                  |
+| [Factory](./contracts/factory/)           | N/A                                               | N/A                                                                                  |
 
 ## Getting started
 

@@ -84,6 +84,7 @@ Circular linked services are supported. EZ4 resolves linked contexts lazily and 
 - [Queue](../contracts/queue/README.md)
 - [Distribution](../contracts/distribution/README.md)
 - [Email](../contracts/email/README.md)
+- [Encryption](../contracts/encryption/README.md)
 - [Validation](../contracts/validation/README.md)
 - [Factory](../contracts/factory/README.md)
 

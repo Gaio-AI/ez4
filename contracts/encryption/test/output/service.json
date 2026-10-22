@@ -1,0 +1,21 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestEncryption": {
+    "type": "@ez4/encryption",
+    "name": "TestEncryption",
+    "context": {},
+    "description": "Test encryption service.",
+    "file": "test/input/output-service.ts",
+    "variables": {},
+    "services": {}
+  }
+}

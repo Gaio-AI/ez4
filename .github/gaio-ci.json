@@ -54,6 +54,7 @@
         "@ez4/factory",
         "@ez4/validation",
         "@ez4/email",
+        "@ez4/encryption",
         "@ez4/pgsql",
         "@ez4/pgclient",
         "@ez4/pgmigration",
@@ -66,6 +67,7 @@
         "@ez4/local-queue",
         "@ez4/local-topic",
         "@ez4/local-distribution",
+        "@ez4/local-encryption",
         "@ez4/docs-gateway",
         "@ez4/docs-database",
         "@ez4/docs-topology"
@@ -92,6 +94,7 @@
         "@ez4/aws-function",
         "@ez4/aws-gateway",
         "@ez4/aws-identity",
+        "@ez4/aws-kms",
         "@ez4/aws-logs",
         "@ez4/aws-queue",
         "@ez4/aws-scheduler",
