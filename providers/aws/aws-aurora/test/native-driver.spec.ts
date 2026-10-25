@@ -6,6 +6,8 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { equal, ok, rejects } from 'node:assert/strict';
 import { rootCertificates } from 'node:tls';
 import { EventEmitter } from 'node:events';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import pg from 'pg';
 
@@ -188,6 +190,14 @@ describe('aurora native driver', () => {
         process.env.AWS_PROFILE = profile;
       }
     }
+  });
+
+  it('assert :: the published driver imports nothing from @aws-sdk/core', async () => {
+    // A function bundle leaves every @aws-sdk package to the Lambda runtime, and a runtime version may not
+    // give the function's code @aws-sdk/core: the clients resolve there, the package they share may not.
+    const source = await readFile(join(import.meta.dirname, '../dist/client-native.mjs'), 'utf8');
+
+    ok(!/["']@aws-sdk\/core(\/[^"']*)?["']/.test(source));
   });
 
   it('assert :: opening a connection is retried while the database is unavailable', async () => {
