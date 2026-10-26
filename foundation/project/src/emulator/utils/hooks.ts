@@ -17,6 +17,14 @@ export const bootstrapServices = (emulators: ServiceEmulators) => {
   });
 };
 
+export const reloadServices = (emulators: ServiceEmulators) => {
+  return forEachEmulator(emulators, async (emulator) => {
+    if (emulator.reloadHandler) {
+      await emulator.reloadHandler();
+    }
+  });
+};
+
 export const shutdownServices = (emulators: ServiceEmulators) => {
   return forEachEmulator(emulators, async (emulator) => {
     if (emulator.shutdownHandler) {
