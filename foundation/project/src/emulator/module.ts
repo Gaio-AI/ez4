@@ -33,7 +33,9 @@ export const createEmulatorModule = async (module: EmulatorModuleDefinition): Pr
     if (!entrypoint.module) {
       const moduleUrl = pathToFileURL(join(process.cwd(), entrypoint.file));
 
-      return import(`${moduleUrl.href}?v=${version}`);
+      // Tests and scripts never reload, so they stay on version 0 and import the module as a spec or a script
+      // does: both reach one instance of it, mocks included.
+      return import(version ? `${moduleUrl.href}?v=${version}` : moduleUrl.href);
     }
 
     return import(entrypoint.module);
