@@ -37,23 +37,27 @@ export async function dbStreamEntryPoint(event: DynamoDBStreamEvent, context: Co
     }
 
     for (const record of event.Records) {
+      const traceId = getRandomUUID();
+
+      // Each record gets its scope before its change is validated, and leaves the previous record's request
+      // behind, so a record that fails validation is reported as itself.
+      currentRequest = undefined;
+
+      Runtime.setScope({
+        traceId
+      });
+
       const change = await getRecordChange(record, __EZ4_SCHEMA);
 
       if (!change) {
         continue;
       }
 
-      const traceId = getRandomUUID();
-
       currentRequest = {
         ...request,
         ...change,
         traceId
       };
-
-      Runtime.setScope({
-        traceId
-      });
 
       await onReady(currentRequest);
       await handle(currentRequest, __EZ4_CONTEXT);

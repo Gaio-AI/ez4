@@ -33,18 +33,20 @@ export async function snsEntryPoint(event: SNSEvent, context: Context): Promise<
     }
 
     for (const { Sns } of event.Records) {
+      const traceId = Sns.MessageAttributes['EZ4.TRACE_ID']?.Value ?? getRandomUUID();
+
+      // The scope outlives the invocation, so it's replaced before the event is validated: an event that fails
+      // validation is reported under its own trace id, not under the one of the previous invocation.
+      Runtime.importScope(traceId, Sns.MessageAttributes['EZ4.SCOPE']?.Value);
+
       const payload = JSON.parse(Sns.Message);
       const event = await getJsonEvent(payload, __EZ4_SCHEMA);
-
-      const traceId = Sns.MessageAttributes['EZ4.TRACE_ID']?.Value ?? getRandomUUID();
 
       currentRequest = {
         ...request,
         traceId,
         event
       };
-
-      Runtime.importScope(traceId, Sns.MessageAttributes['EZ4.SCOPE']?.Value);
 
       await onReady(currentRequest);
       await handle(currentRequest, __EZ4_CONTEXT);

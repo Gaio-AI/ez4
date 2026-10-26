@@ -1,10 +1,10 @@
 import type { Context, SNSEvent, SNSMessageAttributes } from 'aws-lambda';
 
 import { afterEach, describe, it } from 'node:test';
-import { deepEqual } from 'node:assert/strict';
+import { deepEqual, rejects } from 'node:assert/strict';
 
+import { ServiceEventType, Runtime } from '@ez4/common';
 import { SchemaType } from '@ez4/schema';
-import { Runtime } from '@ez4/common';
 
 import { snsEntryPoint } from '../lib/event';
 
@@ -77,6 +77,45 @@ describe('topic entry point scope', () => {
     });
 
     deepEqual(handledScope, { traceId: 'trace-1', clientVersion: '1.2.3' });
+  });
+
+  it('assert :: an event that fails validation reports the error in its own scope', async () => {
+    let errorScope: Runtime.Scope | undefined;
+
+    Object.assign(globalThis, {
+      __EZ4_SCHEMA: {
+        type: SchemaType.Object,
+        properties: {
+          foo: { type: SchemaType.String }
+        }
+      },
+      __EZ4_CONTEXT: {},
+      dispatch: async (event: { type: ServiceEventType }) => {
+        if (event.type === ServiceEventType.Error) {
+          errorScope = Runtime.getScope();
+        }
+      },
+      handle: async () => {}
+    });
+
+    Runtime.setScope({ traceId: 'stale' });
+
+    const event = {
+      Records: [
+        {
+          Sns: {
+            Message: '{}',
+            MessageAttributes: {
+              ['EZ4.TRACE_ID']: { Type: 'String', Value: 'trace-invalid' }
+            }
+          }
+        }
+      ]
+    } as unknown as SNSEvent;
+
+    await rejects(() => snsEntryPoint(event, lambdaContext));
+
+    deepEqual(errorScope, { traceId: 'trace-invalid' });
   });
 
   it('assert :: restore only the trace id without EZ4.SCOPE', async () => {
