@@ -11,13 +11,15 @@ import type {
   StreamMode,
   OrderMode,
   LockMode,
-  AggregateMode
+  AggregateMode,
+  EventualReadMode
 } from '../types/mode';
 
 /**
  * Database engine.
  */
 export type DatabaseEngine = {
+  eventualReadMode?: EventualReadMode;
   parametersMode: ParametersMode;
   transactionMode: TransactionMode;
   insensitiveMode: InsensitiveMode;

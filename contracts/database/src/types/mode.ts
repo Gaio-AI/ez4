@@ -77,3 +77,11 @@ export const enum AggregateMode {
   Unsupported = 'unsupported',
   Supported = 'supported'
 }
+
+/**
+ * Eventual read mode.
+ */
+export const enum EventualReadMode {
+  Unsupported = 'unsupported',
+  Supported = 'supported'
+}
