@@ -15,3 +15,9 @@ export const probeScope = () => {
     headers: Runtime.getScopeHeaders()
   });
 };
+
+export const probeScopeLater = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  probeScope();
+};

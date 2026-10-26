@@ -7,7 +7,18 @@ import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/loc
 import { getRandomUUID, pickObject } from '@ez4/utils';
 import { Runtime } from '@ez4/common';
 
-export const processSchedulerEvent = async (
+export const processSchedulerEvent = (
+  service: CronService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  event: Cron.Event | null,
+  trace?: MessageTrace
+) => {
+  // Events can fire side by side, so each one keeps its own scope for what it logs and sends.
+  return Runtime.runWithScope(() => handleSchedulerEvent(service, options, context, event, trace));
+};
+
+const handleSchedulerEvent = async (
   service: CronService,
   options: ServeOptions,
   context: EmulateServiceContext,

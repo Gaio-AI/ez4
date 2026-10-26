@@ -125,6 +125,29 @@ describe('local topic scope', () => {
     ]);
   });
 
+  it('assert :: concurrent lambda events keep their own scope', async () => {
+    const observed = observeScopes(2);
+
+    const subscription = {
+      ...topicService.subscriptions[0],
+      handler: {
+        name: 'probeScopeLater',
+        file: 'test/fixtures/scope-probe.ts',
+        position: [1, 1]
+      }
+    } as TopicLambdaSubscription;
+
+    await Promise.all([
+      processLambdaEvent(topicService, options, context, subscription, { foo: 'a' }, { traceId: 'trace-a' }),
+      processLambdaEvent(topicService, options, context, subscription, { foo: 'b' }, { traceId: 'trace-b' })
+    ]);
+
+    const traceIds = (await observed).map(({ scope }) => scope?.traceId).sort();
+
+    deepEqual(traceIds, ['trace-a', 'trace-b']);
+    equal(Runtime.getScope(), undefined);
+  });
+
   it('assert :: local client carries trace id and scope to lambda and queue subscribers', async () => {
     const client = registerLocalService(topicService, options, context).exportHandler() as Client<{ foo: string }>;
     const observed = observeScopes(2);
