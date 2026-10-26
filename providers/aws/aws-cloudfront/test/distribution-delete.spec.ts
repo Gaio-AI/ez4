@@ -6,12 +6,7 @@ import type { DistributionState } from '../src/distribution/types';
 import { afterEach, describe, it, mock } from 'node:test';
 import { equal, ok } from 'node:assert/strict';
 
-import {
-  CloudFrontClient,
-  DeleteDistributionCommand,
-  GetDistributionCommand,
-  UpdateDistributionCommand
-} from '@aws-sdk/client-cloudfront';
+import { CloudFrontClient, DeleteDistributionCommand, GetDistributionCommand, UpdateDistributionCommand } from '@aws-sdk/client-cloudfront';
 
 import { getDistributionHandler } from '../src/distribution/handler';
 import { DistributionServiceType } from '../src/distribution/types';
