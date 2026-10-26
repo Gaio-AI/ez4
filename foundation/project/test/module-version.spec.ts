@@ -42,7 +42,7 @@ const runDriver = (entry: string, versions: string[]): DriverOutput => {
         '--no-warnings',
         '--experimental-strip-types',
         '--experimental-transform-types',
-        '--loader',
+        '--import',
         EXTENSIONS,
         'driver.mjs',
         entry,

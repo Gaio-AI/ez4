@@ -1,5 +1,6 @@
-import type { ResolveHook, ResolveHookContext } from 'node:module';
+import type { ResolveHookContext, ResolveHookSync } from 'node:module';
 
+import { registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -20,7 +21,7 @@ const aliasPaths = {
 // A handler loaded for a serve reload carries `?v=<version>`, and every project module it reaches carries the same
 // one: a reload loads each module once more, and within a version a module is a single instance, so `instanceof`
 // and import cycles behave as in the bundle.
-export const resolve: ResolveHook = (specifier, context, defaultResolve) => {
+const resolve: ResolveHookSync = (specifier, context, defaultResolve) => {
   if (isGlobalParentModule(context)) {
     return defaultResolve(specifier, context);
   }
@@ -33,20 +34,16 @@ export const resolve: ResolveHook = (specifier, context, defaultResolve) => {
     return defaultResolve(version ? getVersionedPath(modulePath, version) : modulePath, context);
   }
 
-  if (!version) {
-    return defaultResolve(specifier, context);
+  const result = defaultResolve(specifier, context);
+
+  if (!version || !isProjectModule(specifier, result.url)) {
+    return result;
   }
 
-  return onResolved(defaultResolve(specifier, context), (result) => {
-    if (!isProjectModule(specifier, result.url)) {
-      return result;
-    }
-
-    return {
-      ...result,
-      url: getVersionedPath(result.url, version)
-    };
-  });
+  return {
+    ...result,
+    url: getVersionedPath(result.url, version)
+  };
 };
 
 const isGlobalParentModule = ({ parentURL }: ResolveHookContext) => {
@@ -73,10 +70,6 @@ const isProjectModule = (specifier: string, url: string) => {
   }
 
   return specifier.startsWith('.') || /\.[cm]?tsx?$/.test(new URL(url).pathname);
-};
-
-const onResolved = <T, R>(result: T | Promise<T>, callback: (result: T) => R) => {
-  return result instanceof Promise ? result.then(callback) : callback(result);
 };
 
 const resolveImportPath = (specifier: string, parentFile: string, aliasPaths: Record<string, string[]>) => {
@@ -126,3 +119,6 @@ const resolveSpecifier = (specifier: string, parentPath: string, extension: stri
 
   return undefined;
 };
+
+// The hooks run on the thread that loads the modules, so resolving costs no hop to a loader thread.
+registerHooks({ resolve });
