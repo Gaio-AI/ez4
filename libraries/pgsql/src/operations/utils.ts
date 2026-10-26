@@ -8,7 +8,7 @@ import { escapeSqlData } from '../utils/escape';
 import { SqlRawValue } from '../common/raw';
 
 export const getOperandValue = (schema: AnySchema | undefined, operand: unknown, context: SqlOperationContext, encode?: boolean) => {
-  const { source, variables, references, options, path } = context;
+  const { source, variables, references, options } = context;
 
   if (operand instanceof SqlRawValue) {
     return operand.build(source);
@@ -30,7 +30,7 @@ export const getOperandValue = (schema: AnySchema | undefined, operand: unknown,
   }
 
   const preparedValue = options.onPrepareVariable(operand, {
-    json: encode && !!path,
+    json: isJsonOperand(schema, context, encode),
     schema,
     index
   });
@@ -49,6 +49,11 @@ export const getOperandArray = (schema: AnySchema | undefined, operands: unknown
 
   // SQL written by the caller (raw values and column references) can't go inside a bound array.
   if (operands.some((operand) => operand instanceof SqlRawValue || operand instanceof SqlColumnReference)) {
+    return undefined;
+  }
+
+  // A JSON value compares as JSON, which a bound array of plain values doesn't, so each one is bound on its own.
+  if (isJsonOperand(schema, context)) {
     return undefined;
   }
 
@@ -130,4 +135,10 @@ export const getOperandFunction = (column: string, flags: SqlOperationFlags) => 
   }
 
   return column;
+};
+
+// Inside a JSON column, a field without a schema is read as JSON (`"column"['field']`), so its operand must be
+// JSON too: compared as text or as a number, Postgres has no operator for it.
+const isJsonOperand = (schema: AnySchema | undefined, context: SqlOperationContext, encode?: boolean) => {
+  return !!context.path && (!!encode || !schema);
 };

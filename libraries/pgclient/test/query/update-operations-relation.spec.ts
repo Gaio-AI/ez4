@@ -317,7 +317,7 @@ describe('update operations relation', () => {
   });
 
   it('assert :: prepare update operations (json remove from)', async ({ assert }) => {
-    const [statement] = await prepareUpdate({
+    const [statement, variables] = await prepareUpdate({
       operation: {
         json: {
           bar: {
@@ -330,9 +330,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json" = "T"."json" #- '{bar}' FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json" = "T"."json" #- :0::text[] FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
+
+    assert.deepEqual(variables, ['{"bar"}']);
   });
 
   it('assert :: prepare update operations (json update and remove from)', async ({ assert }) => {
@@ -350,11 +352,11 @@ describe('update operations relation', () => {
     assert.equal(
       statement,
       `WITH "Q0" AS (SELECT "operation_id" FROM "ez4-test-update-relation") ` +
-        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json" = "T"."json" #- '{bar}', "json"[:0] = :1 FROM "Q0" ` +
+        `UPDATE ONLY "ez4-test-update-operation" AS "T" SET "json" = "T"."json" #- :2::text[], "json"[:0] = :1 FROM "Q0" ` +
         `WHERE "T"."id" = "Q0"."operation_id"`
     );
 
-    assert.deepEqual(variables, ['foo', 123]);
+    assert.deepEqual(variables, ['foo', 123, '{"bar"}']);
   });
 
   it('assert :: prepare update operations (invalid operator)', async ({ assert }) => {

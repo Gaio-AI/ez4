@@ -8,7 +8,7 @@ import type { InternalTableMetadata } from '../types/table';
 import { InvalidAtomicOperation, InvalidFieldSchemaError, InvalidRelationFieldError, MissingPrimaryIndexError } from '@ez4/pgclient';
 import { getOptionalSchema, getSchemaProperty, isNumberSchema, isObjectSchema, isUnionSchema } from '@ez4/schema';
 import { isAnyNumber, isAnyObject, isEmptyObject, isNullish } from '@ez4/utils';
-import { SqlSelectStatement, escapeSqlName, mergeSqlAlias } from '@ez4/pgsql';
+import { SqlSelectStatement, escapeSqlName, getSqlTextArray, mergeSqlAlias } from '@ez4/pgsql';
 import { Index, Order } from '@ez4/database';
 
 import { getConnectionSchema, isRelationHolder, isSingleRelationData } from './utils/relation';
@@ -439,7 +439,7 @@ export const getAtomicObjectOperationUpdate = async (
 
       case 'removeFrom': {
         if (value) {
-          return [builder.rawOperation('#-', `{${fieldKey}}`)];
+          return [builder.rawOperation('#-', getSqlTextArray([fieldKey]))];
         }
 
         return [];

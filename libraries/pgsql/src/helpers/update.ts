@@ -11,7 +11,6 @@ import { SqlColumnReference } from '../common/reference';
 import { mergeSqlAlias, mergeSqlJsonPath, mergeSqlPath } from '../utils/merge';
 import { InvalidAtomicOperation } from '../errors/operations';
 import { SqlSelectStatement } from '../statements/select';
-import { escapeSqlText } from '../utils/escape';
 
 // A key is always plain text: left to the driver's detection, a key shaped like a date or a UUID would be bound
 // as one and come back rewritten.
@@ -41,7 +40,7 @@ export const getUpdateColumns = (
   const json = !!parent;
 
   // Inside a JSON column the field name is a key that can come straight from data, so it's bound as a variable
-  // and never written into the statement.
+  // and never written into the statement. The path a key is removed by is bound the same way.
   const bindJsonKey = (fieldName: string) => {
     const keyIndex = references.counter++;
 
@@ -62,7 +61,7 @@ export const getUpdateColumns = (
     }
 
     if (value instanceof SqlRawOperation && isJsonRemoveOperator(value.operator)) {
-      columns.push(`${value.operator} ${escapeSqlText(`${value.build()}`)}`);
+      columns.push(`${value.operator} ${bindJsonKey(`${value.build()}`)}::text[]`);
       continue;
     }
 
