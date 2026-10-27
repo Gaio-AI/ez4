@@ -24,6 +24,7 @@ describe('database service metadata', () => {
   process.env.TEST_ENV_VAR = 'test-env-var-value';
 
   it('assert :: empty databases', () => testFile('database'));
+  it('assert :: engine eventual reads', () => testFile('eventual-read'));
   it('assert :: database tables', () => testFile('tables'));
   it('assert :: database scalability', () => testFile('scalability'));
   it('assert :: table schema', () => testFile('schema'));

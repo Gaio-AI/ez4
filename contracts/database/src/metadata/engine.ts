@@ -29,7 +29,8 @@ import {
   StreamMode,
   OrderMode,
   LockMode,
-  AggregateMode
+  AggregateMode,
+  EventualReadMode
 } from '../types/mode';
 
 export const isDatabaseEngineDeclaration = (type: TypeModel) => {
@@ -189,6 +190,14 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, parent: TypeModel, mem
       case 'aggregateMode': {
         if ((engine.aggregateMode = getPropertyStringIn(member, [AggregateMode.Unsupported, AggregateMode.Supported]))) {
           properties.delete(member.name);
+        }
+        break;
+      }
+
+      // Optional: an engine that doesn't declare it reads with strong consistency only.
+      case 'eventualReadMode': {
+        if (!(engine.eventualReadMode = getPropertyStringIn(member, [EventualReadMode.Unsupported, EventualReadMode.Supported]))) {
+          errorList.push(new InvalidServicePropertyError(parent.name, member.name, type.file));
         }
         break;
       }

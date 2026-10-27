@@ -47,6 +47,13 @@ describe('database engine errors', () => {
     deepEqual(error2.properties, ['engine']);
   });
 
+  it('assert :: invalid engine (eventual read mode)', () => {
+    const [error1] = parseFile('invalid-engine-eventual-read', 1);
+
+    ok(error1 instanceof InvalidServicePropertyError);
+    deepEqual(error1.propertyName, 'eventualReadMode');
+  });
+
   it('assert :: invalid engine (property)', () => {
     const [error1] = parseFile('invalid-engine-property', 1);
 

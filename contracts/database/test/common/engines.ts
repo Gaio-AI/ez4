@@ -8,7 +8,8 @@ import type {
   StreamMode,
   OrderMode,
   LockMode,
-  AggregateMode
+  AggregateMode,
+  EventualReadMode
 } from '@ez4/database';
 
 export type TestEngine = {
@@ -142,6 +143,22 @@ export type TestEngineAggregate<A extends AggregateMode> = {
   orderMode: OrderMode.AnyColumns;
   lockMode: LockMode.Unsupported;
   aggregateMode: A;
+  options: never;
+  name: 'test';
+};
+
+export type TestEngineEventualRead<E extends EventualReadMode> = {
+  parametersMode: ParametersMode.OnlyIndex;
+  transactionMode: TransactionMode.Static;
+  insensitiveMode: InsensitiveMode.Unsupported;
+  undefinedMode: UndefinedMode.Supported;
+  paginationMode: PaginationMode.Offset;
+  relationMode: RelationMode.Supported;
+  streamMode: StreamMode.Unsupported;
+  orderMode: OrderMode.AnyColumns;
+  lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
+  eventualReadMode: E;
   options: never;
   name: 'test';
 };

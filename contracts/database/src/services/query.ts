@@ -9,6 +9,7 @@ import type { PaginationModeUtils } from './pagination';
 import type { RelationFilter, RelationMetadata } from './relations';
 import type { OrderModeUtils } from './order';
 import type { LockModeUtils } from './lock';
+import type { EventualReadModeUtils } from './read';
 import type { TableMetadata } from './table';
 import type { Database } from './contract';
 
@@ -35,8 +36,15 @@ export namespace Query {
    */
   export type PreviousInput = boolean;
 
+  /**
+   * When `false`, the read is eventually consistent: it costs half and may miss a write that finished a moment
+   * before it. Reads are strongly consistent by default, and reads through a secondary index are always eventual.
+   */
+  export type ConsistentInput<T extends TableMetadata> = EventualReadModeUtils.Input<T>;
+
   export type FindOneInput<S extends AnyObject, T extends TableMetadata> = {
     lock?: LockModeUtils.Input<T>;
+    consistent?: ConsistentInput<T>;
     select: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
     where: WhereInput<T, true>;
@@ -86,6 +94,7 @@ export namespace Query {
 
   export type FindManyInput<S extends AnyObject, C extends boolean, T extends TableMetadata> = PaginationModeUtils.Range<T['engine']> & {
     lock?: LockModeUtils.Input<T>;
+    consistent?: ConsistentInput<T>;
     select: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
     where?: WhereInput<T>;
@@ -100,6 +109,7 @@ export namespace Query {
   };
 
   export type ExistsInput<T extends TableMetadata> = {
+    consistent?: ConsistentInput<T>;
     where?: WhereInput<T>;
   };
 

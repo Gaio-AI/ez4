@@ -1,0 +1,35 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestDatabase": {
+    "type": "@ez4/database",
+    "name": "TestDatabase",
+    "context": {},
+    "file": "test/input/output-eventual-read.ts",
+    "variables": {},
+    "services": {},
+    "engine": {
+      "parametersMode": "index",
+      "transactionMode": "static",
+      "insensitiveMode": "unsupported",
+      "undefinedMode": "supported",
+      "paginationMode": "offset",
+      "relationMode": "supported",
+      "streamMode": "unsupported",
+      "orderMode": "any",
+      "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
+      "eventualReadMode": "supported",
+      "name": "test"
+    },
+    "tables": []
+  }
+}

@@ -40,7 +40,7 @@ export const prepareFindOne = <T extends InternalTableMetadata, S extends Query.
   const [statement, variables] = prepareSelect(table, schema, secondaryIndex, query);
 
   return {
-    ConsistentRead: !secondaryIndex,
+    ConsistentRead: isConsistentRead(secondaryIndex, query.consistent),
     Statement: statement,
     Limit: 1,
     ...(variables.length && {
@@ -135,7 +135,7 @@ export const prepareFindMany = <T extends InternalTableMetadata, S extends Query
 
   return {
     Statement: statement,
-    ConsistentRead: !secondaryIndex,
+    ConsistentRead: isConsistentRead(secondaryIndex, query.consistent),
     ...('cursor' in query && {
       NextToken: query.cursor
     }),
@@ -263,13 +263,18 @@ export const prepareExists = <T extends InternalTableMetadata, S extends Query.S
   });
 
   return {
-    ConsistentRead: !secondaryIndex,
+    ConsistentRead: isConsistentRead(secondaryIndex, query.consistent),
     Statement: statement,
     Limit: 1,
     ...(variables.length && {
       Parameters: variables
     })
   };
+};
+
+// A read is strongly consistent unless the query asks otherwise. A secondary index only serves eventual reads.
+const isConsistentRead = (secondaryIndex: string | undefined, consistent: boolean | undefined) => {
+  return !secondaryIndex && consistent !== false;
 };
 
 export const prepareCount = <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
