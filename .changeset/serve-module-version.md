@@ -1,5 +1,0 @@
----
-'@ez4/project': patch
----
-
-A serve reload loads each project module once: every module a handler reaches carries the handler's `?v=<version>`, where it used to get a new `?v=<timestamp>` for each module importing it. A module reached through two imports was two instances, so `instanceof` failed across files (an error class thrown in one file and checked in another made the route answer 500 locally, though the bundle answered as expected), and an import cycle loaded without end until `RangeError: Maximum call stack size exceeded`. A workspace package whose entry is TypeScript source (linked into `node_modules`, resolved outside it) now reloads with the project instead of keeping the code of the first load; a built package outside `node_modules` keeps one instance, as packages inside it do. `ez4 serve` also raises the version before creating the emulators, so what an emulator loads to bootstrap (a factory, a validation) and the requests share one version. Within a test run the handlers share one graph too, still apart from the modules the specs import.
