@@ -36,6 +36,7 @@ export const createQueueFunction = <E extends EntryState>(
     files: parameters.files,
     tags: parameters.tags,
     vpc: parameters.vpc,
+    recursiveLoop: parameters.recursiveLoop,
     getFunctionVariables: () => {
       return variables.reduce<LinkedVariables>((variables, current) => ({ ...variables, ...current }), {});
     },

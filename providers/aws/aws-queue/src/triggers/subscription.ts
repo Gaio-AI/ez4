@@ -52,7 +52,8 @@ export const prepareSubscriptions = (
         memory = defaults?.memory ?? Defaults.Memory,
         debug = options.debug,
         files,
-        vpc
+        vpc,
+        recursiveLoop
       } = subscription;
 
       const logGroupState = createLogGroup(state, {
@@ -119,7 +120,8 @@ export const prepareSubscriptions = (
         files,
         debug,
         tags,
-        vpc
+        vpc,
+        recursiveLoop
       });
 
       context.setServiceState(internalName, options, handlerState);

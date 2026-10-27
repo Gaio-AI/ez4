@@ -204,7 +204,8 @@ const getTypeFromMembers = (
       }
 
       case 'vpc':
-      case 'debug': {
+      case 'debug':
+      case 'recursiveLoop': {
         subscription[member.name] = getPropertyBoolean(member);
         break;
       }
