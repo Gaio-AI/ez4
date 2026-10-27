@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { Logger } from '@ez4/logger';
 
 import { CommandType, getInputOptions } from './terminal/options';
+import { getCompileCacheDirectory } from './terminal/compile-cache';
 import { proxyCommand } from './terminal/commands/proxy';
 import { checkMinNodeVersion } from './terminal/version';
 
@@ -17,14 +18,15 @@ const extensionsPath = join(import.meta.dirname, './extensions.mjs');
 const input = getInputOptions();
 
 // The application process reads the directory from `NODE_COMPILE_CACHE` and caches what it compiles there.
-// Coverage needs every module compiled from source, so it runs without the cache.
 const setupCompileCache = () => {
-  if (input.coverage || process.env.NODE_V8_COVERAGE) {
+  const directory = getCompileCacheDirectory(input, process.env, process.cwd());
+
+  if (!directory) {
     process.env.NODE_DISABLE_COMPILE_CACHE = '1';
     return;
   }
 
-  const cache = module.enableCompileCache();
+  const cache = module.enableCompileCache(directory);
 
   if (cache.directory) {
     process.env.NODE_COMPILE_CACHE = cache.directory;
