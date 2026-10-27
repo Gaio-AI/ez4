@@ -12,7 +12,8 @@ import { getProxyPort, getServeBind } from '../../utils/project';
 import { addRoute, removeRoute } from '../../proxy/routes';
 import { ensureProxy } from '../../proxy/daemon';
 import { toRouteHost } from './proxy';
-import { bootstrapServices, prepareServices, shutdownServices } from '../../emulator/utils/hooks';
+import { bootstrapServices, prepareServices, reloadServices, shutdownServices } from '../../emulator/utils/hooks';
+import { getMetadataSignature } from '../../emulator/utils/reload';
 import { useLambdaTimezone } from '../../emulator/utils/timezone';
 import { getServiceEmulators } from '../../emulator/service';
 import { getServeOptions } from '../../emulator/options';
@@ -59,6 +60,7 @@ export const serveCommand = async (input: InputOptions) => {
   });
 
   let emulators: ServiceEmulators = {};
+  let metadataSignature: string | undefined;
   let isRunning = false;
 
   const additionalPaths = project.watchOptions?.additionalPaths ?? [];
@@ -69,6 +71,25 @@ export const serveCommand = async (input: InputOptions) => {
     additionalPaths: [namespacePath, ...additionalPaths],
     aliasPaths: { ...references.paths, ...paths },
     onMetadataReady: async (metadata) => {
+      const currentSignature = getMetadataSignature(metadata);
+
+      // Only code changed: the emulators keep their state (queued and delayed messages, scheduled events, open
+      // connections) and run the new code from the next invocation on.
+      if (isRunning && currentSignature === metadataSignature) {
+        options.version++;
+
+        // The watcher drops an error thrown after its first build, so a module that fails to load says it here.
+        try {
+          await reloadServices(emulators);
+        } catch (error) {
+          return Logger.error(`Project [${project.projectName}] code reload failed: ${error}`);
+        }
+
+        return Logger.log(`🚀 Project [${project.projectName}] reloaded (code only, emulators kept)`);
+      }
+
+      metadataSignature = currentSignature;
+
       if (isRunning) {
         await shutdownServices(emulators);
         Logger.space();

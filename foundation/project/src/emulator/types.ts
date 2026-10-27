@@ -11,6 +11,8 @@ export type EmulatorPrepareHandler = () => Promise<void> | void;
 
 export type EmulatorBootstrapHandler = () => Promise<void> | void;
 
+export type EmulatorReloadHandler = () => Promise<void> | void;
+
 export type EmulatorShutdownHandler = () => Promise<void> | void;
 
 export type EmulatorConnectionHandler = (event: EmulatorConnectionEvent) => Promise<void> | void;
@@ -70,6 +72,11 @@ export type ServiceEmulator = {
   manifestHandler?: EmulatorManifestHandler;
   prepareHandler?: EmulatorPrepareHandler;
   bootstrapHandler?: EmulatorBootstrapHandler;
+  /**
+   * Runs when a serve reload keeps the emulator, as only code changed, after the version goes up. An emulator that
+   * loads project code to bootstrap loads it again here; one that loads it per invocation needs no handler.
+   */
+  reloadHandler?: EmulatorReloadHandler;
   shutdownHandler?: EmulatorShutdownHandler;
   connectHandler?: EmulatorConnectionHandler;
   disconnectHandler?: EmulatorConnectionHandler;

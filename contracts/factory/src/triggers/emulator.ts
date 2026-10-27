@@ -16,6 +16,17 @@ export const getEmulatorService = (event: EmulateServiceEvent): ServiceEmulator 
 
   let factoryModule: EntrypointModule;
 
+  const loadFactoryModule = async () => {
+    factoryModule = await createEmulatorModule({
+      version: options.version,
+      entrypoint: handler,
+      variables: {
+        ...options.variables,
+        ...service.variables
+      }
+    });
+  };
+
   return {
     type: 'Factory',
     name: resourceName,
@@ -27,15 +38,7 @@ export const getEmulatorService = (event: EmulateServiceEvent): ServiceEmulator 
 
       return factoryModule.invoke(serviceClients);
     },
-    bootstrapHandler: async () => {
-      factoryModule = await createEmulatorModule({
-        version: options.version,
-        entrypoint: handler,
-        variables: {
-          ...options.variables,
-          ...service.variables
-        }
-      });
-    }
+    bootstrapHandler: loadFactoryModule,
+    reloadHandler: loadFactoryModule
   };
 };

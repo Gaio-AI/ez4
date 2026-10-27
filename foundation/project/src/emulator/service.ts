@@ -15,11 +15,23 @@ export const getServiceEmulators = async (metadata: MetadataReflection, options:
   const clientsCache: Record<string, EmulatorServiceClients> = {};
   const emulators: ServiceEmulators = {};
 
+  let clientsVersion = options.version;
+
   const context = {
     makeClient: (resourceName: string, resourceOptions?: AnyObject) => {
       return getInvocationClient(resourceName, options) ?? makeEmulatorClient(resourceName, resourceOptions, undefined, emulators, options);
     },
     makeClients: (linkedServices: EmulatorLinkedServices, linkedOptions?: AnyObject) => {
+      // A reload that keeps the emulators reloads the code behind some clients (a factory's), so clients are kept
+      // within a version only.
+      if (clientsVersion !== options.version) {
+        clientsVersion = options.version;
+
+        for (const clientKey in clientsCache) {
+          delete clientsCache[clientKey];
+        }
+      }
+
       const clientKey = hashObject({ linkedServices, linkedOptions });
 
       if (!clientsCache[clientKey]) {
