@@ -88,7 +88,7 @@ See [Proxy host](./documentation/configuration.md#proxy-host) for the options, c
 ## Requirements
 
 - TypeScript 5.8+
-- NodeJS 22.7+
+- NodeJS 22.15+ for the `ez4` CLI (22.7+ for the deployed code)
 
 ## License
 

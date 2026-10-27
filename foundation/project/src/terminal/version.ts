@@ -3,8 +3,9 @@ export const checkMinNodeVersion = () => {
     return parseInt(version, 10);
   });
 
-  if (major < 22 || (major === 22 && minor < 7)) {
-    console.error('❌ Node v22.7+ is required.');
+  // Synchronous module hooks (`module.registerHooks`) arrived in Node v22.15.
+  if (major < 22 || (major === 22 && minor < 15)) {
+    console.error('❌ Node v22.15+ is required.');
     process.exit(1);
   }
 };
