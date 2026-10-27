@@ -74,6 +74,10 @@ export const serveCommand = async (input: InputOptions) => {
         Logger.space();
       }
 
+      // The version goes up before the emulators exist, so the modules they load to bootstrap are the ones the
+      // requests of this version reach.
+      options.version++;
+
       emulators = await DynamicLogger.logExecution('🔄️ Loading emulators', () => {
         return getServiceEmulators(metadata, options);
       });
@@ -89,8 +93,6 @@ export const serveCommand = async (input: InputOptions) => {
       if (isRunning) {
         Logger.log(`🚀 Project [${project.projectName}] reloaded`);
       }
-
-      options.version++;
 
       isRunning = true;
     }

@@ -1,0 +1,5 @@
+{
+  "name": "@fixture/built",
+  "type": "module",
+  "exports": "./lib/index.mjs"
+}

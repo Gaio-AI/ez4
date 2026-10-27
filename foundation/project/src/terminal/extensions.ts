@@ -17,6 +17,9 @@ const aliasPaths = {
   ...paths
 };
 
+// A handler loaded for a serve reload carries `?v=<version>`, and every project module it reaches carries the same
+// one: a reload loads each module once more, and within a version a module is a single instance, so `instanceof`
+// and import cycles behave as in the bundle.
 export const resolve: ResolveHook = (specifier, context, defaultResolve) => {
   if (isGlobalParentModule(context)) {
     return defaultResolve(specifier, context);
@@ -24,28 +27,56 @@ export const resolve: ResolveHook = (specifier, context, defaultResolve) => {
 
   const parentFile = context.parentURL ? fileURLToPath(context.parentURL) : '.';
   const modulePath = resolveImportPath(specifier, parentFile, aliasPaths);
+  const version = getParentVersion(context);
 
-  if (!modulePath) {
+  if (modulePath) {
+    return defaultResolve(version ? getVersionedPath(modulePath, version) : modulePath, context);
+  }
+
+  if (!version) {
     return defaultResolve(specifier, context);
   }
 
-  if (isTemporaryParentModule(context)) {
-    return defaultResolve(getTemporaryModulePath(modulePath), context);
-  }
+  return onResolved(defaultResolve(specifier, context), (result) => {
+    if (!isProjectModule(specifier, result.url)) {
+      return result;
+    }
 
-  return defaultResolve(modulePath, context);
+    return {
+      ...result,
+      url: getVersionedPath(result.url, version)
+    };
+  });
 };
 
 const isGlobalParentModule = ({ parentURL }: ResolveHookContext) => {
   return parentURL?.includes('/node_modules/');
 };
 
-const isTemporaryParentModule = ({ parentURL }: ResolveHookContext) => {
-  return parentURL?.includes('v=');
+const getParentVersion = ({ parentURL }: ResolveHookContext) => {
+  return parentURL ? new URL(parentURL).searchParams.get('v') : null;
 };
 
-const getTemporaryModulePath = (modulePath: string) => {
-  return `${modulePath}?v=${Date.now()}`;
+const getVersionedPath = (modulePath: string, version: string) => {
+  return `${modulePath}?v=${version}`;
+};
+
+/**
+ * Whether a module that the default resolution found is project code, which a reload has to load again. A
+ * relative import is, and so is a package outside `node_modules` whose entry is TypeScript source (a workspace
+ * package linked into `node_modules`). A built package outside `node_modules` keeps one instance across reloads,
+ * as every package inside it does, so the state it holds for the emulators is the one the handler sees.
+ */
+const isProjectModule = (specifier: string, url: string) => {
+  if (!url.startsWith('file:') || url.includes('/node_modules/')) {
+    return false;
+  }
+
+  return specifier.startsWith('.') || /\.[cm]?tsx?$/.test(new URL(url).pathname);
+};
+
+const onResolved = <T, R>(result: T | Promise<T>, callback: (result: T) => R) => {
+  return result instanceof Promise ? result.then(callback) : callback(result);
 };
 
 const resolveImportPath = (specifier: string, parentFile: string, aliasPaths: Record<string, string[]>) => {

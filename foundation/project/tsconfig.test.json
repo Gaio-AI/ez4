@@ -8,5 +8,8 @@
   "include": [
     "./src",
     "./test"
+  ],
+  "exclude": [
+    "./test/files/module-version/workspace"
   ]
 }

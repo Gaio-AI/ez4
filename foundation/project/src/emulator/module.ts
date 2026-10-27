@@ -33,6 +33,8 @@ export const createEmulatorModule = async (module: EmulatorModuleDefinition): Pr
     if (!entrypoint.module) {
       const moduleUrl = pathToFileURL(join(process.cwd(), entrypoint.file));
 
+      // Tests stay on version 0, so the handlers they run load a graph apart from the modules a spec imports: a
+      // spec that mocks a module (`mock.module`) and imports it afterwards needs no handler to have loaded it.
       return import(`${moduleUrl.href}?v=${version}`);
     }
 
