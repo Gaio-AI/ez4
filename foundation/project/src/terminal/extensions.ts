@@ -36,7 +36,7 @@ const resolve: ResolveHookSync = (specifier, context, defaultResolve) => {
 
   const result = defaultResolve(specifier, context);
 
-  if (!version || !isProjectModule(specifier, result.url)) {
+  if (!version || !isProjectModule(specifier, result.url, version)) {
     return result;
   }
 
@@ -63,13 +63,20 @@ const getVersionedPath = (modulePath: string, version: string) => {
  * relative import is, and so is a package outside `node_modules` whose entry is TypeScript source (a workspace
  * package linked into `node_modules`). A built package outside `node_modules` keeps one instance across reloads,
  * as every package inside it does, so the state it holds for the emulators is the one the handler sees.
+ *
+ * Tests stay on version 0, which nothing reloads: there a workspace package keeps the single instance a spec
+ * imports, so a spec that mocks one of its exports reaches the handler a tester runs.
  */
-const isProjectModule = (specifier: string, url: string) => {
+const isProjectModule = (specifier: string, url: string, version: string) => {
   if (!url.startsWith('file:') || url.includes('/node_modules/')) {
     return false;
   }
 
-  return specifier.startsWith('.') || /\.[cm]?tsx?$/.test(new URL(url).pathname);
+  if (specifier.startsWith('.')) {
+    return true;
+  }
+
+  return version !== '0' && /\.[cm]?tsx?$/.test(new URL(url).pathname);
 };
 
 const resolveImportPath = (specifier: string, parentFile: string, aliasPaths: Record<string, string[]>) => {

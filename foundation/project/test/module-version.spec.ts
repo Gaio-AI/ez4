@@ -110,4 +110,29 @@ describe('module version', () => {
       ['packages/built/lib/index.mjs']: 1
     });
   });
+
+  // A spec imports with no version (`-`), and the handlers a tester runs load on version 0.
+  it('assert :: tests keep project modules apart from what a spec imports', () => {
+    const { results, loads } = runDriver('diamond/entry.ts', ['-', '0']);
+
+    deepEqual(results, [true, true]);
+
+    deepEqual(loads, {
+      ['diamond/entry.ts']: 2,
+      ['diamond/thrower.ts']: 2,
+      ['diamond/errors.ts']: 2
+    });
+  });
+
+  it('assert :: tests share workspace source with what a spec imports', () => {
+    const { results, loads } = runDriver('workspace/entry.ts', ['-', '0']);
+
+    deepEqual(results, ['source built', 'source built']);
+
+    deepEqual(loads, {
+      ['workspace/entry.ts']: 2,
+      ['packages/source/src/index.ts']: 1,
+      ['packages/built/lib/index.mjs']: 1
+    });
+  });
 });
