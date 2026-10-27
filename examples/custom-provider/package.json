@@ -22,9 +22,9 @@
     "test": "ez4 test"
   },
   "dependencies": {
-    "@ez4/gateway": "^2.11.0",
-    "@ez4/local-gateway": "^2.11.0",
-    "@ez4/project": "^2.11.0",
-    "@ez4/reflection": "^2.11.0"
+    "@ez4/gateway": "^2.12.0",
+    "@ez4/local-gateway": "^2.12.0",
+    "@ez4/project": "^2.12.0",
+    "@ez4/reflection": "^2.12.0"
   }
 }
