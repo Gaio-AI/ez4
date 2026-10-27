@@ -63,12 +63,16 @@ const prepareFunction = (entrypoint: EntrypointSource, variables: LinkedVariable
       const result = runWithVariables(variables, () => callback(...inputs));
 
       if (result instanceof Promise) {
-        return result
-          .finally(() => cleanupFunction())
-          .catch((error) => {
+        return result.then(
+          (value) => {
+            cleanupFunction();
+            return value;
+          },
+          (error) => {
             cleanupFunction(error);
             throw error;
-          });
+          }
+        );
       }
 
       cleanupFunction();

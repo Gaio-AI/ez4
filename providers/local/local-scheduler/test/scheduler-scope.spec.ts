@@ -9,6 +9,7 @@ import { afterEach, describe, it } from 'node:test';
 import { Runtime } from '@ez4/common';
 
 import { registerLocalService } from '../src/provider/local';
+import { processSchedulerEvent } from '../src/handlers/scheduler';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -143,6 +144,23 @@ describe('local scheduler scope', () => {
     } finally {
       scheduler.shutdownHandler();
     }
+  });
+
+  it('assert :: concurrent events keep their own scope', async () => {
+    const service = getCronService('scopeCronConcurrent');
+    const observed = observeScopes(2);
+
+    service.target.handler.name = 'probeScopeLater';
+
+    await Promise.all([
+      processSchedulerEvent(service, options, context, { foo: 'a' }, { traceId: 'trace-a' }),
+      processSchedulerEvent(service, options, context, { foo: 'b' }, { traceId: 'trace-b' })
+    ]);
+
+    const traceIds = (await observed).map(({ scope }) => scope?.traceId).sort();
+
+    deepEqual(traceIds, ['trace-a', 'trace-b']);
+    equal(Runtime.getScope(), undefined);
   });
 
   it('assert :: request without producer scope uses a fresh trace id', async () => {

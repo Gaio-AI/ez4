@@ -6,7 +6,18 @@ import { createModule, onBegin, onReady, onDone, onError, onEnd } from '@ez4/loc
 import { getRandomUUID, pickObject } from '@ez4/utils';
 import { Runtime } from '@ez4/common';
 
-export const processLambdaEvent = async (
+export const processLambdaEvent = (
+  service: BucketService,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  event: BucketEvent,
+  input: Bucket.ObjectEvent
+) => {
+  // Object events can run side by side, so each one keeps its own scope for what it logs and sends.
+  return Runtime.runWithScope(() => handleLambdaEvent(service, options, context, event, input));
+};
+
+const handleLambdaEvent = async (
   service: BucketService,
   options: ServeOptions,
   context: EmulateServiceContext,

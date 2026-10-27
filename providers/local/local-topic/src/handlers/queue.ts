@@ -17,10 +17,13 @@ export const processQueueEvent = async (
   try {
     const queueClient = context.makeClient(subscription.service) as QueueClient<any, any>;
 
-    // The queue client captures the runtime scope synchronously, so it must be imported right before sendMessage.
-    Runtime.importScope(trace.traceId ?? getRandomUUID(), trace.scope);
+    // The queue client captures the runtime scope synchronously, so it's imported right before sendMessage, in a
+    // scope of its own so the event's trace doesn't take over the scope of whatever runs next.
+    await Runtime.runWithScope(() => {
+      Runtime.importScope(trace.traceId ?? getRandomUUID(), trace.scope);
 
-    await queueClient.sendMessage(event);
+      return queueClient.sendMessage(event);
+    });
     //
   } catch (error) {
     Logger.error(`${error}`);

@@ -38,7 +38,19 @@ export const processLambdaSubscription = async (
   }
 };
 
-export const processLambdaEvent = async (
+export const processLambdaEvent = (
+  service: TopicService | TopicImport,
+  options: ServeOptions,
+  context: EmulateServiceContext,
+  subscription: TopicLambdaSubscription,
+  event: AnyObject,
+  trace: MessageTrace
+) => {
+  // Events and their subscribers run side by side, so each run keeps its own scope for what it logs and sends.
+  return Runtime.runWithScope(() => handleLambdaEvent(service, options, context, subscription, event, trace));
+};
+
+const handleLambdaEvent = async (
   service: TopicService | TopicImport,
   options: ServeOptions,
   context: EmulateServiceContext,
