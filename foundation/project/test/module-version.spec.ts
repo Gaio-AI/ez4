@@ -5,9 +5,6 @@ import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { createEmulatorModule } from '../src/emulator/module';
-import { getToken } from './files/module-version/identity';
-
 const FIXTURES = resolve('test/files/module-version');
 const EXTENSIONS = resolve('bin/extensions.mjs');
 
@@ -112,19 +109,5 @@ describe('module version', () => {
       ['packages/source/src/index.ts']: 2,
       ['packages/built/lib/index.mjs']: 1
     });
-  });
-
-  it('assert :: no version keeps the module a spec imports', async () => {
-    const module = await createEmulatorModule({
-      entrypoint: {
-        file: 'test/files/module-version/identity.ts',
-        position: [0, 0],
-        name: 'getToken'
-      },
-      variables: {},
-      version: 0
-    });
-
-    equal(await module.invoke(), getToken());
   });
 });

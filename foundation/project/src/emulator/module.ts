@@ -33,9 +33,9 @@ export const createEmulatorModule = async (module: EmulatorModuleDefinition): Pr
     if (!entrypoint.module) {
       const moduleUrl = pathToFileURL(join(process.cwd(), entrypoint.file));
 
-      // Tests and scripts never reload, so they stay on version 0 and import the module as a spec or a script
-      // does: both reach one instance of it, mocks included.
-      return import(version ? `${moduleUrl.href}?v=${version}` : moduleUrl.href);
+      // Tests stay on version 0, so the handlers they run load a graph apart from the modules a spec imports: a
+      // spec that mocks a module (`mock.module`) and imports it afterwards needs no handler to have loaded it.
+      return import(`${moduleUrl.href}?v=${version}`);
     }
 
     return import(entrypoint.module);
