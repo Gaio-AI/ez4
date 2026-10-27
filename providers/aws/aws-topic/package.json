@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-topic",
   "description": "EZ4: Self-managed AWS SNS topics provider",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -55,19 +55,19 @@
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.1127.0",
-    "@ez4/aws-common": "^2.13.0",
-    "@ez4/aws-identity": "^2.13.0",
-    "@ez4/aws-function": "^2.13.0",
-    "@ez4/aws-logs": "^2.13.0",
-    "@ez4/aws-queue": "^2.13.0",
-    "@ez4/common": "^2.13.0",
-    "@ez4/project": "^2.13.0",
-    "@ez4/queue": "^2.13.0",
-    "@ez4/schema": "^2.13.0",
-    "@ez4/state": "^2.13.0",
-    "@ez4/topic": "^2.13.0",
-    "@ez4/transform": "^2.13.0",
-    "@ez4/utils": "^2.13.0",
-    "@ez4/validator": "^2.13.0"
+    "@ez4/aws-common": "^2.14.0",
+    "@ez4/aws-identity": "^2.14.0",
+    "@ez4/aws-function": "^2.14.0",
+    "@ez4/aws-logs": "^2.14.0",
+    "@ez4/aws-queue": "^2.14.0",
+    "@ez4/common": "^2.14.0",
+    "@ez4/project": "^2.14.0",
+    "@ez4/queue": "^2.14.0",
+    "@ez4/schema": "^2.14.0",
+    "@ez4/state": "^2.14.0",
+    "@ez4/topic": "^2.14.0",
+    "@ez4/transform": "^2.14.0",
+    "@ez4/utils": "^2.14.0",
+    "@ez4/validator": "^2.14.0"
   }
 }
