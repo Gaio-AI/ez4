@@ -180,9 +180,10 @@ const deleteResource = async (current: DistributionState) => {
 
   if (result) {
     return OperationLogger.logExecution(DistributionServiceName, distributionName, 'deletion', async (logger) => {
-      const { distributionId, originAccessId } = result;
+      const { distributionId, originAccessId, rewriteFunctionArn, certificateArn } = result;
 
-      // Only disabled distributions can be deleted.
+      // Only disabled distributions can be deleted. The update that disables it still sends the certificate:
+      // CloudFront refuses aliases on its default certificate.
       if (parameters.enabled) {
         const originsData = [result.defaultOrigin, ...result.origins];
         const allOrigins = bindOriginsData(parameters, originsData);
@@ -191,6 +192,8 @@ const deleteResource = async (current: DistributionState) => {
           ...parameters,
           ...allOrigins,
           originAccessId,
+          rewriteFunctionArn,
+          certificateArn,
           enabled: false
         });
       }
