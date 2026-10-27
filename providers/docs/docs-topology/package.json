@@ -1,7 +1,7 @@
 {
   "name": "@ez4/docs-topology",
   "description": "EZ4: Topology documentation generator",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -40,19 +40,19 @@
     "live:publish": "npm run build && npm publish --access public"
   },
   "dependencies": {
-    "@ez4/common": "^2.13.0",
-    "@ez4/distribution": "^2.13.0",
-    "@ez4/database": "^2.13.0",
-    "@ez4/factory": "^2.13.0",
-    "@ez4/gateway": "^2.13.0",
-    "@ez4/logger": "^2.13.0",
-    "@ez4/queue": "^2.13.0",
-    "@ez4/project": "^2.13.0",
-    "@ez4/scheduler": "^2.13.0",
-    "@ez4/schema": "^2.13.0",
-    "@ez4/storage": "^2.13.0",
-    "@ez4/topic": "^2.13.0",
-    "@ez4/utils": "^2.13.0",
-    "@ez4/validation": "^2.13.0"
+    "@ez4/common": "^2.14.0",
+    "@ez4/distribution": "^2.14.0",
+    "@ez4/database": "^2.14.0",
+    "@ez4/factory": "^2.14.0",
+    "@ez4/gateway": "^2.14.0",
+    "@ez4/logger": "^2.14.0",
+    "@ez4/queue": "^2.14.0",
+    "@ez4/project": "^2.14.0",
+    "@ez4/scheduler": "^2.14.0",
+    "@ez4/schema": "^2.14.0",
+    "@ez4/storage": "^2.14.0",
+    "@ez4/topic": "^2.14.0",
+    "@ez4/utils": "^2.14.0",
+    "@ez4/validation": "^2.14.0"
   }
 }
