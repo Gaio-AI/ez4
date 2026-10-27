@@ -48,6 +48,49 @@ describe('migration :: update relation tests', () => {
     ]);
   };
 
+  // The statements that replace the foreign key, each one skipped when the key already has the new
+  // definition.
+  const getReplaceRelations = (column: string, sourceColumn: string, onDelete: string, deleteAction: string) => {
+    const keptKey =
+      `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_fk' AND "contype" = 'f' AND "convalidated" ` +
+      `AND "confupdtype" = 'c' AND "confdeltype" = '${deleteAction}' ` +
+      `AND starts_with(pg_get_constraintdef("oid"), 'FOREIGN KEY (' || quote_ident('${column}') || ') REFERENCES ' || ` +
+      `quote_ident('table_b') || '(' || quote_ident('${sourceColumn}') || ')')`;
+
+    const tmpMissing = `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_tmp_fk')`;
+    const condition = 'unless the foreign key already has this definition';
+
+    return {
+      rollout: [
+        {
+          check: `SELECT 1 WHERE EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_tmp_fk') OR EXISTS (${keptKey})`,
+          query:
+            `ALTER TABLE IF EXISTS "table_a" ADD CONSTRAINT "table_a_relation_tmp_fk" ` +
+            `FOREIGN KEY ("${column}") REFERENCES "table_b" ("${sourceColumn}") ` +
+            `ON DELETE ${onDelete} ON UPDATE CASCADE NOT VALID`,
+          condition
+        },
+        {
+          check: `SELECT 1 WHERE EXISTS (SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_a_relation_tmp_fk') OR EXISTS (${keptKey})`,
+          query: `ALTER TABLE IF EXISTS "table_a" VALIDATE CONSTRAINT "table_a_relation_tmp_fk"`,
+          condition
+        }
+      ],
+      cleanup: [
+        {
+          check: `SELECT 1 WHERE EXISTS (${keptKey}) AND EXISTS (${tmpMissing})`,
+          query: `ALTER TABLE IF EXISTS "table_a" DROP CONSTRAINT IF EXISTS "table_a_relation_fk"`,
+          condition
+        },
+        {
+          check: tmpMissing,
+          query: 'ALTER TABLE IF EXISTS "table_a" RENAME CONSTRAINT "table_a_relation_tmp_fk" TO "table_a_relation_fk"',
+          condition
+        }
+      ]
+    };
+  };
+
   it('assert :: update relation (set mandatory)', async () => {
     const sourceTable = getDatabaseTables(true);
     const targetTable = getDatabaseTables(false);
@@ -77,35 +120,14 @@ describe('migration :: update relation tests', () => {
             name: 'table_a_relation_fk'
           }
         ],
-        relations: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_tmp_fk'`,
-            query:
-              `ALTER TABLE IF EXISTS "table_a" ADD CONSTRAINT "table_a_relation_tmp_fk" ` +
-              `FOREIGN KEY ("column_a") REFERENCES "table_b" ("column_b") ` +
-              `ON DELETE CASCADE ` +
-              `ON UPDATE CASCADE ` +
-              `NOT VALID`
-          },
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_a_relation_tmp_fk'`,
-            query: `ALTER TABLE IF EXISTS "table_a" VALIDATE CONSTRAINT "table_a_relation_tmp_fk"`
-          }
-        ],
+        relations: getReplaceRelations('column_a', 'column_b', 'CASCADE', 'c').rollout,
         indexes: []
       },
       cleanup: {
         tables: [],
         constraints: [],
         validations: [],
-        relations: [
-          {
-            query: `ALTER TABLE IF EXISTS "table_a" DROP CONSTRAINT IF EXISTS "table_a_relation_fk"`
-          },
-          {
-            query: 'ALTER TABLE IF EXISTS "table_a" RENAME CONSTRAINT "table_a_relation_tmp_fk" TO "table_a_relation_fk"'
-          }
-        ],
+        relations: getReplaceRelations('column_a', 'column_b', 'CASCADE', 'c').cleanup,
         indexes: []
       }
     });
@@ -140,35 +162,14 @@ describe('migration :: update relation tests', () => {
             name: 'table_a_relation_fk'
           }
         ],
-        relations: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_tmp_fk'`,
-            query:
-              `ALTER TABLE IF EXISTS "table_a" ADD CONSTRAINT "table_a_relation_tmp_fk" ` +
-              `FOREIGN KEY ("column_a") REFERENCES "table_b" ("column_b") ` +
-              `ON DELETE SET null ` +
-              `ON UPDATE CASCADE ` +
-              `NOT VALID`
-          },
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_a_relation_tmp_fk'`,
-            query: `ALTER TABLE IF EXISTS "table_a" VALIDATE CONSTRAINT "table_a_relation_tmp_fk"`
-          }
-        ],
+        relations: getReplaceRelations('column_a', 'column_b', 'SET null', 'n').rollout,
         indexes: []
       },
       cleanup: {
         tables: [],
         constraints: [],
         validations: [],
-        relations: [
-          {
-            query: `ALTER TABLE IF EXISTS "table_a" DROP CONSTRAINT IF EXISTS "table_a_relation_fk"`
-          },
-          {
-            query: 'ALTER TABLE IF EXISTS "table_a" RENAME CONSTRAINT "table_a_relation_tmp_fk" TO "table_a_relation_fk"'
-          }
-        ],
+        relations: getReplaceRelations('column_a', 'column_b', 'SET null', 'n').cleanup,
         indexes: []
       }
     });
@@ -211,35 +212,14 @@ describe('migration :: update relation tests', () => {
             name: 'table_a_relation_fk'
           }
         ],
-        relations: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_tmp_fk'`,
-            query:
-              `ALTER TABLE IF EXISTS "table_a" ADD CONSTRAINT "table_a_relation_tmp_fk" ` +
-              `FOREIGN KEY ("column_a") REFERENCES "table_b" ("other_column") ` +
-              `ON DELETE CASCADE ` +
-              `ON UPDATE CASCADE ` +
-              `NOT VALID`
-          },
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_a_relation_tmp_fk'`,
-            query: `ALTER TABLE IF EXISTS "table_a" VALIDATE CONSTRAINT "table_a_relation_tmp_fk"`
-          }
-        ],
+        relations: getReplaceRelations('column_a', 'other_column', 'CASCADE', 'c').rollout,
         indexes: []
       },
       cleanup: {
         tables: [],
         constraints: [],
         validations: [],
-        relations: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table_a" DROP CONSTRAINT IF EXISTS "table_a_relation_fk"'
-          },
-          {
-            query: 'ALTER TABLE IF EXISTS "table_a" RENAME CONSTRAINT "table_a_relation_tmp_fk" TO "table_a_relation_fk"'
-          }
-        ],
+        relations: getReplaceRelations('column_a', 'other_column', 'CASCADE', 'c').cleanup,
         indexes: []
       }
     });
@@ -476,33 +456,14 @@ describe('migration :: update relation tests', () => {
             name: 'table_a_relation_fk'
           }
         ],
-        relations: [
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_a_relation_tmp_fk'`,
-            query:
-              'ALTER TABLE IF EXISTS "table_a" ADD CONSTRAINT "table_a_relation_tmp_fk" ' +
-              'FOREIGN KEY ("renamed_column_a") REFERENCES "table_b" ("column_b") ' +
-              'ON DELETE CASCADE ON UPDATE CASCADE NOT VALID'
-          },
-          {
-            check: `SELECT 1 FROM "pg_constraint" WHERE "convalidated" = true AND "conname" = 'table_a_relation_tmp_fk'`,
-            query: 'ALTER TABLE IF EXISTS "table_a" VALIDATE CONSTRAINT "table_a_relation_tmp_fk"'
-          }
-        ],
+        relations: getReplaceRelations('renamed_column_a', 'column_b', 'CASCADE', 'c').rollout,
         indexes: []
       },
       cleanup: {
         tables: [],
         constraints: [],
         validations: [],
-        relations: [
-          {
-            query: 'ALTER TABLE IF EXISTS "table_a" DROP CONSTRAINT IF EXISTS "table_a_relation_fk"'
-          },
-          {
-            query: 'ALTER TABLE IF EXISTS "table_a" RENAME CONSTRAINT "table_a_relation_tmp_fk" TO "table_a_relation_fk"'
-          }
-        ],
+        relations: getReplaceRelations('renamed_column_a', 'column_b', 'CASCADE', 'c').cleanup,
         indexes: []
       }
     });
