@@ -213,7 +213,7 @@ describe('update operations', () => {
   });
 
   it('assert :: prepare update operations (json remove from)', async ({ assert }) => {
-    const [statement] = await prepareUpdate({
+    const [statement, variables] = await prepareUpdate({
       json: {
         bar: {
           removeFrom: true
@@ -221,7 +221,9 @@ describe('update operations', () => {
       }
     });
 
-    assert.equal(statement, `UPDATE ONLY "ez4-test-update-operation" SET "json" = "json" #- '{bar}'`);
+    assert.equal(statement, `UPDATE ONLY "ez4-test-update-operation" SET "json" = "json" #- :0::text[]`);
+
+    assert.deepEqual(variables, ['{"bar"}']);
   });
 
   it('assert :: prepare update operations (json update and remove from)', async ({ assert }) => {
@@ -234,9 +236,9 @@ describe('update operations', () => {
       }
     });
 
-    assert.equal(statement, `UPDATE ONLY "ez4-test-update-operation" SET "json" = "json" #- '{bar}', "json"[:0] = :1`);
+    assert.equal(statement, `UPDATE ONLY "ez4-test-update-operation" SET "json" = "json" #- :2::text[], "json"[:0] = :1`);
 
-    assert.deepEqual(variables, ['foo', 123]);
+    assert.deepEqual(variables, ['foo', 123, '{"bar"}']);
   });
 
   it('assert :: prepare update operations (invalid operator)', async ({ assert }) => {

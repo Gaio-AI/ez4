@@ -3,7 +3,7 @@ import type { ObjectSchema } from '@ez4/schema';
 import { beforeEach, describe, it } from 'node:test';
 import { equal, deepEqual } from 'node:assert';
 
-import { SqlBuilder } from '@ez4/pgsql';
+import { SqlBuilder, getSqlTextArray } from '@ez4/pgsql';
 import { SchemaType } from '@ez4/schema';
 import { Order } from '@ez4/database';
 
@@ -345,9 +345,40 @@ describe('sql update tests', () => {
 
     const [statement, variables] = query.build();
 
-    deepEqual(variables, []);
+    deepEqual(variables, ["{it's}"]);
 
-    equal(statement, `UPDATE ONLY "table" SET "foo" = "foo" #- '{it''s}'`);
+    equal(statement, `UPDATE ONLY "table" SET "foo" = "foo" #- :0::text[]`);
+  });
+
+  it('assert :: update with json remove operation (quoted path)', () => {
+    const schema: ObjectSchema = {
+      type: SchemaType.Object,
+      properties: {
+        foo: {
+          type: SchemaType.Object,
+          properties: {
+            'a,"b\\': {
+              type: SchemaType.String
+            }
+          }
+        }
+      }
+    };
+
+    const query = sql
+      .update(schema)
+      .only('table')
+      .record({
+        foo: {
+          'a,"b\\': sql.rawOperation('#-', getSqlTextArray(['a,"b\\']))
+        }
+      });
+
+    const [statement, variables] = query.build();
+
+    deepEqual(variables, ['{"a,\\"b\\\\"}']);
+
+    equal(statement, `UPDATE ONLY "table" SET "foo" = "foo" #- :0::text[]`);
   });
 
   it('assert :: update with raw json record operation (optional in schema)', () => {

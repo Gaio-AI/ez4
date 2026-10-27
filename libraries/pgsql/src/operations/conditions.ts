@@ -1,11 +1,12 @@
 import type { AnySchema } from '@ez4/schema';
+import type { AnyObject } from '@ez4/utils';
 import type { SqlBuilderOptions, SqlBuilderReferences } from '../builder';
 import type { SqlOperationContext } from './types';
 import type { SqlFilters } from '../common/types';
 import type { SqlSource } from '../common/source';
 
 import { getSchemaProperty, isArraySchema, isObjectSchema, isTupleSchema, isUnionSchema } from '@ez4/schema';
-import { deepMerge, isAnyObject, isEmptyObject } from '@ez4/utils';
+import { deepMerge, isAnyObject, isPlainObject } from '@ez4/utils';
 
 import { SqlRawCondition, SqlRawValue } from '../common/raw';
 import { SqlOperator } from '../common/types';
@@ -52,7 +53,7 @@ export class SqlConditions {
   }
 
   get empty() {
-    return isEmptyObject(this.#state.filters);
+    return isEmptyFilters(this.#state.filters);
   }
 
   apply(filters: SqlFilters) {
@@ -84,6 +85,42 @@ export class SqlConditions {
     return undefined;
   }
 }
+
+// Every operator, so one added to `SqlOperator` and missing here fails to compile instead of reading as empty.
+const AllOperators: Record<SqlOperator, true> = {
+  [SqlOperator.Equal]: true,
+  [SqlOperator.NotEqual]: true,
+  [SqlOperator.GreaterThan]: true,
+  [SqlOperator.GreaterThanOrEqual]: true,
+  [SqlOperator.LessThan]: true,
+  [SqlOperator.LessThanOrEqual]: true,
+  [SqlOperator.IsIn]: true,
+  [SqlOperator.IsBetween]: true,
+  [SqlOperator.IsMissing]: true,
+  [SqlOperator.IsNull]: true,
+  [SqlOperator.IsMissingOrNull]: true,
+  [SqlOperator.StartsWith]: true,
+  [SqlOperator.Contains]: true
+};
+
+// Filters are empty when every field is undefined or an object of fields that are themselves empty. An operator's
+// operand is a value, so `{ equal: {} }` is a condition: counting it as empty would leave the statement without its
+// WHERE and reach every row.
+const isEmptyFilters = (filters: AnyObject): boolean => {
+  for (const field in filters) {
+    const value = filters[field];
+
+    if (value === undefined) {
+      continue;
+    }
+
+    if (Object.hasOwn(AllOperators, field) || !isPlainObject(value) || !isEmptyFilters(value)) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 const getFilterOperations = (filters: SqlFilters, schema: AnySchema | undefined, context: SqlOperationContext) => {
   const allOperations = [];

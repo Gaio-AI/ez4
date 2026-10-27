@@ -57,7 +57,7 @@ export const prepareUpsertQuery = async <T extends InternalTableMetadata, S exte
   } else {
     const filters = getUpdateFilters(input.where, conflictColumns);
 
-    insertQuery.conflict(conflictColumns, updateRecord, filters && getSelectFilters(builder, filters, relations, insertQuery, table));
+    insertQuery.conflict(conflictColumns, updateRecord, getSelectFilters(builder, filters, relations, insertQuery, table));
   }
 
   const columns = [];
@@ -90,15 +90,12 @@ const isConflictTarget = (where: SqlFilters, record: SqlFilters, conflictColumns
 };
 
 // The conflict columns match by the conflict itself, the other filters decide whether the existing record is updated.
+// Whether what is left holds a condition is up to the WHERE clause: an operand such as `{ equal: {} }` is one.
 const getUpdateFilters = (where: SqlFilters, conflictColumns: string[]) => {
   const filters = { ...where };
 
   for (const column of conflictColumns) {
     delete filters[column];
-  }
-
-  if (isEmptyObject(filters)) {
-    return undefined;
   }
 
   return filters;

@@ -1,7 +1,7 @@
 import { equal } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { escapeSqlData, escapeSqlName, escapeSqlNames, escapeSqlText } from '@ez4/pgsql';
+import { escapeSqlData, escapeSqlName, escapeSqlNames, escapeSqlText, getSqlTextArray } from '@ez4/pgsql';
 import { UnsupportedSqlDataError } from '@ez4/pgsql';
 
 describe('sql escape tests', () => {
@@ -28,5 +28,13 @@ describe('sql escape tests', () => {
     equal(escapeSqlData({ foo: 'bar' }), `'{"foo":"bar"}'`);
 
     assert.throws(() => escapeSqlData(undefined), UnsupportedSqlDataError);
+  });
+
+  it('assert :: text array literal', () => {
+    equal(getSqlTextArray(['foo']), '{"foo"}');
+    equal(getSqlTextArray(['foo', 'bar']), '{"foo","bar"}');
+    equal(getSqlTextArray(['a,b', 'c}', '{d']), '{"a,b","c}","{d"}');
+    equal(getSqlTextArray(['d"e', 'f\\g']), '{"d\\"e","f\\\\g"}');
+    equal(getSqlTextArray([`it's`]), `{"it's"}`);
   });
 });

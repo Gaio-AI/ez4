@@ -1,6 +1,6 @@
 import type { Query, RelationMetadata } from '@ez4/database';
 import type { PostgresEngine } from '@ez4/pgclient';
-import type { ObjectSchema } from '@ez4/schema';
+import type { Object, ObjectSchema } from '@ez4/schema';
 
 import { describe, it } from 'node:test';
 
@@ -21,6 +21,7 @@ type TestTableMetadata = {
     json?: {
       label?: string;
     };
+    extensible?: Object.Any;
   };
 };
 
@@ -54,6 +55,14 @@ describe('upsert schema', () => {
             type: SchemaType.String,
             optional: true
           }
+        }
+      },
+      extensible: {
+        type: SchemaType.Object,
+        optional: true,
+        properties: {},
+        definitions: {
+          extensible: true
         }
       }
     }
@@ -110,6 +119,37 @@ describe('upsert schema', () => {
     assert.deepEqual(variables, ['abc', 'foo@test.com', 1, 1, 'label', 'bar', 'active']);
     assert.deepEqual(columns, ['id', 'counter', '__EZ4_INSERTED']);
     assert.equal(skipsUpdate, false);
+  });
+
+  it('assert :: prepare upsert (filter by an empty object)', async ({ assert }) => {
+    const [statement, variables] = (await prepareUpsert(
+      {
+        insert: {
+          id: 'abc',
+          email: 'foo@test.com'
+        },
+        update: {
+          counter: 1
+        },
+        where: {
+          email: 'foo@test.com',
+          extensible: {
+            equal: {}
+          }
+        }
+      },
+      ['email']
+    ))!;
+
+    assert.equal(
+      statement,
+      `INSERT INTO "ez4-test-upsert" AS "R0" ("id", "email") VALUES (:0, :1) ` +
+        `ON CONFLICT ("email") DO UPDATE SET "counter" = :2 ` +
+        `WHERE "R0"."extensible" = :3 ` +
+        `RETURNING ("R0".xmax = 0) AS "__EZ4_INSERTED"`
+    );
+
+    assert.deepEqual(variables, ['abc', 'foo@test.com', 1, {}]);
   });
 
   it('assert :: prepare upsert (empty update)', async ({ assert }) => {
