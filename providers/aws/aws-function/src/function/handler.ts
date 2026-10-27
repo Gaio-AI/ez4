@@ -19,6 +19,7 @@ import {
   updateAlias,
   updateRetryAttempts,
   updateReservedConcurrency,
+  updateRecursiveLoop,
   untagFunction,
   tagFunction
 } from './client';
@@ -166,6 +167,10 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
         await updateReservedConcurrency(logger, functionName, parameters.reservedConcurrency);
       }
 
+      if (parameters.recursiveLoop !== undefined) {
+        await updateRecursiveLoop(logger, functionName, parameters.recursiveLoop);
+      }
+
       return {
         variables: protectVariables(variables),
         functionArn: importedFunction.functionArn,
@@ -211,6 +216,10 @@ const createResource = (candidate: FunctionState, context: StepContext): Promise
 
     if (parameters.reservedConcurrency !== undefined) {
       await updateReservedConcurrency(logger, functionName, parameters.reservedConcurrency);
+    }
+
+    if (parameters.recursiveLoop !== undefined) {
+      await updateRecursiveLoop(logger, functionName, parameters.recursiveLoop);
     }
 
     return {
@@ -269,6 +278,8 @@ const updateResource = (candidate: FunctionState, current: FunctionState, contex
     await checkRetryUpdates(logger, functionName, parameters, current, context);
 
     await checkConcurrencyUpdates(logger, functionName, parameters, current, context);
+
+    await checkRecursiveLoopUpdates(logger, functionName, parameters, current, context);
 
     const shouldPublish = hasSourceUpdated || hasConfigurationUpdated;
     const functionVersion = shouldPublish ? await publishFunction(logger, functionName) : result.functionVersion;
@@ -332,6 +343,7 @@ const checkConfigurationUpdates = async (
       architecture: true,
       retryAttempts: true,
       reservedConcurrency: true,
+      recursiveLoop: true,
       release: true,
       tags: true
     }
@@ -417,6 +429,28 @@ const checkConcurrencyUpdates = async (
 
   if (hasConcurrencyChange || hasConcurrencyToRestore) {
     await updateReservedConcurrency(logger, functionName, reservedConcurrency);
+  }
+};
+
+const checkRecursiveLoopUpdates = async (
+  logger: OperationLogLine,
+  functionName: string,
+  candidate: FunctionParameters,
+  current: FunctionState,
+  context: StepContext
+) => {
+  const { recursiveLoop } = candidate;
+
+  // Left out, the function keeps the setting it has: a deploy of code that predates the option must not undo it,
+  // and a function that never declares it needs no permission over the recursion config.
+  if (recursiveLoop === undefined) {
+    return;
+  }
+
+  const hasLoopChange = recursiveLoop !== current.parameters.recursiveLoop;
+
+  if (hasLoopChange || current.partial || context.force) {
+    await updateRecursiveLoop(logger, functionName, recursiveLoop);
   }
 };
 

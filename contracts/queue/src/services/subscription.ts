@@ -83,6 +83,13 @@ export interface QueueSubscription<T extends QueueMessage, U extends Queue.Mode 
   readonly keyConcurrency?: QueueKeyConcurrency<T>;
 
   /**
+   * Whether the handler may keep sending to its own queue past the 16 deliveries Lambda's recursive loop detection
+   * lets one chain of requests make; past them, Lambda drops the message without an error. `true` allows the chain,
+   * `false` puts the detection back. Left out, the function keeps whatever it has.
+   */
+  readonly recursiveLoop?: boolean;
+
+  /**
    * Variables associated to the subscription.
    */
   readonly variables?: LinkedVariables;

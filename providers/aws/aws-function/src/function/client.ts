@@ -16,6 +16,7 @@ import {
   DeleteFunctionEventInvokeConfigCommand,
   PutFunctionConcurrencyCommand,
   DeleteFunctionConcurrencyCommand,
+  PutFunctionRecursionConfigCommand,
   TagResourceCommand,
   UntagResourceCommand,
   waitUntilFunctionActive,
@@ -55,6 +56,7 @@ export type CreateRequest = {
   memory: number;
   retryAttempts?: number;
   reservedConcurrency?: number;
+  recursiveLoop?: boolean;
   vpc?: boolean;
   vpcConfig?: FunctionVpcConfig;
   tags?: ResourceTags;
@@ -277,6 +279,19 @@ export const updateReservedConcurrency = async (
       throw error;
     }
   }
+};
+
+export const updateRecursiveLoop = async (logger: OperationLogLine, functionName: string, recursiveLoop: boolean) => {
+  logger.update(`Updating recursive loop`);
+
+  const client = getLambdaClient();
+
+  await client.send(
+    new PutFunctionRecursionConfigCommand({
+      FunctionName: functionName,
+      RecursiveLoop: recursiveLoop ? 'Allow' : 'Terminate'
+    })
+  );
 };
 
 export const updateSourceCode = async (logger: OperationLogLine, functionName: string, request: UpdateSourceCodeRequest) => {

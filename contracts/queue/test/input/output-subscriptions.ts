@@ -21,6 +21,7 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
       batch: 5;
       parallelism: 3;
       acknowledge: 'batch';
+      recursiveLoop: true;
     }>,
 
     // Subscription reference.

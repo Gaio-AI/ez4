@@ -93,6 +93,7 @@ export type QueueSubscription = {
   acknowledge?: QueueSubscriptionAcknowledge;
   idempotency?: QueueIdempotency;
   keyConcurrency?: QueueKeyConcurrency;
+  recursiveLoop?: boolean;
   batch?: number;
   memory?: number;
   files?: string[];
