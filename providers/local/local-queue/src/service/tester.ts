@@ -17,6 +17,9 @@ import { Defaults } from '../utils/defaults';
 // A tracker of its own, so `mock.restoreAll()` in another spec of the same process leaves these mocks alone.
 const tracker = new (mock.constructor as new () => typeof mock)();
 
+// The queues below are taken with their mode left open (`any`), which takes every handler: `Queue.Mode` closes it to
+// the request of a FIFO queue, which a standard queue's handler taking `Queue.DeferrableIncoming` doesn't fit.
+
 export namespace QueueTester {
   export type ClientMock<T extends Queue.Message, U extends Queue.Mode> = Client<T, U> & {
     receiveMessage: Mock<Client<T, U>['receiveMessage']>;
@@ -30,9 +33,10 @@ export namespace QueueTester {
     readonly delivered: T[];
   };
 
-  export type ClientMode<T extends Queue.Service<any, Queue.Mode>> = T extends { fairMode: never }
-    ? { fifoMode: true }
-    : { fairMode: true };
+  // Told apart by `fifoMode`, which every queue declares (`never` on a standard one) rather than by the optional
+  // `fairMode`. A queue named without a type argument keeps a standard queue's client, which takes every option.
+  export type ClientMode<T extends Queue.Service<any, any>> =
+    Queue.Service<any, any> extends T ? { fairMode: true } : T extends { fifoMode: never } ? { fairMode: true } : { fifoMode: true };
 
   export type Incoming<T extends Queue.Message> = Queue.DeferrableIncoming<T> & {
     retry: Mock<Queue.DeferrableIncoming<T>['retry']>;
@@ -43,11 +47,11 @@ export namespace QueueTester {
     Pick<Queue.DeferrableIncoming<Queue.Message>, 'requestId' | 'traceId' | 'attempt' | 'maxAttempts' | 'retry' | 'defer'>
   >;
 
-  export const getClient = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
+  export const getClient = <T extends Queue.Service<any, any>>(resourceName: string) => {
     return Tester.getServiceClient(resourceName) as Client<T['schema'], ClientMode<T>>;
   };
 
-  export const getClientMock = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
+  export const getClientMock = <T extends Queue.Service<any, any>>(resourceName: string) => {
     const client = createClientMock(resourceName, getQueueContract(resourceName)) as ClientMock<T['schema'], ClientMode<T>>;
 
     tracker.method(client, 'sendMessage');
@@ -57,7 +61,7 @@ export namespace QueueTester {
     return client;
   };
 
-  export const setClientMock = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
+  export const setClientMock = <T extends Queue.Service<any, any>>(resourceName: string) => {
     const client = getClientMock<T>(resourceName);
 
     Tester.mockServiceClient(resourceName, client);
@@ -72,7 +76,7 @@ export namespace QueueTester {
   /**
    * Messages the queue moved to its dead-letter queue, as the consumer receives them.
    */
-  export const getDeadLetterMessages = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string) => {
+  export const getDeadLetterMessages = <T extends Queue.Service<any, any>>(resourceName: string) => {
     return getLocalQueue(resourceName).getDeadLetterMessages() as T['schema'][];
   };
 
@@ -89,7 +93,7 @@ export namespace QueueTester {
    * (400 when it refuses it). The consumers take it out of the test's async context, so client overrides don't
    * reach them; `waitForDrain` resolves once they're done.
    */
-  export const send = <T extends Queue.Service<any, Queue.Mode>>(
+  export const send = <T extends Queue.Service<any, any>>(
     resourceName: string,
     message: T['schema'],
     options?: SendOptions<ClientMode<T>>
@@ -107,7 +111,7 @@ export namespace QueueTester {
    * message goes through the checks of the real client and then the queue schema, as it reaches the runtime, so a
    * message either would refuse fails with its error. `retry` and `defer` record their calls.
    */
-  export const incoming = async <T extends Queue.Service<any, Queue.Mode>>(
+  export const incoming = async <T extends Queue.Service<any, any>>(
     resourceName: string,
     message: T['schema'],
     overrides?: IncomingOverrides
@@ -139,7 +143,7 @@ export namespace QueueTester {
    * Get the context the subscription handlers of the queue receive, where a client in `overrides` takes the place
    * of the linked one with its name.
    */
-  export const getContext = <T extends Queue.Service<any, Queue.Mode>>(resourceName: string, overrides?: Partial<Service.Context<T>>) => {
+  export const getContext = <T extends Queue.Service<any, any>>(resourceName: string, overrides?: Partial<Service.Context<T>>) => {
     return Tester.getContext<Service.Context<T>>(resourceName, overrides);
   };
 }
