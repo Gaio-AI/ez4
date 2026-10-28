@@ -1,6 +1,7 @@
+import type { PgTableIndex, PgTableRepository } from '@ez4/pgclient/library';
 import type { AnySchema } from '@ez4/schema';
 
-import { deepEqual, equal } from 'node:assert/strict';
+import { deepEqual, equal, ok } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { getTableRepositoryChanges } from '@ez4/pgmigration/library';
@@ -65,5 +66,69 @@ describe('migration :: table rename detection', () => {
     const changes = getTableRepositoryChanges(target, source);
 
     deepEqual(changes.rename, { contact_events: 'person_events' });
+  });
+});
+
+describe('migration :: index rename detection', () => {
+  const getIndexedTable = (index: PgTableIndex) => {
+    return getTableRepository([
+      {
+        name: 'runs',
+        indexes: [{ name: 'id', type: Index.Primary, columns: ['id'] }, index],
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: { type: SchemaType.String },
+            account_id: { type: SchemaType.String },
+            started_at: { type: SchemaType.String },
+            user_id: { type: SchemaType.String }
+          }
+        }
+      }
+    ]);
+  };
+
+  const getIndexQueries = (target: PgTableRepository, source: PgTableRepository) => {
+    const steps = getUpdateStepQueries(target, source);
+
+    return [...steps.rollout.indexes, ...steps.cleanup.indexes].map(({ query }) => query);
+  };
+
+  const plainIndex: PgTableIndex = {
+    name: 'account_id:started_at',
+    type: Index.Secondary,
+    columns: ['account_id', 'started_at']
+  };
+
+  it('assert :: an index that only takes a name of its own is a rename', () => {
+    const target = getIndexedTable({
+      name: 'runs_account_started_sk',
+      type: Index.Secondary,
+      columns: ['account_id', 'started_at'],
+      options: { name: 'runs_account_started_sk' }
+    });
+
+    const queries = getIndexQueries(target, getIndexedTable(plainIndex));
+
+    deepEqual(queries, ['ALTER INDEX IF EXISTS "runs_account_id_started_at_sk" RENAME TO "runs_account_started_sk"']);
+  });
+
+  it('assert :: an index that also gains included columns is built, and the old one dropped', () => {
+    const target = getIndexedTable({
+      name: 'runs_account_started_people_sk',
+      type: Index.Secondary,
+      columns: ['account_id', 'started_at'],
+      options: { name: 'runs_account_started_people_sk', include: ['user_id'] }
+    });
+
+    const queries = getIndexQueries(target, getIndexedTable(plainIndex));
+
+    equal(
+      queries.some((query) => query.includes('RENAME')),
+      false
+    );
+
+    ok(queries.some((query) => query.includes('INCLUDE ("user_id")')));
+    ok(queries.includes('DROP INDEX CONCURRENTLY IF EXISTS "runs_account_id_started_at_sk"'));
   });
 });
