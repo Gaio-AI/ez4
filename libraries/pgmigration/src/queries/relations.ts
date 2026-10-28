@@ -3,6 +3,7 @@ import type { RelationDeleteAction } from '@ez4/database/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { SqlBuilder } from '@ez4/pgsql';
 import type { PgMigrationQueries } from '../types/query';
+import type { ForeignKeyDefinition } from '../utils/checks';
 
 import { getTableName } from '@ez4/pgclient/utils';
 import { deepEqual } from '@ez4/utils';
@@ -12,8 +13,12 @@ import { isOptionalColumn } from '../utils/columns';
 import { getRelationName, getTemporaryName } from '../utils/naming';
 
 import {
+  getCheckAllQuery,
+  getCheckAnyQuery,
   getCheckConstraintExistsQuery,
   getCheckConstraintInvalidQuery,
+  getCheckConstraintMissingQuery,
+  getCheckForeignKeyMatchesQuery,
   getCheckRunningValidationQuery,
   getCheckConstraintValidQuery
 } from '../utils/checks';
@@ -105,14 +110,24 @@ export namespace RelationQuery {
 
       const tmpName = getTemporaryName(newName);
 
+      // The metadata says what the key was declared as, but a key made before its relation declared it
+      // may already hold the new definition in the database. Then every step of the replacement is
+      // skipped, and so is the validation that would read the whole table.
+      const keptKey = getKeptKeyCheck(builder, newName, targetKey);
+      const condition = keptKey && 'unless the foreign key already has this definition';
+
+      const tmpMissing = getCheckConstraintMissingQuery(builder, tmpName);
+
       steps.rollout.relations.push(
         {
-          check: getCheckConstraintExistsQuery(builder, tmpName),
-          query: getCreateQuery(builder, table, tmpName, targetKey).build()
+          check: getCheckAnyQuery(getCheckConstraintExistsQuery(builder, tmpName), keptKey),
+          query: getCreateQuery(builder, table, tmpName, targetKey).build(),
+          condition
         },
         {
-          check: getCheckConstraintValidQuery(builder, tmpName),
-          query: getValidateQuery(builder, table, tmpName).build()
+          check: getCheckAnyQuery(getCheckConstraintValidQuery(builder, tmpName), keptKey),
+          query: getValidateQuery(builder, table, tmpName).build(),
+          condition
         }
       );
 
@@ -124,10 +139,14 @@ export namespace RelationQuery {
 
       steps.cleanup.relations.push(
         {
-          query: getDeleteQuery(builder, table, newName).build()
+          check: keptKey && getCheckAllQuery(keptKey, tmpMissing),
+          query: getDeleteQuery(builder, table, newName).build(),
+          condition
         },
         {
-          query: builder.table(table).alter().existing().constraint(tmpName).rename(newName).build()
+          check: tmpMissing,
+          query: builder.table(table).alter().existing().constraint(tmpName).rename(newName).build(),
+          condition
         }
       );
     }
@@ -223,6 +242,33 @@ export namespace RelationQuery {
       onDelete: getDeleteAction(relation, schema),
       scope
     };
+  };
+
+  const DELETE_ACTION_CODES: Record<RelationDeleteAction, ForeignKeyDefinition['deleteAction']> = {
+    cascade: 'c',
+    'set null': 'n',
+    restrict: 'r',
+    'no action': 'a'
+  };
+
+  /**
+   * The check that finds the key already made as the foreign key describes. A scoped key cleared on
+   * delete lists the column it clears in its definition, which the check doesn't compare, so that one
+   * is always replaced.
+   */
+  const getKeptKeyCheck = (builder: SqlBuilder, name: string, foreignKey: ForeignKey) => {
+    const { sourceTable, sourceColumn, targetColumn, onDelete, scope } = foreignKey;
+
+    if (scope.length && onDelete === 'set null') {
+      return undefined;
+    }
+
+    return getCheckForeignKeyMatchesQuery(builder, name, {
+      columns: [...scope, targetColumn],
+      table: getTableName(sourceTable),
+      tableColumns: [...scope, sourceColumn],
+      deleteAction: DELETE_ACTION_CODES[onDelete]
+    });
   };
 
   const getDeleteQuery = (builder: SqlBuilder, table: string, name: string) => {

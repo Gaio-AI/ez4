@@ -303,3 +303,52 @@ export const getCheckUniqueRecordsQuery = (
 
   return query;
 };
+
+/**
+ * Skips a statement when any of the checks finds a row.
+ */
+export const getCheckAnyQuery = (...checks: (string | undefined)[]) => {
+  const queries = checks.filter((check) => check !== undefined);
+
+  return queries.length > 1 ? `SELECT 1 WHERE ${queries.map((query) => `EXISTS (${query})`).join(' OR ')}` : queries[0];
+};
+
+/**
+ * Skips a statement only when every check finds a row.
+ */
+export const getCheckAllQuery = (...checks: string[]) => {
+  return checks.length > 1 ? `SELECT 1 WHERE ${checks.map((query) => `EXISTS (${query})`).join(' AND ')}` : checks[0];
+};
+
+export type ForeignKeyDefinition = {
+  columns: string[];
+  table: string;
+  tableColumns: string[];
+  deleteAction: 'c' | 'n' | 'r' | 'a';
+};
+
+/**
+ * Finds the foreign key of the given name when it's already valid and made as given: the same columns,
+ * the same table and columns it references, cascading updates and the same delete action. Postgres can't
+ * change a key's delete action in place, so a key the catalog already holds as given needs no new one, nor
+ * the validation that reads the whole table for it.
+ */
+export const getCheckForeignKeyMatchesQuery = (builder: SqlBuilder, name: string, definition: ForeignKeyDefinition) => {
+  const { columns, table, tableColumns, deleteAction } = definition;
+
+  const literal = (value: string) => builder.rawString(value).build();
+
+  // Built with `quote_ident`, so the identifiers are quoted the way `pg_get_constraintdef` prints them.
+  const identifiers = (values: string[]) => values.map((value) => `quote_ident(${literal(value)})`).join(` || ', ' || `);
+
+  const keyDefinition = `'FOREIGN KEY (' || ${identifiers(columns)} || ') REFERENCES ' || ${identifiers([table])} || '(' || ${identifiers(tableColumns)} || ')'`;
+
+  return [
+    `SELECT 1 FROM "pg_constraint" WHERE "conname" = ${literal(name)}`,
+    `"contype" = 'f'`,
+    `"convalidated"`,
+    `"confupdtype" = 'c'`,
+    `"confdeltype" = ${literal(deleteAction)}`,
+    `starts_with(pg_get_constraintdef("oid"), ${keyDefinition})`
+  ].join(' AND ');
+};
