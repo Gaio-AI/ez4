@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-kms",
   "description": "EZ4: Self-managed AWS KMS encryption provider",
-  "version": "2.14.4",
+  "version": "2.14.5",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
