@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-agent",
   "description": "EZ4: Self-managed AWS agent provider",
-  "version": "2.14.2",
+  "version": "2.14.3",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",

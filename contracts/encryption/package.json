@@ -1,7 +1,7 @@
 {
   "name": "@ez4/encryption",
   "description": "EZ4: Components to build encryption services",
-  "version": "2.14.2",
+  "version": "2.14.3",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
