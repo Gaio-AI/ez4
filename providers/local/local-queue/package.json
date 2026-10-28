@@ -1,7 +1,7 @@
 {
   "name": "@ez4/local-queue",
   "description": "EZ4: Local queue emulator",
-  "version": "2.14.4",
+  "version": "2.14.5",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
