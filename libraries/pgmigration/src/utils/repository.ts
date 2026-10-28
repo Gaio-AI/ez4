@@ -210,8 +210,14 @@ const canRenameTable = (target: ObjectSchema, source: ObjectSchema) => {
   return true;
 };
 
+// A rename keeps the index as it is built: one that also changes its included columns, predicate or
+// order is built again under its new name, and the old one is dropped.
 const canRenameIndex = (target: PgTableIndex, source: PgTableIndex) => {
-  return target.type === source.type && deepEqual(target.columns, source.columns);
+  return (
+    target.type === source.type &&
+    deepEqual(target.columns, source.columns) &&
+    deepEqual(target.options ?? {}, source.options ?? {}, { exclude: { name: true } })
+  );
 };
 
 const canRenameColumn = (target: AnySchema, source: AnySchema) => {
