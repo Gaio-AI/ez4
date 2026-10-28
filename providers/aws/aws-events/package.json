@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-events",
   "description": "EZ4: Self-managed AWS EventBridge provider",
-  "version": "2.14.2",
+  "version": "2.14.3",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
