@@ -12,10 +12,15 @@ export type StatementResult = {
   records: any[];
 };
 
+/**
+ * Run a statement. A failure is logged before it is thrown, unless `isExpectedError` takes it as an
+ * outcome the caller handles.
+ */
 export const executeStatement = async (
   client: DynamoDBDocumentClient,
   command: ExecuteStatementCommandInput,
-  debug?: boolean
+  debug?: boolean,
+  isExpectedError?: (error: unknown) => boolean
 ): Promise<StatementResult> => {
   try {
     const result = await client.send(
@@ -61,7 +66,9 @@ export const executeStatement = async (
       records: [...records, ...nextResult.records]
     };
   } catch (error) {
-    logQueryError(command);
+    if (!isExpectedError?.(error)) {
+      logQueryError(command);
+    }
 
     throw error;
   }

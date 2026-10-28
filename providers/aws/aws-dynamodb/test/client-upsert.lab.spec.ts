@@ -128,6 +128,82 @@ describe('dynamodb client upsert', { timeout: 60000 }, () => {
     });
   });
 
+  const otherId = getRandomUUID();
+
+  it('assert :: upsert inserts a missing item with the insert, not the update', async () => {
+    ok(dbClient);
+
+    const result = await dbClient.testTable.upsertOne({
+      insert: { id: otherId, foo: 'new', bar: 1 },
+      update: { bar: 999 },
+      where: { id: otherId }
+    });
+
+    deepEqual(result, { inserted: true });
+
+    const item = await dbClient.testTable.findOne({ select: { foo: true, bar: true }, where: { id: otherId } });
+
+    deepEqual(item, { foo: 'new', bar: 1 });
+  });
+
+  it('assert :: upsert updates an existing item with the update alone', async () => {
+    ok(dbClient);
+
+    const result = await dbClient.testTable.upsertOne({
+      select: { foo: true, bar: true },
+      insert: { id: otherId, foo: 'other', bar: 5 },
+      update: { bar: 7 },
+      where: { id: otherId }
+    });
+
+    deepEqual(result, { inserted: false, record: { foo: 'new', bar: 7 } });
+  });
+
+  it('assert :: upsert answers the record before the update with previous', async () => {
+    ok(dbClient);
+
+    const result = await dbClient.testTable.upsertOne({
+      select: { bar: true },
+      previous: true,
+      insert: { id: otherId, foo: 'other', bar: 5 },
+      update: { bar: 8 },
+      where: { id: otherId }
+    });
+
+    deepEqual(result, { inserted: false, record: { bar: 7 } });
+  });
+
+  it('assert :: upsert with nothing to update leaves an existing item as it is', async () => {
+    ok(dbClient);
+
+    const result = await dbClient.testTable.upsertOne({
+      insert: { id: otherId, foo: 'claim', bar: 0 },
+      update: {},
+      where: { id: otherId }
+    });
+
+    deepEqual(result, { inserted: false });
+
+    const item = await dbClient.testTable.findOne({ select: { foo: true, bar: true }, where: { id: otherId } });
+
+    deepEqual(item, { foo: 'new', bar: 8 });
+  });
+
+  it('assert :: upsert with nothing to update inserts a missing item', async () => {
+    ok(dbClient);
+
+    const claimId = getRandomUUID();
+
+    const query = {
+      insert: { id: claimId, foo: 'claim' },
+      update: {},
+      where: { id: claimId }
+    };
+
+    deepEqual(await dbClient.testTable.upsertOne(query), { inserted: true });
+    deepEqual(await dbClient.testTable.upsertOne(query), { inserted: false });
+  });
+
   it('assert :: destroy', async () => {
     ok(tableId && lastState);
     ok(lastState[tableId]);

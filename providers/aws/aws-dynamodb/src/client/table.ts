@@ -100,15 +100,20 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   async upsertOne<S extends Query.SelectInput<T>>(query: Query.UpsertOneInput<S, T>) {
-    const previous = await this.findOne({
-      select: query.select ?? ({} as Query.StrictSelectInput<S, T>),
-      where: query.where
-    });
+    // With nothing to write over an existing item, the insert alone answers: a duplicate means the
+    // item was already there.
+    if (!query.select && !hasUpdateData(query.update)) {
+      return {
+        inserted: await this.tryInsertOne(query.insert)
+      } as Query.UpsertOneResult<S, T>;
+    }
 
-    if (!previous) {
-      try {
-        await this.insertOne({ data: query.insert });
+    // An existing item takes the update in one request, and only a missing one costs the insert after
+    // it. An item another writer inserts in between takes the update again.
+    let updated = await this.tryUpdateOne(query);
 
+    if (!updated) {
+      if (await this.tryInsertOne(query.insert)) {
         if (query.select) {
           const [record] = getTransformedRecords([query.insert], this.schema, query.select);
 
@@ -121,22 +126,12 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
         return {
           inserted: true
         } as Query.UpsertOneResult<S, T>;
-
-        //
-      } catch (error) {
-        // In case of race condition, fallback to update.
-        if (!isDuplicateItemError(error)) {
-          throw error;
-        }
       }
+
+      updated = await this.tryUpdateOne(query);
     }
 
-    const record = await this.updateOne({
-      where: query.where as Query.WhereInput<T>,
-      select: query.select,
-      previous: query.previous,
-      data: query.update
-    });
+    const record = updated?.record;
 
     return {
       inserted: false,
@@ -144,6 +139,51 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
         record
       })
     } as Query.UpsertOneResult<S, T>;
+  }
+
+  // Whether the insert wrote the item: `false` when one with its key already exists.
+  private async tryInsertOne(data: Query.InsertOneInput<{}, T>['data']) {
+    const { client, debug } = this.settings;
+
+    const statement = await prepareInsertOne(this.name, this.schema, this.indexes, { data });
+
+    try {
+      await executeStatement(client, statement, debug, isDuplicateItemError);
+
+      return true;
+    } catch (error) {
+      if (isDuplicateItemError(error)) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  // The upsert's update of an existing item, or `undefined` when no item matches its `where`.
+  private async tryUpdateOne<S extends Query.SelectInput<T>>(query: Query.UpsertOneInput<S, T>) {
+    const { client, debug } = this.settings;
+
+    const statement = await prepareUpdateOne(this.name, this.schema, this.indexes, {
+      where: query.where as Query.WhereInput<T>,
+      select: query.select,
+      previous: query.previous,
+      data: query.update
+    });
+
+    try {
+      const { records } = await executeStatement(client, statement, debug, isConditionalCheckFailure);
+
+      const [record] = getTransformedRecords(records, this.schema, query.select);
+
+      return { record };
+    } catch (error) {
+      if (isConditionalCheckFailure(error)) {
+        return undefined;
+      }
+
+      throw error;
+    }
   }
 
   async insertMany<S extends Query.InsertManySelectInput<T>>(query: Query.InsertManyInput<S, T>) {
@@ -351,3 +391,11 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     return Promise.reject(new UnsupportedAggregateError());
   }
 }
+
+const hasUpdateData = (data: AnyObject) => {
+  return Object.values(data).some((value) => value !== undefined);
+};
+
+const isConditionalCheckFailure = (error: unknown) => {
+  return error instanceof ConditionalCheckFailedException;
+};
