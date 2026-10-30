@@ -25,6 +25,9 @@ export const getAgentBucketName = (options: AgentsNameOptions) => {
 
 export const getAgentKey = (agent: Pick<AgentService, 'name'>) => agent.name;
 
+// Here rather than with the task definition, which imports deploy providers: the client bundled into functions needs it.
+export const AGENT_CONTAINER_NAME = 'agent';
+
 // Log group names go through toKebabCase, which would drop path separators; the agent's family name survives it.
 export const getAgentLogGroupName = (agent: Pick<AgentService, 'name'>, options: DeployOptions) =>
   `${getAgentsBaseName(options)}-${toKebabCase(agent.name)}`;

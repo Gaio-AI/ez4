@@ -35,6 +35,16 @@
       "types": "./dist/client.d.ts",
       "require": "./dist/client.cjs",
       "import": "./dist/client.mjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "require": "./dist/runtime.cjs",
+      "import": "./dist/runtime.mjs"
+    },
+    "./handlers": {
+      "types": "./dist/handlers.d.ts",
+      "require": "./dist/handlers.cjs",
+      "import": "./dist/handlers.mjs"
     }
   },
   "sideEffects": [
@@ -43,7 +53,11 @@
     "./dist/library.cjs",
     "./dist/library.mjs",
     "./dist/client.cjs",
-    "./dist/client.mjs"
+    "./dist/client.mjs",
+    "./dist/runtime.cjs",
+    "./dist/runtime.mjs",
+    "./dist/handlers.cjs",
+    "./dist/handlers.mjs"
   ],
   "workspaces": [
     "foundation/*",

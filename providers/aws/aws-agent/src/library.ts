@@ -31,6 +31,7 @@ export * from './proxy/config';
 export * from './proxy/taskdef';
 
 export {
+  AGENT_CONTAINER_NAME,
   getSecretResourceArn,
   getProviderSecretName,
   getAgentTaskRoleName,

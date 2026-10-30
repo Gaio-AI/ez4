@@ -1,7 +1,7 @@
 import type { SQSEvent } from 'aws-lambda';
 import type { Agent } from '@ez4/agent';
 
-import { handleWorkflowEvent } from '@ez4/aws-agent/library';
+import { handleWorkflowEvent } from '@ez4/aws-agent/handlers';
 
 declare const __EZ4_CONTEXT: Record<string, unknown>;
 

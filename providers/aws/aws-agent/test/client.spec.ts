@@ -13,9 +13,8 @@ import { InvalidReplyToError } from '@ez4/agent/library';
 import type { EventContext, DeployOptions, ServiceMetadata } from '@ez4/project/library';
 import { QueueServiceType } from '@ez4/aws-queue';
 import { createEcsClusterStateId, createEcsTaskDefStateId } from '@ez4/aws-ecs';
-import { AGENT_CONTAINER_NAME } from '../src/agent/taskdef';
 import { createBucketStateId } from '@ez4/aws-bucket';
-import { getAgentBucketName, getAgentClusterName } from '../src/utils/names';
+import { AGENT_CONTAINER_NAME, getAgentBucketName, getAgentClusterName } from '../src/utils/names';
 import { getDefinitionName } from '@ez4/project/library';
 import type { EcsTaskDefState } from '@ez4/aws-ecs';
 

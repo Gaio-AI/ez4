@@ -1,5 +1,5 @@
-import type { AgentEntryDefinition } from '@ez4/aws-agent/library';
-import { startAgent } from '@ez4/aws-agent/library';
+import type { AgentEntryDefinition } from '@ez4/aws-agent/runtime';
+import { startAgent } from '@ez4/aws-agent/runtime';
 
 declare const __EZ4_AGENT: AgentEntryDefinition;
 declare const __EZ4_HANDLERS: Function[];
