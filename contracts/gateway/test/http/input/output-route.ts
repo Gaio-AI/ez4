@@ -12,7 +12,6 @@ export declare class TestService extends Http.Service {
       logRetention: 7;
       disabled: true;
     }>,
-
     ...[
       // Route reference.
       TestRoute

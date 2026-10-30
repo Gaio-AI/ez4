@@ -11,7 +11,6 @@ export declare class TestStandardQueue extends Queue.Unordered<TestMessage> {
     Queue.UseSubscription<{
       handler: typeof deferringHandler;
     }>,
-
     Queue.UseSubscription<{
       handler: typeof plainHandler;
     }>

@@ -11,12 +11,10 @@ export declare class TestCdn extends Cdn.Service {
     domain: 'example.com';
     rewrite: [
       TestRewriteRule,
-
       Cdn.UseRewriteRule<{
         from: '/legacy/*';
         to: '/internal/*';
       }>,
-
       {
         from: '/exact';
         to: '/exact-target';
@@ -30,12 +28,10 @@ export declare class TestCdn extends Cdn.Service {
       path: 'app/*';
       rewrite: [
         TestRewriteRule,
-
         Cdn.UseRewriteRule<{
           from: '/internal/*';
           to: '/modern/*';
         }>,
-
         // Inline rules
         {
           from: '/redirect/*';
@@ -47,7 +43,6 @@ export declare class TestCdn extends Cdn.Service {
           to: '/temp/*';
           status: 302;
         },
-
         // Negation rules
         {
           from: '!*.css';

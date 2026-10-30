@@ -20,15 +20,12 @@ export declare class TestTopic extends Topic.Unordered<TestEvent> {
       logRetention: 14;
       timeout: 15;
     }>,
-
     // Inline queue subscription.
     Topic.UseSubscription<{
       service: Environment.Service<TestOrderedQueue>;
     }>,
-
     // Lambda subscription reference.
     TestLambdaSubscription,
-
     // Queue subscription reference.
     TestUnorderedQueueSubscription
   ];

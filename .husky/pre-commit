@@ -1,1 +1,1 @@
-npm run prettify -- --log-level silent
+npm run format --silent

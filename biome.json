@@ -7,22 +7,47 @@
   },
   "files": {
     "includes": [
-      "foundation/*/src/**/*.ts",
-      "contracts/*/src/**/*.ts",
-      "libraries/*/src/**/*.ts",
+      "foundation/**/*.ts",
+      "contracts/**/*.ts",
+      "libraries/**/*.ts",
       "extensions/*/src/**/*.ts",
-      "providers/*/*/src/**/*.ts",
+      "providers/**/*.ts",
       "tests/database/src/**/*.ts"
     ]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "includes": ["foundation/**", "contracts/**", "libraries/**", "providers/**", "!foundation/reflection/test/types/class.ts"],
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 140,
+    "expand": "auto"
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "always",
+      "bracketSameLine": false,
+      "bracketSpacing": true,
+      "quoteProperties": "asNeeded",
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "none"
+    }
   },
   "assist": {
     "enabled": false
   },
   "linter": {
     "enabled": true,
+    "includes": [
+      "foundation/*/src/**",
+      "contracts/*/src/**",
+      "libraries/*/src/**",
+      "extensions/*/src/**",
+      "providers/*/*/src/**",
+      "tests/database/src/**"
+    ],
     "rules": {
       "preset": "none",
       "correctness": {

@@ -22,4 +22,4 @@ Release rules: `RELEASING.md`. Merging the release PR on `main` publishes `v<ver
 ## Lint
 
 - `npm run lint` lints every workspace's `src` in one run, after the build: Biome (`biome.json`) for unused code, type-only imports and undeclared dependencies, and oxlint with type information (`.oxlintrc.json`) for `return-await` (`in-try-catch`) and `require-await`. An exception goes on its line with the reason (`// biome-ignore lint/<group>/<rule>: <reason>`, `// oxlint-disable-next-line <rule> -- <reason>`).
-- Formatting stays with Prettier (`npm run prettify`, in the pre-commit hook): upstream is formatted with it, so a picked commit applies without format conflicts.
+- `npm run format` formats `foundation`, `contracts`, `libraries` and `providers` with Biome (`biome.json`); the pre-commit hook runs it.

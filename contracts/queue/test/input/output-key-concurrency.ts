@@ -16,7 +16,6 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
         max: 1;
       };
     }>,
-
     // Two fields name it together.
     Queue.UseSubscription<{
       handler: typeof otherHandler;
@@ -25,7 +24,6 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
         max: 3;
       }>;
     }>,
-
     // Subscription reference.
     TestSubscription
   ];

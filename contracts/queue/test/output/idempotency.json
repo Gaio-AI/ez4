@@ -41,7 +41,7 @@
           "name": "testHandler",
           "file": "test/input/output-idempotency.ts",
           "position": [
-            60,
+            58,
             1
           ]
         },
@@ -57,7 +57,7 @@
           "name": "otherHandler",
           "file": "test/input/output-idempotency.ts",
           "position": [
-            62,
+            60,
             1
           ]
         },
@@ -74,7 +74,7 @@
           "name": "thirdHandler",
           "file": "test/input/output-idempotency.ts",
           "position": [
-            64,
+            62,
             1
           ]
         },
@@ -101,7 +101,7 @@
           "name": "testHandler",
           "file": "test/input/output-idempotency.ts",
           "position": [
-            60,
+            58,
             1
           ]
         },

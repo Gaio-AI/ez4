@@ -9,7 +9,6 @@ export declare class TestDatabase extends Database.Service<TestEngine> {
       schema: TestSchema1;
       indexes: {};
     }>,
-
     ...[
       // Table reference.
       TestTable

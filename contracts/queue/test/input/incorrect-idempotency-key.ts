@@ -16,7 +16,6 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
         ttl: 60;
       };
     }>,
-
     // An optional field can't name the unit of work.
     Queue.UseSubscription<{
       handler: typeof otherHandler;

@@ -23,7 +23,7 @@
           "name": "testRoute",
           "file": "test/http/input/output-cors.ts",
           "position": [
-            30,
+            29,
             1
           ],
           "response": {
@@ -38,7 +38,7 @@
           "name": "testRoute",
           "file": "test/http/input/output-cors.ts",
           "position": [
-            30,
+            29,
             1
           ],
           "response": {

@@ -56,7 +56,7 @@ describe('system task utils', { timeout: 10000 }, () => {
     await Tasks.run(tasks, {
       concurrency: 4,
       onProgress: (completed, total) => {
-        (equal(completed, progress.shift()), equal(total, tasks.length));
+        equal(completed, progress.shift()), equal(total, tasks.length);
       }
     });
   });
@@ -67,7 +67,7 @@ describe('system task utils', { timeout: 10000 }, () => {
     await Tasks.safeRun(tasks, {
       concurrency: 4,
       onProgress: (completed, total) => {
-        (equal(completed, progress.shift()), equal(total, tasks.length));
+        equal(completed, progress.shift()), equal(total, tasks.length);
       }
     });
   });

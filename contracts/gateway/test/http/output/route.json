@@ -27,7 +27,7 @@
           "name": "testRoute1",
           "file": "test/http/input/output-route.ts",
           "position": [
-            43,
+            42,
             1
           ],
           "response": {
@@ -43,7 +43,7 @@
           "name": "testRoute2",
           "file": "test/http/input/output-route.ts",
           "position": [
-            49,
+            48,
             1
           ],
           "response": {
