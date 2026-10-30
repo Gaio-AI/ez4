@@ -78,7 +78,8 @@ describe('migration :: migration statements tests', () => {
 
     deepEqual(getMigrationStatements(getRelatedRepository(false), getRelatedRepository(true)), {
       'cleanup.1': `ALTER TABLE IF EXISTS "messages" DROP CONSTRAINT IF EXISTS "messages_contact_fk"`,
-      'cleanup.2': 'DROP INDEX CONCURRENTLY IF EXISTS "contacts_email_uk"'
+      'cleanup.2': 'ALTER TABLE IF EXISTS "contacts" DROP CONSTRAINT IF EXISTS "contacts_email_uk"',
+      'cleanup.3': 'DROP INDEX CONCURRENTLY IF EXISTS "contacts_email_uk"'
     });
   });
 

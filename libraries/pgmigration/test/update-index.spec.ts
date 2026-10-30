@@ -9,7 +9,12 @@ import { getTableRepository } from '@ez4/pgclient/library';
 import { SchemaType } from '@ez4/schema';
 import { Index } from '@ez4/database';
 
-import { getIndexValidation, getPrimaryKeySwapStatements, getRebuildIndexStatement } from './common/indexes';
+import {
+  getIndexValidation,
+  getPrimaryKeySwapStatements,
+  getRebuildIndexStatement,
+  getUniqueConstraintDropStatement
+} from './common/indexes';
 
 describe('migration :: update index tests', () => {
   const getDatabaseTables = (properties: ObjectSchemaProperties, indexes: TableIndex[] = []) => {
@@ -164,7 +169,10 @@ describe('migration :: update index tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk'),
+        constraints: [
+          getUniqueConstraintDropStatement('table', 'table_index_uk'),
+          ...getPrimaryKeySwapStatements('table', 'table_index_tmp_pk', 'table_index_pk')
+        ],
         validations: [],
         relations: [],
         indexes: [
@@ -206,7 +214,7 @@ describe('migration :: update index tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: [getUniqueConstraintDropStatement('table', 'table_index_uk')],
         validations: [],
         relations: [],
         indexes: [
@@ -379,7 +387,13 @@ describe('migration :: update index tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: [
+          getUniqueConstraintDropStatement(
+            'table',
+            'table_index_uk',
+            `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_class" WHERE "relname" = 'table_index_tmp_uk' AND "relkind" = 'i')`
+          )
+        ],
         validations: [],
         relations: [],
         indexes: [

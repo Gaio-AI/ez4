@@ -66,7 +66,15 @@ describe('migration :: client index changes tests', async () => {
   };
 
   before(async () => {
-    for (const table of ['index_pk_swap', 'index_pk_swap_long', 'index_invalid', 'index_column_rename', 'index_type_change']) {
+    for (const table of [
+      'index_pk_swap',
+      'index_pk_swap_long',
+      'index_invalid',
+      'index_column_rename',
+      'index_type_change',
+      'index_unique_constraint_pk',
+      'index_unique_constraint_drop'
+    ]) {
       await client.rawQuery(`DROP TABLE IF EXISTS "${table}"`);
     }
   });
@@ -227,5 +235,64 @@ describe('migration :: client index changes tests', async () => {
       (await getIndexes('index_type_change')).map(({ name }) => name),
       ['index_type_change_column_sk', 'index_type_change_id_pk']
     );
+  });
+
+  // Databases created by earlier versions hold some unique keys as constraints, and Postgres refuses to
+  // drop the index of a constraint.
+  const holdUniqueKeyAsConstraint = async (table: string, name: string) => {
+    await client.rawQuery(`ALTER TABLE "${table}" ADD CONSTRAINT "${name}" UNIQUE USING INDEX "${name}"`);
+  };
+
+  const getUniqueConstraints = async (table: string) => {
+    return client.rawQuery(`SELECT conname AS name FROM pg_constraint WHERE conrelid = '"${table}"'::regclass AND contype = 'u'`);
+  };
+
+  it('assert :: promote a unique key held by a constraint to the primary key', async () => {
+    const columns = textColumns('column_a', 'column_b');
+
+    const repositoryV1 = getRepository('index_unique_constraint_pk', columns, [
+      { name: 'column_a:column_b', type: Index.Unique, columns: ['column_a', 'column_b'] }
+    ]);
+
+    const repositoryV2 = getRepository('index_unique_constraint_pk', columns, [
+      { name: 'column_a:column_b', type: Index.Primary, columns: ['column_a', 'column_b'] }
+    ]);
+
+    await runMigration(client, getCreateQueries(repositoryV1));
+    await holdUniqueKeyAsConstraint('index_unique_constraint_pk', 'index_unique_constraint_pk_column_a_column_b_uk');
+
+    await client.rawQuery(`INSERT INTO "index_unique_constraint_pk" VALUES ('a1', 'b1'), ('a2', 'b2')`);
+
+    await runSteps(repositoryV2, repositoryV1);
+
+    deepEqual(
+      (await getIndexes('index_unique_constraint_pk')).map(({ name, primary }) => ({ name, primary })),
+      [{ name: 'index_unique_constraint_pk_column_a_column_b_pk', primary: true }]
+    );
+
+    deepEqual(await getUniqueConstraints('index_unique_constraint_pk'), []);
+  });
+
+  it('assert :: drop a unique key held by a constraint', async () => {
+    const columns = textColumns('id', 'column');
+
+    const repositoryV1 = getRepository('index_unique_constraint_drop', columns, [
+      { name: 'id', type: Index.Primary, columns: ['id'] },
+      { name: 'column', type: Index.Unique, columns: ['column'] }
+    ]);
+
+    const repositoryV2 = getRepository('index_unique_constraint_drop', columns, [{ name: 'id', type: Index.Primary, columns: ['id'] }]);
+
+    await runMigration(client, getCreateQueries(repositoryV1));
+    await holdUniqueKeyAsConstraint('index_unique_constraint_drop', 'index_unique_constraint_drop_column_uk');
+
+    await runSteps(repositoryV2, repositoryV1);
+
+    deepEqual(
+      (await getIndexes('index_unique_constraint_drop')).map(({ name }) => name),
+      ['index_unique_constraint_drop_id_pk']
+    );
+
+    deepEqual(await getUniqueConstraints('index_unique_constraint_drop'), []);
   });
 });

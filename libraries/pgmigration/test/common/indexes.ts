@@ -20,6 +20,16 @@ export const getIndexValidation = (name: string) => {
   };
 };
 
+// Drops the unique key `name` when an earlier version left it as a constraint; `skip` is the index drop's check.
+export const getUniqueConstraintDropStatement = (table: string, name: string, skip?: string) => {
+  const constraintMissing = `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = '${name}')`;
+
+  return {
+    check: skip ? `SELECT 1 WHERE EXISTS (${skip}) OR EXISTS (${constraintMissing})` : constraintMissing,
+    query: `ALTER TABLE IF EXISTS "${table}" DROP CONSTRAINT IF EXISTS "${name}"`
+  };
+};
+
 export const getPrimaryKeySwapStatements = (table: string, temporaryName: string, targetName: string, sourceName?: string) => {
   const dropSource = sourceName ? `DROP CONSTRAINT IF EXISTS "${sourceName}", ` : '';
 

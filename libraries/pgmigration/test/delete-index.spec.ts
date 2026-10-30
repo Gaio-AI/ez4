@@ -98,7 +98,12 @@ describe('migration :: delete index tests', () => {
       },
       cleanup: {
         tables: [],
-        constraints: [],
+        constraints: [
+          {
+            check: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_index_uk')`,
+            query: 'ALTER TABLE IF EXISTS "table" DROP CONSTRAINT IF EXISTS "table_index_uk"'
+          }
+        ],
         validations: [],
         relations: [],
         indexes: [
