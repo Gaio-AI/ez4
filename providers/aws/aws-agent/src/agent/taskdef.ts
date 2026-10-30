@@ -9,8 +9,7 @@ import { AccessPointServiceType } from '@ez4/aws-efs';
 import { toKebabCase } from '@ez4/utils';
 import { buildNoProxyList } from '../proxy/config';
 import { WORKSPACE_MOUNT_PATH, WORKSPACE_VOLUME_NAME } from '../workspace/resources';
-
-export const AGENT_CONTAINER_NAME = 'agent';
+import { AGENT_CONTAINER_NAME } from '../utils/names';
 
 export type AgentRuntimeFields = Pick<AgentService, 'name' | 'resources' | 'secrets' | 'workspace' | 'permissions'>;
 

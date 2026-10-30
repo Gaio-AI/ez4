@@ -6,7 +6,7 @@ import { validate, getErrorDetails } from '@ez4/validator';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Agent } from '@ez4/agent';
 import { AgentErrorCode, AgentResultStatus } from '@ez4/agent';
-import { AGENT_CONTAINER_NAME } from './agent/taskdef';
+import { AGENT_CONTAINER_NAME } from './utils/names';
 
 export { WorkflowClient, type WorkflowClientParameters, type WorkflowStageParameters } from './workflow/client';
 

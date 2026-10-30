@@ -11,3 +11,11 @@ bundlePackage('src/library.ts', 'dist/library.cjs', 'cjs');
 // Client package.
 bundlePackage('src/client.ts', 'dist/client.mjs', 'esm');
 bundlePackage('src/client.ts', 'dist/client.cjs', 'cjs');
+
+// Runtime package.
+bundlePackage('src/runtime.ts', 'dist/runtime.mjs', 'esm');
+bundlePackage('src/runtime.ts', 'dist/runtime.cjs', 'cjs');
+
+// Handlers package.
+bundlePackage('src/handlers.ts', 'dist/handlers.mjs', 'esm');
+bundlePackage('src/handlers.ts', 'dist/handlers.cjs', 'cjs');
