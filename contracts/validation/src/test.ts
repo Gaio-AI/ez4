@@ -27,7 +27,7 @@ export namespace ValidationTester {
 
       async tryValidate(value: T) {
         try {
-          return (await this.validate(value), true);
+          return await this.validate(value), true;
         } catch {
           return false;
         }

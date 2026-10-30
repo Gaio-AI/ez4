@@ -23,7 +23,6 @@ export declare class TestQueue extends Queue.Unordered<TestMessage> {
       acknowledge: 'batch';
       recursiveLoop: true;
     }>,
-
     // Subscription reference.
     TestSubscription
   ];

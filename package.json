@@ -82,7 +82,7 @@
   ],
   "scripts": {
     "prepare": "husky",
-    "prettify": "npx prettier 'foundation/**/*.ts' 'contracts/**/*.ts' 'libraries/**/*.ts' 'providers/**/*.ts' --write",
+    "format": "biome format --write",
     "lint": "biome lint --error-on-warnings && oxlint --type-aware --deny-warnings foundation/*/src contracts/*/src libraries/*/src extensions/*/src providers/*/*/src tests/database/src",
     "clean": "npm run clean --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
@@ -109,7 +109,6 @@
     "husky": "^9.1.7",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
-    "prettier": "^3.3.2",
     "verdaccio": "^6.0.5"
   }
 }

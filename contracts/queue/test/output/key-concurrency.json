@@ -38,7 +38,7 @@
           "name": "testHandler",
           "file": "test/input/output-key-concurrency.ts",
           "position": [
-            44,
+            42,
             1
           ]
         },
@@ -54,7 +54,7 @@
           "name": "otherHandler",
           "file": "test/input/output-key-concurrency.ts",
           "position": [
-            49,
+            47,
             1
           ]
         },
@@ -71,7 +71,7 @@
           "name": "thirdHandler",
           "file": "test/input/output-key-concurrency.ts",
           "position": [
-            51,
+            49,
             1
           ]
         },

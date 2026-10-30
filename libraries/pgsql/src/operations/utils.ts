@@ -26,7 +26,7 @@ export const getOperandValue = (schema: AnySchema | undefined, operand: unknown,
   const field = `:${index}`;
 
   if (!options.onPrepareVariable) {
-    return (variables.push(operand), field);
+    return variables.push(operand), field;
   }
 
   const preparedValue = options.onPrepareVariable(operand, {

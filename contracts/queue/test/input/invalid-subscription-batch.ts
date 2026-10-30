@@ -15,7 +15,6 @@ export declare class TestFifoQueue extends Queue.Ordered<TestMessage> {
       handler: typeof testHandler;
       batch: 10;
     }>,
-
     // Too large for a FIFO queue.
     Queue.UseSubscription<{
       handler: typeof otherHandler;

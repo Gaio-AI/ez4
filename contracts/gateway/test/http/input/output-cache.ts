@@ -7,7 +7,6 @@ export declare class TestService extends Http.Service {
       path: 'POST /test-route-1';
       handler: typeof testRoute;
     }>,
-
     // With Auth Cache.
     Http.UseRoute<{
       path: 'PATCH /test-route-2';
