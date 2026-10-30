@@ -13,6 +13,7 @@ import { deepEqual, isAnyObject } from '@ez4/utils';
 import { getPrimaryKeyName, getSecondaryKeyName, getTemporaryName, getUniqueKeyName } from '../utils/naming';
 
 import {
+  getCheckAnyQuery,
   getCheckConstraintExistsQuery,
   getCheckConstraintMissingQuery,
   getCheckIndexMissingQuery,
@@ -335,16 +336,11 @@ export namespace IndexQueries {
     combineQueries(steps.rollout, prepareIndex(builder, table, schema, targetIndex, temporaryName));
 
     // Once the temporary index is renamed, the index with the current name is the new one.
-    steps.cleanup.indexes.push(
-      {
-        check: getCheckIndexMissingQuery(builder, temporaryName),
-        query: builder.index(getIndexName(table, sourceIndex)).drop().existing().concurrent().build(),
-        concurrent: true
-      },
-      {
-        query: builder.index(temporaryName).rename(targetName).existing().build()
-      }
-    );
+    combineQueries(steps.cleanup, prepareDropIndex(builder, table, sourceIndex, getCheckIndexMissingQuery(builder, temporaryName)));
+
+    steps.cleanup.indexes.push({
+      query: builder.index(temporaryName).rename(targetName).existing().build()
+    });
 
     return steps;
   };
@@ -447,12 +443,34 @@ export namespace IndexQueries {
           query: builder.table(table).alter().existing().constraint(name).drop().existing().build()
         });
       } else {
-        statements.indexes.push({
-          query: builder.index(name).drop().existing().concurrent().build(),
-          concurrent: true
-        });
+        combineQueries(statements, prepareDropIndex(builder, table, index));
       }
     }
+
+    return statements;
+  };
+
+  /**
+   * A database created by an earlier version may hold a unique key as a constraint, and Postgres doesn't
+   * drop the index of a constraint. When there is one, the constraint goes first and takes its index with
+   * it, so the index drop that follows finds nothing. `skip` skips both, as the index drop's own check.
+   */
+  const prepareDropIndex = (builder: SqlBuilder, table: string, index: PgTableIndex, skip?: string) => {
+    const statements = getIndexQueries();
+    const name = getIndexName(table, index);
+
+    if (index.type === Index.Unique) {
+      statements.constraints.push({
+        check: getCheckAnyQuery(skip, getCheckConstraintMissingQuery(builder, name)),
+        query: builder.table(table).alter().existing().constraint(name).drop().existing().build()
+      });
+    }
+
+    statements.indexes.push({
+      ...(skip && { check: skip }),
+      query: builder.index(name).drop().existing().concurrent().build(),
+      concurrent: true
+    });
 
     return statements;
   };

@@ -338,6 +338,8 @@ describe('aurora migration cleanup', () => {
       [
         `DO $ez4$ BEGIN PERFORM set_config('lock_timeout', '5s', true); ` +
           `ALTER TABLE IF EXISTS "pets" DROP CONSTRAINT IF EXISTS "pets_owner_fk"; END $ez4$`,
+        `DO $ez4$ BEGIN PERFORM set_config('lock_timeout', '5s', true); ` +
+          `ALTER TABLE IF EXISTS "owners" DROP CONSTRAINT IF EXISTS "owners_email_uk"; END $ez4$`,
         'DROP INDEX CONCURRENTLY IF EXISTS "owners_email_uk"'
       ]
     );
