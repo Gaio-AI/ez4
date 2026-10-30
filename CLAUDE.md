@@ -17,4 +17,9 @@ Release rules: `RELEASING.md`. Merging the release PR on `main` publishes `v<ver
 ## TypeScript
 
 - `tsc` in every script is TypeScript 7 (`@typescript/native`). It only emits declarations: the published JavaScript comes from esbuild (each package's `tools/bundler.mjs`), so the compiler version never changes runtime code.
-- The root `typescript` is `@typescript/typescript6`, the 6.0 API that typescript-eslint needs. `@ez4/reflection` declares the real `typescript` 6 as a dependency and keeps using its API at runtime.
+- `@ez4/reflection` declares the real `typescript` 6 as a dependency and keeps using its API at runtime.
+
+## Lint
+
+- `npm run lint` lints every workspace's `src` in one run, after the build: Biome (`biome.json`) for unused code, type-only imports and undeclared dependencies, and oxlint with type information (`.oxlintrc.json`) for `return-await` (`in-try-catch`) and `require-await`. An exception goes on its line with the reason (`// biome-ignore lint/<group>/<rule>: <reason>`, `// oxlint-disable-next-line <rule> -- <reason>`).
+- Formatting stays with Prettier (`npm run prettify`, in the pre-commit hook): upstream is formatted with it, so a picked commit applies without format conflicts.

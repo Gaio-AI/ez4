@@ -37,7 +37,6 @@
     "./dist/main.mjs"
   ],
   "scripts": {
-    "lint": "eslint --cache",
     "clean": "rm -rf dist/* *.tsbuildinfo .eslintcache",
     "build": "tsc -p tsconfig.pack.json && node tools/bundler.mjs",
     "local:publish": "npm run build && npm run clean:registry && npm publish --registry http://localhost:4873 --@ez4:registry=http://localhost:4873/",

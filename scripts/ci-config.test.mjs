@@ -76,9 +76,12 @@ test('the build outputs are cached by relative globs that cover every dist and t
 test('lint builds first, lints every workspace and still runs this config test', () => {
   const { lint } = config;
   assert.ok(lint.startsWith('bash scripts/ci-build-once.sh && '), 'build before lint');
-  assert.match(lint, /npm run lint -w \{\}/);
+  assert.match(lint, /npm run lint &&/);
   assert.match(lint, /node --test scripts\/ci-config\.test\.mjs/);
-  assert.match(lint, /-P "\$\(nproc\)"/);
+
+  // One run over every workspace, after the build: the type-aware rules read the declarations it emits.
+  const rootLint = JSON.parse(read('package.json')).scripts.lint;
+  assert.match(rootLint, /^biome lint --error-on-warnings && oxlint --type-aware --deny-warnings /);
 });
 
 test('the suite builds once per job: lint and every test leg share one build', () => {

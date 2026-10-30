@@ -83,7 +83,7 @@
   "scripts": {
     "prepare": "husky",
     "prettify": "npx prettier 'foundation/**/*.ts' 'contracts/**/*.ts' 'libraries/**/*.ts' 'providers/**/*.ts' --write",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "biome lint --error-on-warnings && oxlint --type-aware --deny-warnings foundation/*/src contracts/*/src libraries/*/src extensions/*/src providers/*/*/src tests/database/src",
     "clean": "npm run clean --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
@@ -100,18 +100,16 @@
     "release": "tools/release.sh"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.5",
     "@changesets/cli": "^3.0.3",
     "@changesets/read": "^1.0.1",
     "@types/node": "^22.9.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "@typescript-eslint/parser": "^8.38.0",
     "@typescript/native": "npm:typescript@^7.0.2",
     "esbuild": "^0.28.1",
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
     "prettier": "^3.3.2",
-    "typescript": "npm:@typescript/typescript6@^6.0.3",
     "verdaccio": "^6.0.5"
   }
 }

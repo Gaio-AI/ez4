@@ -1,5 +1,6 @@
 import type { PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { Arn } from '@ez4/aws-common';
+// biome-ignore lint/correctness/noUndeclaredDependencies: types only, erased from the bundle
 import type { PoolClient } from 'pg';
 
 import { rootCertificates } from 'node:tls';

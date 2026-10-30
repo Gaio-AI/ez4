@@ -1,3 +1,4 @@
+// biome-ignore lint/correctness/noUndeclaredDependencies: types only, erased from the bundle
 import type { SQSEvent } from 'aws-lambda';
 import type { Agent } from '@ez4/agent';
 import { WorkflowEventType } from '@ez4/agent';
