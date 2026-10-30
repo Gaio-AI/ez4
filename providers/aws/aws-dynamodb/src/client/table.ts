@@ -44,7 +44,8 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
     const statement = await prepareInsertOne(this.name, this.schema, this.indexes, query);
 
-    await executeStatement(client, statement, debug);
+    // A duplicate is the insert's answer for a key that exists, thrown for the caller to handle.
+    await executeStatement(client, statement, debug, isDuplicateItemError);
 
     if (query.data) {
       const [firstResult] = getTransformedRecords([query.data], this.schema, query.select);
@@ -61,13 +62,13 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
     const statement = await prepareUpdateOne(this.name, this.schema, this.indexes, query);
 
     try {
-      const { records } = await executeStatement(client, statement, debug);
+      const { records } = await executeStatement(client, statement, debug, isConditionalCheckFailure);
 
       const [firstRecord] = getTransformedRecords(records, this.schema, query.select);
 
       return firstRecord;
     } catch (error) {
-      if (error instanceof ConditionalCheckFailedException) {
+      if (isConditionalCheckFailure(error)) {
         return undefined;
       }
 
@@ -92,7 +93,8 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
     const statement = prepareDeleteOne(this.name, this.schema, query);
 
-    const { records } = await executeStatement(client, statement, debug);
+    // A failed condition is the delete's answer for an item it doesn't match, thrown for the caller to handle.
+    const { records } = await executeStatement(client, statement, debug, isConditionalCheckFailure);
 
     const [firstRecord] = getTransformedRecords(records, this.schema, query.select);
 
