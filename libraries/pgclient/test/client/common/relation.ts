@@ -86,7 +86,7 @@ export const makeRelationClient = async (debug?: boolean) => {
     repository: TestRelationRepository,
     debug,
     connection: {
-      database: 'postgres',
+      database: 'pgclient_tests',
       password: 'postgres',
       user: 'postgres',
       host: '127.0.0.1'

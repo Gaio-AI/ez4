@@ -93,6 +93,13 @@ test('the suite builds once per job: lint and every test leg share one build', (
   assert.ok(script.indexOf('npm run build') < script.indexOf('npm link -w @ez4/project'), 'build before link');
 });
 
+test('the suite runs four legs at a time, which wait on one build instead of building together', () => {
+  assert.equal(config['suite-concurrency'], 4);
+  const script = read('scripts/ci-build-once.sh');
+  const lock = script.indexOf('flock');
+  assert.ok(lock > 0 && lock < script.indexOf('if [ -f "$marker" ]') && lock < script.indexOf('npm run build'), 'lock before the marker check');
+});
+
 // The suite holds the CI credentials, so the offline specs run against a dead endpoint with fake keys, and a
 // profile (which the SDK would take over the keys) or a credentials file can't bring a real account back.
 const OFFLINE_TEST =

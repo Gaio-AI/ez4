@@ -30,15 +30,32 @@ runs:
       run: echo "name=$(jq -r '.packageManager // "npm" | split("@")[0]' package.json)" >> "$GITHUB_OUTPUT"
     - if: steps.pm.outputs.name == 'pnpm'
       uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version-file: .nvmrc
-        cache: ${{ steps.pm.outputs.name }}
-    - if: inputs.install == 'true'
+        cache: ${{ steps.pm.outputs.name == 'pnpm' && 'pnpm' || '' }}
+        package-manager-cache: false
+    # pnpm reuses an installed node_modules. `npm ci` deletes it before installing, so npm caches only its
+    # download cache, keyed without the versions a release bumps (npm-cache-key.mjs).
+    - if: inputs.install == 'true' && steps.pm.outputs.name == 'pnpm'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: node_modules
-        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'package-lock.json') }}
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml') }}
+    - id: npm-cache
+      if: inputs.install == 'true' && steps.pm.outputs.name == 'npm'
+      shell: bash
+      run: |
+        {
+          echo "dir=$(npm config get cache)"
+          echo "key=$(node "$GITHUB_ACTION_PATH/npm-cache-key.mjs" package-lock.json)"
+        } >> "$GITHUB_OUTPUT"
+    - if: inputs.install == 'true' && steps.pm.outputs.name == 'npm'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: npm-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ steps.npm-cache.outputs.key }}
+        restore-keys: npm-cache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-
     - if: inputs.install == 'true' && inputs.codeartifact == 'true'
       shell: bash
       env:

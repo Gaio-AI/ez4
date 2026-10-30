@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
+// A private ECR registry refuses an anonymous pull; the public ones keep pulling without a login.
+const ECR_REGISTRY = /^(\d{12}\.dkr\.ecr\.([a-z0-9-]+)\.amazonaws\.com)\//;
 const ATTEMPTS = 60;
 const INTERVAL_MS = 2000;
 const START_ATTEMPTS = 18;
@@ -21,6 +23,21 @@ export function dockerRunArgs(slot, spec) {
 export function hostPorts(services) {
   const ports = Object.values(services).flatMap((spec) => (spec.ports ?? []).map((port) => Number(port.split(':')[0])));
   return [...new Set(ports)];
+}
+
+export function ecrRegistries(services) {
+  const registries = new Map();
+  for (const spec of Object.values(services)) {
+    const match = ECR_REGISTRY.exec(spec.image ?? '');
+    if (match) registries.set(match[1], match[2]);
+  }
+  return [...registries].map(([host, region]) => ({ host, region }));
+}
+
+// Logs docker in with the credentials of the role the job assumed, which the action gets as AWS_* variables.
+function login({ host, region }) {
+  const password = execFileSync('aws', ['ecr', 'get-login-password', '--region', region], { encoding: 'utf8' });
+  execFileSync('docker', ['login', '--username', 'AWS', '--password-stdin', host], { input: password, stdio: ['pipe', 'inherit', 'inherit'] });
 }
 
 export function portTaken(dockerError) {
@@ -75,8 +92,12 @@ async function main() {
   const { CONFIG = '.github/gaio-ci.json' } = process.env;
   const services = JSON.parse(readFileSync(CONFIG, 'utf8')).services ?? {};
   if (Object.keys(services).length === 0) return;
+  const registries = ecrRegistries(services);
+  for (const registry of registries) login(registry);
   reservePorts(hostPorts(services));
   for (const [slot, spec] of Object.entries(services)) await start(slot, spec);
+  // The images are pulled by now, and the legs that run the repo's code after this step need no registry token.
+  for (const { host } of registries) execFileSync('docker', ['logout', host], { stdio: 'ignore' });
   for (const [slot, spec] of Object.entries(services)) await waitReady(slot, readyProbe(slot, spec));
 }
 

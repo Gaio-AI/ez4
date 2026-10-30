@@ -108,6 +108,7 @@
       "prepare": { "*": "bash scripts/ci-build-once.sh" }
     }
   ],
+  "suite-concurrency": 4,
   "services": {
     "postgres": { "image": "postgres:16", "ports": ["5432:5432"], "env": { "POSTGRES_USER": "postgres", "POSTGRES_PASSWORD": "postgres" } },
     "dynamodb": { "image": "amazon/dynamodb-local:3.3.0", "ports": ["8000:8000"] },

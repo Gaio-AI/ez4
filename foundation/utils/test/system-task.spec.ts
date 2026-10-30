@@ -5,12 +5,13 @@ import { describe, it } from 'node:test';
 import { Tasks, TaskStatus } from '@ez4/utils';
 
 describe('system task utils', { timeout: 10000 }, () => {
+  // B and D take longer so tasks finish out of order; the assertions never depend on the durations.
   const tasks = [
-    () => setTimeout(1000, 'A'),
-    () => setTimeout(1500, 'B'),
-    () => setTimeout(1000, 'C'),
-    () => setTimeout(1500, 'D'),
-    () => setTimeout(1000, 'E')
+    () => setTimeout(20, 'A'),
+    () => setTimeout(30, 'B'),
+    () => setTimeout(20, 'C'),
+    () => setTimeout(30, 'D'),
+    () => setTimeout(20, 'E')
   ];
 
   it('assert :: result order', async () => {
