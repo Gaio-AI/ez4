@@ -10,6 +10,8 @@
 A collection of high‑quality, reflection‑driven components that make it EZ4 developers to build modern applications on top of AWS with NodeJS and TypeScript.
 </div>
 
+> **Gaio's line of ez4.** This repository started as a fork of [sbalmt/ez4](https://github.com/sbalmt/ez4) and is maintained on its own: it does not follow upstream, its versions are its own, and its `@ez4/*` packages are published to Gaio's private registry, not to npm. Releases: [RELEASING.md](./RELEASING.md).
+
 ## Why EZ4
 
 Most engineering teams strive to build solid foundations and deliver value when building production‑ready cloud applications. EZ4's mission is to provide all the tools needed to achieve this with as little friction as possible. It gives you a **single unified model** to declare infrastructure, connect services, validate payloads, and deploy everything... without YAML, boilerplate, or scattered configuration.

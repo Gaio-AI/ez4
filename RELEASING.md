@@ -38,17 +38,17 @@ there is nothing to release. The `changeset` job fails any other pull request wi
 change that must not release adds `npx changeset add --empty`. An empty changeset releases nothing: it
 waits and goes out with the next release.
 
-Remotes: `origin` is `Gaio-AI/ez4`, `upstream` is `sbalmt/ez4`. The fork follows its own line and
-does not track or rebase onto upstream: `upstream` is there to read, and a change worth having is
-taken on its own (see [Taking a change from upstream](#taking-a-change-from-upstream)). In a fork
-`gh` resolves to the parent repository unless told otherwise: run `gh repo set-default Gaio-AI/ez4`
-once, or pass `-R Gaio-AI/ez4`.
+Remotes: `origin` is `Gaio-AI/ez4`; `upstream`, where a clone has it, is `sbalmt/ez4`. This line started
+as a fork of `sbalmt/ez4` and is independent of it: nothing is merged, rebased, cherry-picked or kept
+compatible with upstream, and nothing is proposed back (see [Ideas from upstream](#ideas-from-upstream)).
+GitHub still lists the repository as a fork, so `gh` resolves to the parent repository unless told
+otherwise: run `gh repo set-default Gaio-AI/ez4` once, or pass `-R Gaio-AI/ez4`.
 
 ## Every published version has a tag
 
-This is the one rule that matters. Upstream publishes per-package patches with no release commit —
-`aws-queue`, `aws-common`, `pgmigration` and `raw-pg` went to `0.53.1` and `local-topic` to `0.53.2`
-without a single commit saying so. Anyone basing work on the release commit alone silently regresses
+This is the one rule that matters. The upstream this line started from published per-package patches
+with no release commit — `aws-queue`, `aws-common`, `pgmigration` and `raw-pg` went to `0.53.1` and
+`local-topic` to `0.53.2` without a single commit saying so. Anyone basing work on the release commit alone silently regresses
 those packages, which is exactly what happened to this fork on its first day.
 
 So: **a version is published only from the commit that gets its tag.** If there is no `v<version>`
@@ -248,16 +248,10 @@ pull request.
    The release workflow opens the release pull request, and merging that publishes.
 8. Delete `develop` and its ruleset.
 
-## Taking a change from upstream
+## Ideas from upstream
 
-Upstream is read for ideas, one change at a time, from the `upstream` remote (`git fetch upstream`).
-`cherry-pick` usually conflicts, since the two lines diverged. When the file differs only by the fix,
-take the file:
-
-```bash
-git diff --stat <our-base> <commit>^ -- <file>   # empty means only the fix separates them
-git checkout <commit> -- <file>
-```
-
-Keep the original author with `git commit --author`. When our side of the file has changed too, port
-the change by hand and name the upstream commit in the pull request.
+`sbalmt/ez4` is read for ideas and for the bugs it finds, on GitHub or through an `upstream` remote. What
+is worth having is written here like any other change: designed for this line, with its tests and its
+changeset, in a pull request that names the upstream commit or issue it came from. Nothing is
+cherry-picked or checked out from upstream, and no choice here is made to stay close to it: the two
+lines diverged, and upstream code carries assumptions this line no longer holds.

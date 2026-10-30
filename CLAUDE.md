@@ -1,4 +1,6 @@
-# ez4 (Gaio fork)
+# ez4 (Gaio line)
+
+This is Gaio's own line of ez4. It started as a fork of `sbalmt/ez4` and does not follow it: nothing is merged, cherry-picked or kept compatible with upstream, and nothing is proposed back. Upstream is read for ideas and for the bugs it finds; what is worth having is written here like any other change. Never argue a choice from staying close to upstream.
 
 Release rules: `RELEASING.md`. Merging the release PR on `main` publishes `v<version>` to CodeArtifact.
 
