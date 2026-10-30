@@ -24,6 +24,7 @@ Each declared agent is packaged into a container image and run as an isolated AW
 - **IAM Roles & Security**:
   - Per-agent task role grants artifact reads only for its own prefix and linked agents' prefixes, plus `AgentPermission` grants scoped to the resource names they declare, prefixed with the deploy prefix and custom statements.
   - Execution role used by ECS to pull images and inject secrets from AWS Secrets Manager.
+  - The project's `permissionsBoundary` goes on every role above, on the dispatcher role and on each workflow role, so the boundary has to allow what they do: running and stopping the agent tasks, passing the task and execution roles to ECS tasks, pulling the images, reading the agent secrets and mounting the workspace.
 
 - **Shared Git Workspaces**:
   - Backed by an Amazon EFS file system (`${base}-workspace`) provisioned via `@ez4/aws-efs` with POSIX access points.

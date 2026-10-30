@@ -10,7 +10,7 @@ import { isPolicyState } from '../policy/utils';
 import { createPolicyDocument } from '../utils/policy';
 import { createRoleDocument, createRoleStatement } from '../utils/role';
 import { getAccountId } from '../utils/account';
-import { buildPolicyArn } from '../utils/arn';
+import { buildPermissionsBoundaryArn } from '../utils/arn';
 
 export const prepareExecutionRole = async (event: RoleResourceEvent) => {
   const { state, grants, accounts, policies, options } = event;
@@ -34,12 +34,10 @@ export const prepareExecutionRole = async (event: RoleResourceEvent) => {
     policyList.push(policyResource);
   }
 
-  const { permissionsBoundary } = options;
-
   return createRole(state, policyList, {
     roleName: `${namePrefix}-role`,
     tags: options.tags,
-    permissionsBoundary: permissionsBoundary ? buildPolicyArn(accountId, permissionsBoundary) : undefined,
+    permissionsBoundary: buildPermissionsBoundaryArn(accountId, options.permissionsBoundary),
     roleDocument: createRoleDocument([
       createRoleStatement(
         {

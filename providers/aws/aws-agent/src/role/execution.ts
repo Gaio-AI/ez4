@@ -4,6 +4,7 @@ import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
 import { getAgentsBaseName, getSecretResourceArn } from '../utils/names';
 import {
+  buildPermissionsBoundaryArn,
   createRole,
   createPolicy,
   createPolicyDocument,
@@ -74,6 +75,7 @@ export const buildAgentExecutionRole = <E extends EntryState>(
   return createRole(state, attachedPolicies, {
     roleName,
     roleDocument,
+    permissionsBoundary: buildPermissionsBoundaryArn(accountId, options.permissionsBoundary),
     tags: options.tags
   });
 };

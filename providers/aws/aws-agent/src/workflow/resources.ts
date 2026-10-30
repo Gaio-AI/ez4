@@ -5,6 +5,7 @@ import { ArchitectureType, RuntimeType } from '@ez4/project';
 import type { RoleState, PolicyState } from '@ez4/aws-identity';
 
 import {
+  buildPermissionsBoundaryArn,
   createPolicy,
   createRole,
   createPolicyDocument,
@@ -131,6 +132,7 @@ export const prepareWorkflowResources = async <E extends EntryState>(
     roleDocument: createRoleDocument([
       createRoleStatement({ permissions: ['sts:AssumeRole'], resourceIds: [] }, [{ account: 'lambda.amazonaws.com' }], accountId)
     ]),
+    permissionsBoundary: buildPermissionsBoundaryArn(accountId, options.permissionsBoundary),
     tags: options.tags
   }) as RoleState;
 
