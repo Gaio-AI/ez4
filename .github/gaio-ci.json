@@ -19,14 +19,15 @@
     "foundation/project/bin/*.mjs.map"
   ],
   "changeset": "npm run changeset:check && npx --yes @changesets/cli status --since=origin/{base}",
-  "lint": "bash scripts/ci-build-once.sh && npm query .workspace | jq -r '.[].name' | xargs -P \"$(nproc)\" -I{} npm run lint -w {} --if-present && node --test scripts/ci-config.test.mjs",
+  "lint": "bash scripts/ci-build-once.sh && npm run lint && node --test scripts/ci-config.test.mjs",
   "shared-inputs": [
     "package-lock.json",
     "package.json",
     ".nvmrc",
     ".npmrc",
     "tsconfig.base.json",
-    "eslint.base.js",
+    "biome.json",
+    ".oxlintrc.json",
     "scripts/ci-build-once.sh"
   ],
   "ignore": [".github/", "*.md"],
