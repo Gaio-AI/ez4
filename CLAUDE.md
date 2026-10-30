@@ -18,8 +18,8 @@ Release rules: `RELEASING.md`. Merging the release PR on `main` publishes `v<ver
 
 ## TypeScript
 
-- `tsc` in every script is TypeScript 7 (`@typescript/native`). It only emits declarations: the published JavaScript comes from esbuild (each package's `tools/bundler.mjs`), so the compiler version never changes runtime code.
-- `@ez4/reflection` declares the real `typescript` 6 as a dependency and keeps using its API at runtime.
+- `tsc` in every script is TypeScript 7, the root `typescript`. It only emits declarations: the published JavaScript comes from esbuild (each package's `tools/bundler.mjs`), so the compiler version never changes runtime code.
+- `@ez4/reflection` declares the real `typescript` 6 as a dependency and keeps using its API at runtime. It installs nested under the workspace: with TypeScript 7 at the root, npm cannot hoist the 6 there and take over `tsc`.
 
 ## Lint
 
