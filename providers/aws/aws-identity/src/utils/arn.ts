@@ -7,3 +7,7 @@ export const buildRoleArn = (accountId: string, roleName: string): Arn => {
 export const buildPolicyArn = (accountId: string, policyName: string): Arn => {
   return `arn:aws:iam::${accountId}:policy/${policyName}`;
 };
+
+export const buildPermissionsBoundaryArn = (accountId: string, policyName: string | undefined): Arn | undefined => {
+  return policyName ? buildPolicyArn(accountId, policyName) : undefined;
+};

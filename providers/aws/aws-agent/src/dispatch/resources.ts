@@ -6,7 +6,14 @@ import type { LogGroupState } from '@ez4/aws-logs';
 import { join } from 'node:path';
 import { getFunctionBundle } from '@ez4/aws-common';
 import { createFunction } from '@ez4/aws-function';
-import { createPolicy, createPolicyDocument, createRole, createRoleDocument, createRoleStatement } from '@ez4/aws-identity';
+import {
+  buildPermissionsBoundaryArn,
+  createPolicy,
+  createPolicyDocument,
+  createRole,
+  createRoleDocument,
+  createRoleStatement
+} from '@ez4/aws-identity';
 import { ArchitectureType, RuntimeType } from '@ez4/project';
 
 import { createEventsRule, createEventsRuleStateId } from '@ez4/aws-events';
@@ -77,6 +84,7 @@ export const prepareDispatcher = <E extends EntryState>(state: EntryStates<E>, o
     roleDocument: createRoleDocument([
       createRoleStatement({ permissions: ['sts:AssumeRole'], resourceIds: [] }, [{ account: 'lambda.amazonaws.com' }], accountId)
     ]),
+    permissionsBoundary: buildPermissionsBoundaryArn(accountId, options.permissionsBoundary),
     tags: options.tags
   });
 

@@ -4,7 +4,15 @@ import type { DeployOptions, IdentityGrant } from '@ez4/project/library';
 import type { RoleState, PolicyState, PolicyContext } from '@ez4/aws-identity';
 import type { FileSystemState, AccessPointState } from '@ez4/aws-efs';
 import { getServiceName } from '@ez4/project/library';
-import { createRole, createPolicy, createPolicyDocument, createRoleDocument, createRoleStatement, getAccountId } from '@ez4/aws-identity';
+import {
+  buildPermissionsBoundaryArn,
+  createRole,
+  createPolicy,
+  createPolicyDocument,
+  createRoleDocument,
+  createRoleStatement,
+  getAccountId
+} from '@ez4/aws-identity';
 import { FileSystemServiceType, AccessPointServiceType } from '@ez4/aws-efs';
 import { getAgentBucketName, getAgentClusterName, getAgentKey, getAgentsBaseName, getAgentTaskRoleName } from '../utils/names';
 import { toKebabCase } from '@ez4/utils';
@@ -159,6 +167,7 @@ export const buildAgentTaskRole = <E extends EntryState>(
   return createRole(state, [policyState as PolicyState], {
     roleName,
     roleDocument,
+    permissionsBoundary: buildPermissionsBoundaryArn(accountId, options.permissionsBoundary),
     tags: options.tags
   });
 };
