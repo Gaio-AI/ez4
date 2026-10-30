@@ -1,9 +1,9 @@
-import type { ReflectionOptions, ReflectionReadyListener, ReflectionTypes } from '@ez4/reflection';
+import type { ReflectionOptions, ReflectionProgram, ReflectionReadyListener, ReflectionTypes } from '@ez4/reflection';
 
 import { existsSync, globSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { getReflectionFromFiles, watchReflectionFromFiles } from '@ez4/reflection';
+import { getReflectionProgramFromFiles, watchReflectionFromFiles } from '@ez4/reflection';
 import { triggerAllSync } from '@ez4/project/library';
 
 import { ReflectionSourceFileNotFound } from '../errors/reflection';
@@ -12,13 +12,17 @@ export type BuildReflectionOptions = {
   aliasPaths?: Record<string, string[]>;
 };
 
-export const buildReflection = (sourceFiles: string[], options?: BuildReflectionOptions): ReflectionTypes => {
-  return getReflectionFromFiles(getReflectionSources(sourceFiles), {
+export const buildReflectionProgram = (sourceFiles: string[], options?: BuildReflectionOptions): ReflectionProgram => {
+  return getReflectionProgramFromFiles(getReflectionSources(sourceFiles), {
     ...getReflectionOptions(),
     compilerOptions: {
       paths: options?.aliasPaths
     }
   });
+};
+
+export const buildReflection = (sourceFiles: string[], options?: BuildReflectionOptions): ReflectionTypes => {
+  return buildReflectionProgram(sourceFiles, options).reflection;
 };
 
 export type WatchReflectionOptions = {

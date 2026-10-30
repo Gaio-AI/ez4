@@ -119,11 +119,9 @@ describe('aws gateway plan of route groups', () => {
 
     const [, files] = parameters.getFunctionFiles();
 
-    deepEqual(files.map((file) => relative(process.cwd(), file)).sort(), [
-      'lib/group.ts',
-      'test/files/plan-delete-item.ts',
-      'test/files/plan-handlers.ts'
-    ]);
+    const projectFiles = files.map((file) => relative(process.cwd(), file)).filter((file) => !file.includes('/node_modules/'));
+
+    deepEqual(projectFiles.sort(), ['lib/group.ts', 'test/files/plan-delete-item.ts', 'test/files/plan-handlers.ts']);
 
     // Routes outside the group keep their own function.
     equal(getFunction(state, 'ez4-plan-test-items-service-health').parameters.memory, 256);

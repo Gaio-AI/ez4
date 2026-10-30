@@ -1,13 +1,13 @@
 import type { AllType, ReflectionTypes, TypeClass } from '@ez4/reflection';
 import type { MetadataDependencies, MetadataReflection } from '../types/metadata';
 
-import { getReflectionFiles, isTypeClass, isTypeInterface, TypeName } from '@ez4/reflection';
+import { isTypeClass, isTypeInterface, TypeName } from '@ez4/reflection';
 import { triggerAllSync } from '@ez4/project/library';
 import { Logger } from '@ez4/logger';
 
 import { assertNoErrors } from '../utils/errors';
 import { DuplicateMetadataError, UnhandledServiceError } from '../errors/metadata';
-import { buildReflection, watchReflection } from './reflection';
+import { buildReflectionProgram, watchReflection } from './reflection';
 
 export type MetadataReadyListener = (metadata: MetadataReflection) => Promise<void> | void;
 
@@ -21,7 +21,7 @@ export type BuildMetadataOptions = {
 };
 
 export const buildMetadata = (sourceFiles: string[], options?: BuildMetadataOptions): MetadataResult => {
-  const reflectionTypes = buildReflection(sourceFiles, options);
+  const { reflection: reflectionTypes, getReflectionFiles } = buildReflectionProgram(sourceFiles, options);
   const reflectionFiles = getMetadataFiles(reflectionTypes);
 
   const metadata: MetadataReflection = {};
@@ -41,9 +41,7 @@ export const buildMetadata = (sourceFiles: string[], options?: BuildMetadataOpti
 
   return {
     metadata,
-    dependencies: getReflectionFiles(reflectionFiles, {
-      paths: options?.aliasPaths
-    })
+    dependencies: getReflectionFiles(reflectionFiles)
   };
 };
 

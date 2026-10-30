@@ -12,12 +12,13 @@ import type { TypeObjectEvents } from './types/type-object';
 import type { TypeReferenceEvents } from './types/type-reference';
 import type { TypeIntersectionEvents } from './types/type-intersection';
 import type { ReflectionTypes } from './types/source';
+import type { ReflectionCompilerHost } from './compiler';
 import type { AllType } from './types';
 
-import { isExportDeclaration, isImportDeclaration } from 'typescript';
-import { relative } from 'node:path';
+import { createSourceFile, isExportDeclaration, isImportDeclaration, ScriptTarget } from 'typescript';
+import { relative, resolve } from 'node:path';
 
-import { getModulePath } from './utils/module';
+import { createModuleCache, getModulePath } from './utils/module';
 import { isTypeLiteralString } from './resolver/type-string';
 import { trySource } from './resolver/source';
 
@@ -112,14 +113,52 @@ export type ReflectionOptions = {
 
 export type ReflectionFiles = Record<string, string[]>;
 
-export const resolveReflectionFiles = (program: Program, compilerOptions: CompilerOptions, compilerHost: CompilerHost) => {
-  const basePath = program.getCurrentDirectory();
-  const importGraph: ReflectionFiles = {};
+// The files a program loads: without `allowJs`, an import resolved to JavaScript or JSON has no imports of its own.
+const TYPESCRIPT_FILE = /\.(?:d\.)?[cm]?tsx?$/;
 
-  for (const sourceFile of program.getSourceFiles()) {
+export const resolveReflectionFiles = (
+  program: Program,
+  compilerOptions: CompilerOptions,
+  compilerHost: CompilerHost & Partial<Pick<ReflectionCompilerHost, 'isRedirectedFile'>>,
+  fileNames: readonly string[] = program.getRootFileNames()
+) => {
+  const basePath = program.getCurrentDirectory();
+  const moduleCache = createModuleCache(basePath, compilerOptions);
+  const importGraph = new Map<string, string[]>();
+
+  // The dependencies of a file are the files a program of its own would load. A file the program read
+  // from another one (`onResolveFileName`) keeps the imports of the file on disk, and so does a file
+  // only those imports reach, which the program never loaded.
+  const getImportSource = (filePath: string) => {
+    const sourceFile = program.getSourceFile(filePath);
+
+    if (sourceFile && !compilerHost.isRedirectedFile?.(filePath)) {
+      return sourceFile;
+    }
+
+    if (!TYPESCRIPT_FILE.test(filePath)) {
+      return undefined;
+    }
+
+    const sourceText = compilerHost.readFile(filePath);
+
+    return sourceText !== undefined ? createSourceFile(filePath, sourceText, ScriptTarget.ESNext) : undefined;
+  };
+
+  const getImportFiles = (fileName: string) => {
+    const cachedImportFiles = importGraph.get(fileName);
+
+    if (cachedImportFiles) {
+      return cachedImportFiles;
+    }
+
+    // Imports resolve from the absolute path: from a relative one, the lookup for a package stops at
+    // the working directory and misses the `node_modules` of a parent workspace.
+    const filePath = resolve(basePath, fileName);
+    const sourceFile = getImportSource(filePath);
     const importFiles: string[] = [];
 
-    sourceFile.forEachChild((node) => {
+    sourceFile?.forEachChild((node) => {
       if (!isImportDeclaration(node) && !isExportDeclaration(node)) {
         return;
       }
@@ -129,27 +168,23 @@ export const resolveReflectionFiles = (program: Program, compilerOptions: Compil
       }
 
       const moduleName = node.moduleSpecifier.text;
-      const modulePath = getModulePath(moduleName, sourceFile.fileName, compilerOptions, compilerHost);
+      const modulePath = getModulePath(moduleName, filePath, compilerOptions, compilerHost, moduleCache);
 
       if (modulePath) {
         importFiles.push(relative(basePath, modulePath));
       }
     });
 
-    if (importFiles.length > 0) {
-      const importName = relative(basePath, sourceFile.fileName);
+    importGraph.set(fileName, importFiles);
 
-      importGraph[importName] = importFiles;
-    }
-  }
+    return importFiles;
+  };
 
   const groupReflectionFiles = (fileName: string, dependencies = new Set<string>()) => {
     if (!dependencies.has(fileName)) {
-      const importFiles = importGraph[fileName];
-
       dependencies.add(fileName);
 
-      importFiles?.forEach((importFile) => {
+      getImportFiles(fileName).forEach((importFile) => {
         groupReflectionFiles(importFile, dependencies);
       });
     }
@@ -159,7 +194,7 @@ export const resolveReflectionFiles = (program: Program, compilerOptions: Compil
 
   const imports: ReflectionFiles = {};
 
-  for (const fileName of program.getRootFileNames()) {
+  for (const fileName of fileNames) {
     imports[fileName] = [...groupReflectionFiles(fileName)];
   }
 
