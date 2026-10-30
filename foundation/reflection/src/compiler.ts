@@ -54,11 +54,20 @@ export const createCompilerOptions = (options?: CompilerOptions): BaseCompilerOp
   return compilerOptions;
 };
 
-export const createCompilerHost = (options: CompilerOptions, events?: CompilerEvents): CompilerHost => {
+export type ReflectionCompilerHost = CompilerHost & {
+  /**
+   * Whether the program read the given file from another one (`onResolveFileName`).
+   */
+  isRedirectedFile: (fileName: string) => boolean;
+};
+
+export const createCompilerHost = (options: CompilerOptions, events?: CompilerEvents): ReflectionCompilerHost => {
   const onResolveFileName = events?.onResolveFileName;
   const sourceFilesCache = new Map<string, SourceFile>();
+  const redirectedFiles = new Set<string>();
 
   return {
+    isRedirectedFile: (fileName) => redirectedFiles.has(fileName),
     fileExists: sys.fileExists,
     readFile: sys.readFile,
     writeFile: sys.writeFile,
@@ -71,6 +80,10 @@ export const createCompilerHost = (options: CompilerOptions, events?: CompilerEv
       try {
         const resolvedFileName = onResolveFileName?.(fileName) ?? fileName;
         const cachedSourceFile = sourceFilesCache.get(resolvedFileName);
+
+        if (resolvedFileName !== fileName) {
+          redirectedFiles.add(fileName);
+        }
 
         if (cachedSourceFile) {
           return cachedSourceFile;

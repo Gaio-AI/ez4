@@ -1,5 +1,6 @@
 import type { CompilerOptions, CompilerEvents } from './compiler';
-import type { ResolverOptions, ResolverEvents } from './resolver';
+import type { ReflectionFiles, ResolverOptions, ResolverEvents } from './resolver';
+import type { ReflectionTypes } from './types';
 
 import { createProgram, createWatchProgram } from 'typescript';
 
@@ -33,16 +34,36 @@ export type ReflectionOptions = {
   resolverEvents?: ResolverEvents;
 };
 
-export const getReflectionFromFiles = (fileNames: string[], options?: ReflectionOptions) => {
+export type ReflectionProgram = {
+  /**
+   * Reflection of every type in the program.
+   */
+  reflection: ReflectionTypes;
+
+  /**
+   * Dependency files of each given file, resolved over the same program.
+   */
+  getReflectionFiles: (fileNames: string[]) => ReflectionFiles;
+};
+
+export const getReflectionProgramFromFiles = (fileNames: string[], options?: ReflectionOptions): ReflectionProgram => {
   const compilerOptions = createCompilerOptions(options?.compilerOptions);
+  const compilerHost = createCompilerHost(compilerOptions, options?.compilerEvents);
 
   const program = createProgram({
-    host: createCompilerHost(compilerOptions, options?.compilerEvents),
+    host: compilerHost,
     options: compilerOptions,
     rootNames: fileNames
   });
 
-  return resolveReflectionMetadata(program, options);
+  return {
+    reflection: resolveReflectionMetadata(program, options),
+    getReflectionFiles: (reflectionFiles) => resolveReflectionFiles(program, compilerOptions, compilerHost, reflectionFiles)
+  };
+};
+
+export const getReflectionFromFiles = (fileNames: string[], options?: ReflectionOptions) => {
+  return getReflectionProgramFromFiles(fileNames, options).reflection;
 };
 
 export type WatchReflectionHandler = {
