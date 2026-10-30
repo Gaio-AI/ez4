@@ -89,7 +89,7 @@ const makeJsonKeysClient = (dataApi: boolean) => {
     repository: TestJsonKeysRepository,
     debug: false,
     connection: {
-      database: 'postgres',
+      database: 'pgclient_tests',
       password: 'postgres',
       user: 'postgres',
       host: '127.0.0.1',

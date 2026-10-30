@@ -39,7 +39,7 @@ export const makeSelfRelationClient = async (debug?: boolean) => {
     repository: TestSelfRelationRepository,
     debug,
     connection: {
-      database: 'postgres',
+      database: 'pgclient_tests',
       password: 'postgres',
       user: 'postgres',
       host: '127.0.0.1'

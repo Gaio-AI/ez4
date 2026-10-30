@@ -133,6 +133,7 @@ jobs:
           {
             echo "codeartifact=$(jq -r '.codeartifact // false' "$CONFIG")"
             echo "doppler=$(jq -r '.doppler // false' "$CONFIG")"
+            echo "suite-concurrency=$(jq -r '.["suite-concurrency"] // 1' "$CONFIG")"
           } >> "$GITHUB_OUTPUT"
       - name: Plan legs
         id: plan
@@ -167,6 +168,10 @@ jobs:
         uses: ./.github/gaio-actions/services
         with:
           config: ${{ inputs.config }}
+          aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}
+          aws-session-token: ${{ steps.aws.outputs.aws-session-token }}
+          aws-region: ${{ secrets.aws-region }}
       - name: ${{ fromJSON(steps.plan.outputs.names).env }}
         if: steps.plan.outputs.skip != 'true'
         env:
@@ -191,6 +196,7 @@ jobs:
           checks: ${{ steps.plan.outputs.checks }}
           lint-hash: ${{ steps.plan.outputs.lint-needed == 'true' && steps.plan.outputs.lint-hash || '' }}
           names: ${{ steps.plan.outputs.names }}
+          concurrency: ${{ steps.config.outputs.suite-concurrency }}
           doppler-token: ${{ secrets.doppler-token }}
           aws-access-key-id: ${{ steps.aws.outputs.aws-access-key-id || secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ steps.aws.outputs.aws-secret-access-key || secrets.aws-secret-access-key }}

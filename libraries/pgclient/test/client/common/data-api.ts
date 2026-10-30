@@ -7,8 +7,9 @@ export declare class TestDataApiDb extends Database.Service<PostgresEngine> {
   tables: [];
 }
 
+// Created by test/database.mjs before the specs run.
 export const TestConnection = {
-  database: 'postgres',
+  database: 'pgclient_tests',
   password: 'postgres',
   user: 'postgres',
   host: '127.0.0.1'

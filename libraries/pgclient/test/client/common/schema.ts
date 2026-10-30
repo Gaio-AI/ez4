@@ -53,7 +53,7 @@ export const makeSchemaClient = async (debug?: boolean, dataApi?: boolean) => {
     repository: TestSchemaRepository,
     debug,
     connection: {
-      database: 'postgres',
+      database: 'pgclient_tests',
       password: 'postgres',
       user: 'postgres',
       host: '127.0.0.1',

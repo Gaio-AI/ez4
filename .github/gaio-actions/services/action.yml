@@ -3,10 +3,26 @@ description: Start the config's service containers and wait until they are ready
 inputs:
   config:
     default: .github/gaio-ci.json
+  aws-access-key-id:
+    description: Signs the login to a private ECR registry an image comes from; public images need none.
+    default: ''
+  aws-secret-access-key:
+    default: ''
+  aws-session-token:
+    description: The session token of temporary credentials (an assumed role); empty for static keys.
+    default: ''
+  aws-region:
+    default: ''
 runs:
   using: composite
   steps:
     - shell: bash
       env:
         CONFIG: ${{ inputs.config }}
-      run: node "$GITHUB_ACTION_PATH/services.mjs"
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        AWS_SESSION_TOKEN: ${{ inputs.aws-session-token }}
+        AWS_REGION: ${{ inputs.aws-region }}
+      run: |
+        [ -n "$AWS_SESSION_TOKEN" ] || unset AWS_SESSION_TOKEN
+        node "$GITHUB_ACTION_PATH/services.mjs"

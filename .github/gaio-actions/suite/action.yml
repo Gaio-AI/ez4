@@ -1,5 +1,5 @@
 name: Suite
-description: Run the planned legs one after another in this job. See suite.mjs.
+description: Run the planned legs in this job, one after another or `concurrency` at a time. See suite.mjs.
 inputs:
   config:
     default: .github/gaio-ci.json
@@ -15,6 +15,9 @@ inputs:
   names:
     description: The stage names `validated plan` resolved, for the log groups.
     default: '{}'
+  concurrency:
+    description: How many legs run at once; 1 runs them one after another with the output streamed live.
+    default: '1'
   doppler-token:
     default: ''
   aws-access-key-id:
@@ -37,6 +40,7 @@ runs:
         LINT_HASH: ${{ inputs.lint-hash }}
         PASSED_DIR: ${{ inputs.passed-dir }}
         NAMES: ${{ inputs.names }}
+        CONCURRENCY: ${{ inputs.concurrency }}
         DOPPLER_TOKEN: ${{ inputs.doppler-token }}
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}

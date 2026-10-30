@@ -5,7 +5,8 @@ install from there. Releases are driven by [changesets](https://github.com/chang
 merging the release pull request publishes to CodeArtifact on its own.
 
 CI and release logic is a copy of [`Gaio-AI/gaio-actions`](https://github.com/Gaio-AI/gaio-actions)
-at its `feat!: v3, AWS roles assumed through GitHub OIDC (#16)` commit (`91317e3`): `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
+at its `fix(setup): cache npm's downloads on the lockfile without release bumps, and no node_modules for npm (#21)`
+commit (`26b15ed`): `.github/workflows/gaio-*.yml` and `.github/gaio-actions/`. ez4 is public and
 gaio-actions is private, and GitHub does not let a public repo call a private repo's workflows.
 To update the copy, take the workflows and the actions' `action.yml` and `.mjs` files (no tests)
 from a gaio-actions commit, rewrite `Gaio-AI/gaio-actions/<action>@v3` to
@@ -149,10 +150,13 @@ A published version is immutable. A mistake means publishing the next one.
   untested tree): lint, one `test` leg per workspace listed in that task's `packages` (foundation,
   contracts, `pgsql`/`pgclient`/`pgmigration`, `local-*` and `docs-gateway`/`docs-database`/`docs-topology`)
   and one `test-offline` leg per `providers/aws/*` package with offline specs (below),
-  one after another in the same job, with Postgres 16 on `:5432`, DynamoDB local 3.3.0 on `:8000` and
-  Valkey 8 on `:6379` started once. Every leg's `prepare` is `scripts/ci-build-once.sh`, which builds and
-  links the ez4 CLI on the first leg and skips on the rest of the job. It posts `Tested tree` and
-  `Quick checks` only when every leg passed.
+  four at a time in the same job (`suite-concurrency`), with Postgres 16 on `:5432`, DynamoDB local 3.3.0
+  on `:8000` and Valkey 8 on `:6379` started once. Every leg's `prepare` is `scripts/ci-build-once.sh`,
+  which builds and links the ez4 CLI once per job: the legs that start together wait on its lock, and the
+  later ones skip. It posts `Tested tree` and `Quick checks` only when every leg passed. Legs running at
+  once share the services, so a package's specs keep to their own database (`pgclient` creates
+  `pgclient_tests`, since `pgmigration` uses table names it also uses in `postgres`), and a spec does not
+  wait on real time: `@ez4/utils` stubs `scheduler.wait`.
 
 A lint or leg whose content hash already passed is skipped (`force` ignores the validated manifest), and
 `release.yml` skips the suite when the pushed tree already has `Tested tree` or nothing is untagged.
@@ -183,6 +187,7 @@ lab ones included, with `-e ../../../local.env`, the file that points them at th
 | `ignore` | Paths that alone run no lint or task. A PR that changes anything under `.changeset/` always runs the changeset check; a changeset-only PR keeps lint and tasks hash-skipped. |
 | `tasks` | The `test` leg per workspace and the `test-offline` leg per `providers/aws/*` package, described above. |
 | `services` | Containers started for every task leg. |
+| `suite-concurrency` | How many legs the full suite runs at once (the quick checks run one at a time). |
 | `apps` | One release unit, `ez4`: `foundation/utils` carries the version, tagged `v{version}`, no demo, published by `npm run release`. |
 | `version` | Command that consumes the changesets. |
 
