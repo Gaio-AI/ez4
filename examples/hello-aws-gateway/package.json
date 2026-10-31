@@ -23,12 +23,12 @@
     "output": "ez4 output -e local.env"
   },
   "dependencies": {
-    "@ez4/aws-gateway": "^2.17.0",
-    "@ez4/common": "^2.17.0",
-    "@ez4/docs-gateway": "^2.17.0",
-    "@ez4/local-gateway": "^2.17.0",
-    "@ez4/gateway": "^2.17.0",
-    "@ez4/project": "^2.17.0",
-    "@ez4/schema": "^2.17.0"
+    "@ez4/aws-gateway": "^2.18.0",
+    "@ez4/common": "^2.18.0",
+    "@ez4/docs-gateway": "^2.18.0",
+    "@ez4/local-gateway": "^2.18.0",
+    "@ez4/gateway": "^2.18.0",
+    "@ez4/project": "^2.18.0",
+    "@ez4/schema": "^2.18.0"
   }
 }
