@@ -69,6 +69,44 @@ describe('migration :: declared rename tests', () => {
     ]);
   });
 
+  it('assert :: declared column rename in index options', () => {
+    // The column moves with the rename in the order, the included columns and the where of an index, so the
+    // index is the same and only its column is renamed: rebuilding it would hold the old code broken meanwhile.
+    const columns = { id: text, account_id: text, name: text };
+
+    const source = getRepository('posts', columns, undefined, [
+      {
+        name: 'listing',
+        type: Index.Secondary,
+        columns: ['account_id', 'name'],
+        options: { name: 'idx_posts_listing', order: { name: 'desc' } }
+      },
+      {
+        name: 'covering',
+        type: Index.Secondary,
+        columns: ['account_id'],
+        options: { name: 'idx_posts_covering', include: ['name'], where: { name: { isNull: false } } }
+      }
+    ]);
+
+    const target = getRepository('posts', { id: text, account_id: text, title: text }, { columns: { title: 'name' } }, [
+      {
+        name: 'listing',
+        type: Index.Secondary,
+        columns: ['account_id', 'title'],
+        options: { name: 'idx_posts_listing', order: { title: 'desc' } }
+      },
+      {
+        name: 'covering',
+        type: Index.Secondary,
+        columns: ['account_id'],
+        options: { name: 'idx_posts_covering', include: ['title'], where: { title: { isNull: false } } }
+      }
+    ]);
+
+    deepEqual(getQueries(getUpdateStepQueries(target, source)), ['rollout: ALTER TABLE IF EXISTS "posts" RENAME COLUMN "name" TO "title"']);
+  });
+
   it('assert :: declared column rename already deployed', () => {
     const deployed = getRepository('posts', { id: text, title: text });
     const target = getRepository('posts', { id: text, title: text }, { columns: { title: 'name' } });
