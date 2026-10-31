@@ -309,13 +309,28 @@ export namespace IndexQueries {
     return result;
   };
 
+  // A renamed column keeps its place in the order, the included columns and the where of an index, as it does in
+  // the key: the index is the same one, and only the column changes its name.
   const isSameIndex = (sourceIndex: PgTableIndex, targetIndex: PgTableIndex, renamedColumns: Record<string, string>) => {
-    const sourceColumns = sourceIndex.columns.map((column) => renamedColumns[column] ?? column);
+    const renameColumn = (column: string) => renamedColumns[column] ?? column;
+
+    const renameKeys = <T>(record: Record<string, T> | undefined) => {
+      return record && Object.fromEntries(Object.entries(record).map(([column, value]) => [renameColumn(column), value]));
+    };
+
+    const { order, include, where, ...otherOptions } = sourceIndex.options ?? {};
+
+    const sourceOptions = {
+      ...otherOptions,
+      ...(order && { order: renameKeys(order) }),
+      ...(include && { include: include.map(renameColumn) }),
+      ...(where && { where: renameKeys(where) })
+    };
 
     return (
       sourceIndex.type === targetIndex.type &&
-      deepEqual(sourceColumns, targetIndex.columns) &&
-      deepEqual(sourceIndex.options ?? {}, targetIndex.options ?? {})
+      deepEqual(sourceIndex.columns.map(renameColumn), targetIndex.columns) &&
+      deepEqual(sourceOptions, targetIndex.options ?? {})
     );
   };
 
