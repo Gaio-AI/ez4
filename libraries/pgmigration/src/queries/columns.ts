@@ -1,8 +1,10 @@
 import type { PgIndexRepository } from '@ez4/pgclient/library';
+import type { TableTimestamps } from '@ez4/database/library';
 import type { AnySchema, ObjectSchema } from '@ez4/schema';
 import type { ObjectComparison } from '@ez4/utils';
 import type { SqlBuilder } from '@ez4/pgsql';
 
+import { getTimestampColumns } from '@ez4/pgclient/library';
 import { isAnyNumber, isNotNullish } from '@ez4/utils';
 import { Index } from '@ez4/database';
 
@@ -10,8 +12,16 @@ import { getColumnDefault, getColumnType, isOptionalColumn } from '../utils/colu
 import { getCheckColumnExistsQuery } from '../utils/checks';
 
 export namespace ColumnQuery {
-  export const prepareCreate = (builder: SqlBuilder, table: string, indexes: PgIndexRepository, columns: Record<string, AnySchema>) => {
+  export const prepareCreate = (
+    builder: SqlBuilder,
+    table: string,
+    indexes: PgIndexRepository,
+    columns: Record<string, AnySchema>,
+    timestamps?: TableTimestamps
+  ) => {
     const statement = builder.table(table).alter().existing();
+
+    const timestampColumns = getTimestampColumns(timestamps);
 
     for (const columnName in columns) {
       const columnSchema = columns[columnName];
@@ -21,7 +31,7 @@ export namespace ColumnQuery {
 
       const columnRequired = !isOptionalColumn(columnSchema);
       const columnType = getColumnType(columnSchema, columnIsPrimary);
-      const columnValue = getColumnDefault(columnSchema, columnIsPrimary);
+      const columnValue = getColumnDefault(columnSchema, columnIsPrimary, timestampColumns.includes(columnName));
 
       statement.add(columnName, columnType, columnRequired, columnValue).missing();
     }
@@ -36,9 +46,12 @@ export namespace ColumnQuery {
     table: string,
     schema: ObjectSchema,
     indexes: PgIndexRepository,
-    changes: Record<string, ObjectComparison>
+    changes: Record<string, ObjectComparison>,
+    timestamps?: TableTimestamps
   ) => {
     const statements = [];
+
+    const timestampColumns = getTimestampColumns(timestamps);
 
     for (const columnName in changes) {
       const { create, update, nested, remove } = changes[columnName];
@@ -47,6 +60,7 @@ export namespace ColumnQuery {
 
       const columnIndexType = indexes[columnName]?.type;
       const columnIsPrimary = columnIndexType === Index.Primary;
+      const columnIsTimestamp = timestampColumns.includes(columnName);
 
       const query = builder.table(table).alter().existing().column(columnName);
 
@@ -83,7 +97,7 @@ export namespace ColumnQuery {
       if (hasDefaultChanged) {
         const isDefaultRemoved = remove?.definitions?.default !== undefined || nested?.definitions?.remove?.default !== undefined;
 
-        query.default(isDefaultRemoved ? null : getColumnDefault(columnSchema, columnIsPrimary));
+        query.default(isDefaultRemoved && !columnIsTimestamp ? null : getColumnDefault(columnSchema, columnIsPrimary, columnIsTimestamp));
       }
 
       if (!query.empty) {

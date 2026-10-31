@@ -1,3 +1,4 @@
+import type { InsertSchemas, MergeTimestamps, UpdateSchemas } from './timestamps';
 import type { AtomicFields } from './query/atomic';
 import type { TableIndexes, IndexedTables, PrimaryIndexes, UniqueIndexes } from './indexes';
 import type { DatabaseTable, DatabaseTables } from './table';
@@ -107,8 +108,8 @@ type ExtractRelations<
             [P in N]: {
               indexes: RelationIndexes<N, I, R>;
               filters: FilterRelationSchemas<T, S, I, R>;
-              updates: UpdateRelationSchemas<N, S, I, R>;
-              inserts: InsertRelationSchemas<N, PropertyType<N, S>, S, I, R>;
+              updates: UpdateRelationSchemas<N, UpdateSchemas<S, MergeTimestamps<T>>, I, R>;
+              inserts: InsertRelationSchemas<N, PropertyType<N, S>, InsertSchemas<S, MergeTimestamps<T>>, I, R>;
               selects: SelectRelationSchemas<S, I, R> & NestedSelectRelationSchemas<T, S, I, R>;
               records: MergeObject<RecordsRelationSchemas<PropertyType<N, S>, S, I, R>, NestedRecordsRelationSchemas<T, S, I, R>>;
             };

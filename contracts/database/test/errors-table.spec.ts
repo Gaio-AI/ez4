@@ -7,7 +7,9 @@ import {
   IncorrectTableTypeError,
   InvalidSchemaTypeError,
   InvalidTableRenameError,
+  InvalidTableTimestampsError,
   InvalidTableTypeError,
+  UnsupportedTableTimestampsError,
   registerTriggers
 } from '@ez4/database/library';
 
@@ -67,6 +69,35 @@ describe('database service errors', () => {
     ok(error1 instanceof InvalidTableRenameError);
     equal(error1.tableName, 'contacts');
     equal(error1.renameName, 'people');
+  });
+
+  it('assert :: invalid table timestamps', () => {
+    const errors = parseFile('invalid-table-timestamps', 8);
+
+    for (const error of errors) {
+      ok(error instanceof InvalidTableTimestampsError);
+    }
+
+    deepEqual(
+      errors.map((error) => [(error as InvalidTableTimestampsError).tableName, (error as InvalidTableTimestampsError).timestampName]),
+      [
+        ['missing', 'updated'],
+        ['format', 'created'],
+        ['optional', 'updated'],
+        ['nullable', 'updated'],
+        ['primary', 'created'],
+        ['renamed', 'updated'],
+        ['same', 'updated'],
+        ['option', 'deleted']
+      ]
+    );
+  });
+
+  it('assert :: table timestamps on an engine without them', () => {
+    const [error1] = parseFile('invalid-engine-timestamps', 1);
+
+    ok(error1 instanceof UnsupportedTableTimestampsError);
+    equal(error1.tableName, 'contacts');
   });
 
   it('assert :: incorrect table schema', () => {

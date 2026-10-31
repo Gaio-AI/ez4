@@ -1,4 +1,4 @@
-import type { TableIndex } from '@ez4/database/library';
+import type { TableIndex, TableTimestamps } from '@ez4/database/library';
 import type { Table as DbTable, Query } from '@ez4/database';
 import type { ObjectSchema } from '@ez4/schema';
 import type { AnyObject, IsArray } from '@ez4/utils';
@@ -11,6 +11,7 @@ import { DuplicateUniqueKeyError, MissingUniqueIndexError } from '@ez4/pgclient'
 import { isAnyNumber } from '@ez4/utils';
 
 import { takeRecordsCursor } from '../queries/utils/cursor';
+import { getInsertSchema } from '../utils/timestamps';
 import { getPrimaryColumns, tryExtractUniqueIndex } from './utils/indexes';
 import { runInTransactionOrder } from './utils/order';
 import { UPSERT_INSERTED_FLAG } from '../queries/upsert';
@@ -59,13 +60,19 @@ const getKeyFields = (columns: string[]) => {
 };
 
 export class Table<T extends InternalTableMetadata> implements DbTable<T> {
+  // Reads keep the table schema, where a timestamp is never null: a page cursor takes it as an order column.
+  private insertSchema: ObjectSchema;
+
   constructor(
     private name: string,
     private schema: ObjectSchema,
     private relations: PgRelationRepositoryWithSchema,
     private indexes: TableIndex[],
-    private context: TableContext
-  ) {}
+    private context: TableContext,
+    private timestamps?: TableTimestamps
+  ) {
+    this.insertSchema = getInsertSchema(schema, timestamps);
+  }
 
   private async sendStatement<T extends PgExecuteStatement | PgExecuteStatement[]>(input: T): Promise<SendStatementResult<T>> {
     return runInTransactionOrder(this.context.transactionId, () => this.executeStatement(input));
@@ -95,7 +102,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   async insertOne<S extends Query.SelectInput<T>>(query: Query.InsertOneInput<S, T>) {
-    const statement = await prepareInsertOne(this.name, this.schema, this.relations, this.context.driver, query);
+    const statement = await prepareInsertOne(this.name, this.insertSchema, this.relations, this.context.driver, query);
 
     const { records } = await this.sendStatement(statement);
 
@@ -108,7 +115,8 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
   async updateOne<S extends Query.SelectInput<T>>(query: Query.UpdateOneInput<S, T>) {
     const statement = await prepareUpdateOne(this.name, this.schema, this.relations, this.context.driver, query, {
-      primaryKey: this.primaryKey
+      primaryKey: this.primaryKey,
+      timestamps: this.timestamps
     });
 
     const { records } = await this.sendStatement(statement);
@@ -170,7 +178,15 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
       throw new MissingUniqueIndexError();
     }
 
-    const statement = await prepareUpsertOne(this.name, this.schema, this.relations, this.context.driver, query, uniqueIndex.columns);
+    const statement = await prepareUpsertOne(
+      this.name,
+      this.schema,
+      this.relations,
+      this.context.driver,
+      query,
+      uniqueIndex.columns,
+      this.timestamps
+    );
 
     if (!statement) {
       return this.upsertInSteps(query);
@@ -264,6 +280,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
     const updateStatement = await prepareUpdateOne(this.name, this.schema, this.relations, driver, updateQuery, {
       primaryKey: this.primaryKey,
+      timestamps: this.timestamps,
       flag: UPSERT_WRITTEN_FLAG
     });
 
@@ -272,7 +289,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
       data: query.insert
     };
 
-    const insertStatement = await prepareInsertOne(this.name, this.schema, this.relations, driver, insertQuery, {
+    const insertStatement = await prepareInsertOne(this.name, this.insertSchema, this.relations, driver, insertQuery, {
       flag: UPSERT_WRITTEN_FLAG,
       skipConflicts: true
     });
@@ -312,7 +329,7 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
   }
 
   async insertMany<S extends Query.InsertManySelectInput<T>>(query: Query.InsertManyInput<S, T>) {
-    const statements = await prepareInsertMany(this.name, this.schema, this.relations, this.context.driver, query);
+    const statements = await prepareInsertMany(this.name, this.insertSchema, this.relations, this.context.driver, query);
 
     // One statement is atomic on its own, and several run in one transaction (the caller's when there is one).
     const results =
@@ -329,7 +346,8 @@ export class Table<T extends InternalTableMetadata> implements DbTable<T> {
 
   async updateMany<S extends Query.SelectInput<T>>(query: Query.UpdateManyInput<S, T>) {
     const statement = await prepareUpdateMany(this.name, this.schema, this.relations, this.context.driver, query, {
-      primaryKey: this.primaryKey
+      primaryKey: this.primaryKey,
+      timestamps: this.timestamps
     });
 
     const { records } = await this.sendStatement(statement);

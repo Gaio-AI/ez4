@@ -34,6 +34,7 @@ describe('database service metadata', () => {
   it('assert :: table relation options', () => testFile('relation-options'));
   it('assert :: table relation scope', () => testFile('relation-scope'));
   it('assert :: table renames', () => testFile('table-renames'));
+  it('assert :: table timestamps', () => testFile('timestamps'));
   it('assert :: table stream', () => testFile('stream'));
   it('assert :: stream variables', () => testFile('variables'));
   it('assert :: stream dependencies', () => testFile('dependencies'));

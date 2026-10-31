@@ -10,6 +10,7 @@ import type { RelationFilter, RelationMetadata } from './relations';
 import type { OrderModeUtils } from './order';
 import type { LockModeUtils } from './lock';
 import type { EventualReadModeUtils } from './read';
+import type { TimestampsModeUtils } from './timestamps';
 import type { TableMetadata } from './table';
 import type { Database } from './contract';
 
@@ -27,6 +28,7 @@ export namespace Query {
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
     previous?: PreviousInput;
+    touch?: TouchInput<T>;
     data: Prettify<UpdateDataInput<T>>;
     where: WhereInput<T, true>;
   };
@@ -35,6 +37,12 @@ export namespace Query {
    * When `true`, `select` returns each record as it was before the write instead of as the write left it.
    */
   export type PreviousInput = boolean;
+
+  /**
+   * When `true`, the update writes the records even when `data` changes nothing, so the database bumps their
+   * update timestamp. Only a table with an update timestamp takes it.
+   */
+  export type TouchInput<T extends TableMetadata> = TimestampsModeUtils.TouchInput<T>;
 
   /**
    * When `false`, the read is eventually consistent: it costs half and may miss a write that finished a moment
@@ -69,7 +77,7 @@ export namespace Query {
   export type InsertManyInput<S extends AnyObject, T extends TableMetadata> = {
     select?: StrictObject<S, T['schema']>;
     skipDuplicates?: SkipDuplicatesInput;
-    data: Prettify<T['schema']>[];
+    data: Prettify<InsertSchema<T>>[];
   };
 
   /**
@@ -88,6 +96,7 @@ export namespace Query {
     select?: StrictSelectInput<S, T>;
     include?: StrictIncludeInput<S, T>;
     previous?: PreviousInput;
+    touch?: TouchInput<T>;
     data: Prettify<UpdateDataInput<T>>;
     where?: WhereInput<T>;
   };
@@ -176,13 +185,18 @@ export namespace Query {
 
   export type InsertDataInput<T extends TableMetadata> =
     IsObjectEmpty<T['relations']['inserts']> extends false
-      ? Omit<T['schema'], T['relations']['indexes']> & T['relations']['inserts']
-      : T['schema'];
+      ? Omit<InsertSchema<T>, T['relations']['indexes']> & T['relations']['inserts']
+      : InsertSchema<T>;
 
   export type UpdateDataInput<T extends TableMetadata> =
     IsObjectEmpty<T['relations']['updates']> extends false
-      ? AtomicFields<Omit<T['schema'], T['relations']['indexes']>> & T['relations']['updates']
-      : AtomicFields<T['schema']>;
+      ? AtomicFields<Omit<T['schema'], T['relations']['indexes'] | TimestampsModeUtils.Columns<T>>> & T['relations']['updates']
+      : AtomicFields<TimestampsModeUtils.UpdateSchema<T['schema'], TimestampsModeUtils.Columns<T>>>;
+
+  /**
+   * Table schema of an insert, where the database writes the timestamps left out.
+   */
+  export type InsertSchema<T extends TableMetadata> = TimestampsModeUtils.InsertSchema<T['schema'], TimestampsModeUtils.Columns<T>>;
 
   export type OrderInput<T extends TableMetadata> = OrderModeUtils.Input<T>;
 

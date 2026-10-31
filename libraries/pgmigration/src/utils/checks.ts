@@ -1,5 +1,6 @@
 import type { SqlBuilder, SqlFilters } from '@ez4/pgsql';
 
+import { escapeSqlName } from '@ez4/pgsql';
 import { isEmptyObject } from '@ez4/utils';
 
 export const getCheckDatabaseExistsQuery = (builder: SqlBuilder, database: string) => {
@@ -22,6 +23,20 @@ export const getCheckConstraintExistsQuery = (builder: SqlBuilder, name: string)
     .from('pg_constraint')
     .where({
       conname: builder.rawString(name)
+    })
+    .build();
+
+  return query;
+};
+
+export const getCheckTriggerExistsQuery = (builder: SqlBuilder, table: string, name: string) => {
+  const [query] = builder
+    .select()
+    .rawColumn(1)
+    .from('pg_trigger')
+    .where({
+      tgname: builder.rawString(name),
+      tgrelid: builder.rawValue(`to_regclass(${builder.rawString(escapeSqlName(table)).build()})`)
     })
     .build();
 

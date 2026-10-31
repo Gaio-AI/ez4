@@ -22,6 +22,27 @@ export class InvalidTableRenameError extends TypeError {
   }
 }
 
+export class InvalidTableTimestampsError extends TypeError {
+  constructor(
+    public tableName: string,
+    public timestampName: string,
+    reason: string,
+    fileName?: string
+  ) {
+    super(`Table ${tableName} has an invalid ${timestampName} timestamp: ${reason}.`, fileName);
+  }
+}
+
+export class UnsupportedTableTimestampsError extends TypeError {
+  constructor(
+    public tableName: string,
+    public engineName: string,
+    fileName?: string
+  ) {
+    super(`Table ${tableName} has timestamps, which the ${engineName} engine doesn't write.`, fileName);
+  }
+}
+
 export class IncorrectTableTypeError extends IncorrectTypeError {
   constructor(
     public tableType: string,

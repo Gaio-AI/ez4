@@ -1,4 +1,5 @@
 import type { SqlBuilder, SqlFilters } from '@ez4/pgsql';
+import type { TableTimestamps } from '@ez4/database/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Query } from '@ez4/database';
 import type { PgRelationRepositoryWithSchema } from '../types/repository';
@@ -10,6 +11,7 @@ import { mergeSqlAlias } from '@ez4/pgsql';
 import { getInsertRecord, getRelationQueries, preparePostInsertRelations, preparePreInsertRelations } from './insert';
 import { getUpdateRecord, rewritesOtherTables } from './update';
 import { getSelectFields, getSelectFilters } from './select';
+import { getInsertSchema, omitTimestamps } from '../utils/timestamps';
 
 export const UPSERT_INSERTED_FLAG = '__EZ4_INSERTED';
 
@@ -23,7 +25,8 @@ export const prepareUpsertQuery = async <T extends InternalTableMetadata, S exte
   schema: ObjectSchema,
   relations: PgRelationRepositoryWithSchema,
   input: Query.UpsertOneInput<S, T>,
-  conflictColumns: string[]
+  conflictColumns: string[],
+  timestamps?: TableTimestamps
 ) => {
   if (input.previous || rewritesOtherTables(input.update, relations, table)) {
     return undefined;
@@ -40,13 +43,13 @@ export const prepareUpsertQuery = async <T extends InternalTableMetadata, S exte
   }
 
   // Checked on the record the insert writes, where a connected relation has already become its foreign key column.
-  const insertRecord = await getInsertRecord(input.insert, schema, relations, preInsertQueries, table);
+  const insertRecord = await getInsertRecord(input.insert, getInsertSchema(schema, timestamps), relations, preInsertQueries, table);
 
   if (!isConflictTarget(input.where, insertRecord, conflictColumns)) {
     return undefined;
   }
 
-  const updateRecord = await getUpdateRecord(builder, input.update, schema, relations, table);
+  const updateRecord = await getUpdateRecord(builder, omitTimestamps(input.update, timestamps), schema, relations, table);
 
   insertQuery.record(insertRecord);
 

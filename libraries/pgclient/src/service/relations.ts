@@ -2,6 +2,7 @@ import type { PgTableRepository, PgRelationRepository, PgRelationRepositoryWithS
 
 import { MissingRepositoryTableError } from '@ez4/pgclient';
 
+import { getInsertSchema } from '../utils/timestamps';
 import { getPrimaryIndex } from './utils/indexes';
 
 export const getRelationsWithSchema = (tableName: string, repository: PgTableRepository) => {
@@ -29,10 +30,13 @@ export const getRelationsWithSchema = (tableName: string, repository: PgTableRep
         throw new MissingRepositoryTableError(sourceTable);
       }
 
+      const { timestamps: sourceTimestamps } = sourceRepository;
+
       relationsWithSchema[relationPath] = {
         ...tableRelation,
         primaryColumn: getPrimaryIndex(sourceRepository.indexes)?.[0]!,
-        sourceSchema: sourceRepository.schema,
+        sourceSchema: getInsertSchema(sourceRepository.schema, sourceTimestamps),
+        ...(sourceTimestamps && { sourceTimestamps }),
         targetAlias: relationAlias,
         targetTable: tableName
       };

@@ -3,6 +3,7 @@ export * from './errors/validation';
 export * from './errors/naming';
 export * from './errors/relation';
 export * from './errors/index';
+export * from './errors/timestamps';
 export * from './utils/repository';
 export * from './utils/lock';
 export * from './utils/steps';

@@ -8,6 +8,7 @@ import { getTableRepositoryChanges } from '../utils/repository';
 import { ConstraintQuery } from '../queries/constraints';
 import { RelationQuery } from '../queries/relations';
 import { IndexQueries } from '../queries/indexes';
+import { TimestampQuery } from '../queries/timestamps';
 import { ColumnQuery } from '../queries/columns';
 import { TableQuery } from '../queries/tables';
 
@@ -23,14 +24,16 @@ export const getCreateQueries = (target: PgTableRepository) => {
   };
 
   for (const table in target) {
-    const { name, schema, indexes, relations } = target[table];
+    const { name, schema, indexes, relations, timestamps } = target[table];
 
-    queries.tables.push(TableQuery.prepareCreate(builder, name, schema, indexes));
+    queries.tables.push(TableQuery.prepareCreate(builder, name, schema, indexes, timestamps));
 
     combineQueries(queries, RelationQuery.prepareCreate(builder, name, schema, relations));
     combineQueries(queries, ConstraintQuery.prepareCreate(builder, name, schema.properties));
     combineQueries(queries, IndexQueries.prepareCreate(builder, name, schema, indexes));
   }
+
+  combineQueries(queries, { triggers: TimestampQuery.prepareCreate(builder, target) });
 
   return queries;
 };
@@ -49,6 +52,20 @@ export const getUpdateStepQueries = (target: PgTableRepository, source: PgTableR
   if (changes.create) {
     combineQueries(steps.prepare, getCreateQueries(changes.create));
   }
+
+  // Compared here, since a table whose only change is its timestamps has no nested changes.
+  const timestampSteps = TimestampQuery.prepareUpdate(
+    builder,
+    target,
+    changes.source,
+    changes.remove ?? {},
+    TimestampQuery.getFunctionColumns(changes.create ?? {})
+  );
+
+  combineSteps(steps, {
+    prepare: { triggers: timestampSteps.prepare },
+    cleanup: { triggers: timestampSteps.cleanup }
+  });
 
   if (changes.rename) {
     for (const fromTable in changes.rename) {
@@ -88,8 +105,15 @@ export const getUpdateStepQueries = (target: PgTableRepository, source: PgTableR
 
       const sourceTable = changes.source[table].name;
 
+      const sourceTimestamps = changes.source[table].timestamps;
+      const targetTimestamps = target[table].timestamps;
+
+      if (targetColumns?.rename) {
+        TimestampQuery.validateRenames(table, sourceTimestamps, targetTimestamps, targetColumns.rename);
+      }
+
       if (targetColumns?.create) {
-        steps.prepare.tables.push(ColumnQuery.prepareCreate(builder, sourceTable, targetIndexes, targetColumns.create));
+        steps.prepare.tables.push(ColumnQuery.prepareCreate(builder, sourceTable, targetIndexes, targetColumns.create, targetTimestamps));
         combineQueries(steps.prepare, ConstraintQuery.prepareCreate(builder, sourceTable, targetColumns.create));
 
         if (renamed.has(table)) {
@@ -104,7 +128,9 @@ export const getUpdateStepQueries = (target: PgTableRepository, source: PgTableR
       }
 
       if (targetColumns?.nested) {
-        steps.rollout.tables.push(...ColumnQuery.prepareUpdate(builder, table, targetSchema, targetIndexes, targetColumns.nested));
+        steps.rollout.tables.push(
+          ...ColumnQuery.prepareUpdate(builder, table, targetSchema, targetIndexes, targetColumns.nested, targetTimestamps)
+        );
         combineSteps(steps, ConstraintQuery.prepareUpdate(builder, table, targetSchema, sourceSchema, targetColumns.nested));
       }
 
@@ -176,6 +202,10 @@ const combineSteps = (target: PgMigrationSteps, source: OptionalObject<PgMigrati
 const combineQueries = (target: PgMigrationQueries, source: OptionalObject<PgMigrationQueries>) => {
   if (source.tables) {
     target.tables.push(...source.tables);
+  }
+
+  if (source.triggers?.length) {
+    target.triggers = [...(target.triggers ?? []), ...source.triggers];
   }
 
   if (source.constraints) {

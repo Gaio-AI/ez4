@@ -1,5 +1,6 @@
 import type { AnyObject, PropertyExists } from '@ez4/utils';
-import type { RelationMode, StreamMode } from '../types/mode';
+import type { RelationMode, StreamMode, TimestampsMode } from '../types/mode';
+import type { TableTimestamp, TableTimestampsMetadata, TimestampTables } from './timestamps';
 import type { TableRelations, RelationMetadata, RelationTables } from './relations';
 import type { TableIndexes, IndexedTables } from './indexes';
 import type { TableSchema, TableSchemas } from './schemas';
@@ -42,7 +43,21 @@ export interface DatabaseTable<T extends TableSchema, E extends DatabaseEngine> 
    * and creating them again (Aurora Postgres).
    */
   readonly renamedFrom?: TableRenamedFrom<T>;
+
+  /**
+   * Date-time columns the database writes on its own: `created` when the record is inserted, and
+   * `updated` when it's inserted and on every update. An insert may still give them, an update can't.
+   */
+  readonly timestamps?: E extends { timestampsMode: TimestampsMode.Supported } ? TableTimestampColumns<T> : never;
 }
+
+/**
+ * Creation and update timestamp columns of a table with schema `T`.
+ */
+export type TableTimestampColumns<T extends TableSchema> = {
+  readonly created?: keyof T & string;
+  readonly updated?: keyof T & string;
+};
 
 /**
  * Previous names of a table with schema `T` and of its columns, each column with the name it had.
@@ -79,6 +94,7 @@ export type TableClients<T extends Database.Service<any>> = {
         schema: TableSchemas<T>[P];
         indexes: TableIndex<P, IndexedTables<T>>;
         relations: TableRelation<P, RelationTables<T>>;
+        timestamps: TableTimestamp<P, TimestampTables<T>>;
         engine: T['engine'];
       }>
     : never;
@@ -91,6 +107,7 @@ export type TableMetadata = {
   schema: Database.Schema;
   indexes: Database.Indexes;
   relations: RelationMetadata;
+  timestamps?: TableTimestampsMetadata;
   engine: DatabaseEngine;
 };
 

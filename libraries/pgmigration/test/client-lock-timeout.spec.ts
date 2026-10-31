@@ -64,6 +64,42 @@ describe('migration :: client lock timeout tests', async () => {
     equal(column?.value, `'$ez4$'::text`);
   });
 
+  it('assert :: statement holding a function body', async () => {
+    const statement = {
+      query:
+        `CREATE OR REPLACE FUNCTION "lock_timeout_stamp"() RETURNS trigger LANGUAGE plpgsql AS ` +
+        `$fn$ BEGIN NEW."value" := 'stamped'; RETURN NEW; END $fn$`
+    };
+
+    await client.rawQuery(getMigrationQuery(statement));
+
+    await client.rawQuery(
+      `CREATE OR REPLACE TRIGGER "lock_timeout_stamp" BEFORE INSERT ON "lock_timeout" FOR EACH ROW EXECUTE FUNCTION "lock_timeout_stamp"()`
+    );
+
+    await client.rawQuery(`INSERT INTO "lock_timeout" ("id", "value") VALUES ('stamp', 'given')`);
+
+    const [record] = await client.rawQuery(`SELECT "value" FROM "lock_timeout" WHERE "id" = 'stamp'`);
+
+    equal(record?.value, 'stamped');
+  });
+
+  it('assert :: trigger creation gives up waiting for a lock', async () => {
+    const statement = {
+      query: `CREATE TRIGGER "lock_timeout_waiting" BEFORE UPDATE ON "lock_timeout" FOR EACH ROW EXECUTE FUNCTION "lock_timeout_stamp"()`
+    };
+
+    // A transaction writing the table holds a lock that conflicts with the one creating a trigger takes.
+    await otherClient.transaction(async (transaction: typeof otherClient) => {
+      await transaction.rawQuery(`UPDATE "lock_timeout" SET "value" = "value" WHERE "id" = 'stamp'`);
+
+      await rejects(client.rawQuery(getMigrationQuery(statement, '100ms')), (error: Error) => {
+        equal(Reflect.get(error, 'code'), '55P03');
+        return true;
+      });
+    });
+  });
+
   it('assert :: concurrent statement runs as it is', async () => {
     const statement = {
       query: `CREATE INDEX CONCURRENTLY IF NOT EXISTS "lock_timeout_value_sk" ON "lock_timeout" ("value")`,

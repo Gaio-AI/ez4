@@ -1,17 +1,20 @@
 import type { PgRelationMetadata, PgTableRepository } from '@ez4/pgclient/library';
 import type { AnySchema, ObjectSchema } from '@ez4/schema';
 
+import { isStringSchema } from '@ez4/schema';
 import { Index } from '@ez4/database';
 import { isAnyObject } from '@ez4/utils';
 
 import { MigrationNameCollisionError } from '../errors/naming';
+import { MigrationTimestampsError } from '../errors/timestamps';
 import { MigrationRelationError } from '../errors/relation';
 import { MigrationIndexError } from '../errors/index';
 import { ConstraintQuery } from '../queries/constraints';
+import { TimestampQuery } from '../queries/timestamps';
 import { RelationQuery } from '../queries/relations';
 import { IndexQueries } from '../queries/indexes';
 import { getColumnType, isOptionalColumn } from '../utils/columns';
-import { getStoredName } from '../utils/naming';
+import { getStoredName, MAX_NAME_SIZE } from '../utils/naming';
 
 /**
  * Throws on what the repository declares but Postgres can't build, or would build different from the
@@ -20,7 +23,63 @@ import { getStoredName } from '../utils/naming';
 export const validateRepository = (target: PgTableRepository) => {
   validateIndexes(target);
   validateRelations(target);
+  validateTimestamps(target);
   validateNames(target);
+};
+
+/**
+ * The timestamp columns, as the table metadata validates them: the database writes a required date-time that
+ * isn't the primary key, under a trigger named after the column, and a column the migration renames would lose
+ * its trigger while both versions of the code run.
+ */
+const validateTimestamps = (target: PgTableRepository) => {
+  for (const table in target) {
+    const { timestamps, schema, indexes, renamedFrom } = target[table];
+
+    if (timestamps?.created && timestamps.created === timestamps.updated) {
+      throw new MigrationTimestampsError(table, `has both timestamps in ${timestamps.created}`);
+    }
+
+    for (const option of ['created', 'updated'] as const) {
+      const column = timestamps?.[option];
+
+      if (!column) {
+        continue;
+      }
+
+      const columnSchema = schema.properties[column];
+
+      if (!columnSchema) {
+        throw new MigrationTimestampsError(table, `has no column ${column} for its ${option} timestamp`);
+      }
+
+      if (!isStringSchema(columnSchema) || columnSchema.format !== 'date-time') {
+        throw new MigrationTimestampsError(table, `has its ${option} timestamp in ${column}, which isn't a date-time`);
+      }
+
+      if (isOptionalColumn(columnSchema)) {
+        throw new MigrationTimestampsError(table, `has its ${option} timestamp in ${column}, which is optional or nullable`);
+      }
+
+      if (Object.values(indexes).some(({ type, columns }) => type === Index.Primary && columns.includes(column))) {
+        throw new MigrationTimestampsError(table, `has its ${option} timestamp in ${column}, which is in the primary key`);
+      }
+
+      if (renamedFrom?.columns?.[column]) {
+        throw new MigrationTimestampsError(
+          table,
+          `renames ${column}, which is a timestamp: the rename needs a deploy without timestamps on the column`
+        );
+      }
+
+      if (option === 'updated' && Buffer.byteLength(TimestampQuery.getStampName(column)) > MAX_NAME_SIZE) {
+        throw new MigrationTimestampsError(
+          table,
+          `has its ${option} timestamp in ${column}, whose trigger name is longer than ${MAX_NAME_SIZE} bytes`
+        );
+      }
+    }
+  }
 };
 
 const INDEX_FILTER_OPERATORS = ['equal', 'not', 'gt', 'gte', 'lt', 'lte', 'isIn', 'isNull'];

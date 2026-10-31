@@ -1,5 +1,6 @@
 import type { SqlSourceWithResults, SqlRecord, SqlBuilder, SqlFilters, SqlUpdateStatement } from '@ez4/pgsql';
 import type { AnySchema, NumberSchema, ObjectSchema, UnionSchema } from '@ez4/schema';
+import type { TableTimestamps } from '@ez4/database/library';
 import type { AnyObject } from '@ez4/utils';
 import type { Query } from '@ez4/database';
 import type { PgRelationRepositoryWithSchema, PgRelationWithSchema } from '../types/repository';
@@ -13,11 +14,17 @@ import { Index, Order } from '@ez4/database';
 
 import { getConnectionSchema, isRelationHolder, isSingleRelationData } from './utils/relation';
 import { getWithSchemaValidation, isDynamicObjectField, isDynamicUnionField, validateRecordSchema } from '../utils/schema';
+import { omitTimestamps } from '../utils/timestamps';
 import { getSelectFields, getSelectFilters } from './select';
 
 export type UpdateQueryOptions = {
   flag?: string;
   primaryKey?: string[];
+
+  /**
+   * Timestamps of the table, which the update leaves out of its data and `touch` writes.
+   */
+  timestamps?: TableTimestamps;
 };
 
 export const prepareUpdateQuery = async <T extends InternalTableMetadata, S extends Query.SelectInput<T>>(
@@ -28,10 +35,19 @@ export const prepareUpdateQuery = async <T extends InternalTableMetadata, S exte
   input: Query.UpdateOneInput<S, T> | Query.UpdateManyInput<S, T>,
   options?: UpdateQueryOptions
 ) => {
-  const updateRecord = await getUpdateRecord(builder, input.data, schema, relations, table);
-  const hasRecord = !isEmptyObject(updateRecord);
+  const updateRecord = await getUpdateRecord(builder, omitTimestamps(input.data, options?.timestamps), schema, relations, table);
 
-  const updateQuery = hasRecord ? builder.update(schema).only(table).record(updateRecord).returning() : builder.select(schema).from(table);
+  // Writing the column to itself is enough for the trigger to write the timestamp, and makes an update with nothing
+  // else to change still write the records instead of only reading them.
+  const touchColumn = input.touch ? options?.timestamps?.updated : undefined;
+
+  const hasRecord = !isEmptyObject(updateRecord) || !!touchColumn;
+
+  const updateQuery = hasRecord ? builder.update(schema).only(table).returning() : builder.select(schema).from(table);
+
+  if (!(updateQuery instanceof SqlSelectStatement)) {
+    updateQuery.record(touchColumn ? { ...updateRecord, [touchColumn]: updateQuery.reference(touchColumn) } : updateRecord);
+  }
 
   const queries: (SqlSelectStatement | SqlUpdateStatement)[] = [];
 
@@ -346,7 +362,9 @@ const preparePostUpdateRelations = async (
         results.column(targetColumn);
       }
 
-      const updateRecord = await getUpdateRecord(builder, relationInput, fieldRelation.sourceSchema, relations, table);
+      const relationData = omitTimestamps(relationInput, fieldRelation.sourceTimestamps);
+
+      const updateRecord = await getUpdateRecord(builder, relationData, fieldRelation.sourceSchema, relations, table);
 
       const relationQuery = builder
         .update(sourceSchema)

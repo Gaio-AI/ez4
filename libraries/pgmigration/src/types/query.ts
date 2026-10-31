@@ -25,6 +25,13 @@ export type PgValidationStatement = {
 
 export type PgMigrationQueries = {
   tables: PgMigrationStatement[];
+
+  /**
+   * The functions and triggers that write the table timestamps, with the column defaults that go with them.
+   * Only a migration that changes timestamps has them.
+   */
+  triggers?: PgMigrationStatement[];
+
   constraints: PgMigrationStatement[];
   validations: PgValidationStatement[];
   relations: PgMigrationStatement[];

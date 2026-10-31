@@ -35,4 +35,20 @@ describe('migration column default tests', () => {
 
     equal(value, `'{"author":"O''Reilly"}'`);
   });
+
+  it('assert :: timestamp column default', () => {
+    const value = getColumnDefault(
+      {
+        type: SchemaType.String,
+        format: 'date-time',
+        definitions: {
+          default: '2026-01-01T00:00:00.000Z'
+        }
+      },
+      false,
+      true
+    );
+
+    equal(value, `date_trunc('milliseconds', statement_timestamp())`);
+  });
 });
