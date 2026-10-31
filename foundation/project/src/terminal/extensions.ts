@@ -1,9 +1,9 @@
-import type { ResolveHookContext, ResolveHookSync } from 'node:module';
+import type { LoadHookSync, ResolveHookContext, ResolveHookSync } from 'node:module';
 
 import { registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { tryLoadProject } from '../config/project';
 import { tryLoadReferences } from '../config/references';
@@ -127,5 +127,20 @@ const resolveSpecifier = (specifier: string, parentPath: string, extension: stri
   return undefined;
 };
 
+// A package bundles its `.pem` files as text (esbuild's `text` loader), so its source loads them the same way.
+const load: LoadHookSync = (url, context, defaultLoad) => {
+  if (!url.startsWith('file:') || !new URL(url).pathname.endsWith('.pem')) {
+    return defaultLoad(url, context);
+  }
+
+  const text = readFileSync(fileURLToPath(url), 'utf8');
+
+  return {
+    format: 'module',
+    source: `export default ${JSON.stringify(text)};`,
+    shortCircuit: true
+  };
+};
+
 // The hooks run on the thread that loads the modules, so resolving costs no hop to a loader thread.
-registerHooks({ resolve });
+registerHooks({ resolve, load });

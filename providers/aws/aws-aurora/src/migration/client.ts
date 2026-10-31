@@ -1,5 +1,5 @@
 import type { PgMigrationStatement } from '@ez4/pgmigration/library';
-import type { PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
+import type { PgClientDriver, PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
 
 import { DatabaseQueries, getMigrationQuery, MigrationAssertionFailedError } from '@ez4/pgmigration/library';
@@ -7,7 +7,7 @@ import { StatementTimeoutException } from '@aws-sdk/client-rds-data';
 import { Wait, WaitMaxAttemptsError } from '@ez4/utils';
 
 import { isDeadlockException, isLockTimeoutException } from '../client/errors';
-import { ApiClientDriver } from '../client/drivers/api';
+import { getDeployDriver } from '../utils/connection';
 import { MigrationFailedError, MigrationStatementRunningError } from './errors';
 
 // Enough of a statement to tell it apart, and short enough to fit what Postgres keeps of its text.
@@ -28,9 +28,9 @@ export const createDatabase = async (logger: OperationLogLine, request: Connecti
 
   const { clusterArn, secretArn, database } = request;
 
-  const driver = new ApiClientDriver({
+  const driver = await getDeployDriver({
     database: 'postgres',
-    resourceArn: clusterArn,
+    clusterArn,
     secretArn
   });
 
@@ -44,8 +44,8 @@ export const modifyDatabase = async (logger: OperationLogLine, request: ModifyDa
 
   const { clusterArn, secretArn, database, statements } = request;
 
-  const driver = new ApiClientDriver({
-    resourceArn: clusterArn,
+  const driver = await getDeployDriver({
+    clusterArn,
     secretArn,
     database
   });
@@ -58,9 +58,9 @@ export const deleteDatabase = async (logger: OperationLogLine, request: Connecti
 
   const { clusterArn, secretArn, database } = request;
 
-  const driver = new ApiClientDriver({
+  const driver = await getDeployDriver({
     database: 'postgres',
-    resourceArn: clusterArn,
+    clusterArn,
     secretArn
   });
 
@@ -69,7 +69,7 @@ export const deleteDatabase = async (logger: OperationLogLine, request: Connecti
   await executeMigrationStatement(driver, statement);
 };
 
-const executeMigrationStatements = async (driver: ApiClientDriver, statements: PgMigrationStatement[]) => {
+const executeMigrationStatements = async (driver: PgClientDriver, statements: PgMigrationStatement[]) => {
   const errors = [];
 
   const options: PgExecuteOptions = {
@@ -94,7 +94,7 @@ const executeMigrationStatements = async (driver: ApiClientDriver, statements: P
   }
 };
 
-const executeMigrationStatement = async (driver: ApiClientDriver, statement: PgMigrationStatement, options?: PgExecuteOptions) => {
+const executeMigrationStatement = async (driver: PgClientDriver, statement: PgMigrationStatement, options?: PgExecuteOptions) => {
   const { name, check, assert, query } = statement;
 
   if (assert && (await isAssertionFailed(driver, assert, options))) {
@@ -128,7 +128,7 @@ const executeMigrationStatement = async (driver: ApiClientDriver, statement: PgM
 // its statements one after another: a concurrent index build that starts while another one on the same table is
 // still running deadlocks with it, and Postgres leaves one of the two indexes invalid. So the next statement
 // waits for this one to end, found by the start of its text (Postgres keeps only the start of a long one).
-const waitForStatement = async (driver: ApiClientDriver, query: string, options?: PgExecuteOptions) => {
+const waitForStatement = async (driver: PgClientDriver, query: string, options?: PgExecuteOptions) => {
   const queryStart = query.slice(0, RUNNING_QUERY_PREFIX).replaceAll("'", "''");
 
   const runningQuery =
@@ -159,7 +159,7 @@ const waitForStatement = async (driver: ApiClientDriver, query: string, options?
 
 // An assert only fails the migration before the statement does: the statement, or the validation after it,
 // fails on the same records. So an assert that can't finish in time (a scan of a large table) is skipped.
-const isAssertionFailed = async (driver: ApiClientDriver, assert: string, options?: PgExecuteOptions) => {
+const isAssertionFailed = async (driver: PgClientDriver, assert: string, options?: PgExecuteOptions) => {
   try {
     const { records } = await driver.executeStatement({ query: assert }, options);
 
@@ -173,7 +173,7 @@ const isAssertionFailed = async (driver: ApiClientDriver, assert: string, option
   }
 };
 
-const executeWithRetry = (driver: ApiClientDriver, query: PgExecuteStatement, options?: PgExecuteOptions) => {
+const executeWithRetry = (driver: PgClientDriver, query: PgExecuteStatement, options?: PgExecuteOptions) => {
   return Wait.until(
     async () => {
       try {

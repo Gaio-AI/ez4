@@ -111,6 +111,20 @@ export declare class Db extends Database.Service<PostgresEngine> {
 
 The deploy then creates the database and leaves its tables, indexes and constraints to the outside migrations, and never drops the database, not even when the service is removed with `--force`. The integrity check still validates the declared indexes and constraints by their names before the functions switch, so the outside migrations keep the names the declaration gives them (or the index `name` option). Local runs (`ez4 serve`, `ez4 test`) still create the tables from the declaration.
 
+### Direct connection
+
+The deploy runs migrations and integrity checks through the Data API, which stops waiting for a statement after 45 seconds: the deploy then watches the statement in `pg_stat_activity` until it ends, and skips an assertion that doesn't finish in time. A deploy that can reach the cluster's writer connects to it instead, with the master secret, and runs each statement to its end:
+
+```sh
+EZ4_AURORA_CONNECTION=direct ez4 deploy
+```
+
+The writer is reachable from inside the cluster's VPC (a CI runner in its subnets, allowed by the cluster's security group), or through a tunnel to it. For a tunnel, name its local end for each writer, and the certificate is still checked against the writer's name:
+
+```sh
+EZ4_AURORA_CONNECTION=direct EZ4_AURORA_TUNNELS=<writer endpoint>=127.0.0.1:15432 ez4 deploy
+```
+
 ## Native connections
 
 By default a function reaches the database through the Data API. A link can connect natively instead, with the Postgres protocol, which needs the function in a VPC (see `@ez4/aws-function`):
