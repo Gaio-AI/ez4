@@ -9,7 +9,8 @@ import type {
   OrderMode,
   LockMode,
   AggregateMode,
-  EventualReadMode
+  EventualReadMode,
+  TimestampsMode
 } from '@ez4/database';
 
 export type TestEngine = {
@@ -159,6 +160,22 @@ export type TestEngineEventualRead<E extends EventualReadMode> = {
   lockMode: LockMode.Unsupported;
   aggregateMode: AggregateMode.Unsupported;
   eventualReadMode: E;
+  options: never;
+  name: 'test';
+};
+
+export type TestEngineTimestamps<T extends TimestampsMode> = {
+  parametersMode: ParametersMode.OnlyIndex;
+  transactionMode: TransactionMode.Static;
+  insensitiveMode: InsensitiveMode.Unsupported;
+  undefinedMode: UndefinedMode.Supported;
+  paginationMode: PaginationMode.Offset;
+  relationMode: RelationMode.Supported;
+  streamMode: StreamMode.Unsupported;
+  orderMode: OrderMode.AnyColumns;
+  lockMode: LockMode.Unsupported;
+  aggregateMode: AggregateMode.Unsupported;
+  timestampsMode: T;
   options: never;
   name: 'test';
 };

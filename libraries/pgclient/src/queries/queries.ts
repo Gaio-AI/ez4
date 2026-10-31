@@ -1,3 +1,4 @@
+import type { TableTimestamps } from '@ez4/database/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { SqlRecord } from '@ez4/pgsql';
 import type { AnyObject } from '@ez4/utils';
@@ -176,11 +177,12 @@ export const prepareUpsertOne = async <T extends InternalTableMetadata, S extend
   relations: PgRelationRepositoryWithSchema,
   driver: PgClientDriver,
   input: Query.UpsertOneInput<S, T>,
-  conflictColumns: string[]
+  conflictColumns: string[],
+  timestamps?: TableTimestamps
 ) => {
   const builder = createQueryBuilder(driver);
 
-  const result = await prepareUpsertQuery(builder, table, schema, relations, input, conflictColumns);
+  const result = await prepareUpsertQuery(builder, table, schema, relations, input, conflictColumns, timestamps);
 
   if (!result) {
     return undefined;

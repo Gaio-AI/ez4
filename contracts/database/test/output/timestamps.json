@@ -1,0 +1,106 @@
+{
+  "@variables": {
+    "type": "@ez4/common",
+    "name": "@variables",
+    "context": {}
+  },
+  "@options": {
+    "type": "@ez4/common",
+    "name": "@options",
+    "context": {}
+  },
+  "TestDatabase": {
+    "type": "@ez4/database",
+    "name": "TestDatabase",
+    "context": {},
+    "file": "test/input/output-timestamps.ts",
+    "variables": {},
+    "services": {},
+    "engine": {
+      "parametersMode": "index",
+      "transactionMode": "static",
+      "insensitiveMode": "unsupported",
+      "undefinedMode": "supported",
+      "paginationMode": "offset",
+      "relationMode": "supported",
+      "streamMode": "unsupported",
+      "orderMode": "any",
+      "lockMode": "unsupported",
+      "aggregateMode": "unsupported",
+      "timestampsMode": "supported",
+      "name": "test"
+    },
+    "tables": [
+      {
+        "name": "contacts",
+        "timestamps": {
+          "created": "created_at",
+          "updated": "updated_at"
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "definitions": {
+                "trim": true
+              }
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "definitions": {
+                "trim": true
+              }
+            }
+          },
+          "identity": 1
+        },
+        "indexes": [
+          {
+            "name": "id",
+            "columns": [
+              "id"
+            ],
+            "type": "primary"
+          }
+        ]
+      },
+      {
+        "name": "events",
+        "timestamps": {
+          "created": "created_at"
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "definitions": {
+                "trim": true
+              }
+            }
+          },
+          "identity": 1
+        },
+        "indexes": [
+          {
+            "name": "id",
+            "columns": [
+              "id"
+            ],
+            "type": "primary"
+          }
+        ]
+      }
+    ]
+  }
+}

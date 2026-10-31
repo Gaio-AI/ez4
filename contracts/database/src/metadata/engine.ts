@@ -30,7 +30,8 @@ import {
   OrderMode,
   LockMode,
   AggregateMode,
-  EventualReadMode
+  EventualReadMode,
+  TimestampsMode
 } from '../types/mode';
 
 export const isDatabaseEngineDeclaration = (type: TypeModel) => {
@@ -197,6 +198,14 @@ const getTypeFromMembers = (type: TypeObject | TypeModel, parent: TypeModel, mem
       // Optional: an engine that doesn't declare it reads with strong consistency only.
       case 'eventualReadMode': {
         if (!(engine.eventualReadMode = getPropertyStringIn(member, [EventualReadMode.Unsupported, EventualReadMode.Supported]))) {
+          errorList.push(new InvalidServicePropertyError(parent.name, member.name, type.file));
+        }
+        break;
+      }
+
+      // Optional: an engine that doesn't declare it takes no table timestamps.
+      case 'timestampsMode': {
+        if (!(engine.timestampsMode = getPropertyStringIn(member, [TimestampsMode.Unsupported, TimestampsMode.Supported]))) {
           errorList.push(new InvalidServicePropertyError(parent.name, member.name, type.file));
         }
         break;

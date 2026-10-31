@@ -8,7 +8,8 @@ import type {
   OrderMode,
   StreamMode,
   LockMode,
-  AggregateMode
+  AggregateMode,
+  TimestampsMode
 } from '@ez4/database';
 
 /**
@@ -55,6 +56,7 @@ export type PostgresEngine = {
   streamMode: StreamMode.Unsupported;
   lockMode: LockMode.Supported;
   aggregateMode: AggregateMode.Supported;
+  timestampsMode: TimestampsMode.Supported;
   options: ClientOptions;
   name: 'aurora';
 };

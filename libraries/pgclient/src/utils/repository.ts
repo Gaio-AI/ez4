@@ -5,8 +5,10 @@ import { Index } from '@ez4/database';
 
 import { getTableName } from './resources';
 
+// A table without an option has no key for it, so the repository of a table that doesn't use an option compares
+// and hashes the same as before the option existed.
 export const getTableRepository = (tables: DatabaseTable[]): PgTableRepository => {
-  return tables.reduce((current, { name, schema, relations, indexes, renamedFrom }) => {
+  return tables.reduce((current, { name, schema, relations, indexes, renamedFrom, timestamps }) => {
     return {
       ...current,
       [name]: {
@@ -14,7 +16,8 @@ export const getTableRepository = (tables: DatabaseTable[]): PgTableRepository =
         indexes: getTableIndexes(indexes),
         relations: getTableRelations(relations ?? []),
         schema,
-        ...(renamedFrom && { renamedFrom })
+        ...(renamedFrom && { renamedFrom }),
+        ...(timestamps && { timestamps })
       }
     };
   }, {});

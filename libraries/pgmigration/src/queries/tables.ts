@@ -1,14 +1,24 @@
 import type { PgIndexRepository } from '@ez4/pgclient/library';
+import type { TableTimestamps } from '@ez4/database/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { SqlBuilder } from '@ez4/pgsql';
 
+import { getTimestampColumns } from '@ez4/pgclient/library';
 import { Index } from '@ez4/database';
 
 import { getColumnDefault, getColumnType, isOptionalColumn } from '../utils/columns';
 
 export namespace TableQuery {
-  export const prepareCreate = (builder: SqlBuilder, table: string, schema: ObjectSchema, indexes: PgIndexRepository) => {
+  export const prepareCreate = (
+    builder: SqlBuilder,
+    table: string,
+    schema: ObjectSchema,
+    indexes: PgIndexRepository,
+    timestamps?: TableTimestamps
+  ) => {
     const statement = builder.table(table).create().missing();
+
+    const timestampColumns = getTimestampColumns(timestamps);
 
     for (const columnKey in schema.properties) {
       const columnSchema = schema.properties[columnKey];
@@ -18,7 +28,7 @@ export namespace TableQuery {
 
       const columnRequired = !isOptionalColumn(columnSchema);
       const columnType = getColumnType(columnSchema, columnIsPrimary);
-      const columnValue = getColumnDefault(columnSchema, columnIsPrimary);
+      const columnValue = getColumnDefault(columnSchema, columnIsPrimary, timestampColumns.includes(columnKey));
 
       statement.column(columnKey, columnType, columnRequired, columnValue).missing();
     }

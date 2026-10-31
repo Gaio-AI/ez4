@@ -23,11 +23,14 @@ export const getMigrationQuery = (statement: PgMigrationStatement, lockTimeout =
   return `DO ${tag} BEGIN PERFORM set_config('lock_timeout', '${lockTimeout}', true); ${query}; END ${tag}`;
 };
 
-const getDollarQuoteTag = (query: string) => {
-  let tag = '$ez4$';
+/**
+ * A dollar quote tag named after `name` that the given text doesn't hold, so the text can go inside it.
+ */
+export const getDollarQuoteTag = (text: string, name = 'ez4') => {
+  let tag = `$${name}$`;
 
-  for (let index = 1; query.includes(tag); index++) {
-    tag = `$ez4_${index}$`;
+  for (let index = 1; text.includes(tag); index++) {
+    tag = `$${name}_${index}$`;
   }
 
   return tag;

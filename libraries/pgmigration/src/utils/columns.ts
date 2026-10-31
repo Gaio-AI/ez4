@@ -4,11 +4,28 @@ import { isArraySchema, isEnumSchema, isObjectSchema, isScalarSchema, isStringSc
 import { escapeSqlText } from '@ez4/pgsql';
 import { isAnyNumber } from '@ez4/utils';
 
+/**
+ * The value the database writes in a timestamp column. The ORM reads a date-time to the millisecond, so a value
+ * kept with more precision would compare different from what it reads, and a page cursor would skip records.
+ * The statement start is the same for every record a statement writes (unlike the transaction start of `now()`,
+ * shared by every statement of a transaction), and it isn't volatile like `clock_timestamp()`, so adding a
+ * column with it as the default doesn't rewrite the table.
+ */
+export const TIMESTAMP_VALUE = `date_trunc('milliseconds', statement_timestamp())`;
+
 export const isOptionalColumn = (schema: AnySchema) => {
   return !!(schema.nullable || schema.optional);
 };
 
-export const getColumnDefault = (schema: AnySchema, primaryIndex: boolean) => {
+/**
+ * The default of a column. A timestamp column always defaults to the timestamp, whatever default its schema
+ * declares, so a change to the column never drops it.
+ */
+export const getColumnDefault = (schema: AnySchema, primaryIndex: boolean, timestampColumn = false) => {
+  if (timestampColumn) {
+    return TIMESTAMP_VALUE;
+  }
+
   if (isScalarSchema(schema) || isObjectSchema(schema) || isArraySchema(schema) || isTupleSchema(schema)) {
     const { definitions } = schema;
 

@@ -14,7 +14,8 @@ import type {
   StreamMode,
   RelationMode,
   AggregateMode,
-  EventualReadMode
+  EventualReadMode,
+  TimestampsMode
 } from '../types/mode';
 
 import { createServiceMetadata } from '@ez4/project/library';
@@ -48,6 +49,7 @@ export type DatabaseEngine = {
   lockMode: LockMode;
   aggregateMode: AggregateMode;
   eventualReadMode?: EventualReadMode;
+  timestampsMode?: TimestampsMode;
   name: string;
 };
 
@@ -103,9 +105,19 @@ export type TableRenames = {
   columns?: Record<string, string>;
 };
 
+/**
+ * Columns the database writes on its own: the creation timestamp on insert, and the update timestamp on
+ * insert and on every update.
+ */
+export type TableTimestamps = {
+  created?: string;
+  updated?: string;
+};
+
 export type DatabaseTable = {
   name: string;
   renamedFrom?: TableRenames;
+  timestamps?: TableTimestamps;
   schema: TableSchema;
   relations?: TableRelation[];
   indexes: TableIndex[];

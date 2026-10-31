@@ -12,7 +12,8 @@ import type {
   OrderMode,
   LockMode,
   AggregateMode,
-  EventualReadMode
+  EventualReadMode,
+  TimestampsMode
 } from '../types/mode';
 
 /**
@@ -20,6 +21,7 @@ import type {
  */
 export type DatabaseEngine = {
   eventualReadMode?: EventualReadMode;
+  timestampsMode?: TimestampsMode;
   parametersMode: ParametersMode;
   transactionMode: TransactionMode;
   insensitiveMode: InsensitiveMode;

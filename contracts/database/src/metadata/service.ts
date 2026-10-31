@@ -1,6 +1,6 @@
 import type { AllType, ReflectionTypes, TypeClass, TypeModel, TypeObject } from '@ez4/reflection';
 import type { Incomplete } from '@ez4/utils';
-import type { DatabaseService } from './types';
+import type { DatabaseEngine, DatabaseService } from './types';
 import type { DatabaseTable } from './types';
 import type { TableIndex } from './types';
 
@@ -22,7 +22,8 @@ import { isModelProperty } from '@ez4/reflection';
 import { isObjectWith } from '@ez4/utils';
 
 import { IncompleteServiceError } from '../errors/service';
-import { InvalidTableRenameError } from '../errors/table';
+import { InvalidTableRenameError, UnsupportedTableTimestampsError } from '../errors/table';
+import { TimestampsMode } from '../types/mode';
 import { InvalidRelationAliasError, InvalidRelationColumnError, InvalidRelationTableError } from '../errors/relations';
 import { getDatabaseScalabilityMetadata } from './scalability';
 import { getDatabaseEngineMetadata } from './engine';
@@ -116,9 +117,10 @@ export const getDatabaseServicesMetadata = (reflection: ReflectionTypes) => {
 
     const relationErrors = validateRelations(declaration, service.tables);
     const renameErrors = validateRenames(declaration, service.tables);
+    const timestampErrors = validateTimestamps(declaration, service.engine, service.tables);
 
-    if (relationErrors.length || renameErrors.length) {
-      errorList.push(...relationErrors, ...renameErrors);
+    if (relationErrors.length || renameErrors.length || timestampErrors.length) {
+      errorList.push(...relationErrors, ...renameErrors, ...timestampErrors);
       continue;
     }
 
@@ -213,6 +215,15 @@ const validateRenames = (type: TypeObject | TypeModel, tables: DatabaseTable[]) 
 
     return [];
   });
+};
+
+// The engine writes the timestamps of a table only when it supports them.
+const validateTimestamps = (type: TypeObject | TypeModel, engine: DatabaseEngine, tables: DatabaseTable[]) => {
+  if (engine.timestampsMode === TimestampsMode.Supported) {
+    return [];
+  }
+
+  return tables.filter(({ timestamps }) => timestamps).map(({ name }) => new UnsupportedTableTimestampsError(name, engine.name, type.file));
 };
 
 // The index of the column alone. A partial one (with `where`) doesn't identify a record by the column.

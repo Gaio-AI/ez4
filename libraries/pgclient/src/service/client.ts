@@ -8,6 +8,7 @@ import { isAnyArray } from '@ez4/utils';
 
 import { prepareDeleteOne, prepareInsertOne, prepareUpdateOne } from '../queries/queries';
 import { rollbackFailedTransaction } from '../utils/transaction';
+import { getInsertSchema } from '../utils/timestamps';
 import { getRelationsWithSchema } from './relations';
 import { getPrimaryIndex } from './utils/indexes';
 import { runInTransactionOrder } from './utils/order';
@@ -67,12 +68,12 @@ export namespace PgClient {
         }
 
         if (!tableCache[tableAlias]) {
-          const { name, schema, indexes } = repository[tableAlias];
+          const { name, schema, indexes, timestamps } = repository[tableAlias];
 
           const relationsWithSchema = getRelationsWithSchema(name, repository);
           const indexList = Object.values(indexes);
 
-          const table = new Table(name, schema, relationsWithSchema, indexList, context);
+          const table = new Table(name, schema, relationsWithSchema, indexList, context, timestamps);
 
           tableCache[tableAlias] = table;
         }
@@ -197,9 +198,10 @@ const prepareStaticTransaction = async <T extends Database.Service<any>>(
       throw new MissingRepositoryTableError(tableAlias);
     }
 
-    const { name, schema } = repositoryTable;
+    const { name, schema, timestamps } = repositoryTable;
 
     const relationsWithSchema = getRelationsWithSchema(name, repository);
+    const insertSchema = getInsertSchema(schema, timestamps);
 
     for (const query of operationTable) {
       if (!query) {
@@ -207,14 +209,15 @@ const prepareStaticTransaction = async <T extends Database.Service<any>>(
       }
 
       if ('insert' in query) {
-        statements.push(await prepareInsertOne(name, schema, relationsWithSchema, driver, query.insert));
+        statements.push(await prepareInsertOne(name, insertSchema, relationsWithSchema, driver, query.insert));
         continue;
       }
 
       if ('update' in query) {
         statements.push(
           await prepareUpdateOne(name, schema, relationsWithSchema, driver, query.update, {
-            primaryKey: getPrimaryIndex(repositoryTable.indexes)
+            primaryKey: getPrimaryIndex(repositoryTable.indexes),
+            timestamps
           })
         );
         continue;

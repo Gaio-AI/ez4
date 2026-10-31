@@ -11,6 +11,7 @@ export { PaginationModeUtils } from './services/pagination';
 export { OrderModeUtils } from './services/order';
 export { LockModeUtils } from './services/lock';
 export { EventualReadModeUtils } from './services/read';
+export { TimestampsModeUtils } from './services/timestamps';
 export { AggregateModeUtils } from './services/aggregate';
 export { EngineUtils } from './services/engine';
 export { Database } from './services/contract';

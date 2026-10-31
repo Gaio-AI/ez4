@@ -244,4 +244,49 @@ describe('aurora local tables', () => {
 
     deepEqual(result, [[], []]);
   });
+
+  it('assert :: reset table with timestamps', async () => {
+    const repository: PgTableRepository = {
+      stamped: {
+        name: 'stamped',
+        relations: {},
+        timestamps: {
+          created: 'created_at',
+          updated: 'updated_at'
+        },
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: { type: SchemaType.String },
+            name: { type: SchemaType.String },
+            created_at: { type: SchemaType.String, format: 'date-time' },
+            updated_at: { type: SchemaType.String, format: 'date-time' }
+          }
+        },
+        indexes: {
+          id: { type: Index.Primary, columns: ['id'], name: 'id' }
+        }
+      }
+    };
+
+    await createAllTables(CONNECTION, repository, getServeOptions(true));
+
+    // A reset builds the table as a new one, through the same statements a deploy creates it with.
+    const [objects] = await client.rawQuery(
+      `SELECT ` +
+        `(SELECT count(*)::int FROM "pg_trigger" WHERE "tgname" = 'ez4_stamp_updated_at' AND "tgrelid" = 'stamped'::regclass) AS "triggers", ` +
+        `(SELECT count(*)::int FROM "pg_proc" WHERE "proname" = 'ez4_stamp_updated_at') AS "functions", ` +
+        `(SELECT count(*)::int FROM "information_schema"."columns" WHERE "table_name" = 'stamped' ` +
+        `AND "column_default" = 'date_trunc(''milliseconds''::text, statement_timestamp())') AS "defaults"`
+    );
+
+    deepEqual(objects, { triggers: 1, functions: 1, defaults: 2 });
+
+    await client.rawQuery(`INSERT INTO "stamped" ("id", "name") VALUES ('a', 'foo')`);
+    await client.rawQuery(`UPDATE "stamped" SET "updated_at" = '2020-01-01T00:00:00Z' WHERE "id" = 'a'`);
+
+    const [record] = await client.rawQuery(`SELECT "updated_at" > "created_at" - interval '1 second' AS "stamped" FROM "stamped"`);
+
+    deepEqual(record, { stamped: true });
+  });
 });

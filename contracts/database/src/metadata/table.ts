@@ -2,7 +2,7 @@ import type { AllType, EveryType, ModelProperty, ReflectionTypes, TypeModel, Typ
 import type { MemberType } from '@ez4/common/library';
 import type { ObjectSchema } from '@ez4/schema';
 import type { Incomplete } from '@ez4/utils';
-import type { DatabaseTable, TableIndex, TableRenames } from './types';
+import type { DatabaseTable, TableIndex, TableRenames, TableTimestamps } from './types';
 
 import {
   InvalidServicePropertyError,
@@ -18,9 +18,17 @@ import {
 } from '@ez4/common/library';
 
 import { isModelProperty, isTypeObject, isTypeReference, isTypeTuple } from '@ez4/reflection';
-import { isObjectWith } from '@ez4/utils';
+import { isEmptyObject, isObjectWith } from '@ez4/utils';
+import { isStringSchema } from '@ez4/schema';
 
-import { IncompleteTableError, IncorrectTableTypeError, InvalidTableRenameError, InvalidTableTypeError } from '../errors/table';
+import {
+  IncompleteTableError,
+  IncorrectTableTypeError,
+  InvalidTableRenameError,
+  InvalidTableTimestampsError,
+  InvalidTableTypeError
+} from '../errors/table';
+import { Index } from '../types/index';
 import { InvalidIndexReferenceError } from '../errors/indexes';
 import { getTableRelationsMetadata } from './relations';
 import { getTableIndexesMetadata } from './indexes';
@@ -106,6 +114,7 @@ const getTypeFromMembers = (
   const properties = new Set(['name', 'schema', 'indexes']);
 
   let renamesMember: ModelProperty | undefined;
+  let timestampsMember: ModelProperty | undefined;
 
   for (const member of members) {
     if (!isModelProperty(member) || member.inherited) {
@@ -153,6 +162,11 @@ const getTypeFromMembers = (
         renamesMember = member;
         break;
       }
+
+      case 'timestamps': {
+        timestampsMember = member;
+        break;
+      }
     }
   }
 
@@ -163,6 +177,19 @@ const getTypeFromMembers = (
 
   if (renamesMember && !(table.renamedFrom = getTableRenames(type, renamesMember, table, errorList))) {
     return undefined;
+  }
+
+  if (timestampsMember) {
+    const timestamps = getTableTimestamps(type, timestampsMember, table, errorList);
+
+    if (!timestamps) {
+      return undefined;
+    }
+
+    // Declaring none is the same as not declaring the option, and leaves the table metadata as it was.
+    if (!isEmptyObject(timestamps)) {
+      table.timestamps = timestamps;
+    }
   }
 
   const indexErrors = validateIndexes(type, table.indexes, table.schema);
@@ -258,6 +285,91 @@ const getColumnRenames = (type: TypeObject | TypeModel, member: ModelProperty, t
   }
 
   return renames;
+};
+
+/**
+ * The columns the database writes for the table: `created` on insert, and `updated` on insert and on every
+ * update. Each one is a required date-time column that isn't the primary key, and a column the migration
+ * renames can't be one, since the trigger writing it would lose the column while both versions run.
+ */
+const getTableTimestamps = (type: TypeObject | TypeModel, member: ModelProperty, table: DatabaseTable, errorList: Error[]) => {
+  const timestampsObject = getPropertyObject(member);
+
+  if (!timestampsObject) {
+    errorList.push(new InvalidTableTimestampsError(table.name, member.name, 'it has to be an object', type.file));
+    return undefined;
+  }
+
+  const timestamps: TableTimestamps = {};
+  const errors: Error[] = [];
+
+  for (const option of getObjectMembers(timestampsObject)) {
+    if (!isModelProperty(option)) {
+      continue;
+    }
+
+    if (option.name !== 'created' && option.name !== 'updated') {
+      errors.push(
+        new InvalidTableTimestampsError(table.name, option.name, 'only created and updated are written by the database', type.file)
+      );
+      continue;
+    }
+
+    const column = getPropertyString(option);
+
+    if (!column) {
+      errors.push(new InvalidTableTimestampsError(table.name, option.name, 'it has to name a column', type.file));
+      continue;
+    }
+
+    const reason = getTimestampColumnError(table, column);
+
+    if (reason) {
+      errors.push(new InvalidTableTimestampsError(table.name, option.name, reason, type.file));
+      continue;
+    }
+
+    timestamps[option.name] = column;
+  }
+
+  if (timestamps.created && timestamps.created === timestamps.updated) {
+    errors.push(
+      new InvalidTableTimestampsError(table.name, 'updated', `column ${timestamps.updated} is the created timestamp too`, type.file)
+    );
+  }
+
+  if (errors.length) {
+    errorList.push(...errors);
+    return undefined;
+  }
+
+  return timestamps;
+};
+
+const getTimestampColumnError = (table: DatabaseTable, column: string) => {
+  const columnSchema = table.schema.properties[column];
+
+  if (!columnSchema) {
+    return `column ${column} isn't in the schema`;
+  }
+
+  if (!isStringSchema(columnSchema) || columnSchema.format !== 'date-time') {
+    return `column ${column} isn't a date-time`;
+  }
+
+  if (columnSchema.optional || columnSchema.nullable) {
+    return `column ${column} is optional or nullable`;
+  }
+
+  if (table.indexes.some(({ type, columns }) => type === Index.Primary && columns.includes(column))) {
+    return `column ${column} is in the primary key`;
+  }
+
+  if (table.renamedFrom?.columns?.[column]) {
+    return `column ${column} is renamed, which needs a deploy without timestamps on it`;
+  }
+
+  return undefined;
 };
 
 const validateIndexes = (type: TypeObject | TypeModel, indexes: TableIndex[], schema: ObjectSchema) => {

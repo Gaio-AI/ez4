@@ -718,4 +718,79 @@ describe('migration :: create table tests', () => {
       indexes: []
     });
   });
+
+  it('assert :: create table (timestamps)', async () => {
+    const tables = getTableRepository([
+      {
+        name: 'table',
+        timestamps: {
+          created: 'created_at',
+          updated: 'updated_at'
+        },
+        schema: {
+          type: SchemaType.Object,
+          properties: {
+            id: {
+              type: SchemaType.String,
+              format: 'uuid'
+            },
+            created_at: {
+              type: SchemaType.String,
+              format: 'date-time'
+            },
+            updated_at: {
+              type: SchemaType.String,
+              format: 'date-time',
+              // The database writes the timestamp, whatever default the schema has.
+              definitions: {
+                default: '2026-01-01T00:00:00.000Z'
+              }
+            }
+          }
+        },
+        indexes: [
+          {
+            name: 'id',
+            type: Index.Primary,
+            columns: ['id']
+          }
+        ]
+      }
+    ]);
+
+    const queries = getCreateQueries(tables);
+
+    deepEqual(queries, {
+      tables: [
+        {
+          query:
+            `CREATE TABLE IF NOT EXISTS "table" (` +
+            `"id" uuid DEFAULT gen_random_uuid() NOT null, ` +
+            `"created_at" timestamptz DEFAULT date_trunc('milliseconds', statement_timestamp()) NOT null, ` +
+            `"updated_at" timestamptz DEFAULT date_trunc('milliseconds', statement_timestamp()) NOT null` +
+            `)`
+        }
+      ],
+      triggers: [
+        {
+          query:
+            `CREATE OR REPLACE FUNCTION "ez4_stamp_updated_at"() RETURNS trigger LANGUAGE plpgsql AS ` +
+            `$fn$ BEGIN NEW."updated_at" := date_trunc('milliseconds', statement_timestamp()); RETURN NEW; END $fn$`
+        },
+        {
+          check: `SELECT 1 FROM "pg_trigger" WHERE "tgname" = 'ez4_stamp_updated_at' AND "tgrelid" = to_regclass('"table"')`,
+          query: `CREATE TRIGGER "ez4_stamp_updated_at" BEFORE UPDATE ON "table" FOR EACH ROW EXECUTE FUNCTION "ez4_stamp_updated_at"()`
+        }
+      ],
+      constraints: [
+        {
+          check: `SELECT 1 FROM "pg_constraint" WHERE "conname" = 'table_id_pk'`,
+          query: `ALTER TABLE IF EXISTS "table" ADD CONSTRAINT "table_id_pk" PRIMARY KEY ("id")`
+        }
+      ],
+      validations: [],
+      relations: [],
+      indexes: []
+    });
+  });
 });

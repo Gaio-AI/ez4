@@ -1,5 +1,6 @@
 import type { TransactionMode } from '../types/mode';
 import type { TableIndex, TableMetadata, TableRelation } from './table';
+import type { TableTimestamp, TimestampTables } from './timestamps';
 import type { RelationTables } from './relations';
 import type { IndexedTables } from './indexes';
 import type { EngineUtils } from './engine';
@@ -39,6 +40,7 @@ export namespace TransactionModeUtils {
           schema: TableSchemas<T>[P];
           indexes: TableIndex<P, IndexedTables<T>>;
           relations: TableRelation<P, RelationTables<T>>;
+          timestamps: TableTimestamp<P, TimestampTables<T>>;
           engine: T['engine'];
         }>
       : never)[];

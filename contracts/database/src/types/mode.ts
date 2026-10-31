@@ -85,3 +85,11 @@ export const enum EventualReadMode {
   Unsupported = 'unsupported',
   Supported = 'supported'
 }
+
+/**
+ * Timestamps mode: whether the database writes the creation and update timestamps a table declares.
+ */
+export const enum TimestampsMode {
+  Unsupported = 'unsupported',
+  Supported = 'supported'
+}

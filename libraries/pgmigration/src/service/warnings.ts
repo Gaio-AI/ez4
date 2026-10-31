@@ -1,6 +1,7 @@
 import type { PgIndexRepository, PgRelationMetadata, PgTableRepository } from '@ez4/pgclient/library';
 import type { TableIndexFilters } from '@ez4/database/library';
 
+import { getTimestampColumns } from '@ez4/pgclient/library';
 import { deepEqual, isAnyObject } from '@ez4/utils';
 import { Index } from '@ez4/database';
 
@@ -28,7 +29,88 @@ export const getMigrationWarnings = (target: PgTableRepository, source: PgTableR
     );
   });
 
-  return [...foreignKeyWarnings, ...indexWarnings, ...renameWarnings];
+  const timestampLockWarnings = getTablesGainingTimestamps(target, source).map((table) => {
+    return (
+      `Timestamps on ${table}: setting the column defaults takes an ACCESS EXCLUSIVE lock on it and creating the trigger ` +
+      `a SHARE ROW EXCLUSIVE lock, each held briefly after waiting for the transactions running on it.`
+    );
+  });
+
+  const timestampIndexWarnings = getIndexesOnUpdateTimestamps(target, source).map(({ table, index, column }) => {
+    return `Index ${table}.${index} includes ${column}, which every update now writes, so updates on ${table} can't be HOT.`;
+  });
+
+  return [...foreignKeyWarnings, ...indexWarnings, ...renameWarnings, ...timestampLockWarnings, ...timestampIndexWarnings];
+};
+
+/**
+ * Tables that already exist and gain timestamps: the migration sets the column defaults and creates the trigger on
+ * a table in use, and each statement waits for the transactions running on it while the writes behind it wait too.
+ */
+export const getTablesGainingTimestamps = (target: PgTableRepository, source: PgTableRepository) => {
+  const { source: sourceTables } = getTableRepositoryChanges(target, source);
+
+  return Object.keys(target).filter((table) => {
+    const sourceTable = sourceTables[table];
+
+    if (!sourceTable) {
+      return false;
+    }
+
+    const sourceColumns = getTimestampColumns(sourceTable.timestamps);
+    const targetTimestamps = target[table].timestamps;
+
+    const hasNewTrigger = !!targetTimestamps?.updated && targetTimestamps.updated !== sourceTable.timestamps?.updated;
+    const hasNewDefault = getTimestampColumns(targetTimestamps).some((column) => !sourceColumns.includes(column));
+
+    return hasNewTrigger || hasNewDefault;
+  });
+};
+
+export type UpdateTimestampIndex = {
+  table: string;
+  index: string;
+  column: string;
+};
+
+/**
+ * Indexes that hold the update timestamp of their table, in their columns, included columns or predicate. Every
+ * update writes that column, and an update that changes an indexed column can't be a heap-only tuple (HOT) update,
+ * so it writes a new entry in every index of the table. Only an index or a timestamp that is new or changed is
+ * listed, so a schema isn't reported on every deploy.
+ */
+export const getIndexesOnUpdateTimestamps = (target: PgTableRepository, source: PgTableRepository) => {
+  const { source: sourceTables } = getTableRepositoryChanges(target, source);
+  const indexes: UpdateTimestampIndex[] = [];
+
+  for (const table in target) {
+    const column = target[table].timestamps?.updated;
+
+    if (!column) {
+      continue;
+    }
+
+    const sourceTable = sourceTables[table];
+    const isNewTimestamp = sourceTable?.timestamps?.updated !== column;
+
+    for (const indexKey in target[table].indexes) {
+      const { columns, options } = target[table].indexes[indexKey];
+
+      const indexColumns = [...columns, ...(options?.include ?? []), ...Object.keys(options?.where ?? {})];
+
+      if (!indexColumns.includes(column)) {
+        continue;
+      }
+
+      const sourceIndex = sourceTable?.indexes[indexKey];
+
+      if (isNewTimestamp || !sourceIndex || !deepEqual(sourceIndex, target[table].indexes[indexKey])) {
+        indexes.push({ table, index: indexKey, column });
+      }
+    }
+  }
+
+  return indexes;
 };
 
 export type DetectedRename = {
