@@ -1,9 +1,10 @@
 import type { PgExecuteOptions, PgExecuteStatement } from '@ez4/pgclient';
 import type { Arn } from '@ez4/aws-common';
+import type { PeerCertificate } from 'node:tls';
 // biome-ignore lint/correctness/noUndeclaredDependencies: types only, erased from the bundle
 import type { PoolClient } from 'pg';
 
-import { rootCertificates } from 'node:tls';
+import { checkServerIdentity, rootCertificates } from 'node:tls';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
@@ -17,6 +18,23 @@ export type NativeClientConnection = {
   endpoint: string;
   database: string;
   user?: string;
+
+  /**
+   * Where to connect when it isn't the endpoint itself, such as the local end of a tunnel to it. The certificate is
+   * still checked against the endpoint.
+   */
+  address?: NativeClientAddress;
+
+  /**
+   * Connections the pool keeps. A statement waiting for one gives up after the connection timeout, so a caller that
+   * runs statements side by side needs as many.
+   */
+  poolSize?: number;
+};
+
+export type NativeClientAddress = {
+  host: string;
+  port: number;
 };
 
 // A Lambda runs one invocation at a time, and a connection idle for longer than this is closed and opened
@@ -74,19 +92,24 @@ export class NativeClientDriver extends ClientDriver {
 }
 
 const createAuroraPool = async (connection: NativeClientConnection) => {
-  const { database, endpoint: host, user } = connection;
+  const { database, endpoint, user, address, poolSize = POOL_SIZE } = connection;
 
-  const credentials = user ? getIamCredentials(host, user) : await getSecretCredentials(connection.secretArn);
+  const credentials = user ? getIamCredentials(endpoint, user) : await getSecretCredentials(connection.secretArn);
 
   const pool = createPool({
-    host,
+    host: address?.host ?? endpoint,
+    port: address?.port,
     database,
     ...credentials,
-    poolSize: POOL_SIZE,
+    poolSize,
     idleTimeout: IDLE_TIMEOUT,
     // The public roots trust an RDS Proxy (ACM certificate), the RDS bundle trusts the cluster itself.
     ssl: {
-      ca: [...rootCertificates, RdsCertificates]
+      ca: [...rootCertificates, RdsCertificates],
+      ...(address && {
+        servername: endpoint,
+        checkServerIdentity: (_host: string, certificate: PeerCertificate) => checkServerIdentity(endpoint, certificate)
+      })
     }
   });
 

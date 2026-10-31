@@ -1,11 +1,11 @@
 import type { PgValidationStatement } from '@ez4/pgmigration/library';
 import type { Arn, OperationLogLine } from '@ez4/aws-common';
-import type { PgExecuteOptions } from '@ez4/pgclient';
+import type { PgClientDriver, PgExecuteOptions } from '@ez4/pgclient';
 
 import { MigrationValidationFailedError } from '@ez4/pgmigration/library';
 import { Tasks, TaskStatus, Wait } from '@ez4/utils';
 
-import { ApiClientDriver } from '../client/drivers/api';
+import { DeployConcurrency, getDeployDriver } from '../utils/connection';
 import { IntegrityCheckFailedError } from './errors';
 
 export type ConnectionRequest = {
@@ -23,8 +23,8 @@ export const validateChanges = async (logger: OperationLogLine, request: Validat
 
   const { clusterArn, secretArn, database, queries } = request;
 
-  const driver = new ApiClientDriver({
-    resourceArn: clusterArn,
+  const driver = await getDeployDriver({
+    clusterArn,
     secretArn,
     database
   });
@@ -48,7 +48,7 @@ const assertNoFailureErrors = (results: Tasks.Result<boolean>[]) => {
   }
 };
 
-const executeIntegrityChecks = async (logger: OperationLogLine, driver: ApiClientDriver, validations: PgValidationStatement[]) => {
+const executeIntegrityChecks = async (logger: OperationLogLine, driver: PgClientDriver, validations: PgValidationStatement[]) => {
   const options: PgExecuteOptions = {
     noErrorLog: true
   };
@@ -76,14 +76,14 @@ const executeIntegrityChecks = async (logger: OperationLogLine, driver: ApiClien
   );
 
   return Tasks.safeRun(operations, {
-    concurrency: 5,
+    concurrency: DeployConcurrency,
     onProgress: (completed, total) => {
       logger.update(`Validating integrity (${completed} of ${total})`);
     }
   });
 };
 
-const executeIntegrityStatement = async (driver: ApiClientDriver, statement: PgValidationStatement, options?: PgExecuteOptions) => {
+const executeIntegrityStatement = async (driver: PgClientDriver, statement: PgValidationStatement, options?: PgExecuteOptions) => {
   const { name, check } = statement;
 
   const { records } = await driver.executeStatement({ query: check }, options);
@@ -97,7 +97,7 @@ const executeIntegrityStatement = async (driver: ApiClientDriver, statement: PgV
   return true;
 };
 
-const isValidationRunning = async (driver: ApiClientDriver, retry: string, options?: PgExecuteOptions) => {
+const isValidationRunning = async (driver: PgClientDriver, retry: string, options?: PgExecuteOptions) => {
   const { records } = await driver.executeStatement({ query: retry }, options);
 
   const [isRunning] = records;

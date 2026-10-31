@@ -2,7 +2,12 @@ import { equal } from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { DatabaseErrorException } from '@aws-sdk/client-rds-data';
-import { isAuthenticationException, isDeadlockException, isDuplicateUniqueKeyException } from '@ez4/aws-aurora/client';
+import {
+  isAuthenticationException,
+  isDeadlockException,
+  isDuplicateUniqueKeyException,
+  isLockTimeoutException
+} from '@ez4/aws-aurora/client';
 
 const makeDatabaseError = (message: string) => {
   return new DatabaseErrorException({
@@ -11,7 +16,20 @@ const makeDatabaseError = (message: string) => {
   });
 };
 
+// The error of a direct connection, which carries the SQLState as its code.
+const makeConnectionError = (code: string, message: string) => {
+  return Object.assign(new Error(message), { code });
+};
+
 describe('aurora client errors', () => {
+  it('assert :: deadlock and lock timeout over a direct connection', () => {
+    equal(isDeadlockException(makeConnectionError('40P01', 'deadlock detected')), true);
+    equal(isLockTimeoutException(makeConnectionError('55P03', 'canceling statement due to lock timeout')), true);
+
+    equal(isDeadlockException(makeConnectionError('55P03', 'canceling statement due to lock timeout')), false);
+    equal(isLockTimeoutException(makeConnectionError('ECONNRESET', 'read ECONNRESET')), false);
+  });
+
   it('assert :: duplicate unique key', () => {
     const error = makeDatabaseError(
       'ERROR: duplicate key value violates unique constraint "parent_pkey"\n' +
@@ -88,7 +106,7 @@ describe('aurora client errors', () => {
     equal(isDeadlockException(error), false);
   });
 
-  it('assert :: only data api database errors are classified', () => {
+  it('assert :: an error that only names a sql state in its message is not classified', () => {
     const error = new Error('ERROR: duplicate key value violates unique constraint "parent_pkey"; SQLState: 23505');
 
     equal(isDuplicateUniqueKeyException(error), false);
