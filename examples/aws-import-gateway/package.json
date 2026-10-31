@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "hello-aws-gateway": "^0.0.0",
-    "@ez4/aws-gateway": "^2.17.0",
-    "@ez4/local-gateway": "^2.17.0",
-    "@ez4/gateway": "^2.17.0",
-    "@ez4/project": "^2.17.0"
+    "@ez4/aws-gateway": "^2.18.0",
+    "@ez4/local-gateway": "^2.18.0",
+    "@ez4/gateway": "^2.18.0",
+    "@ez4/project": "^2.18.0"
   }
 }

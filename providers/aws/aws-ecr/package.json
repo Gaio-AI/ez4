@@ -1,7 +1,7 @@
 {
   "name": "@ez4/aws-ecr",
   "description": "EZ4: Self-managed AWS ECR provider",
-  "version": "2.17.0",
+  "version": "2.18.0",
   "author": "Silas B.",
   "license": "MIT",
   "type": "module",
@@ -24,9 +24,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-ecr": "^3.1127.0",
-    "@ez4/aws-common": "^2.17.0",
-    "@ez4/project": "^2.17.0",
-    "@ez4/state": "^2.17.0",
-    "@ez4/utils": "^2.17.0"
+    "@ez4/aws-common": "^2.18.0",
+    "@ez4/project": "^2.18.0",
+    "@ez4/state": "^2.18.0",
+    "@ez4/utils": "^2.18.0"
   }
 }
